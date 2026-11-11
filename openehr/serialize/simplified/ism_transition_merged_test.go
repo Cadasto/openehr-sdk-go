@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // referenceActionKeys are the keys of the PROBE-086 corpus body
@@ -445,4 +447,95 @@ func TestREQ053ActionReferenceSpellingDecodesAndValidates(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestREQ140CareflowStepOfStepsConstrainingNoneRoundTrips — REQ-140, REQ-053,
+// REQ-106. Where the template's per-step nodes constrain no careflow step, a
+// transition spelled under one still decodes with the careflow step the node
+// names: the node id as a `local` code, the node's Web Template name as its
+// value. The merged in-context node lists each such step by its node id, so
+// encode, which writes the transition there alone, writes that careflow step,
+// and the output decodes to the same composition: encode silently loses no
+// in-scope attribute. No vendored OPT has such steps, so the case strips
+// careflow_step from the corpus template's two.
+func TestREQ140CareflowStepOfStepsConstrainingNoneRoundTrips(t *testing.T) {
+	raw, err := os.ReadFile(fixtures.FlatConformanceOpt())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt := buildEditedWT(t, stripCareflowSteps(t, raw, 2))
+	for _, tc := range []struct{ node, state, step string }{
+		{node: "transition", state: "524", step: "at0005"},
+		{node: "transition2", state: "532", step: "at0006"},
+	} {
+		t.Run(tc.node, func(t *testing.T) {
+			name := ismNodeName(t, wt, tc.node)
+			stateOnly := map[string]any{}
+			for k, v := range ismTransitionKeys(tc.node, tc.state, tc.step) {
+				if strings.Contains(k, "/current_state|") {
+					stateOnly[k] = v
+				}
+			}
+			comp := decodeRMAttr(t, wt, rmattrBody(stateOnly))
+			if got := firstAction(t, comp).IsmTransition.CareflowStep; got == nil || got.DefiningCode.CodeString != tc.step || got.Value != name {
+				t.Fatalf("careflow_step = %+v, want local::%s|%s, the node's id and name", got, tc.step, name)
+			}
+			got := reencodeRMAttr(t, wt, comp)
+			holdsKeys(t, got, inContextIsmKeys(tc.state, tc.step, name))
+			if back := decodeRMAttr(t, wt, got); !bytes.Equal(canonical(t, back), canonical(t, comp)) {
+				t.Errorf("the re-encode decodes to\n%s\nwant\n%s", canonical(t, back), canonical(t, comp))
+			}
+		})
+	}
+}
+
+// stripCareflowSteps returns opt with every careflow_step attribute removed,
+// so that no ISM transition constrains one. It fails the test unless it
+// removes want of them, laid out one element per line as the vendored OPTs
+// are.
+func stripCareflowSteps(t *testing.T, opt []byte, want int) []byte {
+	t.Helper()
+	lines := strings.SplitAfter(string(opt), "\n")
+	indentOf := func(l string) int { return len(l) - len(strings.TrimLeft(l, " \t")) }
+	found := 0
+	for i := 0; i+1 < len(lines); i++ {
+		if !strings.HasPrefix(strings.TrimSpace(lines[i]), "<attributes") ||
+			strings.TrimSpace(lines[i+1]) != "<rm_attribute_name>careflow_step</rm_attribute_name>" {
+			continue
+		}
+		indent := indentOf(lines[i])
+		end := i + 1
+		for end < len(lines) && (indentOf(lines[end]) != indent || strings.TrimSpace(lines[end]) != "</attributes>") {
+			end++
+		}
+		if end == len(lines) {
+			t.Fatalf("a careflow_step attribute at line %d is not closed", i+1)
+		}
+		lines = slices.Delete(lines, i, end+1)
+		found++
+		i--
+	}
+	if found != want {
+		t.Fatalf("the OPT holds %d careflow_step attributes, want %d", found, want)
+	}
+	return []byte(strings.Join(lines, ""))
+}
+
+// buildEditedWT reads, compiles and builds the operational template raw, a
+// vendored one a test has edited.
+func buildEditedWT(t *testing.T, raw []byte) *webtemplate.WebTemplate {
+	t.Helper()
+	opt, err := fixtures.ReadOperationalTemplate(raw)
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	wt, err := webtemplate.Build(c)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	return wt
 }

@@ -114,9 +114,11 @@ func unconstrainedIsm(actionPath string) *webtemplate.Node {
 }
 
 // step is one archetyped careflow step as the merged node lists it: its
-// careflow-step code and label, and the current states it admits.
+// careflow-step code and label, its localized labels, and the current states
+// it admits.
 type step struct {
 	code, label string
+	localized   map[string]string
 	states      []string
 }
 
@@ -128,7 +130,7 @@ func mergedIsm(actionPath string, minNode, minStep, minState int, steps []step, 
 	base := actionPath + "/ism_transition"
 	var careflow, states []webtemplate.InputListItem
 	for _, s := range steps {
-		careflow = append(careflow, webtemplate.InputListItem{Value: s.code, Label: s.label, CurrentStates: s.states})
+		careflow = append(careflow, webtemplate.InputListItem{Value: s.code, Label: s.label, LocalizedLabels: s.localized, CurrentStates: s.states})
 	}
 	for _, c := range currentStates {
 		states = append(states, webtemplate.InputListItem{Value: c})
@@ -252,6 +254,70 @@ func TestREQ106MergedIsmTransitionForArchetypedAction(t *testing.T) {
 	})
 }
 
+// TestREQ106MergedCareflowStepListsStepsConstrainingNone — REQ-106, REQ-140:
+// the merged node holds `careflow_step` whenever it merges steps. A step whose
+// archetype constrains no careflow step still names one, its node id, which a
+// transition decoded under it is given; the merged list carries it as one
+// item, the node id with the step's Web Template name as its label and its
+// localized names as localized labels, and the current states that step
+// admits. Otherwise encode, which writes a transition at the merged node
+// alone, would drop that careflow step. The leaf's min is the first step's
+// that constrains one, else 0. No vendored OPT has such a step, so the cases
+// strip careflow_step from test_all_types steps.
+func TestREQ106MergedCareflowStepListsStepsConstrainingNone(t *testing.T) {
+	raw := readFile(t, testAllTypesOPT)
+	planned := step{code: "at0003", label: "Planned", states: []string{"526"}}
+	active := step{code: "at0004", label: "Active", states: []string{"245"}}
+	completed := step{code: "at0005", label: "Completed", states: []string{"532"}}
+	byNodeID := func(s step) step {
+		s.localized = map[string]string{"en": s.label}
+		return s
+	}
+	allStates := []string{"526", "245", "532"}
+	tests := []struct {
+		name  string
+		strip []string
+		want  func(actionPath string) *webtemplate.Node
+	}{
+		{
+			name:  "the middle step",
+			strip: []string{"at0004"},
+			want: func(p string) *webtemplate.Node {
+				return mergedIsm(p, 1, 1, 1, []step{planned, byNodeID(active), completed}, allStates)
+			},
+		},
+		{
+			name:  "the first step",
+			strip: []string{"at0003"},
+			want: func(p string) *webtemplate.Node {
+				return mergedIsm(p, 1, 1, 1, []step{byNodeID(planned), active, completed}, allStates)
+			},
+		},
+		{
+			name:  "every step",
+			strip: []string{"at0003", "at0004", "at0005"},
+			want: func(p string) *webtemplate.Node {
+				return mergedIsm(p, 1, 0, 1, []step{byNodeID(planned), byNodeID(active), byNodeID(completed)}, allStates)
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opt := raw
+			for _, id := range tc.strip {
+				opt = stripIsmAttribute(t, opt, id, "careflow_step")
+			}
+			action := onlyAction(t, buildOPT(t, opt))
+			if n := archetypedIsms(action); n != 3 {
+				t.Errorf("ACTION %s keeps %d archetyped ISM transitions, want 3", action.AQLPath, n)
+			}
+			if got, want := inContextIsm(t, action), tc.want(action.AQLPath); !reflect.DeepEqual(got, want) {
+				t.Errorf("merged ISM transition node =\n  %s\nwant\n  %s", jsonOf(t, got), jsonOf(t, want))
+			}
+		})
+	}
+}
+
 // TestREQ106InContextIsmTransitionWhenEveryArchetypedOneIsPruned — REQ-106:
 // an archetyped ISM_TRANSITION that constrains neither its current_state nor
 // its careflow_step contributes no node, as any empty container does. An
@@ -340,6 +406,49 @@ func stripIsmTransition(t *testing.T, opt []byte, nodeID string) []byte {
 	}
 	if found != 1 {
 		t.Fatalf("the OPT holds ISM_TRANSITION %s %d times, want once", nodeID, found)
+	}
+	return []byte(strings.Join(lines, ""))
+}
+
+// stripIsmAttribute returns opt with the attr attribute of the archetyped
+// ISM_TRANSITION nodeID removed, so that the node no longer constrains it. It
+// fails the test unless opt holds that node once, with that attribute, laid
+// out one element per line as the vendored OPTs are.
+func stripIsmAttribute(t *testing.T, opt []byte, nodeID, attr string) []byte {
+	t.Helper()
+	lines := strings.SplitAfter(string(opt), "\n")
+	indentOf := func(l string) int { return len(l) - len(strings.TrimLeft(l, " \t")) }
+	found := 0
+	for i := 0; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) != "<rm_type_name>ISM_TRANSITION</rm_type_name>" {
+			continue
+		}
+		indent := indentOf(lines[i])
+		j := i + 1
+		for j < len(lines) && (indentOf(lines[j]) != indent || !strings.HasPrefix(strings.TrimSpace(lines[j]), "<node_id>")) {
+			j++
+		}
+		if j == len(lines) || strings.TrimSpace(lines[j]) != "<node_id>"+nodeID+"</node_id>" {
+			continue
+		}
+		for a := j + 1; a+1 < len(lines) && indentOf(lines[a]) >= indent; a++ {
+			if indentOf(lines[a]) != indent || strings.TrimSpace(lines[a+1]) != "<rm_attribute_name>"+attr+"</rm_attribute_name>" {
+				continue
+			}
+			end := a + 1
+			for end < len(lines) && (indentOf(lines[end]) != indent || strings.TrimSpace(lines[end]) != "</attributes>") {
+				end++
+			}
+			if end == len(lines) {
+				t.Fatalf("ISM_TRANSITION %s's %s attribute is not closed", nodeID, attr)
+			}
+			lines = slices.Delete(lines, a, end+1)
+			found++
+			break
+		}
+	}
+	if found != 1 {
+		t.Fatalf("the OPT holds ISM_TRANSITION %s with a %s attribute %d times, want once", nodeID, attr, found)
 	}
 	return []byte(strings.Join(lines, ""))
 }
