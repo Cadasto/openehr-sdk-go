@@ -331,7 +331,7 @@ Input is matched when it names something the decoder reads, even where the decod
 - a FLAT or STRUCTURED key that resolves but has no carrier: PARTICIPATION `time`, FEEDER_AUDIT_DETAILS `other_details` and `_instruction_details` (§ REQ-140 *Deliberate exclusions*); and, at a leaf whose datatype has neither a suffix set nor a sub-path grammar, its bare value and a suffix that names an attribute of its RM class; a `null` one in this bullet reads as absent (§ REQ-053);
 - a FLAT or STRUCTURED key the decoder recognises as the reference's spelling of RM data the Web Template this SDK builds does not model, resolved or not, since ignoring it would drop that data or let a default replace it (the reference spellings, listed below); a `null` one in this bullet reads as absent (§ REQ-053);
 - matched content that is malformed: a value of the wrong shape, a missing required suffix (a `null` one among them, § REQ-053), two spellings of one field that disagree, an index past its bound;
-- a FLAT key that is not well formed, which names no path at all: one with an empty path segment (`a//b|`), a segment with no id before its `:index`, a second `|suffix`, or a segment after its `|suffix`. A last bare `|` is the empty suffix, read off any key before it is judged (§ REQ-053), so `x|` and `x|code|` are well formed. OPT-free FLAT → STRUCTURED conversion refuses such a key too.
+- a FLAT key that is not well formed, which names no path at all: one with an empty path segment (`a//b|`, or a leading or trailing `/`), a segment with no id before its `:index`, a second `|suffix`, or a segment after its `|suffix`. A last bare `|` is the empty suffix, read off any key before it is judged (§ REQ-053), so `x|` and `x|code|` are well formed. OPT-free FLAT → STRUCTURED conversion refuses such a key too.
 
 The reference spellings the decoder recognises are, wherever the Web Template does not resolve them: under an ACTION's `ism_transition` node, a `current_state`, `transition` or `careflow_step` leaf, with any suffix, or a `_reason` family (§ REQ-140's third out-of-scope class covers `transition` and `reason`); and the ACTION's own `time` leaf, with any suffix.
 
@@ -540,7 +540,7 @@ Encode **MUST** write:
 
 - `|sample_count` where the INTERVAL_EVENT holds one;
 - `math_function` and `width` for an INTERVAL_EVENT at an EVENT node;
-- `history_origin`, unless the origin holds nothing but a value that is, as written, the earliest time its events carry, the origin decode gives a HISTORY with no `history_origin`.
+- `history_origin`, unless the origin sets `value` alone and that value is, as written, the earliest time its events carry, the origin decode gives a HISTORY with no `history_origin`; an origin that sets any other attribute, such as `magnitude_status`, is written.
 
 Every other spelling of the four, such as `<event>/sample_count` or `<observation>|history_origin`, is unmatched content (§ REQ-170). Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
