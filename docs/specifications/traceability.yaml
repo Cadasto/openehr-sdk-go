@@ -599,6 +599,7 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/ctx_error_values_test.go
       - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/element_alternatives_test.go
       - openehr/serialize/simplified/empty_duration_uri_test.go
       - openehr/serialize/simplified/empty_structure_test.go
       - openehr/serialize/simplified/empty_temporal_test.go
@@ -629,6 +630,7 @@ requirements:
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/serialize/simplified/rmattr_repeating_test.go
+      - openehr/serialize/simplified/rmattr_value_test.go
       - openehr/serialize/simplified/roundtrip_test.go
       - openehr/serialize/simplified/shorthand_test.go
       - openehr/serialize/simplified/simplified_test.go
@@ -2530,6 +2532,7 @@ requirements:
       - openehr/serialize/simplified/composer_test.go
       - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
+      - openehr/serialize/simplified/element_alternatives_test.go
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/history_origin_test.go
