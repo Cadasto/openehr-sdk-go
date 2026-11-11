@@ -864,42 +864,56 @@ func TestREQ170RepeatableIntervalElement(t *testing.T) {
 	})
 }
 
+// withoutInContextActionNodes is the corpus Web Template with its ACTION's
+// in-context `ism_transition` node and `time` leaf left out: a Web Template
+// that does not resolve the reference's spelling of either.
+func withoutInContextActionNodes(t *testing.T, wt *webtemplate.WebTemplate) *webtemplate.WebTemplate {
+	t.Helper()
+	return editWTNode(t, wt, rmattrAction, func(n *webtemplate.Node) {
+		n.Children = slices.DeleteFunc(slices.Clone(n.Children), func(c *webtemplate.Node) bool {
+			return c.ID == ismReferenceSeg || c.ID == actionTimeLeaf
+		})
+	})
+}
+
 // TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode — REQ-170 / REQ-140.
-// The reference's in-context spelling of an ACTION's ISM transition and time
-// names RM data the Web Template this SDK builds does not model. It is refused
-// by default, under the report option and under strict, naming the key and
-// none of its value: a `current_state`, `transition` or `careflow_step` leaf or
-// a `_reason` family under the reference's in-context `ism_transition` node; a
-// `transition` leaf or `_reason` family under an archetyped
-// `ism_transition[atNNNN]` node (FLAT id `transition`), which models
-// `current_state` and `careflow_step` but neither of those; and the ACTION's own
-// `time` leaf. Each refusal names the attribute it refuses and no
-// requirement id. The STRUCTURED form of each body is refused the same way.
+// The reference's spelling of an ACTION's ISM transition and time is refused
+// wherever the Web Template does not resolve it, since it names RM data the
+// decode would drop. It is refused by default, under the report option and
+// under strict, naming the key and none of its value: a `transition` leaf
+// under an archetyped `ism_transition[atNNNN]` node (FLAT id `transition`),
+// which models `current_state` and `careflow_step` but not it; and, against a
+// Web Template that has neither the in-context `ism_transition` node nor the
+// ACTION's `time` leaf, a `current_state`, `transition` or `careflow_step`
+// leaf or a `_reason` family under that node, and the `time` leaf. Each
+// refusal names the attribute it refuses and no requirement id. The STRUCTURED
+// form of each body is refused the same way.
 func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 	wt, _ := conformanceWT(t)
+	bare := withoutInContextActionNodes(t, wt)
 	const secret = "secret-value-0451"
 	type refusal struct {
 		name  string
+		wt    *webtemplate.WebTemplate
 		keys  []string
 		names string
 		attr  string
 	}
-	leaf := func(base, id string) refusal {
-		return refusal{id + " leaf under " + base, []string{base + "/" + id + "|code", base + "/" + id + "|value", base + "/" + id + "|terminology"}, base + "/" + id + "|code", "an ACTION's ISM transition " + id}
+	leaf := func(wt *webtemplate.WebTemplate, base, id string) refusal {
+		return refusal{id + " leaf under " + base, wt, []string{base + "/" + id + "|code", base + "/" + id + "|value", base + "/" + id + "|terminology"}, base + "/" + id + "|code", "an ACTION's ISM transition " + id}
 	}
 	reference, archetyped := rmattrAction+"/ism_transition", rmattrAction+"/transition"
 	cases := []refusal{
-		leaf(reference, "current_state"),
-		leaf(reference, "transition"),
-		leaf(reference, "careflow_step"),
-		leaf(archetyped, "transition"),
-		{"bare transition leaf under " + reference, []string{reference + "/transition"}, reference + "/transition", "an ACTION's ISM transition transition"},
-		{"bare transition leaf under " + archetyped, []string{archetyped + "/transition"}, archetyped + "/transition", "an ACTION's ISM transition transition"},
-		{"reason family under " + reference, []string{reference + "/_reason:0"}, reference + "/_reason:0", "an ACTION's ISM transition reason"},
-		{"reason family under " + archetyped, []string{archetyped + "/_reason:0"}, archetyped + "/_reason:0", "an ACTION's ISM transition reason"},
-		{"reason family with a suffix", []string{reference + "/_reason|code"}, reference + "/_reason", "an ACTION's ISM transition reason"},
-		{"ACTION time leaf", []string{rmattrAction + "/time"}, rmattrAction + "/time", "an ACTION's time"},
-		{"ACTION time leaf with a suffix", []string{rmattrAction + "/time|magnitude_status"}, rmattrAction + "/time|magnitude_status", "an ACTION's time"},
+		leaf(wt, archetyped, "transition"),
+		{"bare transition leaf under " + archetyped, wt, []string{archetyped + "/transition"}, archetyped + "/transition", "an ACTION's ISM transition transition"},
+		leaf(bare, reference, "current_state"),
+		leaf(bare, reference, "transition"),
+		leaf(bare, reference, "careflow_step"),
+		{"bare transition leaf under " + reference, bare, []string{reference + "/transition"}, reference + "/transition", "an ACTION's ISM transition transition"},
+		{"reason family under " + reference, bare, []string{reference + "/_reason:0"}, reference + "/_reason:0", "an ACTION's ISM transition reason"},
+		{"reason family with a suffix", bare, []string{reference + "/_reason|code"}, reference + "/_reason", "an ACTION's ISM transition reason"},
+		{"ACTION time leaf", bare, []string{rmattrAction + "/time"}, rmattrAction + "/time", "an ACTION's time"},
+		{"ACTION time leaf with a suffix", bare, []string{rmattrAction + "/time|magnitude_status"}, rmattrAction + "/time|magnitude_status", "an ACTION's time"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -907,7 +921,7 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 			for _, k := range tc.keys {
 				keys[k] = secret
 			}
-			err := refusedInEveryMode(t, wt, rmattrBody(keys))
+			err := refusedInEveryMode(t, tc.wt, rmattrBody(keys))
 			if !errors.Is(err, ErrNotModelled) || !errors.Is(err, ErrUnknownPath) {
 				t.Errorf("err = %v, want ErrNotModelled and ErrUnknownPath", err)
 			}
@@ -921,7 +935,7 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 				t.Errorf("err = %v, want it to name %q and no requirement id", err, tc.attr)
 			}
 			// The STRUCTURED form of the same body reaches the same refusal.
-			serr := structuredRefusedInEveryMode(t, wt, rmattrBody(keys))
+			serr := structuredRefusedInEveryMode(t, tc.wt, rmattrBody(keys))
 			if !errors.Is(serr, ErrNotModelled) || !strings.Contains(serr.Error(), tc.attr) ||
 				strings.Contains(serr.Error(), "REQ-") || strings.Contains(serr.Error(), secret) {
 				t.Errorf("STRUCTURED err = %v, want the ErrNotModelled refusal naming %q, no requirement id and no value", serr, tc.attr)
@@ -931,24 +945,25 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 	// Any other key the Web Template does not resolve under those nodes is
 	// unmatched content, ignored by default; so is a leaf name that is not the
 	// node's last segment.
-	for _, key := range []string{
-		reference + "/x_note|code",
-		reference + "/transition/deeper|code",
-		reference + "/current_state/deeper|code",
-		archetyped + "/x_note",
-		rmattrAction + "/time/deeper",
-	} {
-		t.Run("unmatched "+key, func(t *testing.T) {
-			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
-		})
+	for name, wt := range map[string]*webtemplate.WebTemplate{"the corpus Web Template": wt, "one without the in-context nodes": bare} {
+		for _, key := range []string{
+			reference + "/x_note|code",
+			reference + "/transition/deeper|code",
+			reference + "/current_state/deeper|code",
+			archetyped + "/x_note",
+			rmattrAction + "/time/deeper",
+		} {
+			t.Run("unmatched "+key+" against "+name, func(t *testing.T) {
+				assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
+			})
+		}
 	}
 }
 
 // TestREQ170ArchetypedIsmTransitionStillDecodes — REQ-170 / REQ-053. The
 // archetyped `ism_transition[atNNNN]` node's modelled `current_state` and
 // `careflow_step` resolve in the Web Template, so they decode, in every mode,
-// into the ACTION's ISM transition: only the reference's in-context spelling is
-// refused.
+// into the ACTION's ISM transition.
 func TestREQ170ArchetypedIsmTransitionStillDecodes(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	body := rmattrBody(ismTransitionKeys("transition", "524", "at0005"))
@@ -966,27 +981,49 @@ func TestREQ170ArchetypedIsmTransitionStillDecodes(t *testing.T) {
 
 // TestREQ170ActionTimeNotReplacedByDefault — REQ-170 / REQ-053. With
 // WithTemplate the decode fills an absent RM-mandatory ACTION.time from
-// ctx/time. A body that carries the ACTION's own time in the reference's
-// in-context spelling must not have it replaced by that default: the key is
-// refused, in every mode, before the default step runs.
+// ctx/time. A body that carries the ACTION's own time never has it replaced by
+// that default. Where the Web Template has the ACTION's `time` leaf the decode
+// reads it, in every mode, and encode writes it back; where it has none the key
+// is refused, in every mode, before the default step runs. A body without it
+// takes the default.
 func TestREQ170ActionTimeNotReplacedByDefault(t *testing.T) {
 	wt, compiled := conformanceWT(t)
 	key := rmattrAction + "/time"
-	body := mustJSON(t, rmattrBody(map[string]any{
-		rmattrAction + "/dv_text": "action text",
-		key:                       "2021-12-21T15:00:00+01:00",
-	}))
-	for name, opts := range map[string][]Option{
+	const actionTime = "2021-12-21T15:00:00+01:00"
+	text := map[string]any{rmattrAction + "/dv_text": "action text"}
+	body := mustJSON(t, rmattrBody(mergeRMAttr(text, map[string]any{key: actionTime})))
+	modes := map[string][]Option{
 		"default":       nil,
 		"WithUnmatched": {WithUnmatched(func(string) {})},
 		"WithStrict":    {WithStrict()},
-	} {
+	}
+	for name, opts := range modes {
 		comp, err := UnmarshalFlat(body, wt, append(opts, WithTemplate(compiled))...)
+		if err != nil {
+			t.Fatalf("UnmarshalFlat (%s, WithTemplate): %v", name, err)
+		}
+		if got := firstAction(t, comp).Time.Value; got != actionTime {
+			t.Errorf("UnmarshalFlat (%s, WithTemplate) ACTION.time = %q, want the body's %q, not the ctx/time default", name, got, actionTime)
+		}
+		if got := reencodeRMAttr(t, wt, comp)[key]; got != actionTime {
+			t.Errorf("re-encode of %s = %#v, want %q", key, got, actionTime)
+		}
+	}
+	comp, err := UnmarshalFlat(mustJSON(t, rmattrBody(text)), wt, WithTemplate(compiled))
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (no ACTION time, WithTemplate): %v", err)
+	}
+	if got, want := firstAction(t, comp).Time.Value, rmattrBody(nil)["ctx/time"]; got != want {
+		t.Errorf("UnmarshalFlat (no ACTION time, WithTemplate) ACTION.time = %q, want the ctx/time default %q", got, want)
+	}
+	bare := withoutInContextActionNodes(t, wt)
+	for name, opts := range modes {
+		comp, err := UnmarshalFlat(body, bare, append(opts, WithTemplate(compiled))...)
 		if err == nil {
-			t.Fatalf("UnmarshalFlat (%s, WithTemplate) decoded, ACTION.time = %q — the body's own time is replaced by the ctx/time default", name, firstAction(t, comp).Time.Value)
+			t.Fatalf("UnmarshalFlat (%s, WithTemplate) without a time leaf decoded, ACTION.time = %q — the body's own time is replaced by the ctx/time default", name, firstAction(t, comp).Time.Value)
 		}
 		if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), strconv.Quote(key)) {
-			t.Errorf("UnmarshalFlat (%s, WithTemplate) = %v, want ErrUnknownPath naming %q", name, err, key)
+			t.Errorf("UnmarshalFlat (%s, WithTemplate) without a time leaf = %v, want ErrUnknownPath naming %q", name, err, key)
 		}
 	}
 }

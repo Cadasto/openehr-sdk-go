@@ -268,7 +268,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if len(sfx) == 0 {
 			continue
 		}
-		dv, err := clinicalLeafValue(leaf, sfx, keyOf, tmpl != nil)
+		// The careflow step of a merged in-context ISM transition takes what it
+		// leaves out from its Web Template node, in both modes, once every key
+		// is placed ([settleMergedIsmTransition]).
+		settled := mergedCareflowStep(leaf)
+		dv, err := clinicalLeafValue(leaf, sfx, keyOf, tmpl != nil || settled)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
@@ -276,7 +280,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
-		if _, raw := sfx["raw"]; !raw {
+		if _, raw := sfx["raw"]; !raw && !settled {
 			// The key the template is indexed by is known once the value is
 			// placed: what the body leaves out of a coded value is taken from
 			// the template, or refused, now (REQ-053).
@@ -1868,11 +1872,13 @@ func walkAQLKeyed(compJSON map[string]any, aqlPath, namePath string, predIndex m
 			} else if held, _ := obj["archetype_node_id"].(string); held != seg.pred || (pinned != nil && nameValue(obj) != seg.name) ||
 				(pinned == nil && slices.Contains(excluded, nameValue(obj))) {
 				// Two Web Template nodes stand for this one single-valued
-				// attribute (an ACTION's ism_transition[at0005] and [at0006],
-				// or two reused siblings, REQ-111: each pinning its name, or
-				// one pinning none beside one whose name the object carries).
+				// attribute (two of an ACTION's ism_transition nodes, such as
+				// [at0005] and [at0006], or the in-context one and a per-step
+				// one; or two reused siblings, REQ-111: each pinning its name,
+				// or one pinning none beside one whose name the object carries).
 				// Merging their keys into one object would re-encode them under
-				// one node only, moving the other's keys there (REQ-053).
+				// one node only, or decode one body's two spellings of the
+				// value as one (REQ-053).
 				want := seg.pred
 				if pinned != nil || len(excluded) > 0 {
 					held, want = tcimpl.NamePredicate(held, nameValue(obj)), tcimpl.NamePredicate(seg.pred, seg.name)
@@ -1910,21 +1916,44 @@ type ismNode struct {
 	id, name, flat string
 }
 
-// ismTransitionNodes indexes the Web Template's archetyped ISM_TRANSITION nodes
-// by the bare spelling of their canonical path, which is the path
-// [settleIsmTransitions] rebuilds from the decoded tree. found reports whether
-// the Web Template has an ISM_TRANSITION node of either kind, the in-context
-// `ism_transition` node included.
-func ismTransitionNodes(wt *webtemplate.WebTemplate) (nodes map[string]ismNode, found bool) {
-	nodes = make(map[string]ismNode)
+// mergedIsmNode is the in-context `ism_transition` node the Web Template gives
+// an ACTION whose template models archetyped per-step nodes, which it merges:
+// the careflow steps its careflow_step input lists, each with its label and
+// the current states that step admits, and its FLAT path without indexes (for
+// messages).
+type mergedIsmNode struct {
+	steps []webtemplate.InputListItem
+	flat  string
+}
+
+// ismNodes are the Web Template's ISM_TRANSITION nodes [settleIsmTransitions]
+// settles a rebuilt transition at, each indexed by the bare spelling of its
+// canonical path, which is the path the settle walk rebuilds from the decoded
+// tree.
+type ismNodes struct {
+	// archetyped are the per-step `ism_transition[atNNNN]` nodes.
+	archetyped map[string]ismNode
+	// merged are the in-context `ism_transition` nodes that merge per-step ones.
+	merged map[string]mergedIsmNode
+}
+
+// ismTransitionNodes indexes the Web Template's ISM_TRANSITION nodes
+// ([ismNodes]). found reports whether it has an ISM_TRANSITION node of any
+// kind, the in-context `ism_transition` node of an ACTION whose template
+// constrains no ISM transition included.
+func ismTransitionNodes(wt *webtemplate.WebTemplate) (nodes ismNodes, found bool) {
+	nodes = ismNodes{archetyped: make(map[string]ismNode), merged: make(map[string]mergedIsmNode)}
 	var walk func(n *webtemplate.Node, flat string)
 	walk = func(n *webtemplate.Node, flat string) {
 		for _, ch := range n.Children {
 			chFlat := flat + "/" + ch.ID
 			if nodeRMType(ch) == "ISM_TRANSITION" {
 				found = true
-				if ch.NodeID != "" {
-					nodes[bareAQLPath(ch.AQLPath)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
+				switch step := childByID(ch, careflowStepLeaf); {
+				case ch.NodeID != "":
+					nodes.archetyped[bareAQLPath(ch.AQLPath)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
+				case step != nil:
+					nodes.merged[bareAQLPath(ch.AQLPath)] = mergedIsmNode{steps: codeInputList(step), flat: chFlat}
 				}
 			}
 			walk(ch, chFlat)
@@ -1936,20 +1965,33 @@ func ismTransitionNodes(wt *webtemplate.WebTemplate) (nodes map[string]ismNode, 
 	return nodes, found
 }
 
+// codeInputList returns the list of a leaf's `code` input, nil where it has
+// none.
+func codeInputList(leaf *webtemplate.Node) []webtemplate.InputListItem {
+	for _, in := range leaf.Inputs {
+		if in.Suffix == "code" {
+			return in.List
+		}
+	}
+	return nil
+}
+
 // settleIsmTransitions finishes each ISM_TRANSITION the placement walk rebuilt,
 // once every key is placed.
 //
-// At either kind of node, the archetyped `ism_transition[atNNNN]` one and the
-// in-context `ism_transition` one, a current state that names no terminology
-// takes `openehr` ([impliedCurrentStateTerminology]). The rest applies at an
-// archetyped node only. Encode matches a transition to its node by careflow
-// step code, because an ISM_TRANSITION is not LOCATABLE and has no
-// archetype_node_id (REQ-121). So a transition without a careflow step gets the
-// one its node names: the node id as a `local` code, the node's Web Template
-// name as its value. A careflow step the body carries must be coded with the
-// node id; one coded otherwise belongs to another node, and encode would move
-// the transition there (REQ-053). The node id [walkAQL] recorded on the object
-// is removed here, so it never reaches canjson.
+// At every kind of node, a current state and a transition that name no
+// terminology take `openehr` ([impliedOpenehrTerminology]). The rest depends
+// on the node the transition was spelled under:
+//
+//   - at an archetyped per-step node, the careflow step is the node's
+//     ([settleIsmTransition]);
+//   - at the in-context node that merges per-step ones, the careflow step is
+//     completed from the steps the node lists ([settleMergedIsmTransition]);
+//   - at the in-context node of an ACTION whose template constrains no ISM
+//     transition, nothing more: the body cannot spell a careflow step there.
+//
+// The node id [walkAQL] recorded on a per-step transition is removed, so it
+// never reaches canjson.
 //
 // The walk rebuilds each object's bare canonical path from the archetype_node_id
 // values placement wrote, which is how [walkAQL] spells the same path.
@@ -1964,15 +2006,19 @@ func settleIsmTransitions(compJSON map[string]any, wt *webtemplate.WebTemplate) 
 // settleIsmTransitionsUnder walks obj, whose bare canonical path is path, in
 // sorted attribute order so a body with two bad transitions names the same one
 // on every run.
-func settleIsmTransitionsUnder(obj map[string]any, path string, nodes map[string]ismNode) error {
+func settleIsmTransitionsUnder(obj map[string]any, path string, nodes ismNodes) error {
 	for _, attr := range slices.Sorted(maps.Keys(obj)) {
 		switch v := obj[attr].(type) {
 		case map[string]any:
 			p := path + "/" + attr + nodePredicate(v)
 			if v["_type"] == "ISM_TRANSITION" {
-				impliedCurrentStateTerminology(v)
-				if n, ok := nodes[p]; ok {
+				impliedOpenehrTerminology(v)
+				if n, ok := nodes.archetyped[p]; ok {
 					if err := settleIsmTransition(v, n); err != nil {
+						return err
+					}
+				} else if m, ok := nodes.merged[p]; ok {
+					if err := settleMergedIsmTransition(v, m); err != nil {
 						return err
 					}
 				}
@@ -1996,15 +2042,19 @@ func settleIsmTransitionsUnder(obj map[string]any, path string, nodes map[string
 	return nil
 }
 
-// impliedCurrentStateTerminology gives a rebuilt ISM_TRANSITION's current state
-// the `openehr` terminology when it names none (no terminology_id, or a null
-// one). RM `Current_state_valid` admits a code of the openEHR `instruction
-// states` group alone, so no other terminology can be meant; it is the footing
-// `ctx/setting` has in EVENT_CONTEXT `Setting_valid` (REQ-053). A terminology
-// the body names is kept as written, for validation to check.
-func impliedCurrentStateTerminology(tr map[string]any) {
-	if dc := definingCodeOf(tr["current_state"]); dc != nil && dc["terminology_id"] == nil {
-		dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": terminology.ID}
+// impliedOpenehrTerminology gives a rebuilt ISM_TRANSITION's current state and
+// transition the `openehr` terminology where they name none (no
+// terminology_id, or a null one). RM `Current_state_valid` and
+// `Transition_valid` admit a code of the openEHR `instruction states` and
+// `instruction transitions` groups alone, so no other terminology can be
+// meant; it is the footing `ctx/setting` has in EVENT_CONTEXT `Setting_valid`
+// (REQ-053). A terminology the body names is kept as written, for validation
+// to check.
+func impliedOpenehrTerminology(tr map[string]any) {
+	for _, attr := range []string{"current_state", "transition"} {
+		if dc := definingCodeOf(tr[attr]); dc != nil && dc["terminology_id"] == nil {
+			dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": terminology.ID}
+		}
 	}
 }
 
@@ -2017,12 +2067,13 @@ func nodePredicate(m map[string]any) string {
 	return ""
 }
 
-// settleIsmTransition gives one rebuilt ISM_TRANSITION the careflow step its node
-// names, or checks the one the body carries. The node id is an at-code, which
-// belongs to the archetype's `local` terminology: a careflow step that names no
-// terminology (no terminology_id, a null one, or a blank value) takes it, and one
-// coded in any other terminology, or whose terminology_id has another shape,
-// names no node.
+// settleIsmTransition gives one rebuilt ISM_TRANSITION spelled at the per-step
+// node n the careflow step n names, or checks the one the body carries. The
+// node id is an at-code, which belongs to the archetype's `local` terminology:
+// a careflow step that names no terminology (no terminology_id, a null one, or
+// a blank value) takes it. One coded with another code, in any other
+// terminology, or whose terminology_id has another shape, names another node
+// than the one it is spelled under, and is refused.
 func settleIsmTransition(tr map[string]any, n ismNode) error {
 	delete(tr, "archetype_node_id")
 	step, carried := tr["careflow_step"]
@@ -2065,42 +2116,137 @@ func settleIsmTransition(tr map[string]any, n ismNode) error {
 // localTerminology is the terminology an archetype's own at-codes belong to.
 const localTerminology = "local"
 
-// The reference's in-context spelling of RM attributes the Web Template this SDK
-// builds does not model, which REQ-170 refuses in every mode: an ACTION's ISM
-// transition (a `current_state`, `transition` or `careflow_step` leaf or a
-// `_reason` family under an ISM transition node) and its own `time` leaf.
-// ismReferenceSeg is the FLAT id the reference gives the ISM transition node
-// when it writes it in context, and actionTimeLeaf the ACTION's time.
+// settleMergedIsmTransition completes one rebuilt ISM_TRANSITION spelled at the
+// in-context node m, which merges an ACTION's per-step nodes.
+//
+// A careflow step the body carries is kept whatever its code, for validation to
+// judge: encode writes every transition at this node, so a transition never
+// moves to another node (REQ-053). A careflow step that names no terminology
+// (no terminology_id, a null one, or a blank value) takes `local`, the
+// terminology of the at-codes m lists. One with no value takes the label m
+// lists for its code where it is coded in `local`; any other is refused as a
+// missing |value, as a coded value the template does not complete is.
+//
+// A transition the body gives no careflow step gets the one step of m whose
+// current states hold its current state's openehr code, as a `local` code with
+// the step's label as its value. Where no step, or more than one, holds it,
+// the transition keeps no careflow step: decode invents none.
+func settleMergedIsmTransition(tr map[string]any, m mergedIsmNode) error {
+	raw, carried := tr["careflow_step"]
+	if !carried {
+		if s, ok := m.stepFor(tr["current_state"]); ok {
+			tr["careflow_step"] = map[string]any{
+				"_type": "DV_CODED_TEXT", "value": s.Label,
+				"defining_code": codePhraseJSON(s.Value, localTerminology),
+			}
+		}
+		return nil
+	}
+	step, _ := raw.(map[string]any)
+	dc := definingCodeOf(step)
+	if dc == nil {
+		// A |raw value with no defining code: canonical JSON judges its shape.
+		return nil
+	}
+	switch tid := dc["terminology_id"].(type) {
+	case nil:
+		dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": localTerminology}
+	case map[string]any:
+		if v, isString := tid["value"].(string); tid["value"] == nil || (isString && v == "") {
+			tid["value"] = localTerminology
+		}
+	}
+	if _, valued := step["value"]; valued {
+		return nil
+	}
+	tid, _ := dc["terminology_id"].(map[string]any)
+	code, _ := dc["code_string"].(string)
+	label := ""
+	if tid["value"] == localTerminology {
+		label = m.label(code)
+	}
+	if label == "" {
+		return fmt.Errorf("simplified: decode %q: %w", m.flat+"/"+careflowStepLeaf, errMissingSuffix("DV_CODED_TEXT", "value"))
+	}
+	step["value"] = label
+	return nil
+}
+
+// label returns the label m lists for the careflow-step code, or "".
+func (m mergedIsmNode) label(code string) string {
+	for _, s := range m.steps {
+		if s.Value == code {
+			return s.Label
+		}
+	}
+	return ""
+}
+
+// stepFor returns the one careflow step of m whose current states hold the
+// code of state, a rebuilt current state coded in openehr, and whether there
+// is exactly one, with a label.
+func (m mergedIsmNode) stepFor(state any) (webtemplate.InputListItem, bool) {
+	dc := definingCodeOf(state)
+	tid, _ := dc["terminology_id"].(map[string]any)
+	code, _ := dc["code_string"].(string)
+	if code == "" || tid["value"] != terminology.ID {
+		return webtemplate.InputListItem{}, false
+	}
+	var found []webtemplate.InputListItem
+	for _, s := range m.steps {
+		if slices.Contains(s.CurrentStates, code) {
+			found = append(found, s)
+		}
+	}
+	if len(found) != 1 || found[0].Label == "" {
+		return webtemplate.InputListItem{}, false
+	}
+	return found[0], true
+}
+
+// The reference's spelling of an ACTION's ISM transition and time, which the
+// Web Template this SDK builds models as an ACTION's in-context `ism_transition`
+// node, holding `current_state`, `transition` and, where it merges per-step
+// nodes, `careflow_step`, and its `time` leaf. REQ-170 refuses, in every mode,
+// a key of this spelling the Web Template does not resolve
+// ([refuseInContextKeys]). ismReferenceSeg is the FLAT id the reference gives
+// the ISM transition node when it writes it in context, ismReasonFamily the
+// underscore family of its `reason`, careflowStepLeaf the FLAT id of its
+// careflow step, and actionTimeLeaf the ACTION's time.
 const (
-	ismReasonFamily = "_reason"
-	ismReferenceSeg = "ism_transition"
-	actionTimeLeaf  = "time"
+	ismReasonFamily  = "_reason"
+	ismReferenceSeg  = "ism_transition"
+	careflowStepLeaf = "careflow_step"
+	actionTimeLeaf   = "time"
 )
 
 // ismLeaves are the ISM_TRANSITION leaves the reference writes under its ISM
 // transition node, by FLAT id.
-var ismLeaves = map[string]bool{"current_state": true, "transition": true, "careflow_step": true}
+var ismLeaves = map[string]bool{"current_state": true, "transition": true, careflowStepLeaf: true}
 
-// refuseInContextKeys refuses, in every mode, the reference's in-context
-// spelling of an ACTION's ISM transition and time, wherever the Web Template
-// does not resolve it (REQ-170; REQ-140's third out-of-scope class covers
-// `transition` and `reason`):
+// refuseInContextKeys refuses, in every mode, the reference's spelling of an
+// ACTION's ISM transition and time wherever the Web Template does not resolve
+// it (REQ-170; REQ-140's third out-of-scope class covers the careflow step of
+// an ACTION whose template constrains no ISM transition):
 //
 //   - a `current_state`, `transition` or `careflow_step` leaf, with any suffix,
 //     under an ISM transition node that has no child of that id: the
-//     reference's in-context `ism_transition` node, which this SDK's Web
-//     Template projects, with `current_state` alone, only for an ACTION whose
-//     template constrains no ISM transition, or an archetyped
-//     `ism_transition[atNNNN]` node (the Web Template models `current_state`
-//     and `careflow_step` there, never `transition`);
-//   - a `_reason` family under either node;
-//   - the ACTION's own `time` leaf, with any suffix.
+//     in-context `ism_transition` node of an ACTION whose template constrains
+//     no ISM transition has no `careflow_step`, and an archetyped
+//     `ism_transition[atNNNN]` node no `transition`, unless its archetype
+//     constrains one;
+//   - any such leaf, and a `_reason` family, under an `ism_transition` segment
+//     where the Web Template has no node of that id;
+//   - the ACTION's own `time` leaf, with any suffix, where the Web Template has
+//     no `time` node under the ACTION.
 //
 // Each names RM data the decode would otherwise drop, or replace with a
 // default, so it is refused rather than ignored. A key the Web Template
-// resolves is decoded as usual, and any other unresolved key under those nodes
-// is unmatched content. A key that walks through one of several reused siblings
-// that no pinned name tells apart is left to the refusal that path gets.
+// resolves is decoded as usual, a `_reason` family under a node the Web
+// Template has is the underscore family [rmattrFamilies] carries, and any
+// other unresolved key under those nodes is unmatched content. A key that
+// walks through one of several reused siblings that no pinned name tells
+// apart is left to the refusal that path gets.
 //
 // keys holds content's keys in sorted order, each parsed once
 // ([parseContentKeys]), so a body with several names the same one on every run.
@@ -2161,13 +2307,13 @@ func inContextKey(wt *webtemplate.WebTemplate, key string, pk parsedKey, sib *re
 // ismAttrKey judges the key below the ISM transition segment segs[i], whose Web
 // Template node is ism (nil for the reference's in-context node where the Web
 // Template has none): an ISM_TRANSITION leaf the node does not model, or a
-// `_reason` family.
+// `_reason` family where there is no node to carry it.
 func ismAttrKey(key string, segs []flatSeg, i int, ism *webtemplate.Node) (named, attr string, ok bool) {
 	rest := segs[i+1:]
 	switch {
 	case len(rest) == 1 && ismLeaves[rest[0].id] && (ism == nil || childByID(ism, rest[0].id) == nil):
 		return key, "ISM transition " + rest[0].id, true
-	case rest[0].id == ismReasonFamily:
+	case ism == nil && rest[0].id == ismReasonFamily:
 		var b strings.Builder
 		for j, s := range segs[:i+2] {
 			if j > 0 {
@@ -2895,13 +3041,20 @@ func (x *templateIndex) completeOrdinal(dv map[string]any, path string) error {
 }
 
 // ismSettlesTerminology reports whether path names an ISM transition's current
-// state or careflow step, whose terminology [settleIsmTransitions] gives where
-// the body names none: RM Current_state_valid admits `openehr` alone, and a
-// careflow step is coded with its node's at-code. Only ISM_TRANSITION has an
-// attribute of either name.
+// state, transition or careflow step, whose terminology [settleIsmTransitions]
+// gives where the body names none: RM Current_state_valid and
+// Transition_valid admit `openehr` alone, and a careflow step is coded with an
+// at-code. Only ISM_TRANSITION has an attribute of any of these names.
 func ismSettlesTerminology(path string) bool {
 	_, attr, _ := strings.CutLast(path, "/")
-	return attr == "current_state" || attr == "careflow_step"
+	return attr == "current_state" || attr == "transition" || attr == careflowStepLeaf
+}
+
+// mergedCareflowStep reports whether leaf is the careflow step of the
+// in-context `ism_transition` node that merges an ACTION's per-step nodes, the
+// only in-context ISM transition node with one.
+func mergedCareflowStep(leaf *webtemplate.Node) bool {
+	return strings.HasSuffix(bareAQLPath(leaf.AQLPath), "/"+ismReferenceSeg+"/"+careflowStepLeaf)
 }
 
 // ordinalTerminologies returns the terminology the template's C_DV_ORDINAL at
@@ -3956,10 +4109,11 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 }
 
 // clinicalLeafValue is [leafFromSuffixes] for a leaf of the clinical leaf
-// loop. In a decode with the template (deferred), a coded text and an ordinal
-// are built without the suffixes the body leaves out and the template may
-// supply, which [templateIndex.completeCodedValue] gives, or refuses, once the
-// value is placed and its path in the template is known.
+// loop. Where deferred, a coded text and an ordinal are built without the
+// suffixes the body leaves out and may be supplied once the value is placed:
+// in a decode with the template, [templateIndex.completeCodedValue] gives or
+// refuses them, and at the careflow step of a merged in-context ISM
+// transition, in either mode, [settleMergedIsmTransition] does.
 func clinicalLeafValue(leaf *webtemplate.Node, sfx map[string]any, keyOf func(suffix string) string, deferred bool) (any, error) {
 	rmType := nodeRMType(leaf)
 	if !deferred || rmType == stringLeafType {

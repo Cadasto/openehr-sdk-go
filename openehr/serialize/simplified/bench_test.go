@@ -69,11 +69,10 @@ func benchFlatTarget(b *testing.B) (*webtemplate.WebTemplate, *templatecompile.C
 // benchFlatCorpus reads the FLAT conformance corpus and returns the bodies this
 // SDK's codec accepts end to end, together with their total size.
 //
-// The corpus holds 34 bodies and the codec accepts 31 of them today. The other
-// three exercise upstream key families the codec declines by design: the
-// reference's in-context keys for RM attributes the Web Template this SDK
-// builds does not model (an ISM transition's `_reason`, an interval event's
-// `math_function`, a HISTORY's `origin`).
+// The corpus holds 34 bodies and the codec accepts 33 of them today. The other
+// one exercises an upstream key family the codec declines by design: an
+// ACTION's `_instruction_details`, which it refuses as a path it does not
+// model.
 // The split is discovered here rather than written down, so a codec that
 // learns one of those families widens the sweep on its own.
 //
