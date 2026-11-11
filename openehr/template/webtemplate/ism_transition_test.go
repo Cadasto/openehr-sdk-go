@@ -176,8 +176,9 @@ func TestREQ106InContextIsmTransitionForUnconstrainedAction(t *testing.T) {
 // them: no node id, min and max from the first archetyped node, and the
 // `careflow_step`, `current_state` and `transition` leaves in that order. The
 // careflow step lists each archetyped node's step with the current states that
-// node admits; the current state lists them all in node order, a repeat
-// dropped. test_all_types is the reference's own golden case, pinned whole;
+// node admits; the current state lists them all in node order, a state two
+// nodes admit listed twice, as the reference appends each node's list as is.
+// test_all_types is the reference's own golden case, pinned whole;
 // conformance_ehrbase is the PROBE-086 template, pinned on its shape.
 func TestREQ106MergedIsmTransitionForArchetypedAction(t *testing.T) {
 	raw, err := os.ReadFile(testAllTypesOPT)
@@ -207,11 +208,11 @@ func TestREQ106MergedIsmTransitionForArchetypedAction(t *testing.T) {
 			archetyped: 3,
 		},
 		{
-			name: "a step admitting a state another admits",
+			name: "a step admitting a state another admits, listed twice",
 			opt:  bytes.Replace(raw, []byte(states), []byte(moreStates), 1),
 			want: func(p string) *webtemplate.Node {
 				both := step{code: "at0005", label: "Completed", states: []string{"532", "245"}}
-				return mergedIsm(p, 1, 1, 1, []step{planned, active, both}, []string{"526", "245", "532"})
+				return mergedIsm(p, 1, 1, 1, []step{planned, active, both}, []string{"526", "245", "532", "245"})
 			},
 			archetyped: 3,
 		},
