@@ -46,6 +46,18 @@ func TestKindDenominatorValidationBoundsNotAliased(t *testing.T) {
 	}
 }
 
+// cloneInputs deep-copies a list item's current states: the merged ISM
+// transition's careflow step carries them, and Build returns a mutable tree,
+// so a consumer editing one copy must not reach the other (REQ-106).
+func TestCloneInputsCopiesCurrentStates(t *testing.T) {
+	in := []Input{{Suffix: "code", Type: "CODED_TEXT", List: []InputListItem{{Value: "at0003", CurrentStates: []string{"526"}}}}}
+	out := cloneInputs(in)
+	out[0].List[0].CurrentStates[0] = "245"
+	if got := in[0].List[0].CurrentStates[0]; got != "526" {
+		t.Errorf("mutating the clone's current state changed the original to %q — the clone aliases CurrentStates", got)
+	}
+}
+
 // The reference normalises exclusive INTEGER bounds to inclusive
 // (>10 → >=11, <15 → <=14) for DV_COUNT ranges (REQ-106).
 func TestIntRangeValidationNormalisesExclusiveBounds(t *testing.T) {

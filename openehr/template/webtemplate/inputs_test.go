@@ -19,8 +19,9 @@ import (
 
 // inputSig is the comparable signature of a node's inputs: per input the
 // "suffix:type" pair extended with the deep contents PROBE-075 pins —
-// ordinal/coded list entries (value@ordinal), listOpen, terminology,
-// temporal validation patterns, and numeric validation ranges. List
+// ordinal/coded list entries (value@ordinal, and a careflow step's current
+// states as >state+state), listOpen, terminology, temporal validation
+// patterns, and numeric validation ranges. List
 // labels and the remaining validation payloads (duration fields, quantity
 // precision, per-unit ranges) stay outside the signature as documented
 // deviations.
@@ -34,6 +35,7 @@ func inputSig(inputs []webtemplate.Input) string {
 			if it.Ordinal != nil {
 				fmt.Fprintf(&p, "@%d", *it.Ordinal)
 			}
+			p.WriteString(statesSig(it.CurrentStates))
 		}
 		p.WriteString(openSig(in.ListOpen) + termSig(in.Terminology))
 		if v := in.Validation; v != nil && !isDurationField(in.Suffix) {
@@ -75,6 +77,14 @@ func refInputSig(m map[string]any) string {
 				if ord, ok := em["ordinal"].(float64); ok {
 					fmt.Fprintf(&p, "@%d", int(ord))
 				}
+				var states []string
+				if raw, ok := em["currentStates"].([]any); ok {
+					for _, st := range raw {
+						s, _ := st.(string)
+						states = append(states, s)
+					}
+				}
+				p.WriteString(statesSig(states))
 			}
 		}
 		open, _ := im["listOpen"].(bool)
@@ -99,6 +109,13 @@ func refInputSig(m map[string]any) string {
 		parts = append(parts, p.String())
 	}
 	return strings.Join(parts, ",")
+}
+
+func statesSig(states []string) string {
+	if len(states) == 0 {
+		return ""
+	}
+	return ">" + strings.Join(states, "+")
 }
 
 func openSig(open bool) string {

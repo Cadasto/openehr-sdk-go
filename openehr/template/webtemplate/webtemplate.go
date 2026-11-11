@@ -53,6 +53,10 @@ type InputListItem struct {
 	Label           string            `json:"label,omitempty"`
 	Ordinal         *int              `json:"ordinal,omitempty"`
 	LocalizedLabels map[string]string `json:"localizedLabels,omitempty"`
+	// CurrentStates lists, on an entry of an ACTION's careflow_step input,
+	// the codes of the openEHR instruction states the template lets that
+	// careflow step reach: the current_state codes its ISM transition admits.
+	CurrentStates []string `json:"currentStates,omitempty"`
 }
 
 // Validation carries a numeric or temporal constraint on an input.
