@@ -1349,7 +1349,7 @@ Every ACTION **MUST** carry the reference's in-context `ism_transition` node, wi
 
 | The ACTION's template | The `ism_transition` node |
 |---|---|
-| models archetyped `ism_transition[atNNNN]` nodes, one per careflow step | merges them as the reference does: `min` and `max` from the first, and the leaves `careflow_step` (each step's code, with the `currentStates` that step admits), `current_state` (every step's states, in step order, a repeat dropped) and `transition` |
+| models archetyped `ism_transition[atNNNN]` nodes, one per careflow step | merges them as the reference does: `min` and `max` from the first, and the leaves `careflow_step` (each step's careflow-step code, or its node id and name where it constrains none, with the `currentStates` that step admits), `current_state` (every step's states, in step order) and `transition` |
 | models none, or only ones that constrain neither `current_state` nor `careflow_step` | holds the transition's `current_state` and `transition` as leaves |
 
 The archetyped `ism_transition[atNNNN]` nodes stay beside the merged node.
@@ -1380,7 +1380,7 @@ Any structural difference on that pinned surface is a failure; the following cat
 1. **Field-level presentation** — JSON field ordering, absent optional fields, and localized-string packaging (`localizedName` / localized maps emitted for the compiled template's single document language only).
 2. **Reference-only node metadata** — `termBindings`, `annotations`, and the `inContext` flag on synthesized RM-attribute leaves.
 3. **Input-content omissions** — `defaultValue`; DV_DURATION per-field ranges; DV_QUANTITY `precision`; per-unit and multi-unit magnitude validation; list `label` for external-terminology codes; `localizedLabels` and per-item `termBindings`.
-4. **Local terminology** — `terminology` is emitted only for external bindings (e.g. `openehr`); the archetype-internal `local` value is omitted, mirroring the reference.
+4. **Local terminology** — `terminology` is emitted only for external bindings (e.g. `openehr`); the archetype-internal `local` value is omitted, mirroring the reference everywhere but on the merged ACTION `careflow_step` input, where the reference writes it.
 5. **Fixture-outlier `min` on in-context leaves** — where a vendored golden marks synthesized RM-attribute leaves `min=1` and the OPT constrains no `existence`, the export **MAY** emit `min=0`.
    The `GECCO_Diagnose` golden (14 nodes) and the `test_all_types` golden (4 nodes on the ACTION subtree PROBE-075 compares) are such outliers; `constrain_test` and `Corona_Anamnese` agree with `min=0`.
 6. **Reference-set terminology** — for a `C_CODE_REFERENCE`, `terminology` is the one its code phrase names, else the one its `terminology:` URI names, spelled as a TERMINOLOGY_ID ([§ REQ-103](#req-103--primitive-constraint-introspection)): `terminology:LOINC/2.73` gives `LOINC(2.73)`, and a URI of another scheme gives none.

@@ -51,8 +51,9 @@ failure, not a deviation.
     does an ACTION whose archetyped transitions constrain neither `current_state`
     nor `careflow_step`, since those are pruned as empty containers.
 
-  The reference also writes a `_reason` family under the node; neither shape models
-  it, and FLAT decode refuses it (REQ-170).
+  The reference also writes a `_reason` family under the node, which neither shape
+  gives a node of its own: the FLAT codec reads and writes it as the `_reason:N`
+  underscore family (REQ-140).
 - **Per-careflow-step `ism_transition[atNNNN]` nodes are kept** — beside the merged
   node, the builder still emits each archetyped transition with its own
   `current_state` / `careflow_step` leaves, where the reference's filter drops them
