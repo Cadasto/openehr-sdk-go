@@ -169,10 +169,13 @@ in this builder's spelling (§ Duplicate sibling ids).
   - **The format.** ITS-REST Release-1.1.0 *Simplified Formats*, § Node ID Generation
     Rules, rule 7: "Append a numeric suffix if needed to ensure uniqueness among
     siblings", and its example table gives "Blood Pressure (duplicate)" as
-    `blood_pressure_1`. The builder follows the format.
+    `blood_pressure_1`, while its RM-mapping examples (§ ACTION, § EVALUATION) write
+    `dv_text2`. Rule 7 fixes neither the separator nor the first number; the builder
+    follows the example table.
   - **The reference's code.** At the pinned `openEHR_SDK` commit,
-    `OPTParser.makeIdUnique` groups a node's children by `id` and gives the member at
-    index i of a group of two or more, counting from 0, the number i + 1;
+    `OPTParser.makeIdUnique` groups a node's children by `id`; in a group of two or
+    more, the first member stays bare and the member at index i, from 1 on, takes the
+    number i + 1;
     `WebTemplateNode.getId(true)` writes that number straight after the `id`. So the
     second claimant is `<id>2`, and the number is never checked against an ordinary
     sibling that already holds it.
