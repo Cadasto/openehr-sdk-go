@@ -228,7 +228,8 @@ Concretely:
   `Integer`; refused with `ErrUnsupportedDatatype` naming the FLAT key, required and optional
   suffixes and the bare value alike, so it never surfaces as a canonical-JSON error naming a path
   the caller did not write; the key named is the key as written, except that a bare value
-  spelled `x\|` is named `x`, the key it spells, and a STRUCTURED value is named by the FLAT key
+  spelled `x\|` is named `x`, the key it spells, a duplicate sibling in the reference's spelling
+  `x2` is named by its Web Template id `x_1`, and a STRUCTURED value is named by the FLAT key
   its conversion makes, with an `:index` on every segment below the template root; a `\|code`
   at a DV_TEXT leaf that is present and not `""` selects the DV_CODED_TEXT whatever its JSON
   kind, so one that is not a string is refused this way, naming the `\|code` key; the check
