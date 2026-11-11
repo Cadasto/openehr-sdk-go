@@ -191,23 +191,20 @@ var Recorded = map[string]map[Leg]Record{
 	"consult_record": {
 		LegJSONXML: {Outcome: Outcome{Compared: 150}},
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 26, Missing: 1, Extra: 6},
-			Reason: "Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
-				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created. " +
-				"ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and " +
+			Outcome: Outcome{Compared: 26, Extra: 5},
+			Reason: "ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and " +
 				"the codec writes context/_location. ENTRY language and encoding: the upstream FLAT omits " +
 				"them on document_attachment and FLAT encode writes them (4 keys).",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 7, Altered: 4, Excluded: 3},
-			Reason: "The 3 excluded keys are ctx/time, refused, " +
-				"and ctx/location and created/date_time_value, reported as unmatched content, as " +
+			Outcome: Outcome{Compared: 150, Missing: 1, Altered: 4, Excluded: 2},
+			Reason: "The 2 excluded keys are ctx/time, refused, " +
+				"and ctx/location, reported as unmatched content, as " +
 				"follows. UPSTREAM consult_record ctx conflict: the " +
 				"FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the " +
 				"harness removes ctx/time; the start time left agrees with the canonical. " +
 				"ctx/location: the codec does not read ctx/location (it reads context/_location), so the " +
-				"location is missing. Choice element: decode does not read media_file/created/date_time_value " +
-				"(the SDK spells it created), so the media_file cluster lacks its created element (6 leaves). " +
+				"location is missing. " +
 				"RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).",
 		},
 		LegFlatStructured: {
@@ -218,11 +215,10 @@ var Recorded = map[string]map[Leg]Record{
 				"the ENTRY language and encoding of document_attachment that the upstream STRUCTURED carries.",
 		},
 		LegStructuredFlat: {
-			Outcome: Outcome{Compared: 29, Extra: 1, Excluded: 1},
+			Outcome: Outcome{Compared: 30, Extra: 1},
 			Reason: "ctx/location: the upstream FLAT spells the location ctx/location, which the hold-out removes, " +
 				"while the upstream STRUCTURED spells it context/_location, which decodes and re-encodes, " +
-				"so only our side carries it. Excluded: one family drops out of both sides of the comparison: " +
-				"decode reports media_file/created/date_time_value (choice element) as unmatched content.",
+				"so only our side carries it.",
 		},
 	},
 	"corona": {
@@ -239,16 +235,11 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"ehrn_abdm": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 31, Missing: 1, Extra: 1},
-			Reason: "Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
-				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.",
+			Outcome: Outcome{Compared: 31},
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 6, Altered: 4, Excluded: 1},
-			Reason: "The excluded key is created/date_time_value, reported as unmatched content, as follows. " +
-				"Choice element: decode does not read media_file/created/date_time_value (the SDK " +
-				"spells it created), so the media_file cluster lacks its created element (6 leaves). RM-FLOOR " +
-				"archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).",
+			Outcome: Outcome{Compared: 150, Altered: 4},
+			Reason:  "RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (4 leaves).",
 		},
 	},
 	"family_history": {
@@ -322,12 +313,11 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"test_all_types": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 83, Missing: 4, Extra: 7, Altered: 11},
+			Outcome: Outcome{Compared: 83, Missing: 2, Extra: 5, Altered: 11},
 			Reason: "party reference type: the canonical types the composer's reference PERSON, so FLAT encode " +
 				"writes composer|type, which the upstream FLAT omits. HISTORY.origin: the origin is 6 ms before " +
 				"the event time, so FLAT encode writes it as history_origin, which the upstream FLAT omits. " +
-				"Choice element: upstream spells the value of the choice " +
-				"element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as " +
+				"DV_IDENTIFIER: this upstream FLAT writes the id as " +
 				"the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare " +
 				"value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the " +
 				"Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical " +
@@ -340,9 +330,9 @@ var Recorded = map[string]map[Leg]Record{
 				"and proportion type spellings above.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 423, Missing: 40, Extra: 40, Altered: 32, Excluded: 3},
-			Reason: "The 3 excluded keys are " +
-				"choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as " +
+			Outcome: Outcome{Compared: 423, Missing: 35, Extra: 42, Altered: 35, Excluded: 1},
+			Reason: "The excluded key is " +
+				"the bare proportion_any, reported as " +
 				"unmatched content, as follows. ISM transition careflow step: the upstream FLAT gives the " +
 				"section_3 ACTION's transition a current state (526, planned) and no careflow step, so decode " +
 				"gives it the one careflow step of the template whose current states hold 526 " +
@@ -350,8 +340,7 @@ var Recorded = map[string]map[Leg]Record{
 				"this is the intended reading of such a body, not a gap. " +
 				"party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's " +
 				"reference the type PARTY against the canonical's PERSON. " +
-				"Choice element: decode does not read choice/quantity_value (the SDK spells it choice), " +
-				"so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the " +
+				"DV_PROPORTION: decode reports the bare proportion_any, the " +
 				"derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. " +
 				"Upstream conversion differences: a DV_URI and the proportion's " +
 				"precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream " +
@@ -359,10 +348,11 @@ var Recorded = map[string]map[Leg]Record{
 				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (7 leaves). " +
 				"HISTORY.origin: the FLAT has no origin key and decode gives it the event time " +
 				"(openehr/serialize/simplified/deviations.md), where the canonical sets it earlier. Shifted " +
-				"positions: the elements decode lacks move their later siblings up, the DV_URI and the choice " +
-				"element in the EVALUATION, so the EVALUATION's intervals and cluster compare against the " +
-				"canonical's next element; this accounts for most of the missing, extra and altered leaves. RM-FLOOR " +
-				"archetype_details: the canonical SECTION and the " +
+				"positions: the canonical EVALUATION holds a DV_URI at items/0 that the upstream FLAT does not " +
+				"carry, so every later item is compared one place off, each decoded item against the canonical " +
+				"item before its counterpart: the three intervals, the choice ELEMENT (canonical items/4) and the " +
+				"cluster among them; this accounts for most of the missing, extra and altered leaves. " +
+				"RM-FLOOR archetype_details: the canonical SECTION and the " +
 				"ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is " +
 				"1.2.0 against 1.0.2 and 1.0.4.",
 		},
