@@ -1947,8 +1947,8 @@ type ismNodes struct {
 
 // ismTransitionNodes indexes the Web Template's ISM_TRANSITION nodes
 // ([ismNodes]). found reports whether it has an ISM_TRANSITION node of any
-// kind, the in-context `ism_transition` node of an ACTION whose template
-// constrains no ISM transition included.
+// kind, an in-context `ism_transition` node that merges no archetyped one
+// included.
 func ismTransitionNodes(wt *webtemplate.WebTemplate, sib *reusedSiblings) (nodes ismNodes, found bool) {
 	nodes = ismNodes{archetyped: make(map[string]ismNode), merged: make(map[string]mergedIsmNode)}
 	var walk func(n *webtemplate.Node, flat string)
@@ -1995,8 +1995,8 @@ func codeInputList(leaf *webtemplate.Node) []webtemplate.InputListItem {
 //     ([settleIsmTransition]);
 //   - at the in-context node that merges per-step ones, the careflow step is
 //     completed from the steps the node lists ([settleMergedIsmTransition]);
-//   - at the in-context node of an ACTION whose template constrains no ISM
-//     transition, nothing more: the body cannot spell a careflow step there.
+//   - at an in-context node that merges no archetyped one, nothing more: the
+//     body cannot spell a careflow step there.
 //
 // A transition is settled against the node [walkAQL] placed it under, by the
 // resolution path it recorded there ([ismNodeKey]), so reused ACTION siblings
@@ -2229,14 +2229,13 @@ var ismLeaves = map[string]bool{"current_state": true, "transition": true, caref
 // refuseInContextKeys refuses, in every mode, the reference's spelling of an
 // ACTION's ISM transition and time wherever the Web Template does not resolve
 // it (REQ-170; REQ-140's third out-of-scope class covers the careflow step of
-// an ACTION whose template constrains no ISM transition):
+// an ACTION whose `ism_transition` node merges no archetyped one):
 //
 //   - a `current_state`, `transition` or `careflow_step` leaf, with any suffix,
-//     under an ISM transition node that has no child of that id: the
-//     in-context `ism_transition` node of an ACTION whose template constrains
-//     no ISM transition has no `careflow_step`, and an archetyped
-//     `ism_transition[atNNNN]` node no `transition`, unless its archetype
-//     constrains one;
+//     under an ISM transition node that has no child of that id: an
+//     in-context `ism_transition` node that merges no archetyped one has no
+//     `careflow_step`, and an archetyped `ism_transition[atNNNN]` node no
+//     `transition`, unless its archetype constrains one;
 //   - any such leaf, and a `_reason` family, under an `ism_transition` segment
 //     where the Web Template has no node of that id;
 //   - the ACTION's own `time` leaf, with any suffix, where the Web Template has

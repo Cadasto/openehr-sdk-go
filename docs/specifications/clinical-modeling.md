@@ -1350,7 +1350,7 @@ Every ACTION **MUST** carry the reference's in-context `ism_transition` node, wi
 | The ACTION's template | The `ism_transition` node |
 |---|---|
 | models archetyped `ism_transition[atNNNN]` nodes, one per careflow step | merges them as the reference does: `min` and `max` from the first, and the leaves `careflow_step` (each step's careflow-step code, or its node id and name where it constrains none, with the `currentStates` that step admits), `current_state` (every step's states, in step order) and `transition` |
-| models none, or only ones that constrain neither `current_state` nor `careflow_step` | holds the transition's `current_state` and `transition` as leaves |
+| models none, or only ones constraining no attribute of the transition | holds the transition's `current_state` and `transition` as leaves |
 
 The archetyped `ism_transition[atNNNN]` nodes stay beside the merged node.
 

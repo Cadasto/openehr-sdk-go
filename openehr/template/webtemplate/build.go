@@ -157,9 +157,9 @@ func childrenOf(n *templatecompile.CompiledNode, parentPath string, cfg *config)
 // `ism_transition[atNNNN]` nodes, one per careflow step, the node merges the
 // ones the walk emitted ([mergedIsmTransition]); those nodes stay beside it.
 // They are read from the emitted nodes rather than from the template, because
-// an archetyped transition that constrains neither its current_state nor its
-// careflow_step is pruned as an empty container and so carries nothing. Where
-// the walk emitted none, the node is the unconstrained transition: its
+// an archetyped transition that constrains none of its attributes is pruned
+// as an empty container and so carries nothing. Where the walk emitted none,
+// the node is the unconstrained transition: its
 // `current_state`, a code of the openehr terminology written as `|code` and
 // `|value` as EVENT_CONTEXT `setting` is, and its `transition`. The reference
 // leaves `careflow_step` out there, and writes a `_reason` family under either
