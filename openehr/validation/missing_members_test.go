@@ -396,6 +396,24 @@ func decodeJSONFixture(t *testing.T, doc []byte) *rm.Composition {
 	return comp
 }
 
+// reportedPointers decodes jsonDoc and xmlDoc, the two forms of one
+// composition, with each codec's WithMissing option, and returns the
+// pointers each reports, kept as the option passes them.
+func reportedPointers(t *testing.T, jsonDoc, xmlDoc []byte) ([]canjson.Pointer, []canxml.Pointer) {
+	t.Helper()
+	var jsonPointers []canjson.Pointer
+	keepJSON := canjson.WithMissing(func(p canjson.Pointer) { jsonPointers = append(jsonPointers, p) })
+	if err := canjson.Unmarshal(jsonDoc, new(rm.Composition), keepJSON); err != nil {
+		t.Fatalf("canjson.Unmarshal(WithMissing): %v", err)
+	}
+	var xmlPointers []canxml.Pointer
+	keepXML := canxml.WithMissing(func(p canxml.Pointer) { xmlPointers = append(xmlPointers, p) })
+	if err := canxml.Unmarshal(xmlDoc, new(rm.Composition), keepXML); err != nil {
+		t.Fatalf("canxml.Unmarshal(WithMissing): %v", err)
+	}
+	return jsonPointers, xmlPointers
+}
+
 // TestValidateJSON_PROBE110_FixtureIsOneValidInstance pins the fixture the
 // rows edit: its two forms decode to one instance, which both entries find
 // valid, so every finding a row draws comes from what the row leaves out.
@@ -428,7 +446,8 @@ func TestValidateJSON_PROBE110_FixtureIsOneValidInstance(t *testing.T) {
 // give the same issues, root holds what the default decode gives, and
 // New().Validate(root, nil, WithMissing(pointers)), with the pointers the
 // codecs report written out by hand, returns the very result ValidateJSON
-// returns.
+// returns, as does New().Validate(root, nil, WithMissingPointers(pointers))
+// with the pointer values either codec's WithMissing option passes.
 func TestValidateJSON_PROBE110_MissingMembersAreRequired(t *testing.T) {
 	t.Parallel()
 	for _, row := range mmRows() {
@@ -462,6 +481,16 @@ func TestValidateJSON_PROBE110_MissingMembersAreRequired(t *testing.T) {
 			byHand := validation.New().Validate(def, nil, validation.WithMissing(row.pointers))
 			if !slices.Equal(byHand.Issues, rJ.Issues) || !reflect.DeepEqual(byHand.Coverage, rJ.Coverage) {
 				t.Errorf("New().Validate(%s, nil, WithMissing(%q)) = %q %+v, want ValidateJSON's %q %+v", row.name, row.pointers, identityKeys(byHand.Issues), byHand.Coverage, identityKeys(rJ.Issues), rJ.Coverage)
+			}
+			jsonPointers, xmlPointers := reportedPointers(t, jsonDoc, xmlDoc)
+			for codec, opt := range map[string]validation.ValidateOption{
+				"canjson": validation.WithMissingPointers(jsonPointers),
+				"canxml":  validation.WithMissingPointers(xmlPointers),
+			} {
+				kept := validation.New().Validate(def, nil, opt)
+				if !slices.Equal(kept.Issues, rJ.Issues) || !reflect.DeepEqual(kept.Coverage, rJ.Coverage) {
+					t.Errorf("New().Validate(%s, nil, WithMissingPointers(the %s pointers)) = %q %+v, want ValidateJSON's %q %+v", row.name, codec, identityKeys(kept.Issues), kept.Coverage, identityKeys(rJ.Issues), rJ.Coverage)
+				}
 			}
 		})
 	}
@@ -682,6 +711,49 @@ func TestWithMissing_REQ112_OptionsReadAsTheUnion(t *testing.T) {
 	want := []string{"required " + mmItemsPath + "[at0004]/value/magnitude", "required /language"}
 	if got := issueKeys(repeated.Issues); !slices.Equal(got, want) || !slices.Equal(repeated.Issues, union.Issues) {
 		t.Errorf("ValidateRM(fixture, WithMissing(%q), nil, WithMissing(%q)) issues = %q, want %q, what one list of their union gives (%q)", []string{a}, []string{b, a}, got, want, issueKeys(union.Issues))
+	}
+}
+
+// TestWithMissingPointers_REQ112_OptionsReadAsTheUnion pins how a call
+// reads pointer values (REQ-112 § Value-typed mandatory presence: a nil
+// option, an empty list and a repeated option are read as the union of what
+// was given): a nil list, an empty list and the root of either codec add
+// nothing, and text and pointer values, of either codec, given in any mix
+// and repeating one another, give what one text list of their union gives,
+// each member reported once.
+func TestWithMissingPointers_REQ112_OptionsReadAsTheUnion(t *testing.T) {
+	t.Parallel()
+	comp := decodeJSONFixture(t, []byte(mmCompositionJSON))
+	base := validation.ValidateRM(comp)
+	for name, r := range map[string]validation.Result{
+		"a nil list":       validation.ValidateRM(comp, validation.WithMissingPointers[canjson.Pointer](nil)),
+		"an empty list":    validation.ValidateRM(comp, validation.WithMissingPointers([]canxml.Pointer{})),
+		"the canjson root": validation.ValidateRM(comp, validation.WithMissingPointers([]canjson.Pointer{{}})),
+		"the canxml root":  validation.New().Validate(comp, nil, validation.WithMissingPointers([]canxml.Pointer{{}, {}})),
+	} {
+		if !slices.Equal(r.Issues, base.Issues) || !reflect.DeepEqual(r.Coverage, base.Coverage) {
+			t.Errorf("ValidateRM(fixture, WithMissingPointers(%s)) = %q %+v, want what no option gives, %q %+v", name, issueKeys(r.Issues), r.Coverage, issueKeys(base.Issues), base.Coverage)
+		}
+	}
+	a, b := "/language", mmItems+"0/value/magnitude"
+	jsonPointers, xmlPointers := reportedPointers(t, rewriteJSON(t, mmCompositionJSON, dropped(a, b)), rewriteXML(t, mmCompositionXML, dropped(a, b)))
+	onlyB := slices.DeleteFunc(slices.Clone(jsonPointers), func(p canjson.Pointer) bool { return p.String() != b })
+	if len(onlyB) != 1 || len(jsonPointers) != 2 || len(xmlPointers) != 2 {
+		t.Fatalf("the codecs report %d and %d pointers, %d of them %s, want 2, 2 and 1", len(jsonPointers), len(xmlPointers), len(onlyB), b)
+	}
+	union := validation.ValidateRM(comp, validation.WithMissing([]string{a, b}))
+	want := []string{"required " + mmItemsPath + "[at0004]/value/magnitude", "required /language"}
+	if got := issueKeys(union.Issues); !slices.Equal(got, want) {
+		t.Fatalf("ValidateRM(fixture, WithMissing(%q)) issues = %q, want %q", []string{a, b}, got, want)
+	}
+	for name, r := range map[string]validation.Result{
+		"a text and a pointer": validation.ValidateRM(comp, validation.WithMissing([]string{a}), validation.WithMissingPointers(onlyB)),
+		"repeated, either codec": validation.New().Validate(comp, nil, validation.WithMissingPointers(xmlPointers), nil,
+			validation.WithMissingPointers(jsonPointers), validation.WithMissing([]string{b, a}), validation.WithMissingPointers(onlyB)),
+	} {
+		if !slices.Equal(r.Issues, union.Issues) || !reflect.DeepEqual(r.Coverage, union.Coverage) {
+			t.Errorf("validating the fixture with %s = %q %+v, want what one list of their union gives, %q %+v", name, issueKeys(r.Issues), r.Coverage, want, union.Coverage)
+		}
 	}
 }
 

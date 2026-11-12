@@ -80,11 +80,12 @@ import (
 // EHR_STATUS subject or an ARCHETYPED archetype_id, holds its zero value
 // whether the document left it out or gave that value, so the value alone
 // cannot say it is missing. A caller that decoded root with a codec's report
-// of missing members passes it as [WithMissing], and each member the report
-// names is read as absent: an omitted magnitude, subject or rm_version is
-// then `required` at its path. Without the option, such a member reads as
-// present. [ValidateJSON] and [ValidateXML] decode a document and validate
-// it with its report in one call.
+// of missing members passes its pointers as [WithMissingPointers], or their
+// text as [WithMissing], and each member the report names is read as
+// absent: an omitted magnitude, subject or rm_version is then `required` at
+// its path. Without the option, such a member reads as present.
+// [ValidateJSON] and [ValidateXML] decode a document and validate it with
+// its report in one call.
 //
 // ValidateRM returns what a [Validator] built with no options returns from
 // Validate(root, nil, opts...).
@@ -144,9 +145,10 @@ func ValidateRMFolder(folder *rm.Folder) Result {
 // one, `rm_version_valid`, and an omitted `archetype_id` as one with an empty
 // value, `required` at `archetype_id/value`. A caller that decodes the status
 // validates it with [ValidateJSON] or [ValidateXML], or passes the codec's
-// report to [ValidateRM] with [WithMissing]: an omitted subject is then
-// `required` at `/subject`, an omitted rm_version `required` at its path,
-// and an omitted archetype_id `required` at `archetype_id` alone.
+// report to [ValidateRM] with [WithMissingPointers] or [WithMissing]: an
+// omitted subject is then `required` at `/subject`, an omitted rm_version
+// `required` at its path, and an omitted archetype_id `required` at
+// `archetype_id` alone.
 func ValidateRMEHRStatus(status *rm.EHRStatus) Result {
 	if status == nil {
 		return resultFromIssues([]Issue{{Path: "", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})

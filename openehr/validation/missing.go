@@ -1,20 +1,33 @@
 package validation
 
-// missing.go: REQ-112 § Value-typed mandatory presence: the per-call option
-// that hands the walk a decode's report of the members a document leaves
-// out (wire.md § REQ-175), and the trie the walk reads it from. A Validator
-// holds no per-call state (REQ-171 § Surface): the report travels as a
-// trailing option of the call, and the engine threads the trie down the
-// walk, node by node, so that an attribute the report names is read as
-// absent where the walk visits it ([engine.visitAttribute]).
+// missing.go: REQ-112 § Value-typed mandatory presence: the per-call
+// options that hand the walk a decode's report of the members a document
+// leaves out (wire.md § REQ-175), as pointer text or as the codecs' pointer
+// values, and the trie the walk reads it from. A Validator holds no per-call
+// state (REQ-171 § Surface): the report travels as a trailing option of the
+// call, and the engine threads the trie down the walk, node by node, so that
+// an attribute the report names is read as absent where the walk visits it
+// ([engine.visitAttribute]).
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // callConfig is what the options of one call set.
 type callConfig struct {
-	// missing is the root of the trie built from every [WithMissing] of the
-	// call, nil while none named a member.
+	// missing is the root of the trie built from every [WithMissing] and
+	// [WithMissingPointers] of the call, nil while none named a member.
 	missing *missingNode
+}
+
+// root returns the root of the trie of c, made first when no option of the
+// call has named a member yet.
+func (c *callConfig) root() *missingNode {
+	if c.missing == nil {
+		c.missing = &missingNode{}
+	}
+	return c.missing
 }
 
 // newCallConfig returns what opts set; a nil option is ignored.
@@ -49,14 +62,89 @@ type ValidateOption func(*callConfig)
 // does not enter. Neither does the empty pointer, which names the root, nor
 // a text that is no JSON Pointer.
 //
-// A nil or empty list adds nothing, and the option given more than once
-// reads as the union of its lists. [ValidateJSON] and [ValidateXML] decode a
-// document and hand its report on in one call; this option is for a caller
-// that decoded with a codec's report option and validates afterwards.
+// A nil or empty list adds nothing, and the option given more than once, or
+// beside [WithMissingPointers], reads as the union of their lists.
+// [ValidateJSON] and [ValidateXML] decode a document and hand its report on
+// in one call; this option is for a caller that decoded with a codec's
+// report option and validates afterwards. A caller that kept the pointer
+// values the codec passed, rather than their text, hands them to
+// [WithMissingPointers] instead, which writes none of their text.
 func WithMissing(pointers []string) ValidateOption {
 	return func(c *callConfig) {
 		for _, p := range pointers {
 			c.addMissing(p)
+		}
+	}
+}
+
+// WithMissingPointers hands the call the members a decode reported missing,
+// as [WithMissing] does, but by the pointer values the report passed rather
+// than by their text: the canjson.Pointer values the canonical-JSON codec's
+// WithMissing option passes, or the canxml.Pointer values the canonical-XML
+// codec's passes. A caller keeps the pointers as the option passes them and
+// hands them on here, and the call gives what WithMissing of their text
+// gives.
+//
+// The call reads each pointer's parent and last reference token, through
+// its Parent and Token methods, and writes none of its text. Parents that
+// compare equal with == are read once, so the cost of a report grows with
+// the distinct members on its paths, not with the depth of each member
+// times their number. A pointer type of the caller's own serves too: Parent
+// returns the pointer of the object, list or Hash that holds the member, and
+// false for the root; Token returns the last reference token unescaped, a
+// list item's position in decimal.
+//
+// A pointer that names no attribute the walk visits draws no finding, as
+// for [WithMissing], and the root pointer, the zero value of either codec's
+// Pointer, names no member. A nil or empty list adds nothing, and the option
+// given more than once, or beside [WithMissing], reads as the union of
+// their lists.
+func WithMissingPointers[P interface {
+	comparable
+	Parent() (P, bool)
+	Token() string
+}](pointers []P) ValidateOption {
+	return func(c *callConfig) {
+		// met holds the node of each pointer already met as the parent of
+		// another, so the climb from a pointer stops at the first parent
+		// built; chain holds the pointers of one climb, the member first,
+		// then turned to be built from the top down.
+		var (
+			met   map[P]*missingNode
+			chain []P
+		)
+		for _, p := range pointers {
+			chain = chain[:0]
+			var n *missingNode
+			for q := p; ; {
+				if m, ok := met[q]; ok {
+					n = m
+					break
+				}
+				up, ok := q.Parent()
+				if !ok {
+					break
+				}
+				chain = append(chain, q)
+				q = up
+			}
+			if n == nil {
+				if len(chain) == 0 {
+					continue // the root names no member
+				}
+				n = c.root()
+			}
+			slices.Reverse(chain)
+			for i, q := range chain {
+				n = n.add(q.Token())
+				if i < len(chain)-1 {
+					if met == nil {
+						met = map[P]*missingNode{}
+					}
+					met[q] = n
+				}
+			}
+			n.absent = true
 		}
 	}
 }
@@ -73,21 +161,9 @@ func (c *callConfig) addMissing(pointer string) {
 	if !ok || !wellEscaped(rest) {
 		return
 	}
-	if c.missing == nil {
-		c.missing = &missingNode{}
-	}
-	n := c.missing
+	n := c.root()
 	for s := range strings.SplitSeq(rest, "/") {
-		s = unescapePointer(s)
-		next, ok := n.below[s]
-		if !ok {
-			if n.below == nil {
-				n.below = map[string]*missingNode{}
-			}
-			next = &missingNode{}
-			n.below[s] = next
-		}
-		n = next
+		n = n.add(unescapePointer(s))
 	}
 	n.absent = true
 }
@@ -95,14 +171,40 @@ func (c *callConfig) addMissing(pointer string) {
 // missingNode is one node of the trie a call's report is read from: a
 // member of the instance, reached from the node above by one pointer
 // segment. The root stands for the instance itself.
+//
+// The nodes under a node are keyed by segment: an attribute by its name, an
+// item of a list by its position written in decimal and counted from 0, and
+// an entry of a Hash by its key. Most nodes of a report have one node under
+// them, the attribute or item on the way to a member, so the first is held
+// in the node itself and a map is made only for a second.
 type missingNode struct {
 	// absent is set when a pointer of the report names this member.
 	absent bool
-	// below holds the nodes under this one, by segment: an attribute by its
-	// name, an item of a list by its position written in decimal and counted
-	// from 0, and an entry of a Hash by its key. Nil while nothing is named
-	// below.
+	// key is the segment of first; first is the first node named under
+	// this one, nil while nothing is named below.
+	key   string
+	first *missingNode
+	// below holds the nodes under this one after the first, by segment;
+	// nil while fewer than two are named below.
 	below map[string]*missingNode
+}
+
+// add returns the node under n for the segment key, made first when nothing
+// is named under key yet.
+func (n *missingNode) add(key string) *missingNode {
+	if next := n.child(key); next != nil {
+		return next
+	}
+	next := &missingNode{}
+	if n.first == nil {
+		n.key, n.first = key, next
+		return next
+	}
+	if n.below == nil {
+		n.below = map[string]*missingNode{}
+	}
+	n.below[key] = next
+	return next
 }
 
 // child returns the node under n for the segment key: nil when n is nil, as
@@ -111,6 +213,9 @@ type missingNode struct {
 func (n *missingNode) child(key string) *missingNode {
 	if n == nil {
 		return nil
+	}
+	if n.first != nil && n.key == key {
+		return n.first
 	}
 	return n.below[key]
 }

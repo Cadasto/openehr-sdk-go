@@ -103,8 +103,9 @@
 // out or gave that value. Only the decode can tell the two apart.
 // [ValidateJSON] and [ValidateXML] decode a canonical-JSON or canonical-XML
 // document into a root and validate it with the members the document leaves
-// out, in one call, and [WithMissing] hands the report of a codec's own
-// missing-member option to [ValidateRM], [Validate] or [Validator.Validate].
+// out, in one call. [WithMissingPointers] hands the report of a codec's own
+// missing-member option, the pointer values it passes, to [ValidateRM],
+// [Validate] or [Validator.Validate], and [WithMissing] hands it as text.
 // Each member the report names is read as absent, whatever the value holds
 // there: it is `required` at its path, the one finding there, and nothing is
 // reported below it, at any depth of the document.

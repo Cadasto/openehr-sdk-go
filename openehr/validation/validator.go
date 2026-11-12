@@ -132,9 +132,9 @@ func (v *Validator) limitsOrDefault() Limits {
 // A value built in Go cannot say which of its members a document left out:
 // a number, a boolean or a value struct holds its zero value either way. A
 // caller that decoded root with a codec's report of missing members passes
-// it as [WithMissing], so that each member it names is read as absent;
-// [Validator.ValidateJSON] and [Validator.ValidateXML] decode and validate
-// in one call.
+// its pointers as [WithMissingPointers], or their text as [WithMissing], so
+// that each member it names is read as absent; [Validator.ValidateJSON] and
+// [Validator.ValidateXML] decode and validate in one call.
 //
 // [Result.Coverage] lists each path where a limit stopped the walk, with a
 // template each node the template binds to a value set outside it, and the

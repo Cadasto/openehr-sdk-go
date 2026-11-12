@@ -73,7 +73,25 @@ func (v *Validator) ValidateJSON(data []byte, root any, c *templatecompile.Compi
 	if err != nil || jsontext.Value(data).Kind() != '{' {
 		return decodeFailure(entry, err)
 	}
-	return v.Validate(root, c, WithMissing(missing))
+	return v.Validate(root, c, WithMissingPointers(missing))
+}
+
+// reportNode is the pointer of a member a decode's report names, as the
+// decodes this package runs pass it, read through the methods
+// [WithMissingPointers] reads: the pointers the codecs' own report options
+// pass hold the same node.
+type reportNode struct{ node *reportpath.Node }
+
+// Parent returns the pointer of the object, list or Hash that holds r's
+// member, and true; for the root it returns the root and false.
+func (r reportNode) Parent() (reportNode, bool) {
+	up, ok := r.node.Parent()
+	return reportNode{up}, ok
+}
+
+// Token returns r's last reference token, unescaped.
+func (r reportNode) Token() string {
+	return r.node.Last()
 }
 
 // decodeJSONReporting decodes data into root as canjson.Unmarshal does, then
@@ -81,7 +99,7 @@ func (v *Validator) ValidateJSON(data []byte, root any, c *templatecompile.Compi
 // does, and returns the pointer of every missing member, or the first error
 // of the two. A root whose Go type gives the walk no RM value to start from
 // is not walked.
-func decodeJSONReporting(data []byte, root any) ([]string, error) {
+func decodeJSONReporting(data []byte, root any) ([]reportNode, error) {
 	if err := typereg.ClassifyDuplicate(json.Unmarshal(data, root, typereg.Unmarshalers())); err != nil {
 		return nil, err
 	}
@@ -93,9 +111,9 @@ func decodeJSONReporting(data []byte, root any) ([]string, error) {
 	if !ok {
 		return nil, nil
 	}
-	var missing []string
+	var missing []reportNode
 	err = model.Walk(data, start, rmjsonwalk.Hooks{Missing: func(pointer *reportpath.Node) error {
-		missing = append(missing, pointer.String())
+		missing = append(missing, reportNode{pointer})
 		return nil
 	}})
 	return missing, err
@@ -132,13 +150,13 @@ func (v *Validator) ValidateXML(data []byte, root any, c *templatecompile.Compil
 	if _, guard, ok := rmRootGuard(entry, root); !ok {
 		return guard
 	}
-	var missing []string
+	var missing []reportNode
 	t := xmlunmatched.NewTracker(nil, false)
-	t.ReportMissing(func(pointer *reportpath.Node) { missing = append(missing, pointer.String()) })
+	t.ReportMissing(func(pointer *reportpath.Node) { missing = append(missing, reportNode{pointer}) })
 	if err := xmlunmatched.Unmarshal(data, root, t); err != nil {
 		return decodeFailure(entry, err)
 	}
-	return v.Validate(root, c, WithMissing(missing))
+	return v.Validate(root, c, WithMissingPointers(missing))
 }
 
 // decodeFailure is the result of an entry that could not decode its input:
