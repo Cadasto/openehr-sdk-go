@@ -37,7 +37,7 @@ At the stop, every critical and important finding on PR 235 was fixed or decline
 
 ### Phase 2: generator gaps
 
-Done on `fix/generator-plan-leftovers` (2026-11-11):
+Done in [PR 443](https://github.com/Cadasto/openehr-sdk-go/pull/443) (2026-11-12):
 
 - The walk leaves a COMPOSITION root's `composer` alone, so a constraint in the party the OPT names there can no longer make `Generate` fail.
 - The builder entry of `TestREQ107_CorpusRatchet` runs under `RandomFill` too.
