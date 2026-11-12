@@ -47,10 +47,12 @@ package canxml
 // not an item of the document, so both codecs name it one way and a
 // consumer of either format hands the validators one list. The pointer
 // is a [Pointer], which writes its text only when asked, so a caller that
-// only counts the members pays nothing for the text. It carries no value
-// from the input. The members of one element are reported as the element
-// closes, in the order the RM declares the attributes (an ancestor's before
-// the class's own), so the members of the elements inside it come first.
+// only counts the members pays nothing for the text, and a caller that
+// validates the value hands the pointers as they are to the validation
+// package's WithMissingPointers. It carries no value from the input. The
+// members of one element are reported as the element closes, in the order
+// the RM declares the attributes (an ancestor's before the class's own), so
+// the members of the elements inside it come first.
 // Nothing inside a nilled element is reported: the member is reported once,
 // by its parent, as a `null` is in canonical JSON.
 //

@@ -85,9 +85,10 @@ func WithLimits(l Limits) Option {
 // rules of a compiled template when the caller gives one, and the Reference
 // Model rules always. It holds its settings only, never what belongs to one
 // call: a decode's report of the members a document leaves out travels with
-// the call, as [WithMissing]. Build it once with [New] and share it between
-// goroutines; nothing a call does changes it. The zero Validator, and a nil
-// *Validator, behave as one built by New with no options.
+// the call, as [WithMissing] or [WithMissingPointers]. Build it once with
+// [New] and share it between goroutines; nothing a call does changes it.
+// The zero Validator, and a nil *Validator, behave as one built by New with
+// no options.
 //
 // The package-level functions, [Validate], [ValidateComposition],
 // [ValidateRM] and the others, behave as a Validator built with no options.
