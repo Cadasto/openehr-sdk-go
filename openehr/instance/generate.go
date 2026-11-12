@@ -4000,8 +4000,8 @@ var errNoEHRScheme = errors.New("the C_STRING accepts no DV_EHR_URI value with t
 // the ehr scheme, so a list keeps its example value and RandomFill its
 // draw, or when it is empty, which finishValue replaces with the
 // placeholder the RM's mandatory value needs. Else it is the first list
-// member with the ehr scheme that cs accepts, or with no list the
-// shortest string with the ehr scheme that cs's pattern builds and
+// member with the ehr scheme that cs accepts, or with no list or an open
+// one the shortest string with the ehr scheme that cs's pattern builds and
 // accepts (cstringvalue.First), and else ehrURIPlaceholder when cs accepts
 // it, as a C_STRING with neither a list nor a pattern does, whose pick,
 // the example, has no scheme. It returns errNoEHRScheme when cs accepts
@@ -4074,7 +4074,8 @@ const defaultTransition = "535"
 // stringForConstraint picks stays where its scheme is ehr, so a list keeps
 // its example value and RandomFill its draw. Otherwise the value is the
 // first list member with the ehr scheme the C_STRING accepts, or with no
-// list a string with the ehr scheme its pattern builds and accepts, else
+// list or an open one a string with the ehr scheme its pattern builds and
+// accepts, else
 // the placeholder ehr://example (populatePrimitiveDefault) where the
 // C_STRING admits it, as one with neither a list nor a pattern does, whose
 // pick, the example, has no scheme (see ehrSchemeValue). Where the
@@ -4135,11 +4136,12 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 		// DV_EHR_URI Scheme_valid narrows the value. The pick stays where
 		// its scheme is ehr, so a list keeps its example value and
 		// RandomFill its draw. Otherwise the first list member with the
-		// ehr scheme gets it, or with no list one its pattern builds, and
-		// else the placeholder, as where the OPT leaves the value silent
-		// (populatePrimitiveDefault). A C_STRING that admits none of these
-		// is refused. An empty pick stays, for
-		// finishValue to replace with the placeholder.
+		// ehr scheme gets it, or, with no list or an open one, a string
+		// with the ehr scheme the pattern builds, and else the
+		// placeholder, as where the OPT leaves the value silent
+		// (populatePrimitiveDefault). A C_STRING that admits none of
+		// these is refused. An empty pick stays, for finishValue to
+		// replace with the placeholder.
 		if attr == "value" && err == nil {
 			s, err = ehrSchemeValue(cs, s)
 		}

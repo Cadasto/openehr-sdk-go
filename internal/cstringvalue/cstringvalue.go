@@ -29,8 +29,9 @@ const AnyActionArchetype = "/.*/"
 var ErrNoValue = errors.New("no string satisfies the C_STRING constraint")
 
 // Pick returns a string cs accepts: example when cs accepts it, else the
-// first list member cs accepts, else, for a pattern-only constraint, a
-// string the pattern's syntax builds. That is the shortest build where it
+// first list member cs accepts, else, where cs lists no string or its
+// list is open (AOM 1.4 list_open, which names values without limiting the
+// string to them), a string the pattern's syntax builds. That is the shortest build where it
 // is not empty; where it is empty, which an attribute such as
 // DV_TEXT.value refuses, a non-empty build with one repetition of the
 // first optional or starred part that yields a character. Where cs refuses
@@ -56,7 +57,7 @@ func Pick(cs constraints.CString, example any) (string, error) {
 			return member, nil
 		}
 	}
-	if len(cs.List) == 0 && cs.Pattern != "" {
+	if (len(cs.List) == 0 || cs.ListOpen) && cs.Pattern != "" {
 		if v, ok := patternPick(cs.Pattern, accepts); ok {
 			return v, nil
 		}
@@ -65,21 +66,18 @@ func Pick(cs constraints.CString, example any) (string, error) {
 }
 
 // First returns the first string that both cs and keep accept: a list
-// member, in list order, or, where cs lists none, a string its pattern
-// builds, shortest first, from the bounded search [Pick] makes when its
-// first builds are refused. ok is false when there is none, as for a
-// constraint with neither a list nor a pattern.
+// member, in list order, or, where cs lists none or its list is open, a
+// string its pattern builds, shortest first, from the bounded search
+// [Pick] makes when its first builds are refused. ok is false when there
+// is none, as for a constraint with no pattern and a closed or empty list.
 func First(cs constraints.CString, keep func(string) bool) (string, bool) {
 	accepts := func(v string) bool { return keep(v) && len(cs.Validate(v)) == 0 }
-	if len(cs.List) > 0 {
-		for _, member := range cs.List {
-			if accepts(member) {
-				return member, true
-			}
+	for _, member := range cs.List {
+		if accepts(member) {
+			return member, true
 		}
-		return "", false
 	}
-	if cs.Pattern == "" {
+	if len(cs.List) > 0 && !cs.ListOpen || cs.Pattern == "" {
 		return "", false
 	}
 	re, ok := parse(cs.Pattern)
@@ -121,8 +119,8 @@ func parse(pattern string) (*syntax.Regexp, bool) {
 	return re.Simplify(), true
 }
 
-// patternPick returns the string [Pick] takes for a pattern-only C_STRING
-// whose pattern is pattern, judged by accepts. ok is false when the
+// patternPick returns the string [Pick] takes from the pattern of a
+// C_STRING with no list or an open one, judged by accepts. ok is false when the
 // pattern does not parse, matches nothing, or accepts no string the search
 // builds, the empty string included.
 func patternPick(pattern string, accepts func(string) bool) (string, bool) {
