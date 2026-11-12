@@ -28,11 +28,12 @@ package canjson
 // name under the pointer of the object that lacks it, each item of a list by
 // its position counted from 0 and each entry of a `Hash` by its key. The
 // pointer is a [Pointer], which writes its text only when asked, so a caller
-// that only counts the members pays nothing for the text. It carries no value
-// from the input. The members of one object are
-// reported as the object is read to its end, in the order the RM declares
-// the attributes (an ancestor's before the class's own), so the members of
-// the objects inside it come first.
+// that only counts the members pays nothing for the text, and a caller that
+// validates the value hands the pointers as they are to the validation
+// package's WithMissingPointers. It carries no value from the input. The
+// members of one object are reported as the object is read to its end, in
+// the order the RM declares the attributes (an ancestor's before the class's
+// own), so the members of the objects inside it come first.
 //
 // The members are checked once the decode has succeeded, against the RM's
 // own attribute lists, in the same pass that serves [WithUnmatched]: fn runs

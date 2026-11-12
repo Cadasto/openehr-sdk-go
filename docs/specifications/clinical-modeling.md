@@ -1480,6 +1480,13 @@ func ValidateXML(data []byte, root any, c *templatecompile.Compiled) Result
 type ValidateOption func(/* unexported */)
 func WithMissing(pointers []string) ValidateOption
 
+// The same report as either codec's pointer values, read without their text.
+func WithMissingPointers[P interface {
+	comparable
+	Parent() (P, bool)
+	Token() string
+}](pointers []P) ValidateOption
+
 // Deprecated: ValidateJSON(data, new(rm.EHRStatus), nil) reads presence at
 // every level; this entry remains as that call.
 func ValidateRMEHRStatusBytes(data []byte) Result
@@ -1652,7 +1659,9 @@ Interface-, pointer- and slice-typed mandatories are unaffected, nil being a rel
 The floor closes this by reading what the decode found missing, the report of missing members [wire.md § REQ-175](wire.md#req-175--missing-members-on-decode) defines ([ADR 0033](../adr/0033-missing-members-reported-by-decoders.md)).
 
 - Every value-based entry, `ValidateRM`, `Validate` and `Validator.Validate`, **MUST** accept such a report through `WithMissing`, a trailing option, so a caller that decodes with a codec's report option hands the pointers on and validates once; the typed sugars take none and are for a value with no report.
-  A nil option, an empty list and a repeated option are read as the union of what was given.
+  `WithMissingPointers` **MUST** accept the report as either codec's pointer values and read them without writing their text, giving what `WithMissing` of their text gives, with a cost of reading the report into the walk that grows with the distinct members on the report's paths, not with each member's depth times their number.
+  Each finding's own issue path is written as it is without a report.
+  A nil option, an empty list and a repeated option, of either kind and in any mix, are read as the union of what was given.
 - `ValidateJSON` and `ValidateXML`, and their `Validator` methods, **MUST** decode `data` into `root`, a non-nil pointer to one registered RM value, read the document's missing members, and validate `root` with that report in one call, returning what `Validator.Validate(root, c, WithMissing(…))` returns: with a nil `c` the RM rules alone, with a compiled template the template rules too ([§ REQ-102](#req-102--composition-validation)), under the entry's own limits.
   The decode is the codec's default decode: unmatched content is ignored ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)), and `root` holds the decoded value afterwards, so a caller that wants the value and the result decodes once.
 - A reported member **MUST** be read as absent at the node its pointer names, whatever the Go value holds there, inside the one walk ([§ REQ-171 *One walk*](#one-walk)): the walk reports it as it reports any absent attribute, the template's `required` where the template requires it and the RM's `required` with the rule `mandatory` otherwise ([§ REQ-171 *Finding identity*](#finding-identity)), does not enter it and runs no other rule at its path, so its path carries that one finding.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
@@ -35,6 +36,42 @@ func ExampleValidateRM() {
 	// Output:
 	// OK: false
 	// rm_invariant at /items[at0004]
+}
+
+// Decode a document, keep the pointers the codec reports for the members it
+// leaves out, and hand them to the check. The EHR_STATUS below leaves out its
+// subject and its is_modifiable flag. Decoded, both hold their zero values,
+// which are valid ones, so only the report shows them missing.
+func ExampleWithMissingPointers() {
+	body := []byte(`{
+		"_type": "EHR_STATUS",
+		"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+		"name": {"_type": "DV_TEXT", "value": "EHR status"},
+		"archetype_details": {
+			"_type": "ARCHETYPED",
+			"archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-EHR_STATUS.generic.v1"},
+			"rm_version": "1.1.0"
+		},
+		"is_queryable": true
+	}`)
+	var missing []canjson.Pointer
+	keep := canjson.WithMissing(func(p canjson.Pointer) { missing = append(missing, p) })
+	var status rm.EHRStatus
+	if err := canjson.Unmarshal(body, &status, keep); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("OK without the report:", validation.ValidateRM(&status).OK)
+	result := validation.ValidateRM(&status, validation.WithMissingPointers(missing))
+	fmt.Println("OK with the report:", result.OK)
+	for _, issue := range result.Issues {
+		fmt.Println(issue.Code, "at", issue.Path)
+	}
+	// Output:
+	// OK without the report: true
+	// OK with the report: false
+	// required at /subject
+	// required at /is_modifiable
 }
 
 // reportOPT is a minimal operational template: a COMPOSITION whose content
