@@ -645,7 +645,14 @@ An empty `Options.Language` **SHOULD** be read as `Compiled.Language()`, and as 
 
 #### Visit rule
 
-Under every policy, `Generate` does not visit an attribute that no serialization carries, a BMM function among them, the set `rminfo.IsNonStorableAttr` names and [§ REQ-112 *Driver*](#driver) lists; an attribute the compile marks as one the node's RM class does not have (`CompiledAttribute.NotInRM`, [§ REQ-111](#req-111--public-compiled-template-bridge) *Attributes the RM does not have*), such as `ISM_TRANSITION.name`, whatever existence the OPT gives it, since no instance can carry it and the template validator leaves it out and lists its path in its coverage ([§ REQ-171 *One walk*](#one-walk)); a DV_MULTIMEDIA's `data`, whose octets bind to no OPT child ([§ REQ-102](#req-102--composition-validation) *A mandatory child under an optional list*) and which *RM defaults* below write instead; a locatable's `uid`, which *Identity* below governs; or a `COMPOSITION` root's `composer`, which `Generate` writes from `Options.Composer` (*Inputs*).
+Under every policy, `Generate` does not visit these attributes:
+
+- an attribute that no serialization carries, a BMM function among them: the set `rminfo.IsNonStorableAttr` names and [§ REQ-112 *Driver*](#driver) lists;
+- an attribute the compile marks as one the node's RM class does not have (`CompiledAttribute.NotInRM`, [§ REQ-111](#req-111--public-compiled-template-bridge) *Attributes the RM does not have*), such as `ISM_TRANSITION.name`, whatever existence the OPT gives it, since no instance can carry it and the template validator leaves it out and lists its path in its coverage ([§ REQ-171 *One walk*](#one-walk));
+- a DV_MULTIMEDIA's `data`, whose octets bind to no OPT child ([§ REQ-102](#req-102--composition-validation) *A mandatory child under an optional list*) and which *RM defaults* below write instead;
+- a locatable's `uid`, which *Identity* below governs;
+- a `COMPOSITION` root's `composer`, which `Generate` writes from `Options.Composer` (*Inputs*).
+
 Under every policy, `Generate` does not visit an attribute the generator has no writer for (§ [Exceptions and known gaps](#exceptions-and-known-gaps), *Known gap: attributes the generator cannot write*) unless it is required, as defined below, by more than its cardinality lower bound alone, which does not ask for the container (below), and is not a list that only its existence asks a member of (*What a visit writes*), which is left out (*Known gap: required lists canonical JSON cannot carry empty*); where the walk would visit one, `Generate` returns the error § [Errors](#errors) names for it, since a root without it would fail the template validator.
 An OPT child is *allowed* unless its occurrences upper bound is 0, and the OPT *prohibits* an attribute whose existence upper bound is 0, or that has at least one OPT child and allows none of them; `Generate` does not visit an attribute the OPT prohibits unless an RM rule needs it (§ [Precedence](#precedence)), though it writes such a list present and empty where its existence asks for it (*What a visit writes*).
 Wherever this requirement says the BMM marks an attribute mandatory, it reads the BMM on the class the walk builds for the attribute's node: a concrete descendant for a node that names an abstract class (*What a visit writes*), and the type *Generic and untyped types* gives an untyped one.
@@ -819,7 +826,10 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
    - `Accuracy_is_percent_validity` with `Accuracy_validity` narrows a percentage `accuracy` to more than 0 and at most 100, or, where the OPT admits no such accuracy, its `accuracy_is_percent` to false where the OPT admits that;
    - `Normal_range_and_status_consistency` narrows an ordered value whose `normal_status` is `N` into its `normal_range` and one with another `normal_status` out of it, where the value and the range's bounds are a pair § Contract *Intervals* says the generator can compare;
    - the lower bound -1 of a `DV_QUANTITY`'s or `DV_PROPORTION`'s `precision` ([§ REQ-112](#req-112--template-less-reference-model-validation-floor)) narrows a precision range that reaches below it;
-   - `Scheme_valid` narrows a `DV_EHR_URI`'s `value` to the `ehr` scheme: the first value with that scheme the OPT lists, else `ehr://example` where the OPT admits it.
+   - `Scheme_valid` narrows a `DV_EHR_URI`'s `value` to the `ehr` scheme.
+     The value § Contract *Leaf values* gives stays where it has that scheme.
+     Otherwise the generator writes the first value with that scheme the OPT lists, or, where the OPT lists none, one its pattern admits, and else `ehr://example` where the OPT admits it.
+     An empty value, which only a pattern that admits nothing else gives, is not narrowed: it gets the placeholder (§ [Exceptions and known gaps](#exceptions-and-known-gaps)).
 
    A `C_INTEGER`, a `C_DV_ORDINAL` value or a `precision` range that reaches past the 32-bit range of an RM `Integer` is refused when the template is read: its text does not decode as an `Integer` ([wire.md § REQ-056](wire.md#req-056)), whose range [wire.md § Floating-point precision](wire.md#floating-point-precision) gives.
    So the generator meets none.
