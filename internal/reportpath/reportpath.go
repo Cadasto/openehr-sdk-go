@@ -89,6 +89,43 @@ func (p *Node) SetToken(s string) {
 	p.text = s
 }
 
+// Parent returns the path before p's last segment, the node p was made from,
+// and true. For the empty path it returns nil and false. It writes no text,
+// so the paths of the members of one object give one parent, which compares
+// equal with ==.
+func (p *Node) Parent() (*Node, bool) {
+	if p == nil {
+		return nil, false
+	}
+	return p.parent, true
+}
+
+// Last returns p's last segment as a value, never escaped: the text of a
+// [Node.Token] or [Node.Name] node as given, the position of a [Node.Index]
+// node in decimal, and the segment of an XML element, attribute or text node
+// as written without its leading "/", such as "folders[10]", "@lang" and
+// "text()". It returns "" for the empty path. It writes none of the path's
+// text, and allocates only for text the node does not hold: a position in
+// decimal, and the segment of an element or an attribute.
+func (p *Node) Last() string {
+	if p == nil {
+		return ""
+	}
+	switch p.kind {
+	case kindToken, kindName:
+		return p.text
+	case kindIndex:
+		return strconv.Itoa(p.n)
+	case kindElement:
+		return p.text + "[" + strconv.Itoa(p.n) + "]"
+	case kindAttr:
+		return "@" + p.text
+	case kindText:
+		return textSegment[1:]
+	}
+	panic(errKind)
+}
+
 // Len returns the length of the path's text, in bytes.
 func (p *Node) Len() int {
 	n := 0

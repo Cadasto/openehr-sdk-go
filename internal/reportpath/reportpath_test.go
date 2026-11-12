@@ -3,11 +3,13 @@ package reportpath_test
 // reportpath_test.go: REQ-170 and REQ-175 (wire.md § REQ-170 *Report*,
 // § REQ-175 *Identification*). A node writes the JSON Pointer or XML path
 // text the report options pass, shares the nodes of the path before it, and
-// keeps its text once a later sibling is made.
+// keeps its text once a later sibling is made. It gives its parent and its
+// own segment, unescaped, without writing any text.
 
 import (
 	"bytes"
 	"encoding/json/jsontext"
+	"strings"
 	"testing"
 	"unsafe"
 
@@ -72,6 +74,93 @@ func TestNodeSetToken(t *testing.T) {
 	entry.SetToken("en~1")
 	if got, want := member.String(), "/details/en~01/use"; got != want {
 		t.Errorf("String() after SetToken = %q, want %q", got, want)
+	}
+	if got, want := entry.Last(), "en~1"; got != want {
+		t.Errorf("Last() after SetToken = %q, want %q", got, want)
+	}
+	if parent, ok := member.Parent(); !ok || parent != entry {
+		t.Errorf("member.Parent() = %p, %t, want the entry %p, true", parent, ok, entry)
+	}
+}
+
+// escapeToken escapes s as one JSON Pointer reference token (RFC 6901).
+var escapeToken = strings.NewReplacer("~", "~0", "/", "~1").Replace
+
+// TestNodeParentAndLast holds that a node gives the node it was made from as
+// its parent, and its own segment as a value: a token or a name as given,
+// never escaped, a position in decimal, and an XML segment as written
+// without its leading "/". The parent's text, "/" and the escaped segment
+// give the node's text.
+func TestNodeParentAndLast(t *testing.T) {
+	var root *reportpath.Node
+	folder := root.Element("folder", 1)
+	items := root.Token("items")
+	rows := []struct {
+		name   string
+		parent *reportpath.Node
+		node   *reportpath.Node
+		want   string
+	}{
+		{name: "token", parent: root, node: root.Token("content"), want: "content"},
+		{name: "token with escape characters", parent: items, node: items.Token("a~b/c~/"), want: "a~b/c~/"},
+		{name: "token that reads escaped", parent: items, node: items.Token("~0~1"), want: "~0~1"},
+		{name: "empty token", parent: root, node: root.Token(""), want: ""},
+		{name: "token of several bytes per rune", parent: items, node: items.Token("é/ü"), want: "é/ü"},
+		{name: "name", parent: folder, node: folder.Name("x-note"), want: "x-note"},
+		{name: "index 0", parent: items, node: items.Index(0), want: "0"},
+		{name: "index", parent: items, node: items.Index(12345), want: "12345"},
+		{name: "element", parent: folder, node: folder.Element("folders", 10), want: "folders[10]"},
+		{name: "root element", parent: root, node: folder, want: "folder[1]"},
+		{name: "attribute", parent: folder, node: folder.Attr("lang"), want: "@lang"},
+		{name: "text", parent: folder, node: folder.Text(), want: "text()"},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			parent, ok := row.node.Parent()
+			if !ok || parent != row.parent {
+				t.Errorf("Parent() = %p (%q), %t, want %p (%q), true", parent, parent.String(), ok, row.parent, row.parent.String())
+			}
+			got := row.node.Last()
+			if got != row.want {
+				t.Errorf("Last() = %q, want %q", got, row.want)
+			}
+			if joined := parent.String() + "/" + escapeToken(got); joined != row.node.String() {
+				t.Errorf("parent text + \"/\" + escaped Last() = %q, want String() = %q", joined, row.node.String())
+			}
+		})
+	}
+}
+
+// TestNodeRootHasNoParent holds that the empty path has no parent and no
+// segment.
+func TestNodeRootHasNoParent(t *testing.T) {
+	var root *reportpath.Node
+	if parent, ok := root.Parent(); ok || parent != nil {
+		t.Errorf("root Parent() = %p, %t, want nil, false", parent, ok)
+	}
+	if got := root.Last(); got != "" {
+		t.Errorf("root Last() = %q, want %q", got, "")
+	}
+}
+
+var (
+	parentSink *reportpath.Node
+	lastSink   string
+)
+
+// TestNodeParentAndLastAllocateNothing holds that reading a node's parent,
+// and the token, name or small position it holds, allocates nothing: a
+// consumer walks a report's paths without writing their text.
+func TestNodeParentAndLastAllocateNothing(t *testing.T) {
+	var root *reportpath.Node
+	for _, node := range []*reportpath.Node{root.Token("a~b/c"), root.Name("x-note"), root.Index(7), root.Element("a", 1).Text()} {
+		allocs := testing.AllocsPerRun(100, func() {
+			parentSink, _ = node.Parent()
+			lastSink = node.Last()
+		})
+		if allocs != 0 {
+			t.Errorf("Parent() and Last() of %q allocate %v times, want 0", node.String(), allocs)
+		}
 	}
 }
 
