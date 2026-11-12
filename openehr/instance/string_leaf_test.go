@@ -138,16 +138,21 @@ func TestREQ107_StringLeafPatternOnDVTextValue(t *testing.T) {
 // TestREQ107_StringLeafPatternAdmittingEmptyGetsNonEmpty is the REQ-107
 // check that a C_STRING pattern on DV_TEXT.value whose shortest match is
 // the empty string, which the RM refuses there, gets a non-empty match:
-// x? gives "x", and the root passes the template validator and the RM
-// floor.
+// x? gives "x", and x?\By?, which refuses "x" for its word boundary, gives
+// "xy". The root passes the template validator and the RM floor.
 func TestREQ107_StringLeafPatternAdmittingEmptyGetsNonEmpty(t *testing.T) {
-	c := compileSyntheticOPT(t, editOPT(t, textPatternOPT, textValueListXYZ, "<pattern>x?</pattern>"))
-	for _, opts := range stringLeafFills() {
-		root, doc := generateWithJSON(t, c, opts)
-		if got := elementValue(t, doc, "at0031")["value"]; got != "x" {
-			t.Errorf("ValueFill %v: DV_TEXT.value = %v, want x", opts.ValueFill, got)
+	for _, tc := range []struct{ pattern, want string }{
+		{pattern: `x?`, want: "x"},
+		{pattern: `x?\By?`, want: "xy"},
+	} {
+		c := compileSyntheticOPT(t, editOPT(t, textPatternOPT, textValueListXYZ, "<pattern>"+tc.pattern+"</pattern>"))
+		for _, opts := range stringLeafFills() {
+			root, doc := generateWithJSON(t, c, opts)
+			if got := elementValue(t, doc, "at0031")["value"]; got != tc.want {
+				t.Errorf("pattern %s, ValueFill %v: DV_TEXT.value = %v, want %s", tc.pattern, opts.ValueFill, got, tc.want)
+			}
+			validateClean(t, root, c)
 		}
-		validateClean(t, root, c)
 	}
 }
 

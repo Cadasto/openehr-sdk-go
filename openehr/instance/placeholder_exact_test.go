@@ -307,14 +307,19 @@ func optEHRURIElement(body string) string {
 // picks stays where its scheme is ehr: a list keeps its first member under
 // ExampleFill, even beside the placeholder, and a listed member under
 // RandomFill, and a pattern of the ehr scheme keeps its own pick or draw.
-// Where the pick has no ehr scheme, the first list member with the ehr
-// scheme that the C_STRING accepts is written, so a list that names a
-// value without it first gives its ehr member under either fill. Else the
-// placeholder ehr://example is written where the C_STRING admits it, as
-// one with neither a list nor a pattern, one with an empty list, and the
-// pattern .* do, whose pick example has no scheme. The root passes the RM
-// floor and the template validator under every policy and both value
-// fills.
+// The scheme is compared without regard to case, so a list holding only
+// EHR://a keeps it. Where the pick has no ehr scheme, the first list
+// member with the ehr scheme that the C_STRING accepts is written, so a
+// list that names a value without it first gives its ehr member under
+// either fill, and with no list the shortest string with the ehr scheme
+// that the pattern builds and accepts, so a pattern naming another scheme
+// first gives its ehr alternative. Else the placeholder ehr://example is
+// written where the C_STRING admits it, as one with neither a list nor a
+// pattern, one with an empty list, and the pattern .* do, whose pick
+// example has no scheme. A pattern whose first non-empty build it refuses
+// itself gets a longer one, not the placeholder it refuses. The root
+// passes the RM floor and the template validator under every policy and
+// both value fills.
 func TestREQ107_EHRURIValueNarrowedToTheEHRScheme(t *testing.T) {
 	cases := []struct {
 		name string
@@ -340,6 +345,14 @@ func TestREQ107_EHRURIValueNarrowedToTheEHRScheme(t *testing.T) {
 		{
 			name:    "list naming a value without the ehr scheme first",
 			body:    "<list>http://x</list><list>ehr://a</list>",
+			example: "ehr://a",
+			random:  []string{"ehr://a"},
+		},
+		{name: "list in the ehr scheme spelled in capitals", body: "<list>EHR://a</list>", example: "EHR://a", random: []string{"EHR://a"}},
+		{name: "pattern naming another scheme first", body: "<pattern>http://x|ehr://a</pattern>", example: "ehr://a", random: []string{"ehr://a"}},
+		{
+			name:    "pattern refusing its first non-empty build",
+			body:    `<pattern>(?:x?\B|ehr://a)?</pattern>`,
 			example: "ehr://a",
 			random:  []string{"ehr://a"},
 		},

@@ -104,9 +104,11 @@ func TestREQ107PickOrder(t *testing.T) {
 // C_STRING whose shortest match is the empty string, which an RM attribute
 // such as DV_TEXT.value refuses: Pick builds one repetition of the first
 // optional or starred part that yields a character, or the first
-// alternative that yields one, and keeps the empty string only where the
-// pattern admits nothing else it builds, or where the constraint refuses
-// what it builds. The example and the list members keep their precedence.
+// alternative that yields one; where the pattern refuses that string, as a
+// word boundary can, or refuses its shortest build, Pick takes the shortest
+// string of a wider search the pattern accepts, and keeps the empty string
+// only where the pattern accepts no other string it builds. The example and
+// the list members keep their precedence.
 func TestREQ107PickPrefersANonEmptyMatch(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -124,6 +126,9 @@ func TestREQ107PickPrefersANonEmptyMatch(t *testing.T) {
 		{name: "an anchored optional literal", pattern: `^x?$`, example: "example", want: "x"},
 		{name: "a pattern that admits only the empty string", pattern: `x{0}`, example: "example", want: ""},
 		{name: "a non-empty build the constraint refuses", pattern: `x?\B`, example: "example", want: ""},
+		{name: "a longer build where the first non-empty one is refused", pattern: `x?\By?`, example: "example", want: "xy"},
+		{name: "a later alternative where the first one's build is refused", pattern: `(?:x?\B|ehr://a)?`, example: "example", want: "ehr://a"},
+		{name: "another character where the shortest build is refused", pattern: `.\b.`, example: "example", want: "a-"},
 		{name: "the example keeps its precedence", pattern: `[0-9]*`, example: "42", want: "42"},
 		{name: "a list member keeps its precedence", pattern: `[0-9]*`, list: []string{"abc", "12"}, example: "example", want: "12"},
 	}
