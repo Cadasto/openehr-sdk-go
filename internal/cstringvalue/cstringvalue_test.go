@@ -2,6 +2,7 @@ package cstringvalue_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/cstringvalue"
@@ -139,6 +140,38 @@ func TestREQ107PickPrefersANonEmptyMatch(t *testing.T) {
 			got, err := cstringvalue.Pick(cs, tc.example)
 			if err != nil || got != tc.want {
 				t.Errorf("Pick(pattern %q, list %q, example %q) = %q, %v; want %q, nil", tc.pattern, tc.list, tc.example, got, err, tc.want)
+			}
+		})
+	}
+}
+
+// TestREQ107FirstFindsAValueTheCallerKeeps pins First, which the
+// generator's DV_EHR_URI narrowing uses (REQ-107): the first list member,
+// in list order, or for a pattern-only constraint the shortest string its
+// pattern builds, that both the constraint and keep accept.
+func TestREQ107FirstFindsAValueTheCallerKeeps(t *testing.T) {
+	t.Parallel()
+	ehr := func(s string) bool { return strings.HasPrefix(s, "ehr:") }
+	cases := []struct {
+		name    string
+		pattern string
+		list    []string
+		want    string
+		ok      bool
+	}{
+		{name: "a list member after one keep refuses", list: []string{"http://x", "ehr://a", "ehr://b"}, want: "ehr://a", ok: true},
+		{name: "a pattern's later alternative", pattern: `http://x|ehr://[a-z]+`, want: "ehr://a", ok: true},
+		{name: "a list keep refuses throughout", list: []string{"http://x"}},
+		{name: "a pattern keep refuses throughout", pattern: `http://.+`},
+		{name: "neither a pattern nor a list", list: nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cs := constraints.NewCString(tc.pattern, tc.list, "")
+			got, ok := cstringvalue.First(cs, ehr)
+			if got != tc.want || ok != tc.ok {
+				t.Errorf("First(pattern %q, list %q) = %q, %t; want %q, %t", tc.pattern, tc.list, got, ok, tc.want, tc.ok)
 			}
 		})
 	}
