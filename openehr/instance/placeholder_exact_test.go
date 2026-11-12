@@ -313,7 +313,9 @@ func optEHRURIElement(body string) string {
 // list that names a value without it first gives its ehr member under
 // either fill, and with no list the shortest string with the ehr scheme
 // that the pattern builds and accepts, so a pattern naming another scheme
-// first gives its ehr alternative. Else the placeholder ehr://example is
+// first gives its ehr alternative; an open list (list_open), which names
+// values without limiting the string to them, is read the same way. Else
+// the placeholder ehr://example is
 // written where the C_STRING admits it, as one with neither a list nor a
 // pattern, one with an empty list, and the pattern .* do, whose pick
 // example has no scheme. A pattern whose first non-empty build it refuses
@@ -350,6 +352,18 @@ func TestREQ107_EHRURIValueNarrowedToTheEHRScheme(t *testing.T) {
 		},
 		{name: "list in the ehr scheme spelled in capitals", body: "<list>EHR://a</list>", example: "EHR://a", random: []string{"EHR://a"}},
 		{name: "pattern naming another scheme first", body: "<pattern>http://x|ehr://a</pattern>", example: "ehr://a", random: []string{"ehr://a"}},
+		{
+			name:    "open list naming another scheme beside a pattern naming ehr",
+			body:    "<pattern>http://x|ehr://a</pattern><list>http://x</list><list_open>true</list_open>",
+			example: "ehr://a",
+			random:  []string{"ehr://a"},
+		},
+		{
+			name:    "open list whose member the pattern refuses",
+			body:    "<pattern>ehr://.+</pattern><list>http://x</list><list_open>true</list_open>",
+			example: "ehr://a",
+			random:  []string{"ehr://a"},
+		},
 		{
 			name:    "pattern refusing its first non-empty build",
 			body:    `<pattern>(?:x?\B|ehr://a)?</pattern>`,

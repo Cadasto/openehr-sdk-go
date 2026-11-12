@@ -89,6 +89,7 @@ func TestREQ107PickOrder(t *testing.T) {
 		{name: "open string keeps the example", cs: constraints.NewCString("", nil, ""), example: "example", want: "example"},
 		{name: "first member the pattern accepts", cs: constraints.NewCString("[0-9]+", []string{"abc", "123"}, ""), example: "abc", want: "123"},
 		{name: "shortest match of a pattern", cs: constraints.NewCString(`[A-Z]{3}-\d{2}`, nil, ""), example: "example", want: "AAA-00"},
+		{name: "an open list's pattern where no member fits", cs: openList(constraints.NewCString(`ehr://.+`, []string{"http://x"}, "")), example: "http://x", want: "ehr://a"},
 	}
 	for _, tc := range cases {
 		got, err := cstringvalue.Pick(tc.cs, tc.example)
@@ -99,6 +100,17 @@ func TestREQ107PickOrder(t *testing.T) {
 	if got, err := cstringvalue.Pick(constraints.NewCString("", nil, ""), 7); err == nil {
 		t.Errorf("Pick(example 7) = %q, nil; want an error for an example that is not a string", got)
 	}
+	closed := constraints.NewCString(`ehr://.+`, []string{"http://x"}, "")
+	if got, err := cstringvalue.Pick(closed, "http://x"); !errors.Is(err, cstringvalue.ErrNoValue) {
+		t.Errorf("Pick(closed list no member of which the pattern accepts) = %q, %v; want ErrNoValue", got, err)
+	}
+}
+
+// openList returns cs with its list open (AOM 1.4 list_open), so the
+// list names values without limiting the string to them.
+func openList(cs constraints.CString) constraints.CString {
+	cs.ListOpen = true
+	return cs
 }
 
 // TestREQ107PickPrefersANonEmptyMatch pins the pick for a pattern-only
@@ -147,8 +159,9 @@ func TestREQ107PickPrefersANonEmptyMatch(t *testing.T) {
 
 // TestREQ107FirstFindsAValueTheCallerKeeps pins First, which the
 // generator's DV_EHR_URI narrowing uses (REQ-107): the first list member,
-// in list order, or for a pattern-only constraint the shortest string its
-// pattern builds, that both the constraint and keep accept.
+// in list order, or, where the constraint lists none or its list is open,
+// the shortest string its pattern builds, that both the constraint and
+// keep accept.
 func TestREQ107FirstFindsAValueTheCallerKeeps(t *testing.T) {
 	t.Parallel()
 	ehr := func(s string) bool { return strings.HasPrefix(s, "ehr:") }
@@ -156,11 +169,14 @@ func TestREQ107FirstFindsAValueTheCallerKeeps(t *testing.T) {
 		name    string
 		pattern string
 		list    []string
+		open    bool
 		want    string
 		ok      bool
 	}{
 		{name: "a list member after one keep refuses", list: []string{"http://x", "ehr://a", "ehr://b"}, want: "ehr://a", ok: true},
 		{name: "a pattern's later alternative", pattern: `http://x|ehr://[a-z]+`, want: "ehr://a", ok: true},
+		{name: "an open list's pattern", pattern: `http://x|ehr://a`, list: []string{"http://x"}, open: true, want: "ehr://a", ok: true},
+		{name: "a closed list keeps to its members", pattern: `http://x|ehr://a`, list: []string{"http://x"}},
 		{name: "a list keep refuses throughout", list: []string{"http://x"}},
 		{name: "a pattern keep refuses throughout", pattern: `http://.+`},
 		{name: "neither a pattern nor a list", list: nil},
@@ -169,9 +185,10 @@ func TestREQ107FirstFindsAValueTheCallerKeeps(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			cs := constraints.NewCString(tc.pattern, tc.list, "")
+			cs.ListOpen = tc.open
 			got, ok := cstringvalue.First(cs, ehr)
 			if got != tc.want || ok != tc.ok {
-				t.Errorf("First(pattern %q, list %q) = %q, %t; want %q, %t", tc.pattern, tc.list, got, ok, tc.want, tc.ok)
+				t.Errorf("First(pattern %q, list %q, open %t) = %q, %t; want %q, %t", tc.pattern, tc.list, tc.open, got, ok, tc.want, tc.ok)
 			}
 		})
 	}
