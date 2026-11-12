@@ -828,7 +828,7 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
    - the lower bound -1 of a `DV_QUANTITY`'s or `DV_PROPORTION`'s `precision` ([§ REQ-112](#req-112--template-less-reference-model-validation-floor)) narrows a precision range that reaches below it;
    - `Scheme_valid` narrows a `DV_EHR_URI`'s `value` to the `ehr` scheme.
      The value § Contract *Leaf values* gives stays where it has that scheme.
-     Otherwise the generator writes the first value with that scheme the OPT lists, or, where the OPT lists none, one its pattern admits, and else `ehr://example` where the OPT admits it.
+     Otherwise the generator writes the first value with that scheme the OPT lists, or, where the OPT lists none or leaves its list open, one its pattern admits, and else `ehr://example` where the OPT admits it.
      An empty value, which only a pattern that admits nothing else gives, is not narrowed: it gets the placeholder (§ [Exceptions and known gaps](#exceptions-and-known-gaps)).
 
    A `C_INTEGER`, a `C_DV_ORDINAL` value or a `precision` range that reaches past the 32-bit range of an RM `Integer` is refused when the template is read: its text does not decode as an `Integer` ([wire.md § REQ-056](wire.md#req-056)), whose range [wire.md § Floating-point precision](wire.md#floating-point-precision) gives.
