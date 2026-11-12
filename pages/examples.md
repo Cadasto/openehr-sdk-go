@@ -75,7 +75,8 @@ The first form validates a bundled composition that passes, `-corpus`
 validates demo data that reports issues, and two paths validate your own
 files.
 
-Packages: `rm`, `canjson`, `template`, `templatecompile`, `validation`.
+Packages: `openehr/rm`, `openehr/aom/aom14`, `openehr/templatecompile`,
+`openehr/validation`.
 
 ## Build an AQL query {#aql-build}
 
