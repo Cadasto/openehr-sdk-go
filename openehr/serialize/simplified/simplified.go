@@ -104,12 +104,13 @@ func (c decodeConfig) tracked() bool {
 // conventions; these are synthesised defaults, not recovered data. A
 // HISTORY whose "<observation>/history_origin" the body leaves out takes the
 // earliest time its own events carry, compared as instants, else the start
-// time, and an event with no time takes its HISTORY's origin. An ACTIVITY with no action_archetype_id takes the one
-// the instance generator writes on its own template node: a value the first
-// C_STRING that node allows on that attribute accepts, or the default /.*/
-// where that C_STRING has neither a list nor a pattern, or the node allows
-// none there. Decode leaves the id out where that C_STRING accepts no value
-// the generator builds. A composition category the body does not spell is the one
+// time, and an event with no time takes its HISTORY's origin. An ACTIVITY
+// with no action_archetype_id takes the one the instance generator writes on
+// its own template node: the default /.*/ where the first C_STRING that node
+// allows on that attribute lists no string and admits it, as one with
+// neither a list nor a pattern does, or where the node allows none there,
+// and otherwise a value that C_STRING accepts, a member where it has a list. Decode leaves the id out where that C_STRING accepts
+// no value the generator builds. A composition category the body does not spell is the one
 // the template fixes, a single openehr code such as 431|persistent, or else
 // 433|event. An empty structure (an ITEM_TREE or ITEM_LIST with no
 // items, say) that the template requires and allows to stay empty has no key

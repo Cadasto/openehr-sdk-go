@@ -58,3 +58,30 @@ func TestREQ107_ComposerIsWrittenAsGiven(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_ComposerSubtreeIsNotWalked is the REQ-107 check that the walk
+// leaves a COMPOSITION's composer alone, so a constraint inside the party
+// the OPT names there cannot make Generate fail: a PARTY_IDENTIFIED whose
+// name a C_STRING pins to a list no member of which its pattern admits,
+// which Generate refuses as unsatisfiable wherever it builds that party.
+// The root's composer is Options.Composer, as given, under every policy,
+// both value fills and both compile modes.
+func TestREQ107_ComposerSubtreeIsNotWalked(t *testing.T) {
+	unsatisfiable := optSingle("composer", optNode("PARTY_IDENTIFIED", "",
+		optStringAttr("name", "<list>abc</list><pattern>[0-9]+</pattern>")))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, optTemplate("COMPOSITION", unsatisfiable), implicit)
+		for _, opts := range defaultsOptions() {
+			opts.Territory, opts.Composer = "NL", testComposer()
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v, want a root whose composer is the Options composer", err)
+				}
+				if got := generatedComposition(t, out).Composer; got != opts.Composer {
+					t.Errorf("COMPOSITION.composer = %#v, want the Options composer %#v as given", got, opts.Composer)
+				}
+			})
+		}
+	}
+}

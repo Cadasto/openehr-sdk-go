@@ -2,6 +2,7 @@ package cstringvalue_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/cstringvalue"
@@ -12,8 +13,9 @@ import (
 // TestREQ107ActionArchetypeIDFollowsTheConstraint pins the value the
 // generator writes on an ACTIVITY's action_archetype_id (REQ-107), which the FLAT
 // decode's template completion (REQ-053) takes from the same function: the
-// RM default where the C_STRING names no archetype, else the example the
-// constraint accepts, a list member, or the shortest match of a pattern.
+// RM default where the C_STRING lists no string and admits it, else the
+// example the constraint accepts, a list member, or the shortest match of a
+// pattern.
 func TestREQ107ActionArchetypeIDFollowsTheConstraint(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -32,9 +34,22 @@ func TestREQ107ActionArchetypeIDFollowsTheConstraint(t *testing.T) {
 			want: "openEHR-EHR-ACTION.minimal.v1",
 		},
 		{
-			name: "a pattern the example matches",
+			// The example matches too, but names no archetype.
+			name: "a pattern that admits the RM default",
 			cs:   constraints.NewCString(`.*`, nil, ""),
-			want: "example",
+			want: cstringvalue.AnyActionArchetype,
+		},
+		{
+			// A list gives values, so the RM default, though listed, does
+			// not come before Pick's member.
+			name: "a pattern and a list that both admit the RM default",
+			cs:   constraints.NewCString(`.*`, []string{"openEHR-EHR-ACTION.one.v1", cstringvalue.AnyActionArchetype}, ""),
+			want: "openEHR-EHR-ACTION.one.v1",
+		},
+		{
+			name: "a pattern that admits the RM default, and a list that does not",
+			cs:   constraints.NewCString(`.*`, []string{"openEHR-EHR-ACTION.one.v1"}, ""),
+			want: "openEHR-EHR-ACTION.one.v1",
 		},
 		{
 			name: "a list",
@@ -61,8 +76,8 @@ func TestREQ107ActionArchetypeIDFollowsTheConstraint(t *testing.T) {
 
 // TestREQ107PickOrder pins the order of choice of Pick: the example when the
 // constraint accepts it, then the first list member it accepts, then, with no
-// list, the shortest string the pattern builds; and an example that is not a
-// string is an error.
+// list, the shortest string the pattern builds, a non-empty one where that is
+// empty; and an example that is not a string is an error.
 func TestREQ107PickOrder(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -74,6 +89,7 @@ func TestREQ107PickOrder(t *testing.T) {
 		{name: "open string keeps the example", cs: constraints.NewCString("", nil, ""), example: "example", want: "example"},
 		{name: "first member the pattern accepts", cs: constraints.NewCString("[0-9]+", []string{"abc", "123"}, ""), example: "abc", want: "123"},
 		{name: "shortest match of a pattern", cs: constraints.NewCString(`[A-Z]{3}-\d{2}`, nil, ""), example: "example", want: "AAA-00"},
+		{name: "an open list's pattern where no member fits", cs: openList(constraints.NewCString(`ehr://.+`, []string{"http://x"}, "")), example: "http://x", want: "ehr://a"},
 	}
 	for _, tc := range cases {
 		got, err := cstringvalue.Pick(tc.cs, tc.example)
@@ -83,6 +99,98 @@ func TestREQ107PickOrder(t *testing.T) {
 	}
 	if got, err := cstringvalue.Pick(constraints.NewCString("", nil, ""), 7); err == nil {
 		t.Errorf("Pick(example 7) = %q, nil; want an error for an example that is not a string", got)
+	}
+	closed := constraints.NewCString(`ehr://.+`, []string{"http://x"}, "")
+	if got, err := cstringvalue.Pick(closed, "http://x"); !errors.Is(err, cstringvalue.ErrNoValue) {
+		t.Errorf("Pick(closed list no member of which the pattern accepts) = %q, %v; want ErrNoValue", got, err)
+	}
+}
+
+// openList returns cs with its list open (AOM 1.4 list_open), so the
+// list names values without limiting the string to them.
+func openList(cs constraints.CString) constraints.CString {
+	cs.ListOpen = true
+	return cs
+}
+
+// TestREQ107PickPrefersANonEmptyMatch pins the pick for a pattern-only
+// C_STRING whose shortest match is the empty string, which an RM attribute
+// such as DV_TEXT.value refuses: Pick builds one repetition of the first
+// optional or starred part that yields a character, or the first
+// alternative that yields one; where the pattern refuses that string, as a
+// word boundary can, or refuses its shortest build, Pick takes the shortest
+// string of a wider search the pattern accepts, and keeps the empty string
+// only where the pattern accepts no other string it builds. The example and
+// the list members keep their precedence.
+func TestREQ107PickPrefersANonEmptyMatch(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		pattern string
+		list    []string
+		example string
+		want    string
+	}{
+		{name: "an optional literal", pattern: `x?`, example: "example", want: "x"},
+		{name: "a starred class", pattern: `[0-9]*`, example: "example", want: "0"},
+		{name: "the first optional part that yields a character", pattern: `(ab)?c?`, example: "example", want: "ab"},
+		{name: "the first alternative's shortest match", pattern: `a|b?`, example: "example", want: "a"},
+		{name: "the first alternative that yields a character", pattern: `b?|a`, example: "example", want: "b"},
+		{name: "an anchored optional literal", pattern: `^x?$`, example: "example", want: "x"},
+		{name: "a pattern that admits only the empty string", pattern: `x{0}`, example: "example", want: ""},
+		{name: "a non-empty build the constraint refuses", pattern: `x?\B`, example: "example", want: ""},
+		{name: "a longer build where the first non-empty one is refused", pattern: `x?\By?`, example: "example", want: "xy"},
+		{name: "a later alternative where the first one's build is refused", pattern: `(?:x?\B|ehr://a)?`, example: "example", want: "ehr://a"},
+		{name: "another character where the shortest build is refused", pattern: `.\b.`, example: "example", want: "a-"},
+		{name: "the example keeps its precedence", pattern: `[0-9]*`, example: "42", want: "42"},
+		{name: "a list member keeps its precedence", pattern: `[0-9]*`, list: []string{"abc", "12"}, example: "example", want: "12"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cs := constraints.NewCString(tc.pattern, tc.list, "")
+			got, err := cstringvalue.Pick(cs, tc.example)
+			if err != nil || got != tc.want {
+				t.Errorf("Pick(pattern %q, list %q, example %q) = %q, %v; want %q, nil", tc.pattern, tc.list, tc.example, got, err, tc.want)
+			}
+		})
+	}
+}
+
+// TestREQ107FirstFindsAValueTheCallerKeeps pins First, which the
+// generator's DV_EHR_URI narrowing uses (REQ-107): the first list member,
+// in list order, or, where the constraint lists none or its list is open,
+// the shortest string its pattern builds, that both the constraint and
+// keep accept.
+func TestREQ107FirstFindsAValueTheCallerKeeps(t *testing.T) {
+	t.Parallel()
+	ehr := func(s string) bool { return strings.HasPrefix(s, "ehr:") }
+	cases := []struct {
+		name    string
+		pattern string
+		list    []string
+		open    bool
+		want    string
+		ok      bool
+	}{
+		{name: "a list member after one keep refuses", list: []string{"http://x", "ehr://a", "ehr://b"}, want: "ehr://a", ok: true},
+		{name: "a pattern's later alternative", pattern: `http://x|ehr://[a-z]+`, want: "ehr://a", ok: true},
+		{name: "an open list's pattern", pattern: `http://x|ehr://a`, list: []string{"http://x"}, open: true, want: "ehr://a", ok: true},
+		{name: "a closed list keeps to its members", pattern: `http://x|ehr://a`, list: []string{"http://x"}},
+		{name: "a list keep refuses throughout", list: []string{"http://x"}},
+		{name: "a pattern keep refuses throughout", pattern: `http://.+`},
+		{name: "neither a pattern nor a list", list: nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cs := constraints.NewCString(tc.pattern, tc.list, "")
+			cs.ListOpen = tc.open
+			got, ok := cstringvalue.First(cs, ehr)
+			if got != tc.want || ok != tc.ok {
+				t.Errorf("First(pattern %q, list %q, open %t) = %q, %t; want %q, %t", tc.pattern, tc.list, tc.open, got, ok, tc.want, tc.ok)
+			}
+		})
 	}
 }
 

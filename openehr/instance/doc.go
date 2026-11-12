@@ -139,8 +139,9 @@
 // rule narrows what the constraint leaves open, the value is taken from
 // what is left: a PARTY_REF's type is a party class name, a TERM_MAPPING's
 // match one of >, =, < and ?, a magnitude_status one of =, <, >, <=, >=
-// and ~, a percentage accuracy more than 0 and at most 100, a precision -1
-// or more, an ordered value with both a normal range and a normal status
+// and ~, a DV_EHR_URI's value one with the ehr scheme (ehr://example where
+// the template lists or builds none and admits it), a percentage accuracy
+// more than 0 and at most 100, a precision -1 or more, an ordered value with both a normal range and a normal status
 // inside that range where the status is N and outside it where the status
 // is any other, wherever the value compares with the range's bounds (a
 // count, a quantity in the bounds' units, a proportion of the bounds' type,

@@ -50,6 +50,16 @@ var ratchetNow = time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
 // widening the random draw past the single (1, 2) stream.
 var ratchetSeeds = [][2]uint64{{1, 2}, {3, 4}, {5, 6}}
 
+// fillSeeds returns the seeds one value fill runs with: every seed in
+// ratchetSeeds under RandomFill, and the first only under ExampleFill,
+// which ignores its source.
+func fillSeeds(fill instance.ValueFill) [][2]uint64 {
+	if fill == instance.ExampleFill {
+		return ratchetSeeds[:1]
+	}
+	return ratchetSeeds
+}
+
 // ratchetFailure is one axis of the corpus ratchet. The reason carries a
 // locator, so two distinct failures on the same axis do not share a key.
 type ratchetFailure struct {
@@ -104,10 +114,13 @@ var mediumHollowBodies = []string{
 	"templates/generic_folder.v1",
 }
 
-// corpusRatchet is the failure set measured on this tree. Policy and fill
-// are the diagnostic strings from instance.Policy and instance.ValueFill.
-// RandomFill runs once per seed in ratchetSeeds, a fresh math/rand/v2 PCG
-// source per call; a row is observed when any seed produces it.
+// corpusRatchet is the failure set measured on this tree. A row's entry is
+// generate (instance.Generate, every vendored root) or builder
+// (composition.NewBuilder and Build, COMPOSITION roots only). Policy and
+// fill are the diagnostic strings from instance.Policy and
+// instance.ValueFill. Both entries run ExampleFill once and RandomFill once
+// per seed in ratchetSeeds, a fresh math/rand/v2 PCG source per call; a row
+// is observed when any seed produces it.
 // Each reason is category plus a stable locator (type, attribute, code
 // and path, or JSON path).
 //
@@ -122,7 +135,10 @@ var mediumHollowBodies = []string{
 // design and have their hollow_body rows: any other hollow_body failure
 // there fails the ratchet.
 // The builder builds on Large when no WithPolicy is given, so its rows are
-// Large rows.
+// Large rows, under either fill. It has none: every COMPOSITION root it
+// builds passes under both fills and every seed, and each row below is on a
+// root it does not build (TestPerson.v2 is PERSON-rooted, the two generic
+// templates EHR_STATUS- and FOLDER-rooted).
 //
 // Medium rows: Medium gives an attribute at most one optional archetype,
 // its first optional archetype root. The TestPerson.v2 identifier clusters
@@ -163,8 +179,9 @@ var corpusRatchet = []ratchetFailure{
 }
 
 func TestREQ107_CorpusRatchet(t *testing.T) {
-	// PROBE-027 — Generate, then ValidateRM and the template validator,
-	// over every vendored OPT that compiles (REQ-107).
+	// PROBE-027 — Generate, and the composition builder on a COMPOSITION
+	// root, then ValidateRM and the template validator, over every vendored
+	// OPT that compiles, under both value fills (REQ-107).
 	ctx := t.Context()
 	refs, err := fixtures.ListAllOPTs()
 	if err != nil {
@@ -207,11 +224,7 @@ func TestREQ107_CorpusRatchet(t *testing.T) {
 
 		for _, policy := range []instance.Policy{instance.Large, instance.Medium, instance.Required} {
 			for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
-				seeds := ratchetSeeds
-				if fill == instance.ExampleFill {
-					seeds = seeds[:1]
-				}
-				for _, seed := range seeds {
+				for _, seed := range fillSeeds(fill) {
 					opts := instance.Options{
 						Policy:      policy,
 						Language:    "en",
@@ -254,25 +267,31 @@ func TestREQ107_CorpusRatchet(t *testing.T) {
 		if !compositionRoot {
 			continue
 		}
-		b, err := composition.NewBuilder(ctx, compiled,
-			composition.WithLanguage("en"),
-			composition.WithTerritory("NL"),
-			composition.WithComposer(fixedComposer()),
-			composition.WithNow(ratchetNow),
-		)
-		if err != nil {
-			reason := generateReason(t, err)
-			recordReason(observed, ref.Name, entryBuilder, instance.Large, instance.ExampleFill, reason)
-			continue
+		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+			for _, seed := range fillSeeds(fill) {
+				b, err := composition.NewBuilder(ctx, compiled,
+					composition.WithLanguage("en"),
+					composition.WithTerritory("NL"),
+					composition.WithComposer(fixedComposer()),
+					composition.WithNow(ratchetNow),
+					composition.WithValueFill(fill),
+					composition.WithValueSource(mrand.NewPCG(seed[0], seed[1])),
+				)
+				if err != nil {
+					reason := generateReason(t, err)
+					recordReason(observed, ref.Name, entryBuilder, instance.Large, fill, reason)
+					continue
+				}
+				comp, err := b.Build()
+				if err != nil {
+					reason := generateReason(t, err)
+					recordReason(observed, ref.Name, entryBuilder, instance.Large, fill, reason)
+					continue
+				}
+				reasons := outputReasons(t, comp, compiled, true, fill)
+				recordReasons(observed, ref.Name, entryBuilder, instance.Large, fill, reasons)
+			}
 		}
-		comp, err := b.Build()
-		if err != nil {
-			reason := generateReason(t, err)
-			recordReason(observed, ref.Name, entryBuilder, instance.Large, instance.ExampleFill, reason)
-			continue
-		}
-		reasons := outputReasons(t, comp, compiled, true, instance.ExampleFill)
-		recordReasons(observed, ref.Name, entryBuilder, instance.Large, instance.ExampleFill, reasons)
 	}
 
 	compileUnlisted, compileStale := diffStrings(setOf(compileFails), setOf(corpusCompileFailures))

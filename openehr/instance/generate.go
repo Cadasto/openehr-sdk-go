@@ -504,9 +504,10 @@ func compositionDefaultOwns(class, attrName string) bool {
 // locatable's uid, which setLocatableIdentity stamps, nor the normal_range or
 // other_reference_ranges of a bound of a REFERENCE_RANGE's range, which
 // the RM keeps absent, nor an attribute the node's RM class does not have,
-// nor a DV_MULTIMEDIA's data, which settleMultimedia writes (walkSkips). A
-// prohibited ELEMENT null_flavour the RM rule needs, because the OPT
-// prohibits value too, is visited as if the OPT allowed it. An attribute
+// nor a DV_MULTIMEDIA's data, which settleMultimedia writes, nor the
+// composer of a COMPOSITION root, which applyCompositionDefaults writes
+// (walkSkips). A prohibited ELEMENT null_flavour the RM rule needs, because
+// the OPT prohibits value too, is visited as if the OPT allowed it. An attribute
 // the generator has no writer for (noWriter) is visited only where the
 // template requires it (writerNeeded), for the walk to refuse it. Any other
 // attribute is visited when the policy says so (shouldVisit).
@@ -527,13 +528,14 @@ func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAt
 // OPT may name and the RM keeps absent, one the compile marks as absent
 // from the node's RM class (NotInRM), such as ISM_TRANSITION.name, which no
 // instance can carry and the template validator leaves out, whatever
-// existence the OPT gives it, and a DV_MULTIMEDIA's data, whose octets bind
-// to no OPT child and which settleMultimedia writes instead.
+// existence the OPT gives it, a DV_MULTIMEDIA's data, whose octets bind
+// to no OPT child and which settleMultimedia writes instead, and the
+// composer of a COMPOSITION root (rootComposer).
 func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if locatableUID(optNode, attr) || referenceRangeBoundRanges(optNode, attr) {
 		return true
 	}
-	if attr.NotInRM() || multimediaData(optNode, attr) {
+	if attr.NotInRM() || multimediaData(optNode, attr) || rootComposer(optNode, attr) {
 		return true
 	}
 	if attrProhibited(optNode, attr) && !rmNeedsProhibited(optNode, attr) {
@@ -561,6 +563,15 @@ func nodeClass(optNode *tcimpl.CompiledNode) string {
 		return bound
 	}
 	return bmmtype.Class(concreteFor(declared))
+}
+
+// rootComposer reports whether attr is the composer of optNode, a
+// COMPOSITION that is the template root. applyCompositionDefaults writes
+// Options.Composer there, as given, so nothing the OPT names under composer
+// is built, and a constraint in it that no value satisfies cannot make
+// Generate fail.
+func rootComposer(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	return attr.Name() == "composer" && optNode.Parent() == nil && nodeClass(optNode) == "COMPOSITION"
 }
 
 // multimediaData reports whether attr is the data of optNode, a
@@ -1570,7 +1581,7 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	case *rm.DVURI:
 		v.Value = "http://example.com"
 	case *rm.DVEHRURI:
-		v.Value = "ehr://example"
+		v.Value = ehrURIPlaceholder
 	case *rm.DVIdentifier:
 		v.ID = "example"
 	case *rm.DVParsable:
@@ -3133,8 +3144,9 @@ func ordinalSymbolText(ref constraints.CodedTermRef) rm.DVCodedText {
 // 433|event|, Options.Language and Options.Territory, where the OPT gives
 // it no member of its group or code set and admits the default. No
 // EVENT_CONTEXT is created where the OPT prohibits context. The composer
-// is Options.Composer, as given, over any party the walk built from the
-// OPT. The OPT node of c is the template root.
+// is Options.Composer, as given: the walk leaves composer alone
+// (walkSkips), whatever party the OPT names there. The OPT node of c is
+// the template root.
 func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	root := g.compiled.Root()
 	c.Composer = g.opts.Composer
@@ -3396,16 +3408,25 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.Element:
 		g.settleElement(opt, v)
 	case *rm.DVEHRURI:
-		// Backstop for a DV_EHR_URI the primitive default did not reach;
-		// every one the generator emits is walked.
+		// populatePrimitiveDefault has written this value on every
+		// DV_EHR_URI the generator builds. The walk empties it where the
+		// C_STRING the OPT puts on the value gives the empty string, under
+		// either value fill, as a pattern that builds no other string, such
+		// as x{0}, does. The placeholder then keeps the value the RM
+		// requires, and the template validator reports the pattern
+		// mismatch.
 		if v.Value == "" {
-			v.Value = "ehr://example"
+			v.Value = ehrURIPlaceholder
 		}
 	case *rm.DVOrdinal:
+		// As for a DV_EHR_URI: the walk blanks the symbol where the OPT
+		// builds it as a coded text whose text and code_string each carry
+		// a C_STRING that gives the empty string, such as the pattern x{0}.
 		if symbolBlank(v.Symbol) {
 			v.Symbol = localSymbol()
 		}
 	case *rm.DVScale:
+		// As for a DV_ORDINAL.
 		if symbolBlank(v.Symbol) {
 			v.Symbol = localSymbol()
 		}
@@ -3744,6 +3765,26 @@ func localSymbol() rm.DVCodedText {
 	}
 }
 
+// ehrURIPlaceholder is the value the generator writes on a DV_EHR_URI the
+// OPT gives no value, and on one whose C_STRING pick has no ehr scheme
+// and lists no value with it, where the C_STRING admits it
+// (ehrSchemeValue): a URI in the ehr scheme,
+// which DV_EHR_URI Scheme_valid requires, that a reader recognises as a
+// placeholder.
+const ehrURIPlaceholder = "ehr://example"
+
+// ehrScheme is the scheme DV_EHR_URI Scheme_valid requires, the RM's
+// Ehr_scheme.
+const ehrScheme = "ehr"
+
+// hasEHRScheme reports whether s, read as a URI reference, has the scheme
+// DV_EHR_URI Scheme_valid requires: its RFC 3986 scheme, as rm.DVURI's
+// Scheme reads it, is ehr, compared without regard to letter case, as the
+// validation floor compares it.
+func hasEHRScheme(s string) bool {
+	return strings.EqualFold((&rm.DVURI{Value: s}).Scheme(), ehrScheme)
+}
+
 // stampIfLocatable gives a BMM-synthesised locatable the node id and
 // name the floor requires when the OPT did not name the node.
 func (g *generator) stampIfLocatable(rmValue any, rmType string) {
@@ -3949,6 +3990,35 @@ func termMappingMatch(cs constraints.CString, chosen string) (string, error) {
 	return narrowString(cs, chosen, matchCharacters, errNoMatchCharacter)
 }
 
+// errNoEHRScheme reports a C_STRING on a DV_EHR_URI's value that accepts
+// no value with the ehr scheme DV_EHR_URI Scheme_valid requires.
+var errNoEHRScheme = errors.New("the C_STRING accepts no DV_EHR_URI value with the ehr scheme Scheme_valid requires")
+
+// ehrSchemeValue returns the value the generator writes on a DV_EHR_URI
+// whose OPT constrains the value with cs, so DV_EHR_URI Scheme_valid
+// holds. It is picked, the string the C_STRING path picked, when that has
+// the ehr scheme, so a list keeps its example value and RandomFill its
+// draw, or when it is empty, which finishValue replaces with the
+// placeholder the RM's mandatory value needs. Else it is the first list
+// member with the ehr scheme that cs accepts, or with no list or an open
+// one the shortest string with the ehr scheme that cs's pattern builds and
+// accepts (cstringvalue.First), and else ehrURIPlaceholder when cs accepts
+// it, as a C_STRING with neither a list nor a pattern does, whose pick,
+// the example, has no scheme. It returns errNoEHRScheme when cs accepts
+// none of these.
+func ehrSchemeValue(cs constraints.CString, picked string) (string, error) {
+	if picked == "" || hasEHRScheme(picked) {
+		return picked, nil
+	}
+	if s, ok := cstringvalue.First(cs, hasEHRScheme); ok {
+		return s, nil
+	}
+	if len(cs.Validate(ehrURIPlaceholder)) == 0 {
+		return ehrURIPlaceholder, nil
+	}
+	return "", errNoEHRScheme
+}
+
 // narrowString returns chosen, the string the C_STRING path picked for a
 // leaf an RM rule narrows to admitted, when admitted holds it, so a list
 // pin keeps its example value and RandomFill its draw; else the first
@@ -3990,20 +4060,38 @@ const defaultTransition = "535"
 // applyStringLeaf writes a C_STRING leaf onto the String attribute attr
 // of rmValue, or onto its main string attribute when attr is "". The
 // value is a list member or a pattern match that the constraint accepts,
-// or the example under a C_STRING with neither (stringForConstraint),
-// except on an ACTIVITY's action_archetype_id, where such a C_STRING gets
-// the RM default /.*/ (cstringvalue.ActionArchetypeID), as where the OPT
-// leaves the attribute silent (bmmStringDefault); on a PARTY_REF's type it is also a
-// class name PARTY_REF Type_validity admits (see partyRefType), on an
-// ACCESS_GROUP_REF's type the one type its Type_validity admits, on a
-// TERM_MAPPING's match a character
-// TERM_MAPPING Match_valid admits (see termMappingMatch), and on the
-// magnitude_status of a quantified value one of the strings DV_QUANTIFIED
-// Magnitude_status_valid admits (magnitudeStatuses), the first of them
-// the C_STRING accepts, the default = first, where the C_STRING path
-// picked none of them. When there is none, it writes nothing and returns
-// an error wrapping ErrConstraintUnsatisfiable. An attribute the
-// generator has no field for is left alone, like any other unknown
+// or the example under a C_STRING with neither (stringForConstraint).
+//
+// An ACTIVITY's action_archetype_id gets, where the C_STRING lists no
+// string and admits it, the RM default /.*/ the generator writes where the
+// OPT leaves it silent (bmmStringDefault), because the example names no
+// archetype. A C_STRING with neither a list nor a pattern admits it, as
+// the pattern .* does. Under a C_STRING with a list, or one that rejects
+// /.*/, it gets the string stringForConstraint picks, so a list keeps its
+// example value and RandomFill its draw (cstringvalue.ActionArchetypeID).
+//
+// DV_EHR_URI Scheme_valid narrows a DV_EHR_URI's value: the string
+// stringForConstraint picks stays where its scheme is ehr, so a list keeps
+// its example value and RandomFill its draw. Otherwise the value is the
+// first list member with the ehr scheme the C_STRING accepts, or with no
+// list or an open one a string with the ehr scheme its pattern builds and
+// accepts, else
+// the placeholder ehr://example (populatePrimitiveDefault) where the
+// C_STRING admits it, as one with neither a list nor a pattern does, whose
+// pick, the example, has no scheme (see ehrSchemeValue). Where the
+// C_STRING admits none of these, it writes nothing and returns an error
+// wrapping ErrConstraintUnsatisfiable.
+//
+// On a PARTY_REF's type the value is also a class name PARTY_REF
+// Type_validity admits (see partyRefType), on an ACCESS_GROUP_REF's type
+// the one type its Type_validity admits, on a TERM_MAPPING's match a
+// character TERM_MAPPING Match_valid admits (see termMappingMatch), and on
+// the magnitude_status of a quantified value one of the strings
+// DV_QUANTIFIED Magnitude_status_valid admits (magnitudeStatuses), the
+// first of them the C_STRING accepts, the default = first, where the
+// C_STRING path picked none of them. When there is none, it writes nothing
+// and returns an error wrapping ErrConstraintUnsatisfiable. An attribute
+// the generator has no field for is left alone, like any other unknown
 // primitive target.
 func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs constraints.CString, ex any) error {
 	if attr == "" {
@@ -4034,12 +4122,28 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 			s, err = termMappingMatch(cs, s)
 		}
 	case *rm.Activity:
-		// A C_STRING with neither a pattern nor a list gives no id, so the
-		// RM default goes there, as where the OPT leaves the attribute
-		// silent (bmmStringDefault). The FLAT decode's template completion
-		// shares the pick (cstringvalue.ActionArchetypeID).
+		// A C_STRING that lists no string and admits the RM default gets
+		// it, as where the OPT leaves the attribute silent
+		// (bmmStringDefault): the example, which a pattern such as .* also
+		// admits, names no archetype. A list gives values itself, so it
+		// keeps the pick, even where it holds /.*/ too. The FLAT decode's
+		// template completion shares the pick
+		// (cstringvalue.ActionArchetypeID).
 		if attr == "action_archetype_id" {
 			s, err = cstringvalue.ActionArchetypeID(cs, ex)
+		}
+	case *rm.DVEHRURI:
+		// DV_EHR_URI Scheme_valid narrows the value. The pick stays where
+		// its scheme is ehr, so a list keeps its example value and
+		// RandomFill its draw. Otherwise the first list member with the
+		// ehr scheme gets it, or, with no list or an open one, a string
+		// with the ehr scheme the pattern builds, and else the
+		// placeholder, as where the OPT leaves the value silent
+		// (populatePrimitiveDefault). A C_STRING that admits none of
+		// these is refused. An empty pick stays, for finishValue to
+		// replace with the placeholder.
+		if attr == "value" && err == nil {
+			s, err = ehrSchemeValue(cs, s)
 		}
 	default:
 		if attr == "magnitude_status" && quantified(rmValue) {
@@ -4091,11 +4195,14 @@ var errNoStringValue = cstringvalue.ErrNoValue
 // stringForConstraint returns a string cs accepts: the example ex when cs
 // accepts it, else the first list member cs accepts, else, for a
 // pattern-only constraint, the shortest string the pattern's syntax
-// builds. Acceptance is cs.Validate, which matches a pattern against the
-// whole string, so a value that only contains a match is never
-// chosen. It returns errNoStringValue when none of these is accepted. The
-// pick is cstringvalue.Pick, which the FLAT decode's template completion
-// shares, so the two write the same value for one constraint.
+// builds, or, where that is the empty string, a non-empty string the
+// syntax builds that cs accepts. The empty string stays only where cs
+// accepts no such string, as under the pattern x{0}. Acceptance is
+// cs.Validate, which matches a pattern against the whole string, so a
+// value that only contains a match is never chosen. It returns
+// errNoStringValue when none of these is accepted. The pick is
+// cstringvalue.Pick, which the FLAT decode's template completion shares,
+// so the two write the same value for one constraint.
 func stringForConstraint(cs constraints.CString, ex any) (string, error) {
 	return cstringvalue.Pick(cs, ex)
 }
