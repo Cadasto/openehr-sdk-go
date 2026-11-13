@@ -70,8 +70,12 @@ func (c *Compiled) Root() *CompiledNode { return c.root }
 // The nodes below a later alternative, and below a later sibling with the
 // same node id, share their paths with the nodes below the first, so NodeAt
 // returns a node below the first alternative or sibling there too. Resolve,
-// with the later node's id as the predicate of its segment, reaches the
-// later node and the nodes below it.
+// with a later alternative's node id or archetype id as the predicate of its
+// segment, reaches that alternative and the nodes below it where the id
+// differs from the earlier alternatives' ids, as the steps of an
+// ISM_TRANSITION do. A later sibling with the same node id, and an
+// alternative with no id of its own, is reached by neither NodeAt nor
+// Resolve.
 //
 // Returns [ErrPathNotFound] when the path string is not indexed.
 func (c *Compiled) NodeAt(path string) (*CompiledNode, error) {
