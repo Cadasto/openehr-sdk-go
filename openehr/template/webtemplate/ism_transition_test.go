@@ -102,10 +102,10 @@ func transitionLeaf(base string) *webtemplate.Node {
 func unconstrainedIsm(actionPath string) *webtemplate.Node {
 	base := actionPath + "/ism_transition"
 	return &webtemplate.Node{
-		ID: "ism_transition", Name: "Ism_transition", RMType: "ISM_TRANSITION", Max: 1, AQLPath: base,
+		ID: "ism_transition", Name: "ism_transition", RMType: "ISM_TRANSITION", Max: 1, AQLPath: base,
 		Children: []*webtemplate.Node{
 			{
-				ID: "current_state", Name: "Current_state", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: base + "/current_state",
+				ID: "current_state", Name: "current_state", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: base + "/current_state",
 				Inputs: []webtemplate.Input{{Suffix: "code", Type: "TEXT"}, {Suffix: "value", Type: "TEXT"}},
 			},
 			transitionLeaf(base),
@@ -336,9 +336,10 @@ func TestREQ106MergedCareflowStepListsStepsConstrainingNone(t *testing.T) {
 // not the unconstrained one. Its `careflow_step` lists each step by its node
 // id, the careflow step a transition decoded under that step is given, which
 // encode could otherwise not write; with no step constraining one, its
-// `current_state` is the unconstrained leaf. No vendored OPT has such a step,
-// so the case strips current_state from the test_all_types steps and turns
-// their careflow_step into a transition.
+// `current_state` is the unconstrained leaf; its `transition` is the first
+// step's own, as the reference takes it. No vendored OPT has such a step, so
+// the case strips current_state from the test_all_types steps and turns their
+// careflow_step into a transition, at0003's coded with its own node id.
 func TestREQ106MergedIsmTransitionForStepsConstrainingOnlyTransition(t *testing.T) {
 	const careflowAttr, transitionAttr = "<rm_attribute_name>careflow_step</rm_attribute_name>", "<rm_attribute_name>transition</rm_attribute_name>"
 	raw := readFile(t, testAllTypesOPT)
@@ -355,9 +356,64 @@ func TestREQ106MergedIsmTransitionForStepsConstrainingOnlyTransition(t *testing.
 	}
 	steps := []step{{code: "at0003", label: "Planned"}, {code: "at0004", label: "Active"}, {code: "at0005", label: "Completed"}}
 	want := mergedIsm(action.AQLPath, 1, 0, 0, steps, nil)
+	// The unconstrained current state, named as the merged node names its own.
 	want.Children[1] = unconstrainedIsm(action.AQLPath).Children[0]
+	want.Children[1].Name = "Current_state"
+	want.Children[2] = &webtemplate.Node{
+		ID: "transition", Name: "transition", RMType: "DV_CODED_TEXT", Min: 1, Max: 1, AQLPath: want.AQLPath + "/transition",
+		Inputs: []webtemplate.Input{{Suffix: "code", Type: "CODED_TEXT", List: []webtemplate.InputListItem{{Value: "at0003", Label: "Planned"}}}},
+	}
 	if got := inContextIsm(t, action); !reflect.DeepEqual(got, want) {
 		t.Errorf("merged ISM transition node =\n  %s\nwant\n  %s", jsonOf(t, got), jsonOf(t, want))
+	}
+}
+
+// TestREQ106MergedTransitionIsTheFirstStepsOwn — REQ-106: the merged node's
+// `transition` leaf is the first step's own transition, as the reference takes
+// it, where that step constrains one: its min, max and inputs, at the merged
+// node's path, named `transition`. Where the first step constrains none, the
+// leaf is the open one, whatever a later step constrains. No vendored OPT
+// constrains a transition, so the cases splice one, coded in the openehr
+// terminology, into a test_all_types step.
+func TestREQ106MergedTransitionIsTheFirstStepsOwn(t *testing.T) {
+	raw := readFile(t, testAllTypesOPT)
+	planned := step{code: "at0003", label: "Planned", states: []string{"526"}}
+	active := step{code: "at0004", label: "Active", states: []string{"245"}}
+	completed := step{code: "at0005", label: "Completed", states: []string{"532"}}
+	tests := []struct {
+		name   string
+		nodeID string
+		// own reports whether the merged leaf is the step's own transition.
+		own bool
+	}{
+		{name: "the first step", nodeID: "at0003", own: true},
+		{name: "a later step only", nodeID: "at0004", own: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			action := onlyAction(t, buildOPT(t, constrainIsmTransition(t, raw, tc.nodeID, "535", "536")))
+			want := mergedIsm(action.AQLPath, 1, 1, 1, []step{planned, active, completed}, []string{"526", "245", "532"})
+			if tc.own {
+				want.Children[2] = &webtemplate.Node{
+					ID: "transition", Name: "transition", RMType: "DV_CODED_TEXT", Min: 1, Max: 1, AQLPath: want.AQLPath + "/transition",
+					Inputs: []webtemplate.Input{{
+						Suffix: "code", Type: "CODED_TEXT", Terminology: "openehr",
+						List: []webtemplate.InputListItem{{Value: "535"}, {Value: "536"}},
+					}},
+				}
+			}
+			if got := inContextIsm(t, action); !reflect.DeepEqual(got, want) {
+				t.Errorf("merged ISM transition node =\n  %s\nwant\n  %s", jsonOf(t, got), jsonOf(t, want))
+			}
+			stepPath := action.AQLPath + "/ism_transition[" + tc.nodeID + "]"
+			i := slices.IndexFunc(action.Children, func(n *webtemplate.Node) bool { return n.AQLPath == stepPath })
+			if i < 0 {
+				t.Fatalf("ACTION %s has no step at %s; children = %v", action.AQLPath, stepPath, childIDs(action))
+			}
+			if !slices.Contains(childIDs(action.Children[i]), "transition") {
+				t.Errorf("step %s children = %v, want its own transition kept beside the merged node", stepPath, childIDs(action.Children[i]))
+			}
+		})
 	}
 }
 
@@ -392,7 +448,7 @@ func TestREQ106ActionInContextTime(t *testing.T) {
 		t.Run(opt[strings.LastIndexByte(opt, '/')+1:], func(t *testing.T) {
 			action := onlyAction(t, buildOPT(t, readFile(t, opt)))
 			want := &webtemplate.Node{
-				ID: "time", Name: "Time", RMType: "DV_DATE_TIME", Max: 1, AQLPath: action.AQLPath + "/time",
+				ID: "time", Name: "time", RMType: "DV_DATE_TIME", Max: 1, AQLPath: action.AQLPath + "/time",
 				Inputs: []webtemplate.Input{{Type: "DATETIME"}},
 			}
 			i := slices.IndexFunc(action.Children, func(n *webtemplate.Node) bool { return n.AQLPath == want.AQLPath })
@@ -524,6 +580,81 @@ func stripIsmAttribute(t *testing.T, opt []byte, nodeID, attr string) []byte {
 	}
 	if found != 1 {
 		t.Fatalf("the OPT holds ISM_TRANSITION %s with a %s attribute %d times, want once", nodeID, attr, found)
+	}
+	return []byte(strings.Join(lines, ""))
+}
+
+// constrainIsmTransition returns opt with the archetyped ISM_TRANSITION nodeID
+// constraining its transition, once, to a DV_CODED_TEXT of the openehr codes,
+// placed before its careflow_step as the RM orders the two. It fails the test
+// unless opt holds that node once, with a careflow_step, laid out one element
+// per line as the vendored OPTs are.
+func constrainIsmTransition(t *testing.T, opt []byte, nodeID string, codes ...string) []byte {
+	t.Helper()
+	lines := strings.SplitAfter(string(opt), "\n")
+	indentOf := func(l string) int { return len(l) - len(strings.TrimLeft(l, " \t")) }
+	once := []string{
+		"<lower_included>true</lower_included>", "<upper_included>true</upper_included>",
+		"<lower_unbounded>false</lower_unbounded>", "<upper_unbounded>false</upper_unbounded>",
+		"<lower>1</lower>", "<upper>1</upper>",
+	}
+	// block lists the attribute's elements, each with its depth below the
+	// ISM_TRANSITION's attributes.
+	type element struct {
+		depth int
+		text  string
+	}
+	block := []element{{0, `<attributes xsi:type="C_SINGLE_ATTRIBUTE">`}, {1, "<rm_attribute_name>transition</rm_attribute_name>"}}
+	interval := func(depth int, tag string) {
+		block = append(block, element{depth, "<" + tag + ">"})
+		for _, l := range once {
+			block = append(block, element{depth + 1, l})
+		}
+		block = append(block, element{depth, "</" + tag + ">"})
+	}
+	interval(1, "existence")
+	block = append(block, element{1, `<children xsi:type="C_COMPLEX_OBJECT">`}, element{2, "<rm_type_name>DV_CODED_TEXT</rm_type_name>"})
+	interval(2, "occurrences")
+	block = append(block, element{2, "<node_id/>"},
+		element{2, `<attributes xsi:type="C_SINGLE_ATTRIBUTE">`}, element{3, "<rm_attribute_name>defining_code</rm_attribute_name>"})
+	interval(3, "existence")
+	block = append(block, element{3, `<children xsi:type="C_CODE_PHRASE">`}, element{4, "<rm_type_name>CODE_PHRASE</rm_type_name>"})
+	interval(4, "occurrences")
+	block = append(block, element{4, "<node_id/>"}, element{4, "<terminology_id>"}, element{5, "<value>openehr</value>"}, element{4, "</terminology_id>"})
+	for _, c := range codes {
+		block = append(block, element{4, "<code_list>" + c + "</code_list>"})
+	}
+	block = append(block, element{3, "</children>"}, element{2, "</attributes>"}, element{1, "</children>"}, element{0, "</attributes>"})
+
+	found := 0
+	for i := 0; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) != "<rm_type_name>ISM_TRANSITION</rm_type_name>" {
+			continue
+		}
+		indent := indentOf(lines[i])
+		j := i + 1
+		for j < len(lines) && (indentOf(lines[j]) != indent || !strings.HasPrefix(strings.TrimSpace(lines[j]), "<node_id>")) {
+			j++
+		}
+		if j == len(lines) || strings.TrimSpace(lines[j]) != "<node_id>"+nodeID+"</node_id>" {
+			continue
+		}
+		for a := j + 1; a+1 < len(lines) && indentOf(lines[a]) >= indent; a++ {
+			if indentOf(lines[a]) != indent || strings.TrimSpace(lines[a+1]) != "<rm_attribute_name>careflow_step</rm_attribute_name>" {
+				continue
+			}
+			prefix := lines[a][:indent]
+			spliced := make([]string, 0, len(block))
+			for _, e := range block {
+				spliced = append(spliced, prefix+strings.Repeat("    ", e.depth)+e.text+"\n")
+			}
+			lines = slices.Insert(lines, a, spliced...)
+			found++
+			break
+		}
+	}
+	if found != 1 {
+		t.Fatalf("the OPT holds ISM_TRANSITION %s with a careflow_step %d times, want once", nodeID, found)
 	}
 	return []byte(strings.Join(lines, ""))
 }

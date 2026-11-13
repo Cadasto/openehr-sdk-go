@@ -91,7 +91,7 @@
           },
           {
             "id": "start_time",
-            "name": "Start_time",
+            "name": "start_time",
             "rmType": "DV_DATE_TIME",
             "min": 0,
             "max": 1,
@@ -104,7 +104,7 @@
           },
           {
             "id": "setting",
-            "name": "Setting",
+            "name": "setting",
             "rmType": "DV_CODED_TEXT",
             "min": 0,
             "max": 1,
@@ -171,7 +171,7 @@
               },
               {
                 "id": "time",
-                "name": "Time",
+                "name": "time",
                 "rmType": "DV_DATE_TIME",
                 "min": 0,
                 "max": 1,
@@ -186,7 +186,7 @@
           },
           {
             "id": "language",
-            "name": "Language",
+            "name": "language",
             "rmType": "CODE_PHRASE",
             "min": 0,
             "max": 1,
@@ -194,7 +194,7 @@
           },
           {
             "id": "encoding",
-            "name": "Encoding",
+            "name": "encoding",
             "rmType": "CODE_PHRASE",
             "min": 0,
             "max": 1,
@@ -202,7 +202,7 @@
           },
           {
             "id": "subject",
-            "name": "Subject",
+            "name": "subject",
             "rmType": "PARTY_PROXY",
             "min": 0,
             "max": 1,
@@ -230,7 +230,7 @@
       },
       {
         "id": "language",
-        "name": "Language",
+        "name": "language",
         "rmType": "CODE_PHRASE",
         "min": 0,
         "max": 1,
@@ -238,7 +238,7 @@
       },
       {
         "id": "territory",
-        "name": "Territory",
+        "name": "territory",
         "rmType": "CODE_PHRASE",
         "min": 0,
         "max": 1,
@@ -246,7 +246,7 @@
       },
       {
         "id": "composer",
-        "name": "Composer",
+        "name": "composer",
         "rmType": "PARTY_PROXY",
         "min": 0,
         "max": 1,

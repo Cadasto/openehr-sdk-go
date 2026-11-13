@@ -596,6 +596,7 @@ requirements:
       - openehr/serialize/simplified/completion_defaults_test.go
       - openehr/serialize/simplified/composer_test.go
       - openehr/serialize/simplified/composition_name_test.go
+      - openehr/serialize/simplified/composition_pinned_name_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/ctx_error_values_test.go
       - openehr/serialize/simplified/datatypes_test.go
@@ -633,6 +634,7 @@ requirements:
       - openehr/serialize/simplified/rmattr_value_test.go
       - openehr/serialize/simplified/roundtrip_test.go
       - openehr/serialize/simplified/shorthand_test.go
+      - openehr/serialize/simplified/sibling_refusal_test.go
       - openehr/serialize/simplified/sibling_spelling_internal_test.go
       - openehr/serialize/simplified/sibling_spelling_test.go
       - openehr/serialize/simplified/simplified_test.go
@@ -1543,6 +1545,7 @@ requirements:
       - openehr/template/webtemplate
     probes: [PROBE-075, PROBE-086]
     tests:
+      - openehr/serialize/simplified/composition_pinned_name_test.go
       - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/template_roundtrip_test.go
@@ -1555,6 +1558,7 @@ requirements:
       - openehr/template/webtemplate/incontext_rmpath_test.go
       - openehr/template/webtemplate/inputs_test.go
       - openehr/template/webtemplate/ism_transition_test.go
+      - openehr/template/webtemplate/names_test.go
       - openehr/template/webtemplate/parity_test.go
       - openehr/template/webtemplate/req116_gap_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go

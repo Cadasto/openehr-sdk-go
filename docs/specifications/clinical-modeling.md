@@ -1351,6 +1351,7 @@ A nil or empty compiled input, or an unresolvable default language, **MUST** ret
 
 The exported root **MUST** carry `templateId`, `version` (the string `"2.3"`), `defaultLanguage`, `languages`, and a `tree` of nodes.
 Each node **MUST** carry `id`, `rmType`, `min`, `max` (with `-1` denoting unbounded), and `aqlPath`; and where the compiled template supplies them, `name` / localized names, `nodeId`, `inputs`, and `children`.
+A node with a `nodeId` takes its `name` and localized names from the template-level name its template pins on it, where it pins one, else from its archetype term ([§ Node names and name predicates](#node-names-and-name-predicates)).
 JSON field names are camelCase.
 Encoding **MUST** be deterministic: the same compiled template produces byte-identical output across runs and SDK patch releases (fixed field order; map keys sorted).
 
@@ -1382,7 +1383,7 @@ Every ACTION **MUST** carry the reference's in-context `ism_transition` node, wi
 
 | The ACTION's template | The `ism_transition` node |
 |---|---|
-| models archetyped `ism_transition[atNNNN]` nodes, one per careflow step | merges them as the reference does: `min` and `max` from the first, and the leaves `careflow_step` (each step's careflow-step code, or its node id and name where it constrains none, with the `currentStates` that step admits), `current_state` (every step's states, in step order) and `transition` |
+| models archetyped `ism_transition[atNNNN]` nodes, one per careflow step | merges them as the reference does: `min` and `max` from the first, and the leaves `careflow_step` (each step's careflow-step code, or its node id and name where it constrains none, with the `currentStates` that step admits), `current_state` (every step's states, in step order) and `transition` (the first step's own transition leaf where that step constrains one, else the open one) |
 | models none, or only ones constraining no attribute of the transition | holds the transition's `current_state` and `transition` as leaves |
 
 The archetyped `ism_transition[atNNNN]` nodes stay beside the merged node.

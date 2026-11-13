@@ -14,9 +14,10 @@
 // not copy), and the standard library. It never imports the transport,
 // auth, client, or serialize layers.
 //
-// Sibling disambiguation: a node's id comes from the template-level name
-// the OPT pins on it, falling back to the archetype concept term, and
-// aqlPath carries the matching name predicate ([archetype_id,'Name']).
+// Sibling disambiguation: a node's name and id come from the
+// template-level name the OPT pins on it, falling back to the archetype
+// concept term, and aqlPath carries the matching name predicate
+// ([archetype_id,'Name']).
 // Siblings that reuse one archetype are therefore distinct by
 // construction. Where nothing separates them (no pinned name and one
 // shared term), the second and later claimants take the next free numeric
