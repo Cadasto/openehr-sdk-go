@@ -29,8 +29,12 @@ in this builder's spelling (§ Duplicate sibling ids).
 
 - **`termBindings`, `annotations`, `inContext`** — not emitted. The reference tags
   RM-attribute leaves with `inContext: true` and carries per-node term bindings and
-  UI annotations; this slice omits them (the leaves themselves, including their
-  capitalized `name`, are emitted).
+  UI annotations; this slice omits them (the leaves themselves are emitted, each
+  named by its RM attribute in lower case, `start_time`, as the reference's code
+  names it). The older `constrain_test`, `Corona_Anamnese` and `GECCO_Diagnose`
+  goldens, from the reference's Better-era test resources, capitalise those names
+  (`Start_time`); the builder follows the reference's code, which the
+  `test_all_types` golden, regenerated from it, shows.
 - **inContext coverage** — the fixed RM-attribute leaf table covers COMPOSITION,
   EVENT_CONTEXT, the ENTRY types, the EVENT variants (INTERVAL_EVENT adds
   `math_function` / `width`), INSTRUCTION (`narrative` / `expiry_time`), ACTIVITY
@@ -44,7 +48,11 @@ in this builder's spelling (§ Duplicate sibling ids).
     and it holds `careflow_step` (each step's careflow-step code, with the
     `currentStates` that step admits), `current_state` (every step's states in step
     order, a state two steps admit listed twice, as the reference lists it) and
-    `transition` (`|code` / `|value`). Three readings go beyond the golden:
+    `transition`: the first step's own transition leaf, with its `min`, `max` and
+    `inputs`, where that step constrains one, as the reference takes it, else the
+    open leaf (`|code` / `|value`); no vendored template constrains one. The merged
+    node names its first two leaves `Careflow_step` and `Current_state`, as the
+    reference does. Three readings go beyond the golden:
     - a step that constrains no `careflow_step` still names one, its node id, which
       the FLAT codec gives a transition decoded under it, so `careflow_step` lists it
       by its node id, labelled with its name and localized names, where the
@@ -55,8 +63,9 @@ in this builder's spelling (§ Duplicate sibling ids).
       it, and its `min` is the first step's that constrains one, else 0.
   - **Unconstrained**, where the walk emits none: `current_state` and `transition`,
     each with `|code` / `|value` inputs, and no `careflow_step`, as the reference's
-    filter leaves it out; `min` 0, and the name `Ism_transition` in the in-context
-    capitalisation. The `minimal_action_2` corpus template has this shape, and so
+    filter leaves it out; `min` 0, and the node and its leaves named by their RM
+    attributes, `ism_transition` and `current_state`, as every in-context leaf. The
+    `minimal_action_2` corpus template has this shape, and so
     does an ACTION whose archetyped transitions constrain no attribute of the
     transition, since those are pruned as empty containers. A step that constrains its
     `transition` alone is kept, so it is merged.
