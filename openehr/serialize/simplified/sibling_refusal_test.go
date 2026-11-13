@@ -246,6 +246,104 @@ func TestREQ053RefusalNamesDuplicateSiblingAsWritten(t *testing.T) {
 	}
 }
 
+// TestREQ053DuplicateSiblingSpelledBothWaysRefusal — REQ-053: a body that
+// spells one duplicate sibling both ways, at one instance or at two, is
+// refused naming the key it wrote, in the spelling it wrote it, and no key
+// the body does not hold; the error still wraps its sentinel. The value that
+// does not fit is written in either spelling, the other key in the other.
+func TestREQ053DuplicateSiblingSpelledBothWaysRefusal(t *testing.T) {
+	allTypes, _ := allTypesSet(t)
+	tests := []struct {
+		name string
+		// bad is the key whose value does not fit, other a key that spells
+		// the sibling the other way.
+		bad, other string
+	}{
+		{
+			name:  "one instance, the bad value spelled the reference's way",
+			bad:   referenceSpelling.evaluationText(),
+			other: webTemplateSpelling.evaluationPath() + "/uri",
+		},
+		{
+			name:  "one instance, the bad value spelled the Web Template's way",
+			bad:   webTemplateSpelling.evaluationText(),
+			other: referenceSpelling.evaluationPath() + "/uri",
+		},
+		{
+			name:  "two instances, the bad value spelled the reference's way",
+			bad:   referenceSpelling.evaluationText(),
+			other: "test_all_types/" + webTemplateSpelling.evaluation + ":1/uri",
+		},
+		{
+			name:  "two instances, the bad value spelled the Web Template's way",
+			bad:   webTemplateSpelling.evaluationText(),
+			other: "test_all_types/" + referenceSpelling.evaluation + ":1/uri",
+		},
+	}
+	for _, f := range formats {
+		for _, tc := range tests {
+			t.Run(f.name+"/"+tc.name, func(t *testing.T) {
+				body := completionBody(map[string]any{tc.bad: 5, tc.other: "https://example.org"})
+				_, err := decodeFormat(t, f.name, allTypes, body)
+				if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+					t.Fatalf("decode = %v, want an error wrapping %v", err, simplified.ErrUnsupportedDatatype)
+				}
+				msg := err.Error()
+				// FLAT names the key as written; STRUCTURED names the FLAT key
+				// its conversion makes, which spells every :index.
+				if f.name == "FLAT" && !strings.Contains(msg, `"`+tc.bad+`"`) {
+					t.Errorf("refusal %q does not name %q, the key as written", msg, tc.bad)
+				}
+				written := make(map[string]bool, len(body))
+				for k := range body {
+					written[indexedKey(k)] = true
+				}
+				named := false
+				for _, q := range quotedKeys(msg, "test_all_types") {
+					if !written[indexedKey(q)] {
+						t.Errorf("refusal %q names %q, a key the body does not hold", msg, q)
+					}
+					named = named || indexedKey(q) == indexedKey(tc.bad)
+				}
+				if !named {
+					t.Errorf("refusal %q names no spelling of %q", msg, tc.bad)
+				}
+			})
+		}
+	}
+}
+
+// quotedKeys returns each double-quoted run of msg that starts at the
+// template root.
+func quotedKeys(msg, root string) []string {
+	var keys []string
+	parts := strings.Split(msg, `"`)
+	for i := 1; i < len(parts); i += 2 {
+		if q := parts[i]; strings.HasPrefix(q, root+"/") || strings.HasPrefix(q, root+":") {
+			keys = append(keys, q)
+		}
+	}
+	return keys
+}
+
+// indexedKey returns key with an :index on every segment, :0 where it
+// spells none, so a FLAT key and the one a STRUCTURED conversion makes of it
+// compare equal.
+func indexedKey(key string) string {
+	path, suffix, hasSuffix := strings.Cut(key, "|")
+	segs := strings.Split(path, "/")
+	for i, s := range segs {
+		if _, idx, ok := strings.Cut(s, ":"); !ok || idx == "" {
+			segs[i] = strings.TrimSuffix(s, ":") + ":0"
+		}
+	}
+	out := strings.Join(segs, "/")
+	if hasSuffix {
+		out += "|" + suffix
+	}
+	return out
+}
+
 // containsID reports whether msg holds id as a whole id: not followed by a
 // letter, a digit or an underscore, so test_all_types_1 is not found in
 // test_all_types_10.
