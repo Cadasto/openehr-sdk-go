@@ -1369,6 +1369,7 @@ requirements:
       - internal/bmmtype/formal_parameters_test.go
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - internal/templateinstance/rmwrite/write_parent_test.go
+      - openehr/composition/alternative_paths_test.go
       - openehr/composition/attribute_hold_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/builder_test.go
@@ -1852,6 +1853,7 @@ requirements:
       - internal/templatecompile/pathsnapshot_test.go
       - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/resolve_test.go
+      - internal/templatecompile/shared_path_test.go
       - internal/templatecompile/template_readings_test.go
       - internal/templatecompile/untyped_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
