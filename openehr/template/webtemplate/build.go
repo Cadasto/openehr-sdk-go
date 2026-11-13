@@ -210,10 +210,11 @@ func ismTransitionIC(actionPath string, siblings []*Node) *Node {
 //     constrains one, else the open leaf of the unconstrained node
 //     ([mergedTransition]).
 //
-// A leaf's min is the first step's that has it, else 0, and its max 1. A step
-// that constrains no current_state adds nothing to that list; with no step
-// constraining one, current_state is the unconstrained one. A list is open
-// where a step's own list is, or where it lists no code.
+// careflow_step's and current_state's min is the first step's that has the
+// leaf, else 0, and their max 1. A step that constrains no current_state adds
+// nothing to that list; with no step constraining one, current_state is the
+// unconstrained one. A list is open where a step's own list is, or where it
+// lists no code.
 func mergedIsmTransition(path string, steps []*Node) *Node {
 	careflow := &Node{ID: "careflow_step", Name: "Careflow_step", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: path + "/careflow_step"}
 	state := &Node{ID: "current_state", Name: "Current_state", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: path + "/current_state"}

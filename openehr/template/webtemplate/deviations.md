@@ -31,7 +31,8 @@ in this builder's spelling (§ Duplicate sibling ids).
   RM-attribute leaves with `inContext: true` and carries per-node term bindings and
   UI annotations; this slice omits them (the leaves themselves are emitted, each
   named by its RM attribute in lower case, `start_time`, as the reference's code
-  names it). The older `constrain_test`, `Corona_Anamnese` and `GECCO_Diagnose`
+  names it, except the merged `ism_transition` node's `Careflow_step` and
+  `Current_state`, below). The older `constrain_test`, `Corona_Anamnese` and `GECCO_Diagnose`
   goldens, from the reference's Better-era test resources, capitalise those names
   (`Start_time`); the builder follows the reference's code, which the
   `test_all_types` golden, regenerated from it, shows.
@@ -63,7 +64,7 @@ in this builder's spelling (§ Duplicate sibling ids).
   - **Unconstrained**, where the walk emits none: `current_state` and `transition`,
     each with `|code` / `|value` inputs, and no `careflow_step`, as the reference's
     filter leaves it out; `min` 0, and the node and its leaves named by their RM
-    attributes, `ism_transition` and `current_state`, as every in-context leaf. The
+    attributes, `ism_transition` and `current_state`, as the other in-context leaves. The
     `minimal_action_2` corpus template has this shape, and so
     does an ACTION whose archetyped transitions constrain no attribute of the
     transition, since those are pruned as empty containers. A step that constrains its
