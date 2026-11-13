@@ -228,8 +228,7 @@ Concretely:
   `Integer`; refused with `ErrUnsupportedDatatype` naming the FLAT key, required and optional
   suffixes and the bare value alike, so it never surfaces as a canonical-JSON error naming a path
   the caller did not write; the key named is the key as written, except that a bare value
-  spelled `x\|` is named `x`, the key it spells, a duplicate sibling in the reference's spelling
-  `x2` is named by its Web Template id `x_1`, and a STRUCTURED value is named by the FLAT key
+  spelled `x\|` is named `x`, the key it spells, and a STRUCTURED value is named by the FLAT key
   its conversion makes, with an `:index` on every segment below the template root; a `\|code`
   at a DV_TEXT leaf that is present and not `""` selects the DV_CODED_TEXT whatever its JSON
   kind, so one that is not a string is refused this way, naming the `\|code` key; the check
@@ -607,8 +606,9 @@ partially or silently accepted.
   key is read, after the bare-`|` fold, and the STRUCTURED member judge reads the same
   spelling. Both spellings of one key in one body are two spellings of one field (REQ-170):
   equal values, or one `null`, read once, and values that disagree are refused with
-  `ErrUnknownPath` naming both keys. An unmatched key is reported as written; a refusal of a
-  value names the key in the Web Template's spelling, as one of `x|` names `x`. **Where it
+  `ErrUnknownPath` naming both keys. An unmatched key is reported as written, and a refusal
+  names a key as written too, one of `x|` as `x`; a node one body spells both ways keeps the
+  Web Template's `id` in a refusal. **Where it
   misreads:** the reference numbers a duplicate by its place among the siblings of its `id`,
   with no check that the number is free, while the builder takes the next free `<id>_N`.
   Beside a sibling whose own `id` is `<id>_1` ("Blood Pressure 1"), the reference's

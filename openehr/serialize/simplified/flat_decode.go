@@ -147,8 +147,8 @@ func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeC
 // FLAT map, driven by the Web Template. tmpl (nil unless a template was
 // supplied) holds what the decode reads from the compiled template at each
 // node path ([templateIndex]). Every key it does not read goes to sink, and the
-// decode carries on without it.
-func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *templateIndex, sink *unmatchedSink) (map[string]any, error) {
+// decode carries on without it. A refusal names each key as the body wrote it.
+func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *templateIndex, sink *unmatchedSink) (_ map[string]any, err error) {
 	// A key that is no path in the FLAT grammar is refused before any is read.
 	if err := checkFlatKeys(flat); err != nil {
 		return nil, err
@@ -164,8 +164,10 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	flat, fold := foldEmptySuffix(flat)
 	// A duplicate sibling's earlier spelling, `x2` for `x_1`, is read as the Web
 	// Template's id, and a key spelled both ways is two spellings of one field
-	// too (REQ-053, REQ-170). Every later stage reads the Web Template's id.
+	// too (REQ-053, REQ-170). Every later stage reads the Web Template's id, and
+	// a refusal it makes goes back to the body's spelling on the way out.
 	flat, siblings := foldSiblingSpellings(flat, wt, fold.spellings)
+	defer func() { err = siblings.respell(err) }()
 	if sink != nil {
 		sink.spellings = siblings.spellings
 	}

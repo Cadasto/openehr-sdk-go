@@ -634,6 +634,7 @@ requirements:
       - openehr/serialize/simplified/rmattr_value_test.go
       - openehr/serialize/simplified/roundtrip_test.go
       - openehr/serialize/simplified/shorthand_test.go
+      - openehr/serialize/simplified/sibling_refusal_test.go
       - openehr/serialize/simplified/sibling_spelling_internal_test.go
       - openehr/serialize/simplified/sibling_spelling_test.go
       - openehr/serialize/simplified/simplified_test.go

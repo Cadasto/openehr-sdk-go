@@ -477,6 +477,28 @@ func TestREQ053TemplateCompletionReferenceSetTerminology(t *testing.T) {
 	}
 }
 
+// codedAlternativesAllTypes is test_all_types with a second DV_CODED_TEXT
+// alternative at contextCoded, a copy of its own in SNOMED-CT, so the ELEMENT
+// has the value types coded_text_value and coded_text_value_1, which the
+// reference spells coded_text_value2.
+func codedAlternativesAllTypes(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	// alternative is contextCoded's DV_CODED_TEXT, from its opening tag to its
+	// close after the code list; snomed is a copy in SNOMED-CT.
+	opt := allTypesOPT(t)
+	const lastCode = "<code_list>at0008</code_list>"
+	replaceExactlyOnce(t, opt, lastCode, lastCode)
+	listAt := strings.Index(opt, lastCode)
+	start := strings.LastIndex(opt[:listAt], `<children xsi:type="C_COMPLEX_OBJECT">`)
+	closing := regexp.MustCompile(`^` + lastCode + `\s*</children>\s*</attributes>\s*</children>`).FindStringIndex(opt[listAt:])
+	if start < 0 || closing == nil {
+		t.Fatal("the test_all_types OPT no longer holds contextCoded's DV_CODED_TEXT as expected — fixture changed?")
+	}
+	alternative := opt[start : listAt+closing[1]]
+	snomed := replaceExactlyOnce(t, alternative, "<value>local</value>", "<value>SNOMED-CT</value>")
+	return editedAllTypes(t, replaceExactlyOnce(t, opt, alternative, alternative+snomed))
+}
+
 // TestREQ053TemplateCompletionNeedsAgreement — REQ-053: the template
 // determines nothing where it disagrees with itself. Two coded-text
 // alternatives at one path that name different terminologies give no
@@ -484,36 +506,18 @@ func TestREQ053TemplateCompletionReferenceSetTerminology(t *testing.T) {
 // ordinal and no text, and pairs that give it two texts give it no text.
 func TestREQ053TemplateCompletionNeedsAgreement(t *testing.T) {
 	t.Run("coded text alternatives", func(t *testing.T) {
-		// alternative is contextCoded's DV_CODED_TEXT, from its opening tag to
-		// its close after the code list; snomed is a copy in SNOMED-CT.
-		opt := allTypesOPT(t)
-		const lastCode = "<code_list>at0008</code_list>"
-		replaceExactlyOnce(t, opt, lastCode, lastCode)
-		listAt := strings.Index(opt, lastCode)
-		start := strings.LastIndex(opt[:listAt], `<children xsi:type="C_COMPLEX_OBJECT">`)
-		closing := regexp.MustCompile(`^` + lastCode + `\s*</children>\s*</attributes>\s*</children>`).FindStringIndex(opt[listAt:])
-		if start < 0 || closing == nil {
-			t.Fatal("the test_all_types OPT no longer holds contextCoded's DV_CODED_TEXT as expected — fixture changed?")
-		}
-		alternative := opt[start : listAt+closing[1]]
-		snomed := replaceExactlyOnce(t, alternative, "<value>local</value>", "<value>SNOMED-CT</value>")
-		wt, compiled := editedAllTypes(t, replaceExactlyOnce(t, opt, alternative, alternative+snomed))
+		wt, compiled := codedAlternativesAllTypes(t)
 		// The two alternatives give the ELEMENT a child each, coded_text_value
 		// and coded_text_value_1, at one path. A key under either child, or at
 		// the ELEMENT itself, which reads as its first child, is a coded text
 		// at that path; so is one under the second child's earlier spelling,
-		// coded_text_value2, refused under the Web Template's id.
-		for _, key := range []string{contextCoded + "/coded_text_value", contextCoded + "/coded_text_value_1", contextCoded} {
+		// coded_text_value2, refused under the key as written.
+		for _, key := range []string{contextCoded + "/coded_text_value", contextCoded + "/coded_text_value_1", contextCoded, contextCoded + "/coded_text_value2"} {
 			wantMissingSuffix(t, wt, refusalCase{
 				leaves: map[string]any{key + "|code": "at0007", key + "|value": "value2"},
 				key:    key, reason: "DV_CODED_TEXT missing required |terminology",
 			}, simplified.WithTemplate(compiled))
 		}
-		earlier := contextCoded + "/coded_text_value2"
-		wantMissingSuffix(t, wt, refusalCase{
-			leaves: map[string]any{earlier + "|code": "at0007", earlier + "|value": "value2"},
-			key:    contextCoded + "/coded_text_value_1", reason: "DV_CODED_TEXT missing required |terminology",
-		}, simplified.WithTemplate(compiled))
 	})
 	t.Run("ordinal pairs", func(t *testing.T) {
 		opt := replaceExactlyOnce(t, allTypesOPT(t), "<code_string>at0016</code_string>", "<code_string>at0015</code_string>")

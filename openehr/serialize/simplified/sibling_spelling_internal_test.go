@@ -1,6 +1,8 @@
 package simplified
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
@@ -85,4 +87,89 @@ func TestREQ053CurrentSpelling(t *testing.T) {
 			t.Errorf("currentSpelling(%q) = %q, %v; want %q, %v", tc.key, got, renamed, tc.want, want)
 		}
 	}
+}
+
+// REQ-053 — a refusal names a duplicate sibling as the body wrote it: respell
+// puts each renamed id back, whole ids only, at any index spelling and as a
+// lone id, and keeps the Web Template's id where the body spells the node both
+// ways or the message names keys as written. The error still wraps its
+// sentinel.
+func TestREQ053RespellRefusal(t *testing.T) {
+	leaf := func(id string) *webtemplate.Node { return &webtemplate.Node{ID: id} }
+	node := func(id string, children ...*webtemplate.Node) *webtemplate.Node {
+		return &webtemplate.Node{ID: id, Children: children}
+	}
+	wt := &webtemplate.WebTemplate{Tree: node("t",
+		node("x", leaf("a")), node("x_1", leaf("a"), leaf("b"), leaf("y"), leaf("y_1")), node("x_10", leaf("b")),
+	)}
+	tests := []struct {
+		name      string
+		body      []string
+		msg, want string
+	}{
+		{
+			name: "a key", body: []string{"t/x2:0/a"},
+			msg: `decode "t/x_1:0/a": refused`, want: `decode "t/x2:0/a": refused`,
+		},
+		{
+			name: "a key with a suffix, unquoted", body: []string{"t/x2:0/a|code"},
+			msg: `t/x_1:0/a|code does not fit`, want: `t/x2:0/a|code does not fit`,
+		},
+		{
+			name: "whole ids only", body: []string{"t/x2:0/a", "t/x_10/b"},
+			msg: `"t/x_10/b" and "t/x_1:0/a" and x_10`, want: `"t/x_10/b" and "t/x2:0/a" and x_10`,
+		},
+		{
+			name: "any index spelling", body: []string{"t/x2:0/a"},
+			msg: `at "t:0/x_1:0/a:0" and "t/x_1/a"`, want: `at "t:0/x2:0/a:0" and "t/x2/a"`,
+		},
+		{
+			name: "a lone id", body: []string{"t/x2:1/a"},
+			msg: `"t/x_1:1/a": FLAT id "x_1" carries :1`, want: `"t/x2:1/a": FLAT id "x2" carries :1`,
+		},
+		{
+			name: "a node spelled both ways", body: []string{"t/x2:0/a", "t/x_1:1/b"},
+			msg: `"t/x_1:1/b" and FLAT id "x_1"`, want: `"t/x_1:1/b" and FLAT id "x_1"`,
+		},
+		{
+			// The key that spells y_1 the earlier way is read last.
+			name: "a child spelled both ways", body: []string{"t/x_1:0/y_1", "t/x_1:1/y2"},
+			msg: `"t/x_1:0/y_1" and FLAT id "y_1"`, want: `"t/x_1:0/y_1" and FLAT id "y_1"`,
+		},
+		{
+			name: "keys as written", body: []string{"t/x_1:0/a", "t/x2:0/b"},
+			msg: `"t/x_1:0/a" and "t/x2:0/b"`, want: `"t/x_1:0/a" and "t/x2:0/b"`,
+		},
+		{
+			name: "a path not from the root", body: []string{"t/x2:0/a"},
+			msg: `"x_1/a" at /content/x_1 and t|x_1`, want: `"x_1/a" at /content/x_1 and t|x_1`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			body := make(map[string]any, len(tc.body))
+			for _, k := range tc.body {
+				body[k] = "v"
+			}
+			_, fold := foldSiblingSpellings(body, wt, nil)
+			err := fold.respell(fmt.Errorf("%w: %s", ErrUnknownPath, tc.msg))
+			want := ErrUnknownPath.Error() + ": " + tc.want
+			if err.Error() != want {
+				t.Errorf("respell(%q) with body %v =\n%s\nwant\n%s", tc.msg, tc.body, err, want)
+			}
+			if !errors.Is(err, ErrUnknownPath) {
+				t.Errorf("respell(%q) = %v, which no longer wraps ErrUnknownPath", tc.msg, err)
+			}
+		})
+	}
+	t.Run("nothing renamed", func(t *testing.T) {
+		_, fold := foldSiblingSpellings(map[string]any{"t/x_1:0/a": "v"}, wt, nil)
+		in := fmt.Errorf("%w: \"t/x_1:0/a\"", ErrUnknownPath)
+		if err := fold.respell(in); err != in { //nolint:errorlint // the error itself, wrapped in nothing
+			t.Errorf("respell(%v) = %v, want the error itself", in, err)
+		}
+		if err := fold.respell(nil); err != nil {
+			t.Errorf("respell(nil) = %v, want nil", err)
+		}
+	})
 }
