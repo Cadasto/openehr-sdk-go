@@ -173,8 +173,8 @@ func childrenOf(n *templatecompile.CompiledNode, parentPath string, cfg *config)
 // `|value` as EVENT_CONTEXT `setting` is, and its `transition`. The reference
 // leaves `careflow_step` out there, and writes a `_reason` family under either
 // shape, which the builder does not model. That node's min is 0, the
-// in-context convention (§ REQ-106 deviation 5), and its name follows the
-// in-context capitalisation (`Start_time`).
+// in-context convention (§ REQ-106 deviation 5), and it and its leaves are
+// named, as every in-context leaf, by their RM attributes in lower case.
 func ismTransitionIC(actionPath string, siblings []*Node) *Node {
 	path := actionPath + "/ism_transition"
 	var steps []*Node
@@ -187,8 +187,8 @@ func ismTransitionIC(actionPath string, siblings []*Node) *Node {
 		return mergedIsmTransition(path, steps)
 	}
 	return &Node{
-		ID: "ism_transition", Name: "Ism_transition", RMType: "ISM_TRANSITION", Max: 1, AQLPath: path,
-		Children: []*Node{unconstrainedCurrentState(path), transitionIC(path)},
+		ID: "ism_transition", Name: "ism_transition", RMType: "ISM_TRANSITION", Max: 1, AQLPath: path,
+		Children: []*Node{unconstrainedCurrentState(path, "current_state"), transitionIC(path)},
 	}
 }
 
@@ -252,7 +252,7 @@ func mergedIsmTransition(path string, steps []*Node) *Node {
 	if hasState {
 		state.Inputs = []Input{stateIn}
 	} else {
-		state = unconstrainedCurrentState(path)
+		state = unconstrainedCurrentState(path, "Current_state")
 	}
 	return &Node{
 		ID: "ism_transition", Name: "ism_transition", RMType: "ISM_TRANSITION", Min: steps[0].Min, Max: steps[0].Max, AQLPath: path,
@@ -278,19 +278,21 @@ func mergedTransition(path string, first *Node) *Node {
 	}
 }
 
-// unconstrainedCurrentState returns the current_state leaf of the in-context
-// ISM transition node at path for a template that constrains none.
-func unconstrainedCurrentState(path string) *Node {
+// unconstrainedCurrentState returns the current_state leaf, named name, of the
+// in-context ISM transition node at path for a template that constrains none.
+// The reference names it "current_state" on the unconstrained node, as every
+// in-context leaf, and "Current_state" on the merged one.
+func unconstrainedCurrentState(path, name string) *Node {
 	return &Node{
-		ID: "current_state", Name: "Current_state", RMType: "DV_CODED_TEXT", Max: 1,
+		ID: "current_state", Name: name, RMType: "DV_CODED_TEXT", Max: 1,
 		AQLPath: path + "/current_state", Inputs: cloneInputs(settingIC),
 	}
 }
 
 // transitionIC returns the transition leaf of the in-context ISM transition
 // node at path: the ISM transition that led to the current state, a code of
-// the openehr terminology written as `|code` and `|value`, optional and named
-// as the reference's test_all_types golden names it.
+// the openehr terminology written as `|code` and `|value`, optional and named,
+// as every in-context leaf, by its RM attribute.
 func transitionIC(path string) *Node {
 	return &Node{
 		ID: "transition", Name: "transition", RMType: "DV_CODED_TEXT", Max: 1,
@@ -392,48 +394,48 @@ var (
 	settingIC    = []Input{{Suffix: "code", Type: "TEXT"}, {Suffix: "value", Type: "TEXT"}}
 
 	entryIC = []Node{
-		{ID: "language", Name: "Language", RMType: "CODE_PHRASE", Max: 1},
-		{ID: "encoding", Name: "Encoding", RMType: "CODE_PHRASE", Max: 1},
-		{ID: "subject", Name: "Subject", RMType: "PARTY_PROXY", Max: 1, Inputs: partyProxyIC},
+		{ID: "language", Name: "language", RMType: "CODE_PHRASE", Max: 1},
+		{ID: "encoding", Name: "encoding", RMType: "CODE_PHRASE", Max: 1},
+		{ID: "subject", Name: "subject", RMType: "PARTY_PROXY", Max: 1, Inputs: partyProxyIC},
 	}
 	eventIC = []Node{
-		{ID: "time", Name: "Time", RMType: "DV_DATE_TIME", Max: 1, Inputs: dateTimeIC},
+		{ID: "time", Name: "time", RMType: "DV_DATE_TIME", Max: 1, Inputs: dateTimeIC},
 	}
 	// INTERVAL_EVENT adds the interval descriptors on top of EVENT's time.
 	// Width's DV_DURATION inputs follow the reference's per-field shape.
 	intervalEventIC = append(
 		slices.Clone(eventIC),
-		Node{ID: "math_function", Name: "Math_function", RMType: "DV_CODED_TEXT", Max: 1, Inputs: settingIC},
-		Node{ID: "width", Name: "Width", RMType: "DV_DURATION", Max: 1, Inputs: unconstrainedDurationInputs()},
+		Node{ID: "math_function", Name: "math_function", RMType: "DV_CODED_TEXT", Max: 1, Inputs: settingIC},
+		Node{ID: "width", Name: "width", RMType: "DV_DURATION", Max: 1, Inputs: unconstrainedDurationInputs()},
 	)
 	instructionIC = append(
 		slices.Clone(entryIC),
-		Node{ID: "narrative", Name: "Narrative", RMType: "DV_TEXT", Max: 1, Inputs: []Input{{Type: "TEXT"}}},
-		// The reference leaves expiry_time's name lower-case, unlike every
-		// other in-context leaf — copied verbatim rather than normalised.
+		Node{ID: "narrative", Name: "narrative", RMType: "DV_TEXT", Max: 1, Inputs: []Input{{Type: "TEXT"}}},
 		Node{ID: "expiry_time", Name: "expiry_time", RMType: "DV_DATE_TIME", Max: 1, Inputs: dateTimeIC},
 	)
 	// ACTION adds its `time`, shaped as an EVENT's, after the ENTRY leaves,
 	// as the reference's test_all_types golden places it.
 	actionIC   = append(slices.Clone(entryIC), eventIC...)
 	activityIC = []Node{
-		{ID: "timing", Name: "Timing", RMType: "DV_PARSABLE", Max: 1, Inputs: []Input{{Suffix: "value", Type: "TEXT"}, {Suffix: "formalism", Type: "TEXT"}}},
-		{ID: "action_archetype_id", Name: "Action_archetype_id", RMType: "STRING", Max: 1, Inputs: []Input{{Type: "TEXT"}}},
+		{ID: "timing", Name: "timing", RMType: "DV_PARSABLE", Max: 1, Inputs: []Input{{Suffix: "value", Type: "TEXT"}, {Suffix: "formalism", Type: "TEXT"}}},
+		{ID: "action_archetype_id", Name: "action_archetype_id", RMType: "STRING", Max: 1, Inputs: []Input{{Type: "TEXT"}}},
 	}
 
 	// inContextByRM lists the fixed RM-attribute leaves EHRbase emits per
 	// container RM type independent of the template (WebTemplate
-	// "inContext" nodes), derived from the reference fixture. The ID
-	// doubles as the RM attribute name; AQLPath is stamped at emission.
+	// "inContext" nodes), derived from the reference fixture. The ID and the
+	// name are the RM attribute's name, in lower case, as the reference's code
+	// names an in-context leaf (OPTParser.buildNodeForAttribute); AQLPath is
+	// stamped at emission.
 	inContextByRM = map[string][]Node{
 		"COMPOSITION": {
-			{ID: "language", Name: "Language", RMType: "CODE_PHRASE", Max: 1},
-			{ID: "territory", Name: "Territory", RMType: "CODE_PHRASE", Max: 1},
-			{ID: "composer", Name: "Composer", RMType: "PARTY_PROXY", Max: 1, Inputs: partyProxyIC},
+			{ID: "language", Name: "language", RMType: "CODE_PHRASE", Max: 1},
+			{ID: "territory", Name: "territory", RMType: "CODE_PHRASE", Max: 1},
+			{ID: "composer", Name: "composer", RMType: "PARTY_PROXY", Max: 1, Inputs: partyProxyIC},
 		},
 		"EVENT_CONTEXT": {
-			{ID: "start_time", Name: "Start_time", RMType: "DV_DATE_TIME", Max: 1, Inputs: dateTimeIC},
-			{ID: "setting", Name: "Setting", RMType: "DV_CODED_TEXT", Max: 1, Inputs: settingIC},
+			{ID: "start_time", Name: "start_time", RMType: "DV_DATE_TIME", Max: 1, Inputs: dateTimeIC},
+			{ID: "setting", Name: "setting", RMType: "DV_CODED_TEXT", Max: 1, Inputs: settingIC},
 		},
 		"OBSERVATION": entryIC, "EVALUATION": entryIC, "INSTRUCTION": instructionIC,
 		"ACTION": actionIC, "ADMIN_ENTRY": entryIC, "ACTIVITY": activityIC,

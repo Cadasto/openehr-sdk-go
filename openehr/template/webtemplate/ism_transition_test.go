@@ -102,10 +102,10 @@ func transitionLeaf(base string) *webtemplate.Node {
 func unconstrainedIsm(actionPath string) *webtemplate.Node {
 	base := actionPath + "/ism_transition"
 	return &webtemplate.Node{
-		ID: "ism_transition", Name: "Ism_transition", RMType: "ISM_TRANSITION", Max: 1, AQLPath: base,
+		ID: "ism_transition", Name: "ism_transition", RMType: "ISM_TRANSITION", Max: 1, AQLPath: base,
 		Children: []*webtemplate.Node{
 			{
-				ID: "current_state", Name: "Current_state", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: base + "/current_state",
+				ID: "current_state", Name: "current_state", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: base + "/current_state",
 				Inputs: []webtemplate.Input{{Suffix: "code", Type: "TEXT"}, {Suffix: "value", Type: "TEXT"}},
 			},
 			transitionLeaf(base),
@@ -356,7 +356,9 @@ func TestREQ106MergedIsmTransitionForStepsConstrainingOnlyTransition(t *testing.
 	}
 	steps := []step{{code: "at0003", label: "Planned"}, {code: "at0004", label: "Active"}, {code: "at0005", label: "Completed"}}
 	want := mergedIsm(action.AQLPath, 1, 0, 0, steps, nil)
+	// The unconstrained current state, named as the merged node names its own.
 	want.Children[1] = unconstrainedIsm(action.AQLPath).Children[0]
+	want.Children[1].Name = "Current_state"
 	want.Children[2] = &webtemplate.Node{
 		ID: "transition", Name: "transition", RMType: "DV_CODED_TEXT", Min: 1, Max: 1, AQLPath: want.AQLPath + "/transition",
 		Inputs: []webtemplate.Input{{Suffix: "code", Type: "CODED_TEXT", List: []webtemplate.InputListItem{{Value: "at0003", Label: "Planned"}}}},
@@ -446,7 +448,7 @@ func TestREQ106ActionInContextTime(t *testing.T) {
 		t.Run(opt[strings.LastIndexByte(opt, '/')+1:], func(t *testing.T) {
 			action := onlyAction(t, buildOPT(t, readFile(t, opt)))
 			want := &webtemplate.Node{
-				ID: "time", Name: "Time", RMType: "DV_DATE_TIME", Max: 1, AQLPath: action.AQLPath + "/time",
+				ID: "time", Name: "time", RMType: "DV_DATE_TIME", Max: 1, AQLPath: action.AQLPath + "/time",
 				Inputs: []webtemplate.Input{{Type: "DATETIME"}},
 			}
 			i := slices.IndexFunc(action.Children, func(n *webtemplate.Node) bool { return n.AQLPath == want.AQLPath })
