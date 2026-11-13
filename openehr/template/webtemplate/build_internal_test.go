@@ -2,6 +2,7 @@ package webtemplate
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -82,6 +83,40 @@ func TestMergedIsmTransitionEmptyListIsOpen(t *testing.T) {
 		if len(ch.Inputs) != 1 || len(ch.Inputs[0].List) != 0 || !ch.Inputs[0].ListOpen {
 			t.Errorf("merged %s inputs = %+v, want one code input listing nothing, its list open", id, ch.Inputs)
 		}
+	}
+}
+
+// mergedIsmTransition copies the first step's own transition leaf rather than
+// sharing it: the step stays beside the merged node, and Build returns a
+// mutable tree, so a consumer editing the merged leaf must not reach the
+// step's (REQ-106).
+func TestMergedIsmTransitionCopiesTheStepsTransition(t *testing.T) {
+	const action = "/content[openEHR-EHR-ACTION.a.v1]"
+	const base = action + "/ism_transition[at0003]"
+	stepTransition := func() *Node {
+		return &Node{
+			ID: "transition", RMType: "DV_CODED_TEXT", Min: 1, Max: 1, AQLPath: base + "/transition",
+			Inputs: []Input{{
+				Suffix: "code", Type: "CODED_TEXT", Terminology: "openehr",
+				List: []InputListItem{{Value: "535", LocalizedLabels: map[string]string{"en": "initiate"}}},
+			}},
+		}
+	}
+	step := &Node{
+		ID: "planned", Name: "Planned", RMType: "ISM_TRANSITION", NodeID: "at0003", Min: 1, Max: 1, AQLPath: base,
+		Children: []*Node{stepTransition()},
+	}
+	node := mergedIsmTransition(action+"/ism_transition", []*Node{step})
+	merged := childAt(node, node.AQLPath+"/transition")
+	if merged == nil || len(merged.Inputs) != 1 || len(merged.Inputs[0].List) != 1 {
+		t.Fatalf("merged transition = %+v, want the step's own, one code input listing one code", merged)
+	}
+	merged.Min = 0
+	merged.Inputs[0].Terminology = "local"
+	merged.Inputs[0].List[0].Value = "536"
+	merged.Inputs[0].List[0].LocalizedLabels["en"] = "plan step"
+	if got, want := step.Children[0], stepTransition(); !reflect.DeepEqual(got, want) {
+		t.Errorf("editing the merged transition changed the step's to %+v, want %+v — the two share it", got, want)
 	}
 }
 

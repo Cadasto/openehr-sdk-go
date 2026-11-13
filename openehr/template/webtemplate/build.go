@@ -205,7 +205,9 @@ func ismTransitionIC(actionPath string, siblings []*Node) *Node {
 //   - current_state, listing every step's current_state codes in step order,
 //     each step's list as is, so a state two steps admit is listed twice, in
 //     the openehr terminology;
-//   - transition, as on the unconstrained node.
+//   - transition, the first step's own transition leaf where that step
+//     constrains one, else the open leaf of the unconstrained node
+//     ([mergedTransition]).
 //
 // A leaf's min is the first step's that has it, else 0, and its max 1. A step
 // that constrains no current_state adds nothing to that list; with no step
@@ -253,7 +255,25 @@ func mergedIsmTransition(path string, steps []*Node) *Node {
 	}
 	return &Node{
 		ID: "ism_transition", Name: "ism_transition", RMType: "ISM_TRANSITION", Min: steps[0].Min, Max: steps[0].Max, AQLPath: path,
-		Children: []*Node{careflow, state, transitionIC(path)},
+		Children: []*Node{careflow, state, mergedTransition(path, steps[0])},
+	}
+}
+
+// mergedTransition returns the transition leaf of the merged in-context ISM
+// transition node at path whose first step is first: a copy of that step's own
+// transition leaf, with its min, max and inputs, at path extended by
+// /transition and named "transition", where the step constrains one, else the
+// open leaf ([transitionIC]). Only the first step counts, as the reference
+// takes the first step's transition whether it constrains one or not. The
+// step stays beside the merged node, so the copy shares nothing with it.
+func mergedTransition(path string, first *Node) *Node {
+	own := childAt(first, first.AQLPath+"/transition")
+	if own == nil {
+		return transitionIC(path)
+	}
+	return &Node{
+		ID: "transition", Name: "transition", RMType: own.RMType, Min: own.Min, Max: own.Max,
+		AQLPath: path + "/transition", Inputs: cloneInputs(own.Inputs),
 	}
 }
 
