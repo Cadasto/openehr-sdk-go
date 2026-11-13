@@ -38,6 +38,8 @@ Two independent facts forced the decision now:
 
 PROBE-086 held 318 corpus keys out of its comparison **on both sides** precisely because the question was open. Two families in that set turned out not to be spelling questions at all: `context/setting` was holding out a real encode-side drop, and the composer's `external_ref` suffixes were never respellings — those 12 keys now flow through to decode, are refused there, and appear in the census's excluded table, leaving **306** composition-metadata keys held out.
 
+> **Amended 2026-10-15** ([ADR 0029](0029-composer-real-path-carrier.md)). Decode reads those 12 keys at the composer's real path, and the census compares them instead of excluding them. The paragraph is left as written.
+
 ## Decision
 
 **Accept both spellings on input; emit exactly one — `ctx/` — on output.** An asymmetric codec: liberal in what it reads, single-valued in what it writes.
@@ -61,6 +63,9 @@ PROBE-086 held 318 corpus keys out of its comparison **on both sides** precisely
 - **Positive — interop, and the claim is bounded.** A body whose *only* unmodelled surface was the metadata spelling now decodes — that was a hard adoption blocker and it is the main point of the change. Real EHRbase exports are not there yet: **0 of the 34** vendored corpus bodies decode at HEAD, because they still refuse on `_`-prefixed RM attribute keys — the largest open family, and its own REQ.
 - **Positive — REQ-115 unblocked.** Phase 0 can now state the required-key set in `ctx/` terms and name the real-path spellings as accepted aliases, which is exactly the prose that was impossible to write before.
 - **No output change, no break.** Encode still emits `ctx/` only, so nothing downstream shifts. This is additive on the input surface.
+
+  > **Amended 2026-10-15** ([ADR 0029](0029-composer-real-path-carrier.md)). Encode writes a composer the `ctx/` short forms cannot carry whole at its real path, so the FLAT of such a composer changed shape. The consequence is left as written.
+
 - **The PROBE-086 census does not move.** Worth stating plainly, because it is the natural thing to expect and it is wrong: the probe decodes upstream FLAT and **re-encodes** it, so a real-path key comes back respelled as `ctx/` and is not comparable across the two spellings either way. Held out on both sides it counts as nothing at all — neither compared nor divergent; dropped from the hold-out it would read as **Missing only**, because the `ctx/` key emitted in its place is skipped on the emitted side too. So 306 metadata keys stay held out and this decision moves the coverage figure by **exactly zero** (18.0% when it landed; the final 19.5% came from the unrelated datatype-suffix work in the same plan). What changed is that a body carrying them now *decodes* instead of erroring — which the round-trip metric structurally cannot show.
 - **`context/setting`'s waiver survives.** The one hold-out that waives a real encode-side drop is an *emission* gap, not a spelling gap, so this decision does not clear it: the real path decodes where the Web Template carries the node, and the value is then lost because nothing writes `ctx/setting`. Closing it means **emitting `ctx/setting` on encode and accepting it on decode**; tracked in `deviations.md` and `SKIPPED.md`.
 
