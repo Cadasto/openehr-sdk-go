@@ -55,8 +55,7 @@ in this builder's spelling (§ Duplicate sibling ids).
     reference does. Three readings go beyond the golden:
     - a step that constrains no `careflow_step` still names one, its node id, which
       the FLAT codec gives a transition decoded under it, so `careflow_step` lists it
-      by its node id, labelled with its name and localized names, where the
-      reference fails on it;
+      by its node id, labelled with its name, where the reference fails on it;
     - a step that constrains no `current_state` adds nothing to that list, where the
       reference fails on it;
     - `careflow_step`'s `max` is 1 where the reference copies the step's `min` into
