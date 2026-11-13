@@ -8,26 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-11-14
+
+Forty-ninth `v0.x` minor: FLAT and STRUCTURED gain sample counts, history origins, interval attributes and workflow definitions, and complete coded values from the template; the Web Template matches the EHRbase reference for ACTION transitions, multi-type ELEMENTs and node names; FLAT decode and validation do less work per call. **Breaking:** a duplicate sibling's id and keys become `<id>_1`, ACTION and multi-type ELEMENT values move to the reference's keys, and FLAT decode, canonical XML and the operational template reader refuse more malformed input.
+
 ### Added
 
 - **`validation.WithMissingPointers`** takes the missing-member pointers canjson and canxml report as they are, through the pointers' new `Parent` and `Token`, without writing their text (REQ-112, REQ-175).
 - **FLAT and STRUCTURED** carry `|sample_count`, `history_origin`, an abstract EVENT's interval attributes and an INSTRUCTION's workflow definition, and read the format's input shorthands (REQ-053, REQ-140).
 - **`simplified.WithDefaultTime` and `ErrNotModelled`** give a body without a start time the caller's clock and mark a key the format defines and the SDK does not model, still matching `ErrUnknownPath` (REQ-053, REQ-170).
-- **The Web Template** models an ACTION's in-context `time` and one merged `ism_transition`, and gives an ELEMENT with several value types a `<type>_value` child each (REQ-106).
 - **The AQL EXISTS, LIKE and MATCHES expressions** carry `ParsedPath` as a comparison does, so two parsed ones no longer compare equal with `==` (REQ-113, PROBE-082).
 - **`constraints.CodePhraseWithTerminologyOf` and `CodeReference.ReferenceSetTerminology`** read the terminology a `terminology:` reference set names, which decode, the generator and the Web Template builder now use (REQ-103, REQ-106, REQ-107).
 - **`definition.MaxUploadBytes` and `ErrUploadTooLarge`** export the template upload ceiling and its size refusal, which still matches `transport.ErrInvalidConfig` (REQ-108).
 
 ### Changed
 
-- **Breaking: Web Template ids and FLAT and STRUCTURED keys** of a duplicate sibling become `<id>_1`, `<id>_2`, such as `dv_text_1` for `dv_text2`; decode still reads the earlier spelling (REQ-053, REQ-106).
-- **Breaking: FLAT and STRUCTURED encode** writes an ACTION's time and transition and a multi-type ELEMENT's value under the reference's keys, such as `choice/quantity_value|magnitude`; decode still reads the earlier keys (REQ-053, REQ-106).
+- **Breaking: Web Template ids and FLAT and STRUCTURED keys** of a duplicate sibling become `<id>_1`, `<id>_2`, such as `dv_text_1` for `dv_text2`; decode still reads the earlier spelling and names it in a refusal (REQ-053, REQ-106).
+- **Breaking: the Web Template** adds an ACTION's in-context `time` and merged `ism_transition` and a multi-type ELEMENT's `<type>_value` children, keyed in FLAT and STRUCTURED as the reference keys them; decode reads the earlier keys (REQ-053, REQ-106).
 - **Breaking: FLAT and STRUCTURED decode** refuses a malformed key such as `a//b|` and, with `WithTemplate`, a coded text whose terminology neither body nor template gives; an unplaceable underscore sub-path wraps `ErrUnknownPath` (REQ-053, REQ-170).
 - **Breaking: canonical XML and the operational template reader** refuse, in every mode, CDATA and character references outside the root element, a markup declaration inside it and a malformed document type declaration (REQ-056, REQ-176).
+- **The Web Template** names a node by the name its template pins and an in-context leaf by its lower-case RM attribute, so FLAT writes no `_name` for a pinned composition name (REQ-106, REQ-053).
 - **A FLAT or STRUCTURED decode with `WithTemplate`** completes a coded value from the template, takes the composition category and an ACTIVITY's `action_archetype_id` from it, and orders `HISTORY.origin` as the reference does (REQ-053).
 - **The instance generator** writes `/.*/` for an `action_archetype_id` its pattern does not list and a non-empty value for a pattern-only string, and refuses, with `ErrConstraintUnsatisfiable`, a `DV_EHR_URI` whose constraint admits no ehr value (REQ-107).
 - **`transport.BodyReadError.Complete`** is true for an over-long indented first trailer line, a trailer cut after the last chunk and `flate.InternalError` (REQ-151).
-- **FLAT decode, `ValidateJSON` and `ValidateXML`** do less work per call, with identical results, FLAT allocating about a quarter less and validation writing no pointer text (REQ-053, REQ-112).
+- **FLAT decode, `ValidateJSON` and `ValidateXML`** do less work per call with identical results, FLAT decode allocating about a quarter less (REQ-053, REQ-112).
 
 ## [0.48.0] - 2026-11-08
 
