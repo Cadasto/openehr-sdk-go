@@ -607,14 +607,15 @@ partially or silently accepted.
   spelling. Both spellings of one key in one body are two spellings of one field (REQ-170):
   equal values, or one `null`, read once, and values that disagree are refused with
   `ErrUnknownPath` naming both keys. An unmatched key is reported as written, and a refusal
-  names a key as written too, one of `x|` as `x`; a node one body spells both ways keeps the
-  Web Template's `id` in a refusal. **Where it
+  names a key as written too, one of `x|` as `x`; a node one body spells both ways in the keys
+  it reads keeps the Web Template's `id` in a refusal. **Where it
   misreads:** the reference numbers a duplicate by its place among the siblings of its `id`,
   with no check that the number is free, while the builder takes the next free `<id>_N`.
   Beside a sibling whose own `id` is `<id>_1` ("Blood Pressure 1"), the reference's
   `blood_pressure2` is the builder's `blood_pressure_2`, and decode reads it as
   `blood_pressure_1`. No reference Web Template golden has such siblings. Pinned by
-  `TestREQ053DuplicateSibling*` and `TestREQ053EarlierSpelledSibling`.
+  `TestREQ053DuplicateSibling*`, `TestREQ053EarlierSpelledSibling`,
+  `TestREQ053RefusalNamesDuplicateSiblingAsWritten` and `TestREQ053RespellRefusal`.
 
 ## Implementation notes (not deviations, but worth recording)
 
