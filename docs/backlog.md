@@ -1,6 +1,6 @@
 ---
 kind: plan
-harvested_through: 2026-11-12T15:38:30Z
+harvested_through: 2026-11-13T23:42:27Z
 ---
 # Backlog
 
@@ -40,7 +40,7 @@ Code in openehr/instance (and one copy in openehr/serialize/simplified) where a 
 
 ## Sentences to settle: which generator rule values a coded text (REQ-107)
 Document-only changes: clinical-modeling.md has two rules that both claim a coded text's value. Lane: full. Size: S.
-- docs/specifications/clinical-modeling.md:740 · The term-text rule (and the widened rubric rule beside it, :734) overrides Leaf values (:700), where a leaf "is valued as the `ValueFill` in force says" with only Precedence 3 and 4 and *Placeholders* named as exceptions, wherever a C_STRING on the coded text's value admits the text; Precedence 1 (:796) covers only a C_STRING that rejects the rubric; say which rule wins in one of them · by: sdd-doc-reviewer · from: fix/generator-cdr-acceptance
+- docs/specifications/clinical-modeling.md:751 · The term-text rule (and the widened rubric rule beside it, :749) overrides Leaf values (:708), where a leaf "is valued as the `ValueFill` in force says" with only Precedence 3 and 4 and *Placeholders* named as exceptions, wherever a C_STRING on the coded text's value admits the text; Precedence 1 (:806) covers only a C_STRING that rejects the rubric; say which rule wins in one of them · by: sdd-doc-reviewer · from: fix/generator-cdr-acceptance
 
 ## RM floor: the invariants not yet evaluated (REQ-112, REQ-171)
 The ledger is openehr/validation/invariants.json: each entry whose reason starts "Not yet evaluated" is a mechanical rule the floor could evaluate, and each one taken on adds a catalogue bullet, an evaluator and a PROBE-077 row. Lane: full. Size: L.
@@ -55,8 +55,8 @@ Tests that cannot run or do not hold under load: an openehr/rm test package that
 A generator change in internal/bmmgen on its own branch, measured with BenchmarkValidateComposition and the composition Set+Build benchmark; a per-Web-Template cache in openehr/serialize/simplified, measured with BenchmarkUnmarshalFlat; and the report's path text in openehr/validation and internal/reportpath, measured on the spine document of openehr/validation/missing_cost_test.go. Lane: maintenance. Size: M.
 - internal/bmmgen/render_rmaccess.go:612 · every value arm of the generated `single` hands `&p` to a reader that may return a pointer into it, so reading a class passed by value, such as a data value a composition built in Go holds in an interface field, heap-copies the whole parent; since 6415aaca all 75 such arms escape (go build -gcflags=-m on internal/rmaccess), and Peek on a DV_CODED_TEXT costs 128 B instead of 0, reading its value 144 B instead of 16 · by: go-reviewer · from: perf/hot-path-sweep-2
 - internal/rmaccess/access.go:142 · boxPointers and boxValues (:155) still allocate a fresh []any on every rmaccess.Multiple call, which the walk keeps as attrReading.items and iterates more than once; the box around the slice is gone, so composition Set+Build is down to 6 allocations (2026-10-27) · by: sdd-implementer · from: refactor/template-hot-paths
-- openehr/serialize/simplified/flat_decode.go:2993 · every decode still rebuilds templateRanks (orderByTemplate), now that PR 334 builds the larger template index once per compiled template; the ranks hang off the caller's Web Template, which is mutable, so caching them is a design choice, not a copy of that cache · by: go-reviewer · from: fix/simplified-template-roundtrip
-- openehr/serialize/simplified/flat_decode.go:1968 · settleIsmTransitionsUnder sorts each rebuilt node's keys on every visit, about 9 % of BenchmarkUnmarshalFlat's allocations on 20bc8b7b; with decodeRMAttrFeederAudit's sorts (rmattr_feeder.go:197, about 6 %), the next FLAT decode allocation lead · by: sdd-deliver · from: perf/flat-decode-parse-once
+- openehr/serialize/simplified/flat_decode.go:3866 · every decode still rebuilds templateRanks (orderByTemplate), now that PR 334 builds the larger template index once per compiled template; the ranks hang off the caller's Web Template, which is mutable, so caching them is a design choice, not a copy of that cache · by: go-reviewer · from: fix/simplified-template-roundtrip
+- openehr/serialize/simplified/flat_decode.go:2056 · settleIsmTransitionsUnder sorts each rebuilt node's keys on every visit, about 9 % of BenchmarkUnmarshalFlat's allocations on 20bc8b7b; with decodeRMAttrFeederAudit's sorts (rmattr_feeder.go:197, about 6 %), the next FLAT decode allocation lead · by: sdd-deliver · from: perf/flat-decode-parse-once
 - openehr/validation/engine.go:979 · A reported absent member writes its issue path a second time into e.absent, about 154 of the 179 MB a 100,000-member report adds at depth 250; keying the record by trie node or issue index would drop it. · from: #444
 - internal/reportpath/reportpath.go · Node.String builds the text in a byte buffer and then copies it into a string, so a caller that writes every pointer's text pays for it twice. · from: #444
 
