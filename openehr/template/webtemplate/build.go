@@ -1,6 +1,7 @@
 package webtemplate
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"slices"
@@ -610,22 +611,25 @@ func setOccurrences(node *Node, c *templatecompile.CompiledNode) {
 	}
 }
 
-// setNames sets the display name of node and its text and description in
-// each language of cfg, from the term for c's node id that c's nearest
-// enclosing archetype root defines; text is that term's text, as termText
-// returns it. A compiled template carries one set of terms, in its default
-// language, so every language reads the same text and description, which
-// are looked up once.
+// setNames sets node's name and localized name, and its localized name and
+// description in each language of cfg. The name is the one the template pins
+// on c, where it pins one, else text: the text of the term for c's node id
+// that c's nearest enclosing archetype root defines, as termText returns it.
+// The reference names a node so, and [idOf] derives its id from the same
+// name. The description is always the term's. A compiled template carries
+// one set of terms, in its default language, so every language reads the
+// same name and description, which are looked up once.
 func setNames(node *Node, c *templatecompile.CompiledNode, text string, cfg *config) {
-	node.Name = text
-	node.LocalizedName = text
+	name := cmp.Or(c.NodeName(), text)
+	node.Name = name
+	node.LocalizedName = name
 	desc, _ := impl.RootTermItem(c, c.NodeID(), "description")
 	for _, lang := range cfg.languages {
-		if text != "" {
+		if name != "" {
 			if node.LocalizedNames == nil {
 				node.LocalizedNames = map[string]string{}
 			}
-			node.LocalizedNames[lang] = text
+			node.LocalizedNames[lang] = name
 		}
 		if desc != "" {
 			if node.LocalizedDescriptions == nil {
