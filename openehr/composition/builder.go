@@ -197,7 +197,12 @@ func (b *Builder) Set(path string, v any) error {
 	// admits its type, which the validator tries first (REQ-101, REQ-102).
 	// They share the path, so Build reaches the same RM attribute through
 	// any of them, and bindRMType checks that the attribute can hold the
-	// value.
+	// value. A node below a later alternative, or below a later sibling
+	// with the same node id, shares its path with the node below the first,
+	// so NodeAt returns the one below the first, and the value binds against
+	// the alternatives under that node's attribute alone (REQ-101 Type
+	// enforcement). Whether the values set below one ISM_TRANSITION match a
+	// single alternative is the validator's call, not Set's.
 	bound, err := bindRMType(node, v)
 	if err != nil {
 		wrapped := fmt.Errorf("%s: %w", path, err)
