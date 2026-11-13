@@ -12,6 +12,7 @@ package simplified
 // ([siblingSpellingFold.respell]).
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"slices"
@@ -137,10 +138,10 @@ func (f siblingSpellingFold) settle(sink *unmatchedSink) error {
 // [errors.Is] and [errors.As] see what err carries. err is returned as it is
 // where it is nil, nothing was renamed, or its message names no renamed id.
 //
-// A key as written is never respelled: a renamed id is in the Web Template's
-// spelling, which a key as written carries only where the body spells that
-// node both ways, and then the id is kept. So the refusal [settle] makes,
-// which names two keys as written, passes through unchanged.
+// A key as written keeps its ids: each lookup of [respelling] its path meets
+// holds what that key wrote there, or "", up to an id in the earlier
+// spelling, which no lookup is keyed by. So the refusal [settle] makes, which
+// names two keys as written, passes through unchanged.
 func (f siblingSpellingFold) respell(err error) error {
 	if err == nil || f.written == nil {
 		return err
@@ -166,15 +167,32 @@ func (e *respelledError) Error() string { return e.msg }
 // Unwrap returns the refusal the decode made.
 func (e *respelledError) Unwrap() error { return e.err }
 
-// respelling maps an id in the Web Template's spelling to the one the body
-// wrote, where the body spells that node one way only, and that way differs.
-// A node the body spells both ways keeps the Web Template's id. Each map holds
-// "" for an id spelled more than one way.
+// respelling maps a path in the Web Template's spelling to the ids the body
+// wrote it with. A path a message names is read in this order:
+//
+//   - the path of a key the body wrote takes that key's ids ([respelling.byKey]);
+//   - any other path takes, segment by segment, the id the body writes at
+//     that instance ([respelling.byInstance]), or, at an instance no key is
+//     below, at that node ([respelling.byPath]);
+//   - a lone id takes the one the body writes for it ([respelling.byID]).
+//
+// A path is keyed with its ids in the Web Template's spelling. An indexed key
+// gives every segment its :index, :0 where it spells none, so a key the body
+// wrote with no index and the path a stage names with :0 on every segment
+// read alike. Each map of ids holds "" for one spelled more than one way, and
+// that id stays as the message names it.
 type respelling struct {
-	// byPath is keyed by the ids of a node's path from the template root,
-	// joined by "/" and without their :index, so it reads a path whatever
-	// index it spells: a key the body wrote with none, and the path of the
-	// node a stage names with :0 on every segment, alike.
+	// byKey is keyed by the indexed path of each key the body wrote, and by
+	// that path and the key's |suffix, and holds the ids the key was written
+	// with, one per segment. It holds nil for a path two keys written with
+	// other ids have: one key two written keys stand for is the conflict
+	// [siblingSpellingFold.settle] refuses, naming both.
+	byKey map[string][]string
+	// byInstance is keyed by the indexed path of every prefix of a key's path,
+	// so each names one instance of a node.
+	byInstance map[string]string
+	// byPath is keyed by the ids of every prefix of a key's path, joined by
+	// "/" and without their :index, so it names a node at every instance.
 	byPath map[string]string
 	// byID is keyed by a lone id, for a message that names one outside a path
 	// (`FLAT id "x_1"`): the body must spell it one way wherever it appears.
@@ -186,30 +204,50 @@ type respelling struct {
 // order, so a rule that let one of two spellings win would pick the same one
 // on every run.
 func respellingOf(body map[string]any, root *webtemplate.Node) respelling {
-	r := respelling{byPath: make(map[string]string), byID: make(map[string]string)}
+	r := respelling{
+		byKey:      make(map[string][]string),
+		byInstance: make(map[string]string),
+		byPath:     make(map[string]string),
+		byID:       make(map[string]string),
+	}
 	for _, key := range slices.Sorted(maps.Keys(body)) {
 		current, renamed := currentSpelling(root, key)
 		if !renamed {
 			current = key
 		}
 		writtenPath, _ := splitSuffix(key)
-		currentPath, _ := splitSuffix(current)
+		currentPath, suffix := splitSuffix(current)
 		// The rename replaces ids alone, so the two paths have the same
 		// segments, one for one.
 		writtenSegs := strings.Split(writtenPath, "/")
-		var ids strings.Builder
+		written := make([]string, 0, len(writtenSegs))
+		var ids, indexed strings.Builder
 		for i, p := range strings.Split(currentPath, "/") {
 			seg, ok := parseFlatSeg(p)
 			wseg, wok := parseFlatSeg(writtenSegs[i])
 			if !ok || !wok {
+				written = nil
 				break
 			}
 			if i > 0 {
 				ids.WriteByte('/')
+				indexed.WriteByte('/')
 			}
 			ids.WriteString(seg.id)
+			indexed.WriteString(seg.id)
+			indexed.WriteByte(':')
+			indexed.WriteString(strconv.Itoa(max(seg.idx, 0)))
+			record(r.byInstance, indexed.String(), wseg.id)
 			record(r.byPath, ids.String(), wseg.id)
 			record(r.byID, seg.id, wseg.id)
+			written = append(written, wseg.id)
+		}
+		if written == nil {
+			continue
+		}
+		recordKey(r.byKey, indexed.String(), written)
+		if suffix != "" {
+			recordKey(r.byKey, indexed.String()+"|"+suffix, written)
 		}
 	}
 	return r
@@ -225,56 +263,55 @@ func record(m map[string]string, k, written string) {
 	m[k] = written
 }
 
+// recordKey notes that the body writes a key at path k with the ids written,
+// keeping nil where it has written one there with other ids before.
+func recordKey(m map[string][]string, k string, written []string) {
+	if prev, seen := m[k]; seen && !slices.Equal(prev, written) {
+		m[k] = nil
+		return
+	}
+	m[k] = written
+}
+
 // apply returns msg with every renamed id it names put back. It reads msg as
 // text that names paths: a path starts where a run of id characters
 // ([idRune]) follows anything but an id character, "/", ":" or "|", and
 // takes "/"-separated segments, each an id with an optional ":<digits>"
-// index, until something else follows. A path of two or more segments is
-// read from the template root, each id against [respelling.byPath]; a lone
-// id against [respelling.byID]. Only whole ids are replaced: `x_1` inside
-// `x_10` is the id `x_10`, which is not renamed.
+// index, until something else follows, then a "|<suffix>" where one follows.
+// A path of two or more segments is read from the template root, a lone id
+// on its own ([respelling.written]). Only whole ids are replaced, and the
+// index text msg spells is kept: `x_1` inside `x_10` is the id `x_10`, which
+// is not renamed.
 func (r respelling) apply(msg string) string {
 	var b strings.Builder
 	copied := 0
-	replace := func(start, end int, id string) {
-		b.WriteString(msg[copied:start])
-		b.WriteString(id)
-		copied = end
-	}
 	for pos := 0; pos < len(msg); {
 		if !pathStart(msg, pos) {
 			_, n := utf8.DecodeRuneInString(msg[pos:])
 			pos += n
 			continue
 		}
-		type idSpan struct{ start, end int }
-		var spans []idSpan
+		var segs []pathSeg
 		p := pos
 		for {
 			end := idEnd(msg, p)
-			spans = append(spans, idSpan{p, end})
-			p = indexEnd(msg, end)
+			next := indexEnd(msg, end)
+			segs = append(segs, pathSeg{start: p, end: end, index: msg[end:next]})
+			p = next
 			if p+1 >= len(msg) || msg[p] != '/' || idEnd(msg, p+1) == p+1 {
 				break
 			}
 			p++
 		}
-		if len(spans) == 1 {
-			id := msg[spans[0].start:spans[0].end]
-			if w := r.byID[id]; w != "" && w != id {
-				replace(spans[0].start, spans[0].end, w)
-			}
-		} else {
-			var ids strings.Builder
-			for i, s := range spans {
-				id := msg[s.start:s.end]
-				if i > 0 {
-					ids.WriteByte('/')
-				}
-				ids.WriteString(id)
-				if w := r.byPath[ids.String()]; w != "" && w != id {
-					replace(s.start, s.end, w)
-				}
+		suffix := ""
+		if p < len(msg) && msg[p] == '|' {
+			suffix = msg[p+1 : idEnd(msg, p+1)]
+		}
+		for i, w := range r.written(msg, segs, suffix) {
+			if s := segs[i]; w != "" && w != msg[s.start:s.end] {
+				b.WriteString(msg[copied:s.start])
+				b.WriteString(w)
+				copied = s.end
 			}
 		}
 		pos = p
@@ -284,6 +321,55 @@ func (r respelling) apply(msg string) string {
 	}
 	b.WriteString(msg[copied:])
 	return b.String()
+}
+
+// pathSeg is one segment of a path a message names: the offsets of its id in
+// the message, and its ":<digits>" index as the message spells it, "" for
+// none.
+type pathSeg struct {
+	start, end int
+	index      string
+}
+
+// written returns, for each segment of a path msg names, the id the body
+// writes there, read in the order [respelling] gives, or "" where the
+// message's own id stays. segs are the path's segments, and suffix the
+// "|<suffix>" that follows it, "" for none.
+func (r respelling) written(msg string, segs []pathSeg, suffix string) []string {
+	if len(segs) == 1 {
+		return []string{r.byID[msg[segs[0].start:segs[0].end]]}
+	}
+	paths := make([]string, len(segs))
+	instances := make([]string, len(segs))
+	var ids, indexed strings.Builder
+	for i, s := range segs {
+		if i > 0 {
+			ids.WriteByte('/')
+			indexed.WriteByte('/')
+		}
+		id := msg[s.start:s.end]
+		ids.WriteString(id)
+		indexed.WriteString(id)
+		indexed.WriteString(cmp.Or(s.index, ":0"))
+		paths[i], instances[i] = ids.String(), indexed.String()
+	}
+	whole := instances[len(segs)-1]
+	key, ok := r.byKey[whole+"|"+suffix]
+	if suffix == "" || !ok {
+		key = r.byKey[whole]
+	}
+	if key != nil {
+		return key
+	}
+	out := make([]string, len(segs))
+	for i := range segs {
+		w, ok := r.byInstance[instances[i]]
+		if !ok {
+			w = r.byPath[paths[i]]
+		}
+		out[i] = w
+	}
+	return out
 }
 
 // idRune reports whether r can be part of a Web Template id: a letter, a

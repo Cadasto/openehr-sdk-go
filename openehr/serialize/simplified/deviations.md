@@ -607,8 +607,9 @@ partially or silently accepted.
   spelling. Both spellings of one key in one body are two spellings of one field (REQ-170):
   equal values, or one `null`, read once, and values that disagree are refused with
   `ErrUnknownPath` naming both keys. An unmatched key is reported as written, and a refusal
-  names a key as written too, one of `x|` as `x`; a node one body spells both ways in the keys
-  it reads keeps the Web Template's `id` in a refusal. **Where it
+  names a key the body wrote as written, one of `x|` as `x`; only a path that is no key the
+  body wrote, or a lone `id`, keeps the Web Template's `id` of a node spelled both ways, judged
+  at the path's instance where the body writes below it. **Where it
   misreads:** the reference numbers a duplicate by its place among the siblings of its `id`,
   with no check that the number is free, while the builder takes the next free `<id>_N`.
   Beside a sibling whose own `id` is `<id>_1` ("Blood Pressure 1"), the reference's
