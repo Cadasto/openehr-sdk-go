@@ -50,6 +50,14 @@ func (s sampler) float64() float64 {
 	return mrand.Float64()
 }
 
+// between draws a float64 from lo up to hi. The Go spec lets a compiler
+// fuse the multiply and the add into one instruction that rounds once, and
+// arm64 does; the explicit conversion of the product forbids that, so one
+// seed draws the same bits on every architecture.
+func (s sampler) between(lo, hi float64) float64 {
+	return lo + float64(s.float64()*(hi-lo))
+}
+
 // sampleValue returns a value drawn from within pc's constraint, in the
 // same Go shape pc.ExampleValue() yields (so [generator.applyPrimitiveExample]
 // handles both identically). The draw is self-checked against pc.Validate,
@@ -116,7 +124,7 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 			return nil
 		}
 		if lo, hi, ok := floatSampleBounds(c.Range); ok {
-			return lo + s.float64()*(hi-lo)
+			return s.between(lo, hi)
 		}
 		return s.float64() * 100 // unbounded: a small varied value
 
@@ -200,7 +208,7 @@ func quantityUnitEntry(c constraints.DvQuantity, name string) (constraints.Quant
 // falling back to the example magnitude for an unbounded range.
 func sampleMagnitude(r constraints.NumericRange, s sampler) float64 {
 	if lo, hi, ok := floatSampleBounds(r); ok {
-		return lo + s.float64()*(hi-lo)
+		return s.between(lo, hi)
 	}
 	return exampleMagnitudeFallback(r)
 }
