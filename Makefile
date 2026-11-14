@@ -348,7 +348,10 @@ FETCHED      := .fetched
 # The release the site's `go get` lines must name: the first `## [X.Y.Z]` in
 # CHANGELOG.md, i.e. the heading just under `## [Unreleased]`. Same headings
 # scripts/release-notes.sh parses, so the cut commit moves both at once.
-DOCS_RELEASE := $(shell sed -n 's/^## \[\([0-9][0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
+# The `#` goes through HASH because GNU Make before 4.3 (macOS ships 3.81)
+# reads a literal `#` inside $(shell …) as the start of a comment.
+HASH         := \#
+DOCS_RELEASE := $(shell sed -n 's/^$(HASH)$(HASH) \[\([0-9][0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
 # The ITS-REST tag the site must name: the `ref:` the vendoring script recorded
 # in resources/its-rest/MANIFEST.txt. Read from there rather than hardcoded, so
 # re-pinning the OpenAPI files moves the assertion with them.
