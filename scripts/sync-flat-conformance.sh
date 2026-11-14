@@ -193,7 +193,7 @@ cmd_sync() {
   } >"$MANIFEST"
 
   local count
-  count="$(wc -l <<<"$names")"
+  count=$(( $(wc -l <<<"$names") ))
   echo "Synced 1 OPT + $count FLAT fixture(s) → testkit/corpus/flat-conformance/ (commit ${commit:0:12})"
 }
 

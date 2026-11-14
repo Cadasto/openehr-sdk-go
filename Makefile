@@ -103,12 +103,18 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 
 ##@ Setup
 
-doctor: ## Show host Go, Docker, the active toolchain and the pins
+doctor: ## Show host Go, Docker, make, bash, GNU sed, the active toolchain and the pins
 	@echo "host go         : $$(command -v go || echo 'not installed')"
 	@echo "host go version : $$(go version 2>/dev/null || echo 'n/a')"
 	@echo "docker          : $$(command -v docker || echo 'not installed')"
 	@echo "docker compose  : $$(docker compose version 2>/dev/null | head -1 || echo 'n/a')"
 	@echo "active GO       : $(GO)"
+	@echo "make            : GNU Make $(MAKE_VERSION)"
+	@v="$$(bash -c 'echo "$$BASH_VERSION"' 2>/dev/null)"; \
+	 case "$$v" in [4-9]*) h= ;; *) h='  <- scripts need 4 or later (macOS: brew install bash)' ;; esac; \
+	 echo "bash            : $${v:-not installed}$$h"
+	@s="$$(command -v gsed 2>/dev/null || { sed --version 2>/dev/null | grep -q 'GNU sed' && command -v sed; })"; \
+	 echo "GNU sed         : $${s:-not found  <- make spec-check needs it (macOS: brew install gnu-sed)}"
 	@echo "pinned          : LINT_IMAGE=$(LINT_IMAGE)  ANTLR_VERSION=$(ANTLR_VERSION)  MKDOCS_IMAGE=$(MKDOCS_IMAGE)"
 
 go-version: ## Print the Go version of the active toolchain
