@@ -53,6 +53,12 @@ endif
 HOST_CC_OK = $(if $(HOST_GO_OK),$(shell cc="$$(go env CC 2>/dev/null)"; command -v "$${cc%% *}" >/dev/null 2>&1 && echo yes))
 RACE_GO    = $(if $(HOST_CC_OK),CGO_ENABLED=1 go,$(DOCKER_RUN) -e CGO_ENABLED=1 go go)
 
+# `make test-fused` only. Go may fuse a multiply and an add into one
+# instruction that rounds once: arm64 always does, amd64 only from GOAMD64=v3,
+# which CI's amd64 runner sets here so a result that rounds differently on
+# Apple Silicon fails the pull request. arm64 ignores GOAMD64.
+FUSED_GO = $(if $(HOST_GO_OK),GOAMD64=v3 go,$(DOCKER_RUN) -e GOAMD64=v3 go go)
+
 # xmllint for `make operational-template-schema-check`: the host's when it has
 # one, else the dev image's (Dockerfile: libxml2-utils). -T keeps the
 # container's stderr apart from its stdout.
@@ -85,7 +91,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 .PHONY: help doctor go-version build-dev build-antlr \
         build clean \
         fmt fmt-check vet lint mod-tidy \
-        test test-race \
+        test test-race test-fused \
         codegen termgen aqlgen spec-generate \
         bmm-sync bmm-drift its-xml-sync its-xml-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync ehrbase-service-sync corpus-pins-drift \
         terminology-sync terminology-drift \
@@ -159,6 +165,9 @@ test: codegen-check aqlgen-check termgen-check ## Run the unit tests (after the 
 
 test-race: ## Run the unit tests under the race detector
 	@$(RACE_GO) test -race -count=1 ./...
+
+test-fused: ## Run the unit tests with fused multiply-add, as arm64 runs them (GOAMD64=v3)
+	@$(FUSED_GO) test ./... -count=1
 
 ##@ Generate
 
