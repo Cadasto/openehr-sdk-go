@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.49.1] - 2026-11-15
+
+First `v0.49` patch: a seeded `RandomFill` gives the same values on Apple Silicon as on amd64, the Makefile and scripts run on a stock Mac, and the auth dependencies take upstream bug-fix releases.
+
+### Added
+
+- **The Makefile and scripts** run under macOS's make 3.81 with Homebrew bash and GNU sed, `make doctor` names the make, bash and sed in use, and `make test-fused` runs the tests with arm64's rounding.
+
+### Changed
+
+- **A seeded `RandomFill`** gives the same reals on Apple Silicon as on amd64, where 0.49.0 and earlier differed in a real's last bits for the same `ValueSource` (REQ-107).
+- **The minimum `golang.org/x/oauth2` and `go-jose/v4`** move to v0.38.0 and v4.1.9, upstream bug-fix releases; the `auth/` and `smart/` layers sign and verify as before.
+
 ## [0.49.0] - 2026-11-14
 
 Forty-ninth `v0.x` minor: FLAT and STRUCTURED gain sample counts, history origins, interval attributes and workflow definitions, and complete coded values from the template; the Web Template matches the EHRbase reference for ACTION transitions, multi-type ELEMENTs and node names; FLAT decode and validation do less work per call. **Breaking:** a duplicate sibling's id and keys become `<id>_1`, ACTION and multi-type ELEMENT values move to the reference's keys, and FLAT decode, canonical XML and the operational template reader refuse more malformed input.
