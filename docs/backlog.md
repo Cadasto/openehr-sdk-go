@@ -1,6 +1,6 @@
 ---
 kind: plan
-harvested_through: 2026-11-13T23:42:27Z
+harvested_through: 2026-11-14T20:35:28Z
 ---
 # Backlog
 
@@ -40,7 +40,7 @@ Code in openehr/instance (and one copy in openehr/serialize/simplified) where a 
 
 ## Sentences to settle: which generator rule values a coded text (REQ-107)
 Document-only changes: clinical-modeling.md has two rules that both claim a coded text's value. Lane: full. Size: S.
-- docs/specifications/clinical-modeling.md:751 · The term-text rule (and the widened rubric rule beside it, :749) overrides Leaf values (:708), where a leaf "is valued as the `ValueFill` in force says" with only Precedence 3 and 4 and *Placeholders* named as exceptions, wherever a C_STRING on the coded text's value admits the text; Precedence 1 (:806) covers only a C_STRING that rejects the rubric; say which rule wins in one of them · by: sdd-doc-reviewer · from: fix/generator-cdr-acceptance
+- docs/specifications/clinical-modeling.md:752 · The term-text rule (and the widened rubric rule beside it, :749) overrides Leaf values (:708), where a leaf "is valued as the `ValueFill` in force says" with only Precedence 3 and 4 and *Placeholders* named as exceptions, wherever a C_STRING on the coded text's value admits the text; Precedence 1 (:806) covers only a C_STRING that rejects the rubric; say which rule wins in one of them · by: sdd-doc-reviewer · from: fix/generator-cdr-acceptance
 
 ## RM floor: the invariants not yet evaluated (REQ-112, REQ-171)
 The ledger is openehr/validation/invariants.json: each entry whose reason starts "Not yet evaluated" is a mechanical rule the floor could evaluate, and each one taken on adds a catalogue bullet, an evaluator and a PROBE-077 row. Lane: full. Size: L.
@@ -65,4 +65,4 @@ Code in scripts/sync-bmm.sh and scripts/sync-its-xml-schemas.sh, behind `make bm
 - cmd/cdrcheck/cdr.go:242 · documents are posted with `Prefer: return=minimal`, so a FerroEHR 422 says only "the content fails validation at N path(s)" and the summary groups unrelated causes under one line (vital_signs and sdk_crosscheck_siblings share one); post with `return=representation`, for which FerroEHR lists each path and violation, and group refusals by them · from: CDR cross-check 2026-11-06
 - cmd/cdrcheck/cdr.go:192 · on a fresh EHRbase 2.37.1 the workers' first concurrent EHR creates under one new Basic user race: 5 of 884 answered 500 "User already created concurrently by different request", in both runs, and their documents went unposted; create one EHR per CDR before the workers start, or retry that 500 once · from: CDR cross-check 2026-11-06
 - cmd/cdrcheck/generate.go:270 · a CDR example whose root is PERSON is recorded as "root type PERSON is not one the run validates" (FerroEHR's three TestPerson.v2 examples), though the run validates its own PERSON documents; decode and validate every root type the generator writes · from: CDR cross-check 2026-11-06
-- scripts/sync-bmm.sh:359 · bmm-drift and its-xml-drift (sync-its-xml-schemas.sh:336) compare the pin with master, not with the ref the manifest records, so a pin on the unmerged integration/am14-opt-validation branch reports its own commits as changed upstream; compare with the recorded ref and report ahead and behind master separately · from: #378
+- scripts/sync-bmm.sh:361 · bmm-drift and its-xml-drift (sync-its-xml-schemas.sh:336) compare the pin with master, not with the ref the manifest records, so a pin on the unmerged integration/am14-opt-validation branch reports its own commits as changed upstream; compare with the recorded ref and report ahead and behind master separately · from: #378
