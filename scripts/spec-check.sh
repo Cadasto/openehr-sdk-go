@@ -18,6 +18,8 @@
 #   - planned REQs with missing artefacts
 #   - missing canonical: link in traceability.yaml
 set -euo pipefail
+# Associative arrays (declare -A) need bash 4 or later; macOS ships 3.2.
+((BASH_VERSINFO[0] >= 4)) || { echo "${0##*/}: needs bash 4 or later, not ${BASH_VERSION} (macOS: brew install bash)" >&2; exit 2; }
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 YAML="${ROOT}/docs/specifications/traceability.yaml"

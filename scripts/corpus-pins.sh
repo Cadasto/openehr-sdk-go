@@ -25,6 +25,8 @@
 #            head of the branch its line names, via `git ls-remote`. The
 #            network step never fails the command.
 set -euo pipefail
+# Associative arrays (declare -A) need bash 4 or later; macOS ships 3.2.
+((BASH_VERSINFO[0] >= 4)) || { echo "${0##*/}: needs bash 4 or later, not ${BASH_VERSION} (macOS: brew install bash)" >&2; exit 2; }
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly CORPUS="$ROOT/testkit/corpus"
@@ -111,7 +113,7 @@ cmd_verify() {
   if [[ $rc -ne 0 ]]; then
     die "corpora disagree with their pins — re-run the vendoring scripts UPSTREAM_PINS.txt lists"
   fi
-  echo "corpus-pins-check: OK ($n provenance records, $(pin_lines | wc -l) pins)"
+  echo "corpus-pins-check: OK ($n provenance records, $(( $(pin_lines | wc -l) )) pins)"
 }
 
 cmd_drift() {

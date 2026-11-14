@@ -156,7 +156,7 @@ cmd_sync() {
   } >"$MANIFEST"
 
   local count
-  count="$(wc -l <<<"$names")"
+  count=$(( $(wc -l <<<"$names") ))
   echo "Synced $count spec(s) → resources/its-rest/ (commit ${commit:0:12})"
 }
 

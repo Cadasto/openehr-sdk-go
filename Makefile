@@ -53,6 +53,12 @@ endif
 HOST_CC_OK = $(if $(HOST_GO_OK),$(shell cc="$$(go env CC 2>/dev/null)"; command -v "$${cc%% *}" >/dev/null 2>&1 && echo yes))
 RACE_GO    = $(if $(HOST_CC_OK),CGO_ENABLED=1 go,$(DOCKER_RUN) -e CGO_ENABLED=1 go go)
 
+# `make test-fused` only. Go may fuse a multiply and an add into one
+# instruction that rounds once: arm64 always does, amd64 only from GOAMD64=v3,
+# which CI's amd64 runner sets here so a result that rounds differently on
+# Apple Silicon fails the pull request. arm64 ignores GOAMD64.
+FUSED_GO = $(if $(HOST_GO_OK),GOAMD64=v3 go,$(DOCKER_RUN) -e GOAMD64=v3 go go)
+
 # xmllint for `make operational-template-schema-check`: the host's when it has
 # one, else the dev image's (Dockerfile: libxml2-utils). -T keeps the
 # container's stderr apart from its stdout.
@@ -85,7 +91,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 .PHONY: help doctor go-version build-dev build-antlr \
         build clean \
         fmt fmt-check vet lint mod-tidy \
-        test test-race \
+        test test-race test-fused \
         codegen termgen aqlgen spec-generate \
         bmm-sync bmm-drift its-xml-sync its-xml-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync ehrbase-service-sync corpus-pins-drift \
         terminology-sync terminology-drift \
@@ -97,12 +103,18 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 
 ##@ Setup
 
-doctor: ## Show host Go, Docker, the active toolchain and the pins
+doctor: ## Show host Go, Docker, make, bash, GNU sed, the active toolchain and the pins
 	@echo "host go         : $$(command -v go || echo 'not installed')"
 	@echo "host go version : $$(go version 2>/dev/null || echo 'n/a')"
 	@echo "docker          : $$(command -v docker || echo 'not installed')"
 	@echo "docker compose  : $$(docker compose version 2>/dev/null | head -1 || echo 'n/a')"
 	@echo "active GO       : $(GO)"
+	@echo "make            : GNU Make $(MAKE_VERSION)"
+	@v="$$(bash -c 'echo "$$BASH_VERSION"' 2>/dev/null)"; \
+	 case "$$v" in [4-9]*) h= ;; *) h='  <- scripts need 4 or later (macOS: brew install bash)' ;; esac; \
+	 echo "bash            : $${v:-not installed}$$h"
+	@s="$$(command -v gsed 2>/dev/null || { sed --version 2>/dev/null | grep -q 'GNU sed' && command -v sed; })"; \
+	 echo "GNU sed         : $${s:-not found  <- make spec-check needs it (macOS: brew install gnu-sed)}"
 	@echo "pinned          : LINT_IMAGE=$(LINT_IMAGE)  ANTLR_VERSION=$(ANTLR_VERSION)  MKDOCS_IMAGE=$(MKDOCS_IMAGE)"
 
 go-version: ## Print the Go version of the active toolchain
@@ -159,6 +171,9 @@ test: codegen-check aqlgen-check termgen-check ## Run the unit tests (after the 
 
 test-race: ## Run the unit tests under the race detector
 	@$(RACE_GO) test -race -count=1 ./...
+
+test-fused: ## Run the unit tests with fused multiply-add, as arm64 runs them (GOAMD64=v3)
+	@$(FUSED_GO) test ./... -count=1
 
 ##@ Generate
 
@@ -348,7 +363,10 @@ FETCHED      := .fetched
 # The release the site's `go get` lines must name: the first `## [X.Y.Z]` in
 # CHANGELOG.md, i.e. the heading just under `## [Unreleased]`. Same headings
 # scripts/release-notes.sh parses, so the cut commit moves both at once.
-DOCS_RELEASE := $(shell sed -n 's/^## \[\([0-9][0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
+# The `#` goes through HASH because GNU Make before 4.3 (macOS ships 3.81)
+# reads a literal `#` inside $(shell …) as the start of a comment.
+HASH         := \#
+DOCS_RELEASE := $(shell sed -n 's/^$(HASH)$(HASH) \[\([0-9][0-9.]*\)\].*/\1/p' CHANGELOG.md | head -n 1)
 # The ITS-REST tag the site must name: the `ref:` the vendoring script recorded
 # in resources/its-rest/MANIFEST.txt. Read from there rather than hardcoded, so
 # re-pinning the OpenAPI files moves the assertion with them.

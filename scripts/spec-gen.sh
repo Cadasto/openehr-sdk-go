@@ -37,14 +37,16 @@ gen_citations() {
   files="$(git -C "$ROOT" ls-files --cached --others --exclude-standard -- '*_test.go' 'testkit/probes/*.go' 2>/dev/null)" \
     || { echo "spec-gen: cannot list the test files (git ls-files failed in ${ROOT})" >&2; return 1; }
   [[ -n "$files" ]] || return 0
-  # A tracked file deleted from the working tree is not a test file any more.
-  # grep exits 1 when nothing matches, which xargs reports as 123; any other
-  # failure is fatal.
+  # A tracked file deleted from the working tree is not a test file any more,
+  # and is skipped with status 0, which pipefail needs when it comes last.
+  # grep exits 1 when nothing matches; the wrapper turns that into 0 before
+  # xargs sees it, because GNU xargs reports a failed run as 123 but BSD
+  # xargs (macOS) as 1, the code of a real failure. Anything else is fatal.
   local rc=0
   ( cd "$ROOT" && printf '%s\n' "$files" | while IFS= read -r f; do
-      [[ -f "$f" ]] && printf '%s\0' "$f"
-    done | xargs -0 grep -owHE 'REQ-[0-9]+' /dev/null ) > "${TMP}/cites" || rc=$?
-  [[ $rc -eq 0 || $rc -eq 123 ]] \
+      if [[ -f "$f" ]]; then printf '%s\0' "$f"; fi
+    done | xargs -0 sh -c 'grep -owHE "REQ-[0-9]+" /dev/null "$@" || [ $? -eq 1 ]' sh ) > "${TMP}/cites" || rc=$?
+  [[ $rc -eq 0 ]] \
     || { echo "spec-gen: scanning the test files for REQ citations failed (exit ${rc})" >&2; return 1; }
   awk '{ i = length($0); while (substr($0, i, 1) != ":") i--; print substr($0, i + 1) "\t" substr($0, 1, i - 1) }' \
     "${TMP}/cites" | LC_ALL=C sort -u

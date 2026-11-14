@@ -50,6 +50,8 @@
 # downloads every file at that one sha, so two syncs of the same ref are
 # byte-identical. The resolved sha is recorded in MANIFEST.txt.
 set -euo pipefail
+# Associative arrays (declare -A) need bash 4 or later; macOS ships 3.2.
+((BASH_VERSINFO[0] >= 4)) || { echo "${0##*/}: needs bash 4 or later, not ${BASH_VERSION} (macOS: brew install bash)" >&2; exit 2; }
 
 readonly REPO="openEHR/specifications-ITS-BMM"
 readonly DEFAULT_BRANCH="master"
