@@ -89,6 +89,8 @@ make fmt     # gofumpt + goimports
 
 `make help` lists every target, grouped, and [`docs/ci.md`](docs/ci.md) explains what the gate checks. The Docker fallback when you have no host Go is in [`docs/quick-start.md`](docs/quick-start.md#if-you-dont-have-host-go).
 
+The scripts behind several targets need bash 4 or later, and `make spec-check` needs GNU sed. macOS ships bash 3.2 and BSD sed, so on a Mac run `brew install bash gnu-sed` once; Homebrew's bash comes first on `PATH`, and the scripts find GNU sed as `gsed`. `make doctor` shows the make, bash and sed it will use.
+
 ### Hooks and IDE integration
 
 Nothing runs on commit, so run `make lint` yourself before opening a PR. If you use Claude Code, its format-on-save hook is described in [AGENTS.md § Tooling & workflow](AGENTS.md#tooling--workflow).

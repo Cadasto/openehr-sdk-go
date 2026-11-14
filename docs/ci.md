@@ -25,6 +25,7 @@ Jobs run in parallel. All use Go 1.27.x (`actions/setup-go@v7` with module cache
 |---|---|---|
 | **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-check`, `aqlgen-check`, `termgen-check`, `vet`, `spec-check`, `bmm-check`, `its-xml-check`, `flat-check`, `corpus-pins-check`, `terminology-check`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-check`, `aqlgen-check` and `termgen-check` |
+| **Test (fused multiply-add)** | `test-fused` | The unit tests again with `GOAMD64=v3`, so the compiler fuses a multiply and an add into one rounding as it always does on arm64 (Apple Silicon). A result whose last bits differ there, such as a seeded random draw, fails here instead of only on a contributor's Mac |
 | **Lint** | (via `golangci-lint-action` v2.15.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` |
 | **Race** | `test-race` | **Push to `main` only**, because `-race` is slower. Catches data races in `typereg` and codecs. The runner has a C compiler, so the race run uses the host `go` |
 
@@ -58,6 +59,7 @@ Run `make help` for the full grouped list. Common targets:
 |---|---|---|
 | CI | `make ci` | Full PR gate (fmt, mod tidy, vet, test, lint, spec-check, bmm-check, its-xml-check, operational-template-schema-check, flat-check, corpus-pins-check, terminology-check, build) |
 | Test | `make test` | Unit tests; depends on `codegen-check`, `aqlgen-check` and `termgen-check` |
+| Test | `make test-fused` | Unit tests with `GOAMD64=v3`, which fuses multiply-add on amd64 as arm64 always does; on arm64, which fuses by default, it equals `go test`. On amd64 it needs an x86-64-v3 CPU, which Rosetta does not emulate |
 | Test | `make test-race` | `-race` detector (main-branch job only). The detector needs cgo, so it runs on host Go 1.27.x only when the C compiler `go env CC` names is on `PATH`. Otherwise it runs in the dev container with cgo turned on for that run only (`make build-dev` builds the image) |
 | Format | `make fmt-check` | Fail if `golangci-lint fmt --diff` (gofumpt + goimports) would change any file |
 | Modules | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |

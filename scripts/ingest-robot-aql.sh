@@ -51,6 +51,8 @@
 # `commit:` still matches EXPECTED_COMMIT. Only a re-pin (or a missing pin file)
 # moves the recorded date.
 set -euo pipefail
+# Associative arrays (declare -A) need bash 4 or later; macOS ships 3.2.
+((BASH_VERSINFO[0] >= 4)) || { echo "${0##*/}: needs bash 4 or later, not ${BASH_VERSION} (macOS: brew install bash)" >&2; exit 2; }
 
 if [[ -z "${ROBOT_ROOT:-}" ]]; then
   echo "ROBOT_ROOT is unset or empty" >&2

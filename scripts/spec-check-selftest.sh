@@ -10,6 +10,14 @@
 # — removing a collector arm or a count guard MUST fail here.
 set -euo pipefail
 
+# The cases plant their faults with GNU sed: -i with no backup suffix, \n
+# and \r in a replacement, one-line c\ text. macOS ships BSD sed, so take
+# Homebrew's gsed where there is one.
+GNU_SED="$(command -v gsed || command -v sed)"
+[[ "$("$GNU_SED" --version 2>/dev/null)" == *"GNU sed"* ]] \
+  || { echo "spec-check-selftest: needs GNU sed (macOS: brew install gnu-sed)" >&2; exit 2; }
+sed() { "$GNU_SED" "$@"; }
+
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # spec-gen lists test files with git; each fixture is its own repository, so
 # a GIT_DIR inherited from a hook must not point it at this one.
@@ -395,8 +403,17 @@ r="$(new_case malformed-id)"
 sed -i 's/^  - id: REQ-001$/  - id: REQ-01x/' "$r/docs/specifications/traceability.yaml"
 check malformed-id "$r" fail "malformed id line"
 
+# 39 - a tracked test file deleted from the working tree is not a test file,
+#      and the scan skips it even when git lists it last (everything tracked,
+#      so the deleted zz_test.go sorts after good_test.go).
+r="$(new_case tests-deleted-last)"
+printf 'package good\n' > "$r/pkg/good/zz_test.go"
+git -C "$r" add -A
+rm "$r/pkg/good/zz_test.go"
+check tests-deleted-last "$r" ok
+
 if [[ $fail -ne 0 ]]; then
   echo "spec-check-selftest: FAILED" >&2
   exit 1
 fi
-echo "spec-check-selftest: OK (39 cases)"
+echo "spec-check-selftest: OK (40 cases)"
