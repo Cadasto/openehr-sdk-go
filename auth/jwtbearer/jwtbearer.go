@@ -422,6 +422,12 @@ func (s *Source) lead(ctx context.Context, ex *exchange) (auth.Token, error) {
 
 	tok, err := s.fetch(ctx)
 	abandoned := coalesce.EndedByContext(ctx, err)
+	if abandoned {
+		// When ctx ended with a cause, the exchange's error reports only that
+		// cause. This caller still gets an error that reports its context's
+		// error; the waiters exchange again and never read it.
+		err = coalesce.ContextError(ctx, err)
+	}
 	s.mu.Lock()
 	switch {
 	case err == nil:

@@ -98,3 +98,69 @@ func TestREQ026_EndedByContextReadsTheCauseNetHTTPReturns(t *testing.T) {
 		t.Errorf("EndedByContext(ctx cancelled with a cause, %v) = false, want true", err)
 	}
 }
+
+// TestREQ026_ContextError pins what the caller that started a coalesced call
+// gets when its own context ended (REQ-026, idiom.md § Concurrency): an error
+// EndedByContext accepts reports that context's error even when it reported
+// only the cause, and keeps reporting what it reported before. Every other
+// error comes back as it is.
+func TestREQ026_ContextError(t *testing.T) {
+	errServer := errors.New("token endpoint returned 503")
+	errCause := errors.New("the request was abandoned")
+
+	cancelled := func() context.Context {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		return ctx
+	}
+	cancelledWithCause := func() context.Context {
+		ctx, cancel := context.WithCancelCause(t.Context())
+		cancel(errCause)
+		return ctx
+	}
+	expiredWithCause := func() context.Context {
+		ctx, cancel := context.WithDeadlineCause(t.Context(), time.Now().Add(-time.Second), errCause)
+		t.Cleanup(cancel)
+		return ctx
+	}
+	live := func() context.Context { return t.Context() }
+	// requestErr wraps err as http.Client.Do does.
+	requestErr := func(err error) error {
+		return &url.Error{Op: "Post", URL: "https://idp.example/token", Err: err}
+	}
+
+	tests := []struct {
+		name string
+		ctx  func() context.Context
+		err  error
+		// joined is true when ContextError is to wrap the context's error
+		// around err, and false when it is to return err as it is.
+		joined bool
+	}{
+		{name: "no error, cancelled context", ctx: cancelled, err: nil},
+		{name: "server error, live context", ctx: live, err: errServer},
+		{name: "server error, context cancelled with a cause", ctx: cancelledWithCause, err: errServer},
+		{name: "cancellation error, cancelled context", ctx: cancelled, err: requestErr(context.Canceled)},
+		{name: "cancellation error, context cancelled with a cause", ctx: cancelledWithCause, err: requestErr(context.Canceled)},
+		{name: "client timeout, cancelled context", ctx: cancelled, err: requestErr(context.DeadlineExceeded)},
+		{name: "cause, context cancelled with that cause", ctx: cancelledWithCause, err: requestErr(errCause), joined: true},
+		{name: "cause, deadline passed with that cause", ctx: expiredWithCause, err: requestErr(errCause), joined: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tc.ctx()
+			got := coalesce.ContextError(ctx, tc.err)
+			if !tc.joined {
+				if got != tc.err { //nolint:errorlint // the same value, returned as it is
+					t.Errorf("ContextError(ctx.Err() = %v, cause = %v; err = %v) = %v, want err as it is",
+						ctx.Err(), context.Cause(ctx), tc.err, got)
+				}
+				return
+			}
+			if !errors.Is(got, ctx.Err()) || !errors.Is(got, tc.err) || !errors.Is(got, errCause) {
+				t.Errorf("ContextError(ctx.Err() = %v, cause = %v; err = %v) = %v, want one that reports ctx's error, err and the cause",
+					ctx.Err(), context.Cause(ctx), tc.err, got)
+			}
+		})
+	}
+}

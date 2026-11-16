@@ -249,8 +249,14 @@ func (j *JWKS) leadRefresh(ctx context.Context, r *jwksRefresh) error {
 	defer j.release(r)
 
 	err := j.fetch(ctx)
-	r.err = err
 	r.retry = coalesce.EndedByContext(ctx, err)
+	if r.retry {
+		// When ctx ended with a cause, the fetch's error reports only that
+		// cause. This lookup still gets an error that reports its context's
+		// error; the waiters fetch again and never read it.
+		err = coalesce.ContextError(ctx, err)
+	}
+	r.err = err
 	return err
 }
 

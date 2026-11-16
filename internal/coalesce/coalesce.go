@@ -3,12 +3,14 @@
 // of the caller that started it. When that context ending is all that failed
 // the call, the failure belongs to that caller alone: a waiter whose own
 // context is still live does not take it as its result, and tries again.
-// [EndedByContext] decides when a failure is of that kind.
+// [EndedByContext] decides when a failure is of that kind, and [ContextError]
+// makes the error that caller gets report its context's error.
 package coalesce
 
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 // EndedByContext reports whether err means the call failed only because ctx
@@ -24,4 +26,17 @@ func EndedByContext(ctx context.Context, err error) bool {
 	ctxErr := ctx.Err()
 	return err != nil && ctxErr != nil &&
 		(errors.Is(err, ctxErr) || errors.Is(err, context.Cause(ctx)))
+}
+
+// ContextError returns the error the caller that started a call gets when
+// err failed it. When [EndedByContext] accepts err but err does not report
+// ctx's own error, as when ctx ended with a cause and the HTTP client reported
+// only that cause, it returns ctx's error wrapping err, so the result reports
+// both ctx's error and everything err reports. Otherwise it returns err as it
+// is.
+func ContextError(ctx context.Context, err error) error {
+	if !EndedByContext(ctx, err) || errors.Is(err, ctx.Err()) {
+		return err
+	}
+	return fmt.Errorf("%w: %w", ctx.Err(), err)
 }

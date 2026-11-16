@@ -443,9 +443,9 @@ func TestREQ025_JWKSLiteralWithoutHTTPClientRefuses(t *testing.T) {
 var errCallerGaveUp = errors.New("caller gave up")
 
 // TestREQ026_JWKSLeaderContextEndedWithACauseGetsItsContextError pins
-// REQ-026 (idiom.md § Concurrency) with REQ-062 for the lookup leading a
-// key-set fetch when its context ends with a cause, as
-// context.WithCancelCause, context.WithTimeoutCause and errgroup end one.
+// REQ-026 (idiom.md § Concurrency) for the lookup leading a key-set fetch
+// when its context ends with a cause, as context.WithCancelCause,
+// context.WithTimeoutCause and errgroup end one.
 // The HTTP client then reports the cause instead of the context's error.
 // That lookup still gets an error that reports its context's error, and the
 // cause stays inside it.
