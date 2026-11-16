@@ -132,6 +132,19 @@
 // hold its current state's code, where exactly one does. A careflow step there
 // is kept whatever its code, for validation to judge.
 //
+// # An ACTION's instruction details
+//
+// An ACTION's instruction details travel as "<action>/_instruction_details"
+// with three suffixes: "|composition_uid", the id of the composition holding
+// the instruction, "|activity_id", and "|path", the instruction's path in
+// that composition. Decode reads them as a reference to an INSTRUCTION in the
+// "local" namespace whose id is a HIER_OBJECT_ID, and reads an empty "|path"
+// as none. It refuses details without "|composition_uid" or "|activity_id"
+// with [ErrUnsupportedDatatype]. Encode writes "|path" only when it is not
+// empty, and refuses with [ErrUnsupportedDatatype] a reference in another
+// namespace, to another type or with another kind of id, and details that
+// carry wf_details, since the three suffixes cannot carry them.
+//
 // # A bare value beside its leaf's members
 //
 // In STRUCTURED a leaf's bare value is its array element, as in
@@ -175,18 +188,18 @@
 // whose name the FLAT grammar does not read at that level is unmatched
 // whatever its value holds, and is reported as that member; a name it reads
 // keeps the shape refusals. A key the decode reads is never unmatched, even
-// where the decode then refuses it: a PARTICIPATION `time`, a
-// FEEDER_AUDIT_DETAILS `other_details` and `_instruction_details` have no
-// carrier and fail the decode in every mode. So do the reference's spellings
+// where the decode then refuses it: a PARTICIPATION `time` and a
+// FEEDER_AUDIT_DETAILS `other_details` have no carrier and fail the decode in
+// every mode. So do the reference's spellings
 // of an ACTION's ISM transition and time where the Web Template does not
 // resolve them: a `current_state`, `transition` or `careflow_step` leaf under
 // a transition node with no child of that id (such as the careflow step of an
 // ACTION whose template constrains no transition), any of them or a `_reason`
 // family under an `ism_transition` segment the Web Template has no node for,
 // and an ACTION's `time` where it has no such leaf. They name RM data decode
-// would otherwise drop or replace. Those keys and `_instruction_details` are paths the
-// Simplified Formats define and this SDK does not model: their refusal matches
-// [ErrNotModelled] as well as [ErrUnknownPath]. A leaf whose
+// would otherwise drop or replace. Those keys are paths the Simplified Formats
+// define and this SDK does not model: their refusal matches [ErrNotModelled]
+// as well as [ErrUnknownPath]. A leaf whose
 // datatype has neither a suffix set nor a sub-path grammar refuses its bare
 // value and any suffix naming an attribute of its RM class.
 // So does malformed content: a value of the wrong shape, a missing required
