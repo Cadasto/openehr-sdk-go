@@ -964,10 +964,10 @@ Any other value the generator writes without a constraint, a placeholder or a de
 
 #### RM defaults
 
-The generator **SHOULD** write the default given here, subject to § [Precedence](#precedence) 1, a coded default with the openEHR rubric of its code as its text, since each is a value the RM rules accept where the OPT leaves the choice open (§ Contract *Output*), where:
+When both of these hold, the generator **SHOULD** write the default given here, subject to § [Precedence](#precedence) 1, a coded default with the openEHR rubric of its code as its text, since each is a value the RM rules accept where the OPT leaves the choice open (§ Contract *Output*):
 
 - the generator writes one of the attributes below, because the visit rule or § [Precedence](#precedence) 2 has it written;
-- and the OPT gives it no value, because it leaves the attribute silent or names it with no code (or only `at0000`) to choose.
+- the OPT gives it no value, because it leaves the attribute silent or names it with no code (or only `at0000`) to choose.
 
 A `COMPOSITION`'s `context` is written under every policy, `Required` included, as its item says:
 
