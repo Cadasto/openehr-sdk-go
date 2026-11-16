@@ -418,20 +418,95 @@ Composition-supplied predicates never form lookup keys, so missing nodes are rep
 
 ### Validation dimensions
 
-| Dimension | Implementation |
-|---|---|
-| **Structural — root archetype match** | comp.ArchetypeNodeID matches the OPT root's archetype id |
-| **Structural — required attributes (composition root + recursive)** | RM-mandatory attrs at the root (Category, Composer, Language, Territory); template-driven existence checks at every OPT node whose attribute existence lower bound is ≥ 1; a multi-valued attribute fails that check when its list is absent, and when it is present and empty only where the template asks for a member there too: its cardinality lower bound, or the occurrences lower bound of a child it allows, is ≥ 1, or the list is one the floor holds non-empty once present (*An existence lower bound alone asks for no member* below) |
-| **Structural — prohibited attributes** | an OPT child whose occurrences upper bound is 0 is not allowed, and the OPT prohibits an attribute whose existence upper bound is 0, or that has at least one OPT child and allows none of them, as [§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *Visit rule* defines them; a prohibited attribute that is present (a single-valued attribute that holds a value, a multi-valued one that holds at least one item) is reported as `prohibited` at the attribute's path, and the template walk does not walk into it. Under a single-valued attribute, a child that is not allowed binds no value: the value binds among the other children by the alternatives rule below, or fails as `rm_type_mismatch` or `alternative_mismatch` |
-| **Structural — child cardinality** | for each C_MULTIPLE_ATTRIBUTE of an object the instance carries, other than a list the template prohibits or one whose items are primitive values, whose children are never counted (*A mandatory child under an optional list* below), the items bound to each child are counted against its `Occurrences()`; on a list that is absent or empty, only the children *A mandatory child under an optional list* below names are counted, each holding no item; and the RM child count against the parsed `CompiledAttribute.ChildMultiplicity()` interval when the list holds an item or is present and the template requires it by its existence; a list the template requires by its existence that the instance does not carry fails existence alone (*A mandatory child under an optional list* below) |
-| **Structural — alternatives (C_SINGLE_ATTRIBUTE)** | The value is checked against the attribute's child constraints. The children are alternatives, only one of which the value needs to match (ADL 1.4 *cADL*, *Single-valued Attributes*; AOM 1.4 `C_SINGLE_ATTRIBUTE`, whose children are alternative object constraints). Binding prefers the most specific child, in three tiers: a child whose `RMTypeName` equals the value's RM type (for a round-tripped bare `DV_INTERVAL`, the parameterised type its bounds give; one with no bound present has no parameter, so only a bare `DV_INTERVAL` child names its type, and a `DV_INTERVAL<T>` child admits it in the third tier, as § *Roots beyond COMPOSITION* says); then a child naming the AOM 1.4 primitive short name whose canonical DV wrapper the value is; then a child the type only conforms to by BMM descent, or an untyped child. Within the first tier that admits the value, validators **MUST** bind it to a child under whose constraints it validates, where one does, and otherwise to the first child of that tier, reporting the findings it draws there. A value validates under a child when walking it under that child reports no finding that makes `Result.OK` false and, at a slot child, the slot's assertions admit its archetype id; the walk tries the children in OPT order and binds to the first under which the value validates. This trial is the validators' alone: the builder ([§ REQ-101](#req-101--generic-opt-driven-composition-builder) *Type enforcement*) and the generator ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *What a visit writes*) bind by the tiers alone, to the first child of the first tier that admits the type. When no tier admits the value: exactly one child → `rm_type_mismatch`; two or more children → `alternative_mismatch` |
-| **Structural — RM type match** | the RM instance's concrete type conforms to the OPT child's `RMTypeName`: equal to it, or a descendant of it in the pinned RM BMM's class hierarchy, whether that ancestor is abstract or concrete (a `DV_CODED_TEXT` satisfies `DV_TEXT`, a `PARTY_REF` satisfies `OBJECT_REF`). A `DV_INTERVAL<T>` child matches a typed instantiation `DV_INTERVAL<U>` whose parameter `U` is `T` or descends from it, so `DV_INTERVAL<DV_COUNT>` matches a `DV_INTERVAL<DV_QUANTIFIED>` child, and a round-tripped interval that decodes as the bare `DV_INTERVAL` by the runtime types of its bounds, each present bound having to be a `T` or of a class that descends from it; an AOM 1.4 primitive short name admits its canonical DV wrapper, the type the [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator builds for it (`DURATION` → `DV_DURATION`, `DATE` → `DV_DATE`, `TIME` → `DV_TIME`, `DATE_TIME` → `DV_DATE_TIME`, `BOOLEAN` → `DV_BOOLEAN`, `INTEGER` → `DV_COUNT`). Single-child attributes surface failures as `rm_type_mismatch` at the attribute path |
-| **Identity — archetype / node id pinning** | LOCATABLE.archetype_node_id is checked against the matched OPT child's `ArchetypeID()` (for archetype roots) or `NodeID()` (for inner at-codes) |
-| **Structural — binding items (C_MULTIPLE_ATTRIBUTE)** | A LOCATABLE item binds among the non-slot children whose `ArchetypeID()` (archetype root) or `NodeID()` equals its `archetype_node_id`, else to the first slot whose assertions admit that id. Where two or more non-slot children carry the id, as when a template reuses one archetype under several template-level names ([§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates)), the item's `name` value ranks them: first those whose pinned name equals it; failing any, those that pin no name; failing any, all of them. The item binds among the children of the first rank that holds one. Among the children of one rank, validators **MUST** bind the item to a child that has room and under whose constraints the item validates, as *Structural — alternatives* reads it, where one does; failing that, to the first of them that has room; failing that, to the first of them, whose occurrences or name constraint then reports the mismatch. The walk tries them in OPT order and binds to the first that has room and under which the item validates. A child has room while the items of the same list bound to it before, in item order, number fewer than its occurrences upper bound; one that states no upper bound always has room. The item's `name` decides the binding only and never reaches a path or a message ([REQ-168](#req-168--value-free-validation-diagnostics)). Items that are not a LOCATABLE bind by RM type (§ *Items that are not a LOCATABLE*) |
-| **Primitive constraints** | REQ-103 `PrimitiveConstraint.Validate` runs at every primitive leaf the OPT declares; bound to the RM value found by the structural walk. A part of a value that the RM rules report as absent or empty is theirs to report, not the constraint's: the RM's `required` at that part stands for the constraint's finding there, beside any finding of an RM rule's own (§ REQ-112 *Coded invariants*; [§ REQ-171](#req-171--validation-engine) *One finding per defect*). The parts are the `code_string` of a CODE_PHRASE, a DV_CODED_TEXT's defining code included, whose terminology the constraint still judges; the `units` of a DV_QUANTITY, which leaves the constraint nothing to judge, its ranges being per unit; the `value` of the DV_DATE, DV_TIME, DV_DATE_TIME or DV_DURATION an AOM 1.4 short name binds; and the code string of a DV_ORDINAL's `symbol`, when the validator passes the `value` alone for the constraint to judge. When the walk stops before the RM rules report the part, at the depth limit or the visit limit, the constraint judges it as it judges any value, so the part is reported either way. The constraint **MUST** still judge a CODE_PHRASE's terminology; a DV_ORDINAL's `value`, which the validator passes alone when the RM rules report the symbol's code string; a part the RM rules let be blank, such as a DV_SCALE symbol's `code_string`; and a part the RM does not require, such as an optional String, which it judges as any value. At a DV_ORDINAL bound to a `C_DV_ORDINAL` whose symbol's defining code carries a code string, a symbol that does not match its value **MUST** be reported: the validator passes the `value` and that code together as one `constraints.OrdinalSymbol`; a code that names no terminology matches a listed pair under § REQ-103's rule, and the RM rules report the missing terminology. A `CONSTRAINT_REF` leaf constrains nothing the walker can check locally, so the walker still checks the RM-mandatory attributes of the value it binds there (a CODE_PHRASE's `terminology_id` and `code_string`), as at a node the OPT leaves unconstrained |
-| **Slot fit — assertion grammar** | § REQ-103 *Slot assertions*: `CompiledNode.AllowsArchetypeID` (includes / excludes with RM-type-prefix fallback when no includes parsed) |
-| **Extra RM nodes not declared in OPT** | not flagged |
-| **Terminology binding value-set** | not checked: it needs a live external terminology; [§ REQ-111](#req-111--public-compiled-template-bridge) *Term definitions and bindings* surfaces the bindings the OPT carries |
+#### Structural — root archetype match
+
+comp.ArchetypeNodeID matches the OPT root's archetype id.
+
+#### Structural — required attributes (composition root + recursive)
+
+- RM-mandatory attrs at the root (Category, Composer, Language, Territory);
+- template-driven existence checks at every OPT node whose attribute existence lower bound is ≥ 1;
+- a multi-valued attribute fails that check when its list is absent, and when it is present and empty only where the template asks for a member there too: its cardinality lower bound, or the occurrences lower bound of a child it allows, is ≥ 1, or the list is one the floor holds non-empty once present (*An existence lower bound alone asks for no member* below).
+
+#### Structural — prohibited attributes
+
+An OPT child whose occurrences upper bound is 0 is not allowed, and the OPT prohibits an attribute whose existence upper bound is 0, or that has at least one OPT child and allows none of them, as [§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *Visit rule* defines them.
+A prohibited attribute that is present (a single-valued attribute that holds a value, a multi-valued one that holds at least one item) is reported as `prohibited` at the attribute's path, and the template walk does not walk into it.
+Under a single-valued attribute, a child that is not allowed binds no value: the value binds among the other children by the alternatives rule below, or fails as `rm_type_mismatch` or `alternative_mismatch`.
+
+#### Structural — child cardinality
+
+For each C_MULTIPLE_ATTRIBUTE of an object the instance carries:
+
+- other than a list the template prohibits or one whose items are primitive values, whose children are never counted (*A mandatory child under an optional list* below), the items bound to each child are counted against its `Occurrences()`;
+- on a list that is absent or empty, only the children *A mandatory child under an optional list* below names are counted, each holding no item;
+- and the RM child count against the parsed `CompiledAttribute.ChildMultiplicity()` interval when the list holds an item or is present and the template requires it by its existence;
+- a list the template requires by its existence that the instance does not carry fails existence alone (*A mandatory child under an optional list* below).
+
+#### Structural — alternatives (C_SINGLE_ATTRIBUTE)
+
+The value is checked against the attribute's child constraints.
+The children are alternatives, only one of which the value needs to match (ADL 1.4 *cADL*, *Single-valued Attributes*; AOM 1.4 `C_SINGLE_ATTRIBUTE`, whose children are alternative object constraints).
+Binding prefers the most specific child, in three tiers:
+
+1. a child whose `RMTypeName` equals the value's RM type (for a round-tripped bare `DV_INTERVAL`, the parameterised type its bounds give; one with no bound present has no parameter, so only a bare `DV_INTERVAL` child names its type, and a `DV_INTERVAL<T>` child admits it in the third tier, as § *Roots beyond COMPOSITION* says);
+2. then a child naming the AOM 1.4 primitive short name whose canonical DV wrapper the value is;
+3. then a child the type only conforms to by BMM descent, or an untyped child.
+
+Within the first tier that admits the value, validators **MUST** bind it to a child under whose constraints it validates, where one does, and otherwise to the first child of that tier, reporting the findings it draws there.
+A value validates under a child when walking it under that child reports no finding that makes `Result.OK` false and, at a slot child, the slot's assertions admit its archetype id; the walk tries the children in OPT order and binds to the first under which the value validates.
+This trial is the validators' alone: the builder ([§ REQ-101](#req-101--generic-opt-driven-composition-builder) *Type enforcement*) and the generator ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *What a visit writes*) bind by the tiers alone, to the first child of the first tier that admits the type.
+When no tier admits the value: exactly one child → `rm_type_mismatch`; two or more children → `alternative_mismatch`.
+
+#### Structural — RM type match
+
+The RM instance's concrete type conforms to the OPT child's `RMTypeName`: equal to it, or a descendant of it in the pinned RM BMM's class hierarchy, whether that ancestor is abstract or concrete (a `DV_CODED_TEXT` satisfies `DV_TEXT`, a `PARTY_REF` satisfies `OBJECT_REF`).
+A `DV_INTERVAL<T>` child matches a typed instantiation `DV_INTERVAL<U>` whose parameter `U` is `T` or descends from it, so `DV_INTERVAL<DV_COUNT>` matches a `DV_INTERVAL<DV_QUANTIFIED>` child, and a round-tripped interval that decodes as the bare `DV_INTERVAL` by the runtime types of its bounds, each present bound having to be a `T` or of a class that descends from it.
+An AOM 1.4 primitive short name admits its canonical DV wrapper, the type the [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator builds for it (`DURATION` → `DV_DURATION`, `DATE` → `DV_DATE`, `TIME` → `DV_TIME`, `DATE_TIME` → `DV_DATE_TIME`, `BOOLEAN` → `DV_BOOLEAN`, `INTEGER` → `DV_COUNT`).
+Single-child attributes surface failures as `rm_type_mismatch` at the attribute path.
+
+#### Identity — archetype / node id pinning
+
+LOCATABLE.archetype_node_id is checked against the matched OPT child's `ArchetypeID()` (for archetype roots) or `NodeID()` (for inner at-codes).
+
+#### Structural — binding items (C_MULTIPLE_ATTRIBUTE)
+
+A LOCATABLE item binds among the non-slot children whose `ArchetypeID()` (archetype root) or `NodeID()` equals its `archetype_node_id`, else to the first slot whose assertions admit that id.
+Where two or more non-slot children carry the id, as when a template reuses one archetype under several template-level names ([§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates)), the item's `name` value ranks them: first those whose pinned name equals it; failing any, those that pin no name; failing any, all of them.
+The item binds among the children of the first rank that holds one.
+Among the children of one rank, validators **MUST** bind the item to a child that has room and under whose constraints the item validates, as *Structural — alternatives* reads it, where one does; failing that, to the first of them that has room; failing that, to the first of them, whose occurrences or name constraint then reports the mismatch.
+The walk tries them in OPT order and binds to the first that has room and under which the item validates.
+A child has room while the items of the same list bound to it before, in item order, number fewer than its occurrences upper bound; one that states no upper bound always has room.
+The item's `name` decides the binding only and never reaches a path or a message ([REQ-168](#req-168--value-free-validation-diagnostics)).
+Items that are not a LOCATABLE bind by RM type (§ *Items that are not a LOCATABLE*).
+
+#### Primitive constraints
+
+REQ-103 `PrimitiveConstraint.Validate` runs at every primitive leaf the OPT declares; bound to the RM value found by the structural walk.
+A part of a value that the RM rules report as absent or empty is theirs to report, not the constraint's: the RM's `required` at that part stands for the constraint's finding there, beside any finding of an RM rule's own (§ REQ-112 *Coded invariants*; [§ REQ-171](#req-171--validation-engine) *One finding per defect*).
+The parts are:
+
+- the `code_string` of a CODE_PHRASE, a DV_CODED_TEXT's defining code included, whose terminology the constraint still judges;
+- the `units` of a DV_QUANTITY, which leaves the constraint nothing to judge, its ranges being per unit;
+- the `value` of the DV_DATE, DV_TIME, DV_DATE_TIME or DV_DURATION an AOM 1.4 short name binds;
+- and the code string of a DV_ORDINAL's `symbol`, when the validator passes the `value` alone for the constraint to judge.
+
+When the walk stops before the RM rules report the part, at the depth limit or the visit limit, the constraint judges it as it judges any value, so the part is reported either way.
+The constraint **MUST** still judge a CODE_PHRASE's terminology; a DV_ORDINAL's `value`, which the validator passes alone when the RM rules report the symbol's code string; a part the RM rules let be blank, such as a DV_SCALE symbol's `code_string`; and a part the RM does not require, such as an optional String, which it judges as any value.
+At a DV_ORDINAL bound to a `C_DV_ORDINAL` whose symbol's defining code carries a code string, a symbol that does not match its value **MUST** be reported: the validator passes the `value` and that code together as one `constraints.OrdinalSymbol`; a code that names no terminology matches a listed pair under § REQ-103's rule, and the RM rules report the missing terminology.
+A `CONSTRAINT_REF` leaf constrains nothing the walker can check locally, so the walker still checks the RM-mandatory attributes of the value it binds there (a CODE_PHRASE's `terminology_id` and `code_string`), as at a node the OPT leaves unconstrained.
+
+#### Slot fit — assertion grammar
+
+§ REQ-103 *Slot assertions*: `CompiledNode.AllowsArchetypeID` (includes / excludes with RM-type-prefix fallback when no includes parsed).
+
+#### Extra RM nodes not declared in OPT
+
+Not flagged.
+
+#### Terminology binding value-set
+
+Not checked: it needs a live external terminology; [§ REQ-111](#req-111--public-compiled-template-bridge) *Term definitions and bindings* surfaces the bindings the OPT carries.
 
 ### Issue codes
 
@@ -463,6 +538,8 @@ Composition-supplied predicates never form lookup keys, so missing nodes are rep
 | `nil_root` / `nil_folder` / `nil_ehr_status` / `nil_ehr_access` / `nil_party` | global guards: a nil argument to `ValidateRM` or a typed RM-floor wrapper (REQ-112 floor) |
 | `nil_composition` / `nil_template` | global guards — caller supplied a nil argument |
 
+### Multi-valued attributes
+
 Existence and child-count cardinality are **independent constraints** on a list: existence says whether the container exists, and cardinality how many members it holds.
 So a multi-valued attribute with `existence.lower ≥ 1` and `cardinality.lower ≥ 1` whose list is present and empty fails both, and validators **MUST** report both `required` and `cardinality` at its path, as collect-all makes natural; a consumer that de-duplicates for display can treat the pair as one failure at that path.
 A list's own `cardinality` is also reported, where it fails, while the list holds an item.
@@ -480,9 +557,9 @@ Validators **MUST NOT** report `required` on the template layer for the existenc
 Where it does, and the existence lower bound is bounded and at least 1, the template layer reports `required` there, rule `existence`.
 The template asks for one where its cardinality lower bound, or the occurrences lower bound of a child it allows, is bounded and at least 1, or where the list is one the floor holds non-empty once present.
 A child that states no occurrences, or occurrences with an unbounded lower bound, asks for none here, although the generator builds a member of it ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *What a visit writes*).
-The lists the floor holds non-empty once present are those [§ REQ-112 *Non-empty lists*](#req-112--template-less-reference-model-validation-floor) evaluates: `COMPOSITION.content`, `EVENT_CONTEXT.participations`, `INSTRUCTION.activities`, `SECTION.items` and `ATTESTATION.items`, and `HISTORY.events` while the HISTORY has no `summary`: the rules [§ REQ-112 *Non-empty lists*](#req-112--template-less-reference-model-validation-floor) evaluates refuse such a list that is present and holds no item, and a HISTORY with neither an event nor a summary, so the container its existence asks for cannot exist without a member.
+The lists the floor holds non-empty once present are those [§ REQ-112 *Non-empty lists*](#non-empty-lists) evaluates: `COMPOSITION.content`, `EVENT_CONTEXT.participations`, `INSTRUCTION.activities`, `SECTION.items` and `ATTESTATION.items`, and `HISTORY.events` while the HISTORY has no `summary`: the rules [§ REQ-112 *Non-empty lists*](#non-empty-lists) evaluates refuse such a list that is present and holds no item, and a HISTORY with neither an event nor a summary, so the container its existence asks for cannot exist without a member.
 The RM gives other lists the same rule, `ENTRY.other_participations`, `ACTOR.roles` and `PARTY.contacts` among them; the floor does not evaluate it there, so their existence asks for no member.
-`LOCATABLE.links` is one of them that the floor does evaluate, and it reports a `links` that is present and holds no item ([§ REQ-112 *LOCATABLE links and EVENT_CONTEXT location*](#req-112--template-less-reference-model-validation-floor)), but it is not among the lists the floor holds non-empty for the template's sake, so the existence of `links` asks for no member either.
+`LOCATABLE.links` is one of them that the floor does evaluate, and it reports a `links` that is present and holds no item ([§ REQ-112 *LOCATABLE links and EVENT_CONTEXT location*](#locatable-links-and-event_context-location)), but it is not among the lists the floor holds non-empty for the template's sake, so the existence of `links` asks for no member either.
 On a list the floor holds non-empty once present, where its existence lower bound is bounded and at least 1, validators **MUST** report `required` on the template layer, rule `existence`, both when the list is absent and when it is present and empty, and that finding stands for the RM rule that reads the list ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
 An absent list draws `required` alone, whatever asks for a member, as the paragraph above says; the RM layer still reports an RM-mandatory container where the template reports nothing ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
 So an `ITEM_LIST` or `ITEM_TREE` whose `items` carry existence `1..1`, cardinality `0..*` and no allowed child validates with its `items` present and empty, and draws `required` at them where they are left out.
@@ -498,12 +575,21 @@ An absent list holds no item, so each such child whose occurrences lower bound i
 ADL 1.4 calls such a child mandatory in its container and leaves an optional container to its existence; that the child also asks for its container is the reading § REQ-107 *Visit rule* chooses, so that a list `Generate` leaves out under `Required` that the template leaves optional by its existence is one validators accept as absent.
 On a list the template leaves optional by its existence, the list's own `cardinality` is not reported when the list is absent, since ADL 1.4 makes such a container "optional, but if present" bound by its cardinality (*Cardinality*), nor when it is present and empty, since canonical XML writes no element for an empty list ([wire.md § REQ-056](wire.md#req-056)) and canonical JSON leaves out a present empty optional list other than those [reference-model.md § Property → Go field](reference-model.md#property--go-field) names ([wire.md § REQ-052](wire.md#req-052), *An absent mandatory member*): an absent and an empty optional list draw the same template findings, as they do on existence.
 
-**Open multi-valued attributes** — when a C_MULTIPLE_ATTRIBUTE declares no `<children>` (the OPT pinned only existence / cardinality, not membership), validators MUST accept any RM item under that attribute without firing `slot_fill`.
+#### Open multi-valued attributes
+
+When a C_MULTIPLE_ATTRIBUTE declares no `<children>` (the OPT pinned only existence / cardinality, not membership), validators MUST accept any RM item under that attribute without firing `slot_fill`.
 The constraint surface is the attribute itself; the items inside are unconstrained.
 This admits the OPT idiom "items here, any shape allowed" — e.g. a SECTION whose /items is open to any archetype-root content.
 
-**Items that are not a LOCATABLE** — an item of a C_MULTIPLE_ATTRIBUTE that is not a LOCATABLE (a PARTICIPATION under `participations` or `other_participations`, a TERM_MAPPING, a REFERENCE_RANGE, a DV_IDENTIFIER, a PARTY_REF) carries no `archetype_node_id`, so it cannot be matched by id.
-Validators **MUST** bind such an item to a non-slot child whose `RMTypeName` admits the item's RM type, by the same conformance rule and the same three binding tiers a C_SINGLE_ATTRIBUTE uses, choosing among the children of the first tier that admits it as *Structural — binding items* chooses among those of one rank, never report it as `slot_fill`, and report one that no child admits at its own path, as `rm_type_mismatch` if the attribute has exactly one child and as `alternative_mismatch` if it has two or more.
+#### Items that are not a LOCATABLE
+
+An item of a C_MULTIPLE_ATTRIBUTE that is not a LOCATABLE (a PARTICIPATION under `participations` or `other_participations`, a TERM_MAPPING, a REFERENCE_RANGE, a DV_IDENTIFIER, a PARTY_REF) carries no `archetype_node_id`, so it cannot be matched by id.
+Validators **MUST**:
+
+- bind such an item to a non-slot child whose `RMTypeName` admits the item's RM type, by the same conformance rule and the same three binding tiers a C_SINGLE_ATTRIBUTE uses, choosing among the children of the first tier that admits it as *Structural — binding items* chooses among those of one rank;
+- never report it as `slot_fill`;
+- and report one that no child admits at its own path, as `rm_type_mismatch` if the attribute has exactly one child and as `alternative_mismatch` if it has two or more.
+
 A bound item counts toward its child's occurrences like any other item.
 A nil item (a nil element, or a nil pointer) under an attribute that declares children has no RM value to bind, so validators **MUST NOT** bind it to any child, an untyped one included.
 It is reported as `slot_fill`, like a LOCATABLE whose `archetype_node_id` is empty, when it is a nil pointer to a LOCATABLE class or a nil element of an attribute whose declared item type is a LOCATABLE, and as `rm_type_mismatch` or `alternative_mismatch` by the rule above otherwise.
@@ -1419,110 +1505,177 @@ The RM rules **MUST** read the pinned Reference Model's facts whatever `rminfo.L
 ### Per-RM-type invariant catalogue
 
 The floor **MUST** report every invariant the inventory of [§ REQ-171 *Where the RM rules come from*](#where-the-rm-rules-come-from) classifies as evaluated, on every node of a class subject to it that the walk visits, reading it as the entries below say, with the code `rm_invariant` unless an entry names a code of its own.
-Beside the structural required-set walk above, the entries cover the node-level and leaf invariants that the canjson lenient decode accepts but the RM forbids:
+Beside the structural required-set walk above, the entries cover the node-level and leaf invariants that the canjson lenient decode accepts but the RM forbids.
 
-- **CODE_PHRASE** — `code_string` non-empty (`Code_string_valid`).
-  The required-set walk decides this invariant, as § REQ-171 *Where the RM rules come from* says of an invariant another check already decides: an empty `code_string` is an absent RM-mandatory attribute, reported once, as `required` at `…/code_string` with the rule `mandatory`, and not again at the CODE_PHRASE ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
-  A CODE_PHRASE at a mandatory attribute whose terminology is empty too is itself absent (§ REQ-171 *Structural access*), reported as `required` at its own path and not entered.
-  The one exception is a DV_SCALE's `symbol`: the RM lets a scale value that has no code carry a `symbol` with its `terminology_id` and a blank `code_string`, so the floor **MUST NOT** report a blank `code_string` on a DV_SCALE `symbol.defining_code`, in either form.
-  A DV_ORDINAL's `symbol` has no such allowance.
-- **DV_QUANTITY** — `precision`, when set, ≥ -1: per the RM, -1 means no limit (any number of decimal places), so only `precision < -1` is out of range.
-- **DV_DATE_TIME / DV_DATE / DV_TIME / DV_DURATION** — `Value_valid`: `value` is a valid ISO 8601 value of its type as the [REQ-123](reference-model.md#req-123--temporal-data-value-helpers) parse reads it, that is the type's BASE predicate (`valid_iso8601_date_time`, `valid_iso8601_date`, `valid_iso8601_time`, `valid_iso8601_duration`) with the deviations REQ-123 names.
-  The floor reports a non-empty `value` that parse refuses, a placeholder such as `example` included, as `rm_invariant` on the node.
-  An empty `value`, which is also what a JSON `null` decodes to, is an absent RM-mandatory attribute that the required-set walk reports once, as `required` at `…/value`, and this entry does not report it ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
-- **ELEMENT** — `Inv_null_flavour_indicated` (`is_null() xor null_flavour = Void`, where `is_null()` means there is no `value`): exactly one of `value` and `null_flavour` is present.
-  The floor reports an ELEMENT that carries both, and one that carries neither, as `rm_invariant` on the ELEMENT.
-- **DV_PROPORTION** — two precision arms and the proportion-kind rules.
-  `precision`, when set, ≥ -1 under the same RM rule as DV_QUANTITY (-1 means no limit); and the RM invariant `Precision_validity` (`precision = 0 implies is_integral`), read through `Is_integral_validity` as whole-number operands, so the floor reports a `precision` of 0 over a non-integral `numerator` or `denominator`.
-  It also reports the proportion-kind rules: a `type` that is not a `PROPORTION_KIND` value, 0 to 4 (`Type_validity`); a `denominator` other than 1 on a unitary proportion (`Unitary_validity`) and other than 100 on a percent (`Percent_validity`); a `numerator` or `denominator` that is not a whole number on a fraction or an integer fraction (`Fraction_validity`, `is_integral` read as for `Precision_validity`); and a `denominator` of 0 (`Valid_denominator`).
-  The *DV_INTERVAL* entry below leaves a pair of bounds unordered when either has a zero denominator.
-- **DV_INTERVAL** — `Limits_consistent`: when neither side is unbounded, `lower.is_strictly_comparable_to(upper) and lower <= upper`.
-  The floor reads two bounds as strictly comparable as the RM defines `is_strictly_comparable_to` for their type: two DV_COUNT; two DV_QUANTITY with equal `units`; two DV_PROPORTION of one `type`; two DV_DATE, two DV_TIME, two DV_DATE_TIME or two DV_DURATION.
-  Each of these definitions compares a value with one of its own class, so the floor reads bounds of two classes as not strictly comparable, a DV_COUNT beside another DV_ORDERED included, although DV_COUNT's definition reads `Return True` for any.
-  When neither side is unbounded and each side holds a bound, the floor **MUST** report a pair it reads as not strictly comparable (bounds of two classes, two DV_QUANTITY in different `units`, or two DV_PROPORTION of different `type`), and a strictly comparable pair whose `lower` is above its `upper` by the order below, each as `rm_invariant` at the interval with the rule `DV_INTERVAL.Limits_consistent`.
-  The RM leaves DV_ORDINAL's and DV_SCALE's undefined; the floor reads two of them as comparable when their symbols are coded in one named terminology, and **MUST NOT** report two whose symbols are coded in different terminologies or in none, which it does not order either.
-  The order is the RM's `less_than` for the type: `magnitude` for the quantified types, `value` for DV_ORDINAL and DV_SCALE, and for a DV_DURATION the magnitude the REQ-123 parse gives.
-  Two DV_DATE, two DV_TIME or two DV_DATE_TIME values written with one zone designator, or both with none, are ordered at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it, which departs from reading `less_than` by `magnitude()` for a partial value, whose magnitude is the start of the period it names.
-  Two DV_TIME or two DV_DATE_TIME values whose zone designators differ are ordered as instants, each read in UTC, partial values and leap seconds included, and a zoned DV_TIME or DV_DATE_TIME is not ordered against one without a zone.
-  Equal `units` is only part of DV_QUANTITY's `is_strictly_comparable_to`, which also needs a matching `units_system` where one is set.
-  The floor does not compare `units_system`, so it orders a same-units pair whatever its `units_system`, although the RM makes two different systems not strictly comparable.
-  Of the pairs it reads as strictly comparable, it orders none that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, nor a zoned DV_TIME or DV_DATE_TIME against one without a zone, and reports none of them here (see *What the floor does not evaluate* below).
-- **Interval flags** — BASE `Lower_included_valid` and `Upper_included_valid` (`lower_unbounded implies not lower_included`, and the same for `upper`).
-  On every interval the walk reaches, a DV_INTERVAL value, a typed `normal_range` and a REFERENCE_RANGE `range` among them, the floor **MUST** report a side marked both unbounded and included as `lower_included_valid` or `upper_included_valid` at the interval's path.
-  Canonical JSON, canonical XML, FLAT and STRUCTURED decode such a side as written ([wire.md § REQ-169](wire.md#req-169--interval-boundary-flag-defaults)), and an RM value built in Go can carry it too, so this entry is where it is reported.
-- **OBJECT_REF / PARTY_REF / ACCESS_GROUP_REF / LOCATABLE_REF** — `id` present, and `type` and `namespace` non-empty, each reported as `rm_invariant` at its own path (`…/id`, `…/type`, `…/namespace`).
-  The floor walks into a reference like any node, so the OBJECT_ID a present `id` holds is checked in turn, but its required-set check leaves a reference's `id`, `namespace` and `type` to this evaluator, so a missing part is reported once.
-- **PARTY_PROXY family (PARTY_SELF, PARTY_IDENTIFIED, PARTY_RELATED)** — wherever a party proxy sits (a COMPOSITION's `composer`, an EVENT_CONTEXT's `health_care_facility`, an ENTRY's `subject` and `provider`, a PARTICIPATION's `performer`, an EHR_STATUS's `subject`, or the root), the floor walks it, and a present `external_ref` whatever its parts hold, so the entry above checks that PARTY_REF at `…/external_ref/id`, `…/external_ref/type` and `…/external_ref/namespace`.
-  On a PARTY_IDENTIFIED, and on a PARTY_RELATED, which inherits them, the floor reports as `rm_invariant`: `Basic_validity` (none of `name`, `identifiers` and `external_ref` is present) at the node; `Name_valid` (a present `name` that is empty) at `…/name`; and `Identifiers_valid` (a present `identifiers` that is empty) at `…/identifiers`.
-  Presence follows the decoded value, as for DV_TEXT `mappings`: an absent key and JSON `null` both read as absent, so only a decoded `"name":""` or `"identifiers":[]` is present and empty.
-  PARTY_RELATED's RM-mandatory `relationship` falls under the required-set walk, and its `Relationship_valid` under the *Coded invariants* entry below.
-  PARTY_SELF has no invariant of its own; an EHR_STATUS's value-typed `subject` follows § *Value-typed mandatory presence*.
-- **PARTICIPATION** — wherever a participation sits (an EVENT_CONTEXT's `participations`, an ENTRY's `other_participations`, or the root), its RM-mandatory `function` and `performer` fall under the required-set walk, which reports an absent one as `required` at `…/function` or `…/performer`, and a `function` whose `value` is empty counts as absent, as a LOCATABLE's `name` does ([§ REQ-171](#req-171--validation-engine) *Structural access*).
-  The `performer` proxy, `mode` and `time` are walked like any other present attribute.
-  `Function_valid` and `Mode_valid`, which tie a coded `function` and the `mode` to openEHR terminology groups, fall under the *Coded invariants* entry below.
-- **DV_TEXT / DV_CODED_TEXT** — the floor **MUST** report a present-but-empty `mappings` (`Mappings_valid`) as `mappings_valid`; DV_CODED_TEXT inherits `mappings` from DV_TEXT via embedding, so both dispatch through the same evaluator.
-  The floor cannot distinguish an absent `mappings` key from an explicit JSON `null` — canjson decodes both to a nil slice — so only a decoded literal `"mappings":[]` (a non-nil empty slice) is flagged; null and absent are indistinguishable and both valid.
-  `mappings` is a walked container: each element is a TERM_MAPPING node of its own, checked by the entry below wherever it sits.
-- **TERM_MAPPING** — the floor **MUST** report a `match` outside `{'>', '=', '<', '?'}` (`term_mapping_match`) as an invariant violation on the mapping node itself, so the check fires for a mapping under a DV_TEXT / DV_CODED_TEXT `mappings` container, for one nested under a mapping's own `purpose`, and for a TERM_MAPPING handed to `ValidateRM` as the root.
-  The RM-mandatory `match` and `target` (CODE_PHRASE) fall under the required-set walk, and `target`'s and `purpose`'s own invariants apply inside each mapping; an empty `match` therefore reports both `required` and `term_mapping_match` at the same path.
-- **Non-empty lists** — `COMPOSITION.Content_valid`, `EVENT_CONTEXT.Participations_validity`, `INSTRUCTION.Activities_valid`, `SECTION.Items_valid` and `ATTESTATION.Items_valid` each read `x /= Void implies not x.is_empty` for the list `x` they name: `content`, `participations`, `activities`, and `items` on the last two.
-  The floor reports such a list that is present and holds no item, presence as [§ REQ-171 *Structural access*](#structural-access) reads it, as `rm_invariant` at the list's own path (`…/context/participations`), with the invariant as its `Rule`, as it reports a present-but-empty `mappings`, and not an absent one.
-  `HISTORY.Events_valid` reads `(events /= Void and then not events.is_empty) or summary /= Void`: the floor reports a HISTORY whose `events` is absent or holds no item and whose `summary` is absent as `rm_invariant` at the HISTORY's own path, as it reports the other rules of this catalogue over more than one attribute, `Basic_validity` and `Inv_null_flavour_indicated`, at their node, and not one that carries an event or a summary.
-  Under a template, an existence lower bound of 1 or more on one of these lists asks for a member ([§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member*), and the template's finding at a list's path or below it, or, for a HISTORY's `events`, at or below its `summary`, stands for the rule that reads it there ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
-- **LOCATABLE links and EVENT_CONTEXT location** — `LOCATABLE.Links_valid` and `EVENT_CONTEXT.location_valid` each read `x /= Void implies not x.is_empty` for the attribute `x` they name, `links` and `location`.
-  The floor reports a `links` that is present and holds no item, on every LOCATABLE it visits, and a `location` that is present and empty, as `rm_invariant` at the attribute's own path (`…/links`, `…/context/location`), with the invariant as its `Rule`, and not an absent one; presence is as [§ REQ-171 *Structural access*](#structural-access) reads it, so an absent key and a JSON `null` are both absent, and only a decoded `"links":[]` or `"location":""` is present and empty.
-  `links` is not one of the lists the *Non-empty lists* entry evaluates, so under a template an existence lower bound on it asks for no member ([§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member*), and the finding is the RM rule's own, as it is with no template.
-  The diagnostic names the class and the attribute, never a value ([§ REQ-168](#req-168--value-free-validation-diagnostics)).
-- **DV_EHR_URI** — `Scheme_valid` (`scheme.is_equal (Ehr_scheme)`): the scheme of the `value` is `ehr`.
-  The floor reports a DV_EHR_URI whose `value` does not have the scheme `ehr`, wherever the walk visits one (the `target` of a LINK, an ELEMENT's `value`, an ATTESTATION's `items`), as `rm_invariant` at the DV_EHR_URI itself, as it reports the ISO 8601 `Value_valid` rule at its node.
-  The scheme is the text before the first `:` when RFC 3986 section 3.1 admits it as one, `ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`, and the comparison ignores letter case, so `EHR://x` keeps the rule and `http://x` breaks it.
-  A `value` with no scheme, such as `example.org/x`, has none equal to `ehr` and breaks it too; an empty one is the required-set walk's (`DV_URI.Value_valid`).
-  The diagnostic names the class and the attribute, never a value, the scheme being part of it, and the issue's `Value` is empty ([§ REQ-168](#req-168--value-free-validation-diagnostics)).
-- **Archetype roots (`Is_archetype_root`)** — the class-level `Is_archetype_root` invariant fixes `is_archetype_root` true on every class whose BMM declares it, and together with `LOCATABLE.Archetyped_valid` (`is_archetype_root xor archetype_details = Void`) that makes `archetype_details` mandatory on those nodes even though LOCATABLE declares it 0..1; `Archetyped_valid` alone does not, since a non-root node with no details satisfies it.
-  The declaring classes are COMPOSITION, EHR_ACCESS, EHR_STATUS, PARTY (with its concrete descendants PERSON, ORGANISATION, GROUP, AGENT, ROLE) and ENTRY (with its concrete descendants ADMIN_ENTRY, OBSERVATION, EVALUATION, INSTRUCTION, ACTION).
-  The floor **MUST** report an absent or `null` `archetype_details` as `is_archetype_root` at `…/archetype_details` on a node of such a class, and on no other: classes that declare no `Is_archetype_root` (FOLDER, PARTY_RELATIONSHIP, EXTRACT, GENERIC_ENTRY, the demographic parts PARTY_IDENTITY, CONTACT, ADDRESS and CAPABILITY, and the data-structure classes) leave the attribute optional.
-  This positive set is closed: the floor takes it from the `Is_archetype_root` entries of the inventory of [§ REQ-171 *Where the RM rules come from*](#where-the-rm-rules-come-from), and the [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator from a closed list held equal to it and to the vendored BMM's `Is_archetype_root` declarations, so a BMM bump that adds a root class fails the build ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md)).
-  This is a class invariant of the object, not a storage rule, so it holds for a detached object exactly as for a persisted one.
-  Rules that need stored history (`VERSIONED_COMPOSITION.Archetype_node_id_valid`) and requiring `ARCHETYPED.template_id` (0..1 in the RM) stay out of scope.
-- **ARCHETYPED** — wherever an `archetype_details` node is present, on any LOCATABLE, its two RM-mandatory attributes `archetype_id` (`ARCHETYPE_ID`) and `rm_version` (`String`) are value-typed, so the value-based walk cannot tell absent from `null` from empty (they decode to the same zero value).
-  On a value validated with no report of missing members, the value-based entries (`ValidateRM` and the typed sugars) **MUST** report an empty `archetype_id.value` as `required` at `…/archetype_details/archetype_id/value` (SDK policy: `OBJECT_ID.value` is RM-mandatory and has no non-empty invariant of its own) and an empty `rm_version` as `rm_version_valid` (`Rm_version_valid: not rm_version.is_empty`) at `…/archetype_details/rm_version`; absent and `null` decode to the same zero values and are reported the same way, and an ARCHETYPED handed to `ValidateRM` as the root is checked the same way, with the findings at `/archetype_id/value` and `/rm_version`.
-  With a decode's report of missing members, an absent or `null` member is `required` at the member itself, `…/archetype_details/archetype_id` or `…/archetype_details/rm_version`, with nothing below it (§ *Value-typed mandatory presence* below).
-  Validating the `ARCHETYPE_ID` grammar is out of scope for this catalogue.
-- **Coded invariants** — the floor evaluates each RM invariant in the table below, which ties a coded attribute to a group or a code set of the openEHR terminology, on every node of the listed classes it visits, taking the group, the code set and the membership verdict from the [REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034) accessor.
-  An optional attribute is checked only when present, ELEMENT's `null_flavour` only when the ELEMENT has no `value` (the RM states `Inv_null_flavour_valid` as `is_null implies …`), and PARTICIPATION's `function` only when it is a DV_CODED_TEXT (`Function_valid`'s own guard).
+#### CODE_PHRASE
 
-  | Class | Invariant | Attribute | Group or code set |
-  |---|---|---|---|
-  | COMPOSITION | `Category_validity` | `category` | group *composition category* |
-  | COMPOSITION | `Language_valid` | `language` | code set *languages* |
-  | COMPOSITION | `Territory_valid` | `territory` | code set *countries* |
-  | EVENT_CONTEXT | `Setting_valid` | `setting` | group *setting* |
-  | ENTRY (every concrete) | `Language_valid` | `language` | code set *languages* |
-  | ENTRY (every concrete) | `Encoding_valid` | `encoding` | code set *character sets* |
-  | ELEMENT | `Inv_null_flavour_valid` | `null_flavour` | group *null flavours* |
-  | INTERVAL_EVENT | `Math_function_validity` | `math_function` | group *event math function* |
-  | ISM_TRANSITION | `Current_state_valid` | `current_state` | group *instruction states* |
-  | ISM_TRANSITION | `Transition_valid` | `transition` | group *instruction transitions* |
-  | PARTICIPATION | `Function_valid` | `function` | group *participation function* |
-  | PARTICIPATION | `Mode_valid` | `mode` | group *participation mode* |
-  | PARTY_RELATED | `Relationship_valid` | `relationship` | group *subject relationship* |
-  | TERM_MAPPING | `Purpose_valid` | `purpose` | group *term mapping purpose* |
-  | DV_TEXT, DV_CODED_TEXT | `Language_valid` | `language` | code set *languages* |
-  | DV_TEXT, DV_CODED_TEXT | `Encoding_valid` | `encoding` | code set *character sets* |
-  | DV_ORDERED (every concrete) | `Normal_status_validity` | `normal_status` | code set *normal statuses* |
-  | DV_MULTIMEDIA, DV_PARSABLE | DV_ENCAPSULATED `Language_valid` | `language` | code set *languages* |
-  | DV_MULTIMEDIA, DV_PARSABLE | DV_ENCAPSULATED `Charset_valid` | `charset` | code set *character sets* |
-  | DV_MULTIMEDIA | `Media_type_valid` | `media_type` | code set *media types* |
-  | DV_MULTIMEDIA | `Compression_algorithm_validity` | `compression_algorithm` | code set *compression algorithms* |
-  | DV_MULTIMEDIA | `Integrity_check_algorithm_validity` | `integrity_check_algorithm` | code set *integrity check algorithms* |
+`code_string` non-empty (`Code_string_valid`).
+The required-set walk decides this invariant, as § REQ-171 *Where the RM rules come from* says of an invariant another check already decides: an empty `code_string` is an absent RM-mandatory attribute, reported once, as `required` at `…/code_string` with the rule `mandatory`, and not again at the CODE_PHRASE ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
+A CODE_PHRASE at a mandatory attribute whose terminology is empty too is itself absent (§ REQ-171 *Structural access*), reported as `required` at its own path and not entered.
+The one exception is a DV_SCALE's `symbol`: the RM lets a scale value that has no code carry a `symbol` with its `terminology_id` and a blank `code_string`, so the floor **MUST NOT** report a blank `code_string` on a DV_SCALE `symbol.defining_code`, in either form.
+A DV_ORDINAL's `symbol` has no such allowance.
 
-  A group invariant asks the openEHR terminology itself (`terminology (Terminology_id_openehr).has_code_for_group_id (…)`), so it holds only when the CODE_PHRASE's `terminology_id` is `openehr` and its `code_string` is a member of the group: a setting coded in `local`, or in any terminology other than `openehr`, breaks `Setting_valid` whatever its code string.
-  A code-set invariant holds when the `code_string` is a member of the code set under the accessor's membership rule, which ignores letter case for the ISO and IANA sets; the `terminology_id` is not compared, because the RM's `CODE_SET_ACCESS.has_code` takes the bare code.
-  The CODE_PHRASE an invariant reads is the attribute itself for a CODE_PHRASE attribute, and the attribute's `defining_code` for a DV_CODED_TEXT one.
-  The floor **MUST** report each breach as `code_not_in_value_set` at that CODE_PHRASE's path (`…/language`, `…/context/setting/defining_code`).
-  An empty `code_string` is no member, so on a value validated with no report of missing members `code_not_in_value_set` is drawn by a mandatory value-typed attribute that decoded empty, such as a COMPOSITION `language` the source left out or a PARTY_RELATED `relationship`, beside whatever the walk already reports for it (`required` for an omitted COMPOSITION `language`, `required` at its `code_string` for one that carries a terminology id and a blank code); with the report, an omitted `language` is `required` at `…/language` alone (§ *Value-typed mandatory presence*).
-  A PARTICIPATION and a PARTY_RELATED are nodes of the walk wherever they sit (the PARTICIPATION and PARTY_PROXY entries above), a participation's `performer` and a root included, so their rows apply there as on any other node: at `…/other_participations[i]/mode/defining_code`, say, or `…/performer/relationship/defining_code`.
-  The RM's other coded invariants are not in this entry (*What the floor does not evaluate* below).
+#### DV_QUANTITY
+
+`precision`, when set, ≥ -1: per the RM, -1 means no limit (any number of decimal places), so only `precision < -1` is out of range.
+
+#### DV_DATE_TIME / DV_DATE / DV_TIME / DV_DURATION
+
+`Value_valid`: `value` is a valid ISO 8601 value of its type as the [REQ-123](reference-model.md#req-123--temporal-data-value-helpers) parse reads it, that is the type's BASE predicate (`valid_iso8601_date_time`, `valid_iso8601_date`, `valid_iso8601_time`, `valid_iso8601_duration`) with the deviations REQ-123 names.
+The floor reports a non-empty `value` that parse refuses, a placeholder such as `example` included, as `rm_invariant` on the node.
+An empty `value`, which is also what a JSON `null` decodes to, is an absent RM-mandatory attribute that the required-set walk reports once, as `required` at `…/value`, and this entry does not report it ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
+
+#### ELEMENT
+
+`Inv_null_flavour_indicated` (`is_null() xor null_flavour = Void`, where `is_null()` means there is no `value`): exactly one of `value` and `null_flavour` is present.
+The floor reports an ELEMENT that carries both, and one that carries neither, as `rm_invariant` on the ELEMENT.
+
+#### DV_PROPORTION
+
+Two precision arms and the proportion-kind rules.
+`precision`, when set, ≥ -1 under the same RM rule as DV_QUANTITY (-1 means no limit); and the RM invariant `Precision_validity` (`precision = 0 implies is_integral`), read through `Is_integral_validity` as whole-number operands, so the floor reports a `precision` of 0 over a non-integral `numerator` or `denominator`.
+It also reports the proportion-kind rules:
+
+- a `type` that is not a `PROPORTION_KIND` value, 0 to 4 (`Type_validity`);
+- a `denominator` other than 1 on a unitary proportion (`Unitary_validity`) and other than 100 on a percent (`Percent_validity`);
+- a `numerator` or `denominator` that is not a whole number on a fraction or an integer fraction (`Fraction_validity`, `is_integral` read as for `Precision_validity`);
+- and a `denominator` of 0 (`Valid_denominator`).
+
+The *DV_INTERVAL* entry below leaves a pair of bounds unordered when either has a zero denominator.
+
+#### DV_INTERVAL
+
+`Limits_consistent`: when neither side is unbounded, `lower.is_strictly_comparable_to(upper) and lower <= upper`.
+The floor reads two bounds as strictly comparable as the RM defines `is_strictly_comparable_to` for their type: two DV_COUNT; two DV_QUANTITY with equal `units`; two DV_PROPORTION of one `type`; two DV_DATE, two DV_TIME, two DV_DATE_TIME or two DV_DURATION.
+Each of these definitions compares a value with one of its own class, so the floor reads bounds of two classes as not strictly comparable, a DV_COUNT beside another DV_ORDERED included, although DV_COUNT's definition reads `Return True` for any.
+When neither side is unbounded and each side holds a bound, the floor **MUST** report, each as `rm_invariant` at the interval with the rule `DV_INTERVAL.Limits_consistent`:
+
+- a pair it reads as not strictly comparable (bounds of two classes, two DV_QUANTITY in different `units`, or two DV_PROPORTION of different `type`);
+- and a strictly comparable pair whose `lower` is above its `upper` by the order below.
+
+The RM leaves DV_ORDINAL's and DV_SCALE's undefined; the floor reads two of them as comparable when their symbols are coded in one named terminology, and **MUST NOT** report two whose symbols are coded in different terminologies or in none, which it does not order either.
+The order is the RM's `less_than` for the type: `magnitude` for the quantified types, `value` for DV_ORDINAL and DV_SCALE, and for a DV_DURATION the magnitude the REQ-123 parse gives.
+Two DV_DATE, two DV_TIME or two DV_DATE_TIME values written with one zone designator, or both with none, are ordered at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it, which departs from reading `less_than` by `magnitude()` for a partial value, whose magnitude is the start of the period it names.
+Two DV_TIME or two DV_DATE_TIME values whose zone designators differ are ordered as instants, each read in UTC, partial values and leap seconds included, and a zoned DV_TIME or DV_DATE_TIME is not ordered against one without a zone.
+Equal `units` is only part of DV_QUANTITY's `is_strictly_comparable_to`, which also needs a matching `units_system` where one is set.
+The floor does not compare `units_system`, so it orders a same-units pair whatever its `units_system`, although the RM makes two different systems not strictly comparable.
+Of the pairs it reads as strictly comparable, it orders none that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, nor a zoned DV_TIME or DV_DATE_TIME against one without a zone, and reports none of them here (see *What the floor does not evaluate* below).
+
+#### Interval flags
+
+BASE `Lower_included_valid` and `Upper_included_valid` (`lower_unbounded implies not lower_included`, and the same for `upper`).
+On every interval the walk reaches, a DV_INTERVAL value, a typed `normal_range` and a REFERENCE_RANGE `range` among them, the floor **MUST** report a side marked both unbounded and included as `lower_included_valid` or `upper_included_valid` at the interval's path.
+Canonical JSON, canonical XML, FLAT and STRUCTURED decode such a side as written ([wire.md § REQ-169](wire.md#req-169--interval-boundary-flag-defaults)), and an RM value built in Go can carry it too, so this entry is where it is reported.
+
+#### OBJECT_REF / PARTY_REF / ACCESS_GROUP_REF / LOCATABLE_REF
+
+`id` present, and `type` and `namespace` non-empty, each reported as `rm_invariant` at its own path (`…/id`, `…/type`, `…/namespace`).
+The floor walks into a reference like any node, so the OBJECT_ID a present `id` holds is checked in turn, but its required-set check leaves a reference's `id`, `namespace` and `type` to this evaluator, so a missing part is reported once.
+
+#### PARTY_PROXY family (PARTY_SELF, PARTY_IDENTIFIED, PARTY_RELATED)
+
+Wherever a party proxy sits (a COMPOSITION's `composer`, an EVENT_CONTEXT's `health_care_facility`, an ENTRY's `subject` and `provider`, a PARTICIPATION's `performer`, an EHR_STATUS's `subject`, or the root), the floor walks it, and a present `external_ref` whatever its parts hold, so the entry above checks that PARTY_REF at `…/external_ref/id`, `…/external_ref/type` and `…/external_ref/namespace`.
+On a PARTY_IDENTIFIED, and on a PARTY_RELATED, which inherits them, the floor reports as `rm_invariant`: `Basic_validity` (none of `name`, `identifiers` and `external_ref` is present) at the node; `Name_valid` (a present `name` that is empty) at `…/name`; and `Identifiers_valid` (a present `identifiers` that is empty) at `…/identifiers`.
+Presence follows the decoded value, as for DV_TEXT `mappings`: an absent key and JSON `null` both read as absent, so only a decoded `"name":""` or `"identifiers":[]` is present and empty.
+PARTY_RELATED's RM-mandatory `relationship` falls under the required-set walk, and its `Relationship_valid` under the *Coded invariants* entry below.
+PARTY_SELF has no invariant of its own; an EHR_STATUS's value-typed `subject` follows § *Value-typed mandatory presence*.
+
+#### PARTICIPATION
+
+Wherever a participation sits (an EVENT_CONTEXT's `participations`, an ENTRY's `other_participations`, or the root), its RM-mandatory `function` and `performer` fall under the required-set walk, which reports an absent one as `required` at `…/function` or `…/performer`, and a `function` whose `value` is empty counts as absent, as a LOCATABLE's `name` does ([§ REQ-171](#req-171--validation-engine) *Structural access*).
+The `performer` proxy, `mode` and `time` are walked like any other present attribute.
+`Function_valid` and `Mode_valid`, which tie a coded `function` and the `mode` to openEHR terminology groups, fall under the *Coded invariants* entry below.
+
+#### DV_TEXT / DV_CODED_TEXT
+
+The floor **MUST** report a present-but-empty `mappings` (`Mappings_valid`) as `mappings_valid`; DV_CODED_TEXT inherits `mappings` from DV_TEXT via embedding, so both dispatch through the same evaluator.
+The floor cannot distinguish an absent `mappings` key from an explicit JSON `null` — canjson decodes both to a nil slice — so only a decoded literal `"mappings":[]` (a non-nil empty slice) is flagged; null and absent are indistinguishable and both valid.
+`mappings` is a walked container: each element is a TERM_MAPPING node of its own, checked by the entry below wherever it sits.
+
+#### TERM_MAPPING
+
+The floor **MUST** report a `match` outside `{'>', '=', '<', '?'}` (`term_mapping_match`) as an invariant violation on the mapping node itself, so the check fires for a mapping under a DV_TEXT / DV_CODED_TEXT `mappings` container, for one nested under a mapping's own `purpose`, and for a TERM_MAPPING handed to `ValidateRM` as the root.
+The RM-mandatory `match` and `target` (CODE_PHRASE) fall under the required-set walk, and `target`'s and `purpose`'s own invariants apply inside each mapping; an empty `match` therefore reports both `required` and `term_mapping_match` at the same path.
+
+#### Non-empty lists
+
+`COMPOSITION.Content_valid`, `EVENT_CONTEXT.Participations_validity`, `INSTRUCTION.Activities_valid`, `SECTION.Items_valid` and `ATTESTATION.Items_valid` each read `x /= Void implies not x.is_empty` for the list `x` they name: `content`, `participations`, `activities`, and `items` on the last two.
+The floor reports such a list that is present and holds no item, presence as [§ REQ-171 *Structural access*](#structural-access) reads it, as `rm_invariant` at the list's own path (`…/context/participations`), with the invariant as its `Rule`, as it reports a present-but-empty `mappings`, and not an absent one.
+`HISTORY.Events_valid` reads `(events /= Void and then not events.is_empty) or summary /= Void`.
+The floor reports a HISTORY whose `events` is absent or holds no item and whose `summary` is absent as `rm_invariant` at the HISTORY's own path, as it reports the other rules of this catalogue over more than one attribute, `Basic_validity` and `Inv_null_flavour_indicated`, at their node, and not one that carries an event or a summary.
+Under a template, an existence lower bound of 1 or more on one of these lists asks for a member ([§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member*), and the template's finding at a list's path or below it, or, for a HISTORY's `events`, at or below its `summary`, stands for the rule that reads it there ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
+
+#### LOCATABLE links and EVENT_CONTEXT location
+
+`LOCATABLE.Links_valid` and `EVENT_CONTEXT.location_valid` each read `x /= Void implies not x.is_empty` for the attribute `x` they name, `links` and `location`.
+The floor reports a `links` that is present and holds no item, on every LOCATABLE it visits, and a `location` that is present and empty, as `rm_invariant` at the attribute's own path (`…/links`, `…/context/location`), with the invariant as its `Rule`, and not an absent one.
+Presence is as [§ REQ-171 *Structural access*](#structural-access) reads it, so an absent key and a JSON `null` are both absent, and only a decoded `"links":[]` or `"location":""` is present and empty.
+`links` is not one of the lists the *Non-empty lists* entry evaluates, so under a template an existence lower bound on it asks for no member ([§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member*), and the finding is the RM rule's own, as it is with no template.
+The diagnostic names the class and the attribute, never a value ([§ REQ-168](#req-168--value-free-validation-diagnostics)).
+
+#### DV_EHR_URI
+
+`Scheme_valid` (`scheme.is_equal (Ehr_scheme)`): the scheme of the `value` is `ehr`.
+The floor reports a DV_EHR_URI whose `value` does not have the scheme `ehr`, wherever the walk visits one (the `target` of a LINK, an ELEMENT's `value`, an ATTESTATION's `items`), as `rm_invariant` at the DV_EHR_URI itself, as it reports the ISO 8601 `Value_valid` rule at its node.
+The scheme is the text before the first `:` when RFC 3986 section 3.1 admits it as one, `ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`, and the comparison ignores letter case, so `EHR://x` keeps the rule and `http://x` breaks it.
+A `value` with no scheme, such as `example.org/x`, has none equal to `ehr` and breaks it too; an empty one is the required-set walk's (`DV_URI.Value_valid`).
+The diagnostic names the class and the attribute, never a value, the scheme being part of it, and the issue's `Value` is empty ([§ REQ-168](#req-168--value-free-validation-diagnostics)).
+
+#### Archetype roots (`Is_archetype_root`)
+
+The class-level `Is_archetype_root` invariant fixes `is_archetype_root` true on every class whose BMM declares it, and together with `LOCATABLE.Archetyped_valid` (`is_archetype_root xor archetype_details = Void`) that makes `archetype_details` mandatory on those nodes even though LOCATABLE declares it 0..1; `Archetyped_valid` alone does not, since a non-root node with no details satisfies it.
+The declaring classes are COMPOSITION, EHR_ACCESS, EHR_STATUS, PARTY (with its concrete descendants PERSON, ORGANISATION, GROUP, AGENT, ROLE) and ENTRY (with its concrete descendants ADMIN_ENTRY, OBSERVATION, EVALUATION, INSTRUCTION, ACTION).
+The floor **MUST** report an absent or `null` `archetype_details` as `is_archetype_root` at `…/archetype_details` on a node of such a class, and on no other: classes that declare no `Is_archetype_root` (FOLDER, PARTY_RELATIONSHIP, EXTRACT, GENERIC_ENTRY, the demographic parts PARTY_IDENTITY, CONTACT, ADDRESS and CAPABILITY, and the data-structure classes) leave the attribute optional.
+This positive set is closed: the floor takes it from the `Is_archetype_root` entries of the inventory of [§ REQ-171 *Where the RM rules come from*](#where-the-rm-rules-come-from), and the [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator from a closed list held equal to it and to the vendored BMM's `Is_archetype_root` declarations, so a BMM bump that adds a root class fails the build ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md)).
+This is a class invariant of the object, not a storage rule, so it holds for a detached object exactly as for a persisted one.
+Rules that need stored history (`VERSIONED_COMPOSITION.Archetype_node_id_valid`) and requiring `ARCHETYPED.template_id` (0..1 in the RM) stay out of scope.
+
+#### ARCHETYPED
+
+Wherever an `archetype_details` node is present, on any LOCATABLE, its two RM-mandatory attributes `archetype_id` (`ARCHETYPE_ID`) and `rm_version` (`String`) are value-typed, so the value-based walk cannot tell absent from `null` from empty (they decode to the same zero value).
+On a value validated with no report of missing members, the value-based entries (`ValidateRM` and the typed sugars) **MUST** report an empty `archetype_id.value` as `required` at `…/archetype_details/archetype_id/value` (SDK policy: `OBJECT_ID.value` is RM-mandatory and has no non-empty invariant of its own) and an empty `rm_version` as `rm_version_valid` (`Rm_version_valid: not rm_version.is_empty`) at `…/archetype_details/rm_version`.
+Absent and `null` decode to the same zero values and are reported the same way, and an ARCHETYPED handed to `ValidateRM` as the root is checked the same way, with the findings at `/archetype_id/value` and `/rm_version`.
+With a decode's report of missing members, an absent or `null` member is `required` at the member itself, `…/archetype_details/archetype_id` or `…/archetype_details/rm_version`, with nothing below it (§ *Value-typed mandatory presence* below).
+Validating the `ARCHETYPE_ID` grammar is out of scope for this catalogue.
+
+#### Coded invariants
+
+The floor evaluates each RM invariant in the table below, which ties a coded attribute to a group or a code set of the openEHR terminology, on every node of the listed classes it visits, taking the group, the code set and the membership verdict from the [REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034) accessor.
+An optional attribute is checked only when present, ELEMENT's `null_flavour` only when the ELEMENT has no `value` (the RM states `Inv_null_flavour_valid` as `is_null implies …`), and PARTICIPATION's `function` only when it is a DV_CODED_TEXT (`Function_valid`'s own guard).
+
+| Class | Invariant | Attribute | Group or code set |
+|---|---|---|---|
+| COMPOSITION | `Category_validity` | `category` | group *composition category* |
+| COMPOSITION | `Language_valid` | `language` | code set *languages* |
+| COMPOSITION | `Territory_valid` | `territory` | code set *countries* |
+| EVENT_CONTEXT | `Setting_valid` | `setting` | group *setting* |
+| ENTRY (every concrete) | `Language_valid` | `language` | code set *languages* |
+| ENTRY (every concrete) | `Encoding_valid` | `encoding` | code set *character sets* |
+| ELEMENT | `Inv_null_flavour_valid` | `null_flavour` | group *null flavours* |
+| INTERVAL_EVENT | `Math_function_validity` | `math_function` | group *event math function* |
+| ISM_TRANSITION | `Current_state_valid` | `current_state` | group *instruction states* |
+| ISM_TRANSITION | `Transition_valid` | `transition` | group *instruction transitions* |
+| PARTICIPATION | `Function_valid` | `function` | group *participation function* |
+| PARTICIPATION | `Mode_valid` | `mode` | group *participation mode* |
+| PARTY_RELATED | `Relationship_valid` | `relationship` | group *subject relationship* |
+| TERM_MAPPING | `Purpose_valid` | `purpose` | group *term mapping purpose* |
+| DV_TEXT, DV_CODED_TEXT | `Language_valid` | `language` | code set *languages* |
+| DV_TEXT, DV_CODED_TEXT | `Encoding_valid` | `encoding` | code set *character sets* |
+| DV_ORDERED (every concrete) | `Normal_status_validity` | `normal_status` | code set *normal statuses* |
+| DV_MULTIMEDIA, DV_PARSABLE | DV_ENCAPSULATED `Language_valid` | `language` | code set *languages* |
+| DV_MULTIMEDIA, DV_PARSABLE | DV_ENCAPSULATED `Charset_valid` | `charset` | code set *character sets* |
+| DV_MULTIMEDIA | `Media_type_valid` | `media_type` | code set *media types* |
+| DV_MULTIMEDIA | `Compression_algorithm_validity` | `compression_algorithm` | code set *compression algorithms* |
+| DV_MULTIMEDIA | `Integrity_check_algorithm_validity` | `integrity_check_algorithm` | code set *integrity check algorithms* |
+
+A group invariant asks the openEHR terminology itself (`terminology (Terminology_id_openehr).has_code_for_group_id (…)`), so it holds only when the CODE_PHRASE's `terminology_id` is `openehr` and its `code_string` is a member of the group: a setting coded in `local`, or in any terminology other than `openehr`, breaks `Setting_valid` whatever its code string.
+A code-set invariant holds when the `code_string` is a member of the code set under the accessor's membership rule, which ignores letter case for the ISO and IANA sets; the `terminology_id` is not compared, because the RM's `CODE_SET_ACCESS.has_code` takes the bare code.
+The CODE_PHRASE an invariant reads is the attribute itself for a CODE_PHRASE attribute, and the attribute's `defining_code` for a DV_CODED_TEXT one.
+The floor **MUST** report each breach as `code_not_in_value_set` at that CODE_PHRASE's path (`…/language`, `…/context/setting/defining_code`).
+An empty `code_string` is no member, so on a value validated with no report of missing members `code_not_in_value_set` is drawn by a mandatory value-typed attribute that decoded empty, such as a COMPOSITION `language` the source left out or a PARTY_RELATED `relationship`, beside whatever the walk already reports for it (`required` for an omitted COMPOSITION `language`, `required` at its `code_string` for one that carries a terminology id and a blank code).
+With the report, an omitted `language` is `required` at `…/language` alone (§ *Value-typed mandatory presence*).
+A PARTICIPATION and a PARTY_RELATED are nodes of the walk wherever they sit (the PARTICIPATION and PARTY_PROXY entries above), a participation's `performer` and a root included, so their rows apply there as on any other node: at `…/other_participations[i]/mode/defining_code`, say, or `…/performer/relationship/defining_code`.
+The RM's other coded invariants are not in this entry (*What the floor does not evaluate* below).
 
 #### Known gap — a bound beside its own open flag
 
@@ -1877,7 +2030,19 @@ func (c Coverage) Complete() bool // Stopped and External are both empty
 ```
 
 `OK` reports the absence of error findings and nothing more.
-`Coverage` **MUST** say what the result does not prove: `Stopped` lists the path of each `max_depth` and `max_nodes` issue, so at most one per limit; `External` lists, in walk order, the path of each leaf the template binds to a `CONSTRAINT_REF` ([§ REQ-103](#req-103--primitive-constraint-introspection)), or to a `C_CODE_REFERENCE` that names a reference set and lists no code, whose value set is bound outside the template ([§ REQ-111](#req-111--public-compiled-template-bridge) *Term definitions and bindings*) and so cannot be consulted, though such a `C_CODE_REFERENCE` is still judged by the code phrase it carries, while a `C_CODE_PHRASE` that names an external terminology without listing codes is checked for that terminology and is not listed, since whether a code exists in an external terminology is outside every check the SDK makes (§ REQ-112 *Trust model*), and neither is a `C_CODE_REFERENCE` that lists codes or names no reference set, which is checked as a `C_CODE_PHRASE` is; `NotInRM` lists, in walk order and once per node, the path of each attribute the bound template node declares that the compile marks as absent from the node's RM class ([§ REQ-111](#req-111--public-compiled-template-bridge) *Attributes the RM does not have*) and the walk left out (*One walk*); and `Unevaluated` lists, sorted and once each, the invariants of the classes the walk visited, those their ancestors declare included, that the inventory of *Where the RM rules come from* does not classify as evaluated.
+`Coverage` **MUST** say what the result does not prove, in four fields:
+
+| Field | Lists |
+|---|---|
+| `Stopped` | the path of each `max_depth` and `max_nodes` issue, so at most one per limit |
+| `External` | in walk order, the path of each leaf the template binds to a `CONSTRAINT_REF` ([§ REQ-103](#req-103--primitive-constraint-introspection)), or to a `C_CODE_REFERENCE` that names a reference set and lists no code, whose value set is bound outside the template ([§ REQ-111](#req-111--public-compiled-template-bridge) *Term definitions and bindings*) and so cannot be consulted |
+| `NotInRM` | in walk order and once per node, the path of each attribute the bound template node declares that the compile marks as absent from the node's RM class ([§ REQ-111](#req-111--public-compiled-template-bridge) *Attributes the RM does not have*) and the walk left out (*One walk*) |
+| `Unevaluated` | sorted and once each, the invariants of the classes the walk visited, those their ancestors declare included, that the inventory of *Where the RM rules come from* does not classify as evaluated |
+
+A `C_CODE_REFERENCE` that `External` lists is still judged by the code phrase it carries.
+`External` does not list a `C_CODE_PHRASE` that names an external terminology without listing codes, which is checked for that terminology, since whether a code exists in an external terminology is outside every check the SDK makes (§ REQ-112 *Trust model*).
+Nor does it list a `C_CODE_REFERENCE` that lists codes or names no reference set, which is checked as a `C_CODE_PHRASE` is.
+
 `Complete` **MUST** report true exactly when `Stopped` and `External` are both empty: no limit stopped the walk, and every constraint it reached could be checked locally.
 `Complete` says nothing of `NotInRM`: no instance can carry such an attribute, so its constraint is a defect of the template, not a part of the instance the result failed to check.
 Nor does it say anything of `Unevaluated`, which lists RM rules the SDK does not evaluate on any instance, so it is reported beside `Complete` rather than folded into it.
