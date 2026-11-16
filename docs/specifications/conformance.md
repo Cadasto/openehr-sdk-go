@@ -365,14 +365,17 @@ Its client scenarios map to SDK coverage as follows:
 
 - **Title:** Every shape in the list of [§ REQ-113 § Catalogue and residual](aql.md#catalogue-and-residual), the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause and a projected literal's and function call's source text included, parses into `parse.Query` without `aql.ErrIncompleteAST` and round-trips through `(*Query).Emit` under the PROBE-080 fixed point.
 - **Preconditions:** The catalogue corpus: queries for each catalogue shape, the former gap shapes among them, and the `TOP`-clause and projection-source-text cases.
-- **Wire assertion:** In-repo property: for each catalogue shape, `ParseQuery` returns an AST pinned per shape and `Emit` is a fixed point; the residual of [§ REQ-113 § Catalogue and residual](aql.md#catalogue-and-residual) still fires; a `TOP` clause carries its count and direction ([§ The `TOP` carrier](aql.md#the-top-carrier)), and a projected literal or function call carries its source text where that text differs from the canonical rendering ([§ Projection source text](aql.md#projection-source-text)).
+- **Wire assertion:** In-repo property: for each catalogue shape, `ParseQuery` returns an AST pinned per shape and `Emit` is a fixed point.
+  The residual of [§ REQ-113 § Catalogue and residual](aql.md#catalogue-and-residual) still fires.
+  A `TOP` clause carries its count and direction ([§ The `TOP` carrier](aql.md#the-top-carrier)), and a projected literal or function call carries its source text where that text differs from the canonical rendering ([§ Projection source text](aql.md#projection-source-text)).
 - **Modes:** In-repo (unit-level property; no backend).
 - **Status:** Implemented (inline).
 - **Satisfies:** REQ-113.
 
 #### PROBE-088 — AQL builder containment and paging stability
 
-- **Title:** The builder's negated containment (`NOT CONTAINS`), sibling containment junctions (`AND`/`OR`, parenthesised by precedence), opt-in in-text `LIMIT`/`OFFSET`, the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause, and the write-side carriers of [REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) (the `VERSION` predicate bracket, the class-position standing comparison, and the typed projection: `DISTINCT`, `AS`, aggregates, function calls, literals, star) emit byte-stable canonical AQL, and a builder program using none of them emits what it emitted before they existed.
+- **Title:** The builder's negated containment (`NOT CONTAINS`), sibling containment junctions (`AND`/`OR`, parenthesised by precedence), opt-in in-text `LIMIT`/`OFFSET`, the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause, and the write-side carriers of [REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) emit byte-stable canonical AQL, and a builder program using none of them emits what it emitted before they existed.
+  The write-side carriers are the `VERSION` predicate bracket, the class-position standing comparison, and the typed projection: `DISTINCT`, `AS`, aggregates, function calls, literals, star.
 - **Preconditions:** Committed goldens covering the constructs: one per `versionPredicate` alternative; one per standing-predicate operand kind the write side can express (`pathPredicateOperand`'s `primitive`, `objectPath` and `PARAMETER` alternatives; its `ID_CODE` and `AT_CODE` alternatives have no `aql.Value` shape, so the builder cannot reach them); REQ-161's suppression shape; and one per `columnExpr` alternative plus the clause-level flags; beside the unchanged PROBE-020 golden.
 - **Wire assertion:** In-repo golden comparison (no backend): built query strings match the committed goldens byte for byte, and each golden re-parses and re-emits unchanged, which ties the write-side canonical form to PROBE-087.
   Each build-time refusal of [§ REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) (a second row-bound channel, a `TOP` beside a row limit or with a negative count, a `SELECT` that does not read back as the projection the builder recorded, a typed construction the grammar does not admit where it renders) has a row that expects an error and no emission.
@@ -388,8 +391,10 @@ Its client scenarios map to SDK coverage as follows:
 - **Wire assertion:** In-repo property: the checks [§ REQ-119](aql.md#req-119--re-parseable-canonical-aql-emission) *Acceptance* names, over the corpora above; the rules are REQ-119's and this entry does not restate them.
   Every value kind survives emit, parse and compare under `aql.EqualValues` in every value position and on both carriers, or the guards refuse it; a literal read from source text survives twice (parse, emit, parse).
   The single-token positions are held to "the parser reads the string back unchanged" at every position of their class.
-  Round-trip identity is the oracle at the bracket positions: a generated corpus is spliced at both positions into bases, at least one carrying material after the bracket and a later line break, and every base shows itself able to fail by some splice re-parsing as a different query; the `VERSION` shape rule has its own corpus of operands legal by construction.
-  The grammar-derived guards are confronted with the grammar: for every token name in the lexer, and the keyword spellings carried only in lexer fragments, the builder emits a function of that name exactly when the parser accepts it, and for every URI in the corpus the builder emits the operand exactly when it re-parses as one `MATCHES` on the same URI.
+  Round-trip identity is the oracle at the bracket positions: a generated corpus is spliced at both positions into bases, at least one carrying material after the bracket and a later line break, and every base shows itself able to fail by some splice re-parsing as a different query.
+  The `VERSION` shape rule has its own corpus of operands legal by construction.
+  The grammar-derived guards are confronted with the grammar: for every token name in the lexer, and the keyword spellings carried only in lexer fragments, the builder emits a function of that name exactly when the parser accepts it.
+  For every URI in the corpus the builder emits the operand exactly when it re-parses as one `MATCHES` on the same URI.
   A source sweep finds no type assertion or switch on a sealed vocabulary outside a function that normalises.
   Every guard has a test that fails when it is removed, and a guard that could be tightened into refusing valid AQL has a positive control that fails when it is.
 - **Modes:** In-repo (unit-level property; no backend).
@@ -412,10 +417,15 @@ Its client scenarios map to SDK coverage as follows:
 #### PROBE-096 — AQL value-free structured diagnostics
 
 - **Title:** Every construct the extractor drops carries a structured `{kind, clause, span}` record, every lint issue carries a span, no field the contract classifies value-free contains any substring of the input's value spans, and each span points at the construct the diagnostic is about.
-- **Preconditions:** A corpus reaching every **reachable** drop class (today the numeric literal outside the value vocabulary, the residual of [§ REQ-113 § Catalogue and residual](aql.md#catalogue-and-residual), in each clause that admits one); a representative lint-issue set spanning the layers `lint` runs (parameter-binding cases run with `Options.Query` set, since their codes fire on no other path); and, for each corpus query, the **value spans** of its input, identified independently of the diagnostic under test.
+- **Preconditions:** A corpus reaching every **reachable** drop class (today the numeric literal outside the value vocabulary, the residual of [§ REQ-113 § Catalogue and residual](aql.md#catalogue-and-residual), in each clause that admits one).
+  A representative lint-issue set spanning the layers `lint` runs (parameter-binding cases run with `Options.Query` set, since their codes fire on no other path).
+  For each corpus query, the **value spans** of its input, identified independently of the diagnostic under test.
 - **Wire assertion:** In-repo property in three arms, over the two-class rule of [§ REQ-168 § The two field classes](clinical-modeling.md#the-two-field-classes) as [§ REQ-113 § Value-free structured drop records](aql.md#value-free-structured-drop-records) and [§ REQ-109 § Value-free lint diagnostics](aql.md#value-free-lint-diagnostics), which this entry does not restate; it carries each arm's oracle.
-  **(a) Record per drop:** a sweep derived from the source of every non-test file in the package holds completeness, so a site added later, in any file, is covered the day it lands, and a control shows the sweep able to fail; the defensive arms' unreachability by a legal query is checked at unit level, since no corpus can reach them; one query carrying drops in two clauses exercises the source-order rule.
-  **(b) Value-free fields:** for every corpus query, no value-free field of either surface, rendered whole with its span so a future string field cannot slip past, contains a substring of that input's value spans, checked against the input and never against expected strings; the value-bearing fields are deliberately not checked, and each case pins the code it exists to exercise, so it cannot pass on bystander issues.
+  **(a) Record per drop:** a sweep derived from the source of every non-test file in the package holds completeness, so a site added later, in any file, is covered the day it lands, and a control shows the sweep able to fail.
+  The defensive arms' unreachability by a legal query is checked at unit level, since no corpus can reach them.
+  One query carrying drops in two clauses exercises the source-order rule.
+  **(b) Value-free fields:** for every corpus query, no value-free field of either surface, rendered whole with its span so a future string field cannot slip past, contains a substring of that input's value spans, checked against the input and never against expected strings.
+  The value-bearing fields are deliberately not checked, and each case pins the code it exists to exercise, so it cannot pass on bystander issues.
   Additivity is checked over the corpus: codes, severities and `OK()` outcomes match their earlier values.
   **(c) Span attribution:** each span, sliced back out of the input, matches the offending construct rather than its enclosing clause, in one span type across both packages (a compile-time alias check), and an unattributable span is zero rather than approximated.
 - **Modes:** In-repo (unit-level property; no backend).
@@ -424,11 +434,14 @@ Its client scenarios map to SDK coverage as follows:
 
 #### PROBE-097 — AQL semantic and portability lint corpus
 
-- **Title:** Every REQ-161 issue code fires on a corpus query built to carry exactly that defect, with the REQ-161 severity and a span on the offending construct; queries with no REQ-161 defect yield no REQ-161 code; and the builder's verification agrees with the linter on the containment codes ([§ REQ-161 § Builder adapter](aql.md#builder-adapter); the five containment codes, not the lint-only portability codes).
+- **Title:** Every REQ-161 issue code fires on a corpus query built to carry exactly that defect, with the REQ-161 severity and a span on the offending construct.
+  Queries with no REQ-161 defect yield no REQ-161 code.
+  The builder's verification agrees with the linter on the containment codes ([§ REQ-161 § Builder adapter](aql.md#builder-adapter); the five containment codes, not the lint-only portability codes).
 - **Preconditions:** The vendored grammar profile (parse) and the pinned BMM via `rminfo` — no CDR, no OPT.
   The [REQ-160 acceptance table](aql.md#req-160--aql-containment-admissibility-relation) is the relation oracle; the EHRbase admissibility matrix is a neutral observed-behaviour cross-check, including the EHRbase-compatibility guard (an RM-valid pair a conformant engine admits never verdicts Never).
 - **Wire assertion:** In-repo property, three arms.
-  **(a) Per-code corpus:** for each REQ-161 code, at least one corpus query yields it with the specified severity at the span of the offending construct, and at least one near-miss query stays silent — the unknown-class suppression rule (an unknown operand suppresses the pair checks), the archetype-mismatch suppression (a literal archetype predicate whose declared class or HRID type segment is unknown yields `aql_unknown_rm_class` only, never `aql_archetype_class_mismatch`) and the `aql_fanout_row_grain` conservative firing rule each pinned by their own negative case.
+  **(a) Per-code corpus:** for each REQ-161 code, at least one corpus query yields it with the specified severity at the span of the offending construct, and at least one near-miss query stays silent.
+  The unknown-class suppression rule (an unknown operand suppresses the pair checks), the archetype-mismatch suppression (a literal archetype predicate whose declared class or HRID type segment is unknown yields `aql_unknown_rm_class` only, never `aql_archetype_class_mismatch`) and the `aql_fanout_row_grain` conservative firing rule are each pinned by their own negative case.
   **(b) Additivity guard:** every query of the pre-REQ-161 corpus that carried no REQ-161 defect yields an unchanged issue-code multiset; corpus queries that genuinely carry a newly-checked defect are re-baselined deliberately, recorded here.
   **(c) Read/write parity** ([§ REQ-161 § Builder adapter](aql.md#builder-adapter)): for corpus queries the builder can express, the verification's code multiset equals the containment-code subset of `lint.LintString` over the emitted text.
   The class-position `VERSION` predicate, the class-position standing comparison and the typed projection are builder constructs, so the corpus carries them through the same comparison; what stays unspellable is the FROM root's own bracket in every spelling (archetype, standing or version), since the write-side FROM clause carries an RM type and an alias and nothing else.
@@ -491,7 +504,11 @@ Its client scenarios map to SDK coverage as follows:
 
 - **Title:** Building a composition via `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` → `canjson.Unmarshal` → re-marshal preserves the values supplied through `Set` at their addressed paths.
 - **Preconditions:** A compiled OPT and a list of (path, value) assignments addressed against it.
-- **Wire assertion:** In-repo property: `composition.NewBuilder(ctx, c, opts...)` with a `Set` per path and `Build` succeeds; `canjson.Marshal` of the result contains the assigned primitive values (magnitude and units for DV_QUANTITY, the value string for DV_TEXT, code and terminology for DV_CODED_TEXT) as byte fragments; `canjson.Unmarshal` into a fresh `*rm.Composition` succeeds, which shows the polymorphic dispatch on the nested data values works in both directions; and re-marshalling the decoded composition preserves the same fragments.
+- **Wire assertion:** In-repo property:
+  - `composition.NewBuilder(ctx, c, opts...)` with a `Set` per path and `Build` succeeds;
+  - `canjson.Marshal` of the result contains the assigned primitive values (magnitude and units for DV_QUANTITY, the value string for DV_TEXT, code and terminology for DV_CODED_TEXT) as byte fragments;
+  - `canjson.Unmarshal` into a fresh `*rm.Composition` succeeds, which shows the polymorphic dispatch on the nested data values works in both directions;
+  - re-marshalling the decoded composition preserves the same fragments.
 - **Modes:** In-repo (round-trip property over a compiled template; no backend).
 - **Status:** Implemented (inline).
 - **Satisfies:** REQ-101.
@@ -520,7 +537,9 @@ Its client scenarios map to SDK coverage as follows:
 - **Title:** Sharpens PROBE-025 with negative structural cases — missing required nodes, empty multi-valued attributes with `existence ≥ 1` and `cardinality ≥ 1`, occurrences upper-bound violations, RM-type mismatches under C_SINGLE_ATTRIBUTE alternatives — and asserts the issue-code multiset (`required`, `cardinality`, `rm_type_mismatch`, `alternative_mismatch`) is stable across conformant implementations.
 - **Preconditions:** The same OPT and composition tuple shape as PROBE-025; the cases are structural ones the template-driven validator detects.
 - **Wire assertion:** In-repo property, with the pipeline of PROBE-025.
-  A composition with the systolic ELEMENT removed, its ITEM_LIST's `items` present and empty, surfaces no issue, since the template leaves that ELEMENT optional and those `items` carry cardinality `0..*`, so their existence asks for no member, while the same `items` left out surface `required` ([§ REQ-102](clinical-modeling.md#req-102--composition-validation) *An existence lower bound alone asks for no member*); an empty `events` list surfaces `required` + `cardinality`, and an absent one `required` alone; an unmatched alternative surfaces `alternative_mismatch`.
+  A composition with the systolic ELEMENT removed, its ITEM_LIST's `items` present and empty, surfaces no issue, since the template leaves that ELEMENT optional and those `items` carry cardinality `0..*`, so their existence asks for no member, while the same `items` left out surface `required` ([§ REQ-102](clinical-modeling.md#req-102--composition-validation) *An existence lower bound alone asks for no member*).
+  An empty `events` list surfaces `required` + `cardinality`, and an absent one `required` alone.
+  An unmatched alternative surfaces `alternative_mismatch`.
 - **Modes:** In-repo (issue-code multiset against a fixture OPT; no backend).
 - **Status:** Implemented (inline).
 - **Satisfies:** REQ-102
@@ -580,7 +599,11 @@ Its client scenarios map to SDK coverage as follows:
   Subject arm: one omitting the `subject` key; one with `subject: null`; one supplying `subject` as a bare `{"_type":"PARTY_SELF"}` (no external_ref); one omitting the interface-typed `name`.
   ARCHETYPED arm, each on the root `archetype_details`: one omitting, and one nulling, `archetype_id`; one omitting, and one nulling, `rm_version`; one with an empty `rm_version` (`""`); and a complete root `archetype_details` with an attribute-less ARCHETYPED nested under `other_details`.
   Shape: a non-object body, and one whose root `archetype_details` is not an object.
-- **Wire assertion:** In-repo property: each body draws exactly the findings [§ REQ-112 § Value-typed mandatory presence](clinical-modeling.md#value-typed-mandatory-presence) gives it: the subject arm's `required` at `/subject`, absent for the bare `PARTY_SELF`; the ARCHETYPED arm's one finding per missing member, `required` at the member's own path and nothing below it, at the root and at the nested ARCHETYPED alike, and the value walk's findings alone for a present key (an empty `rm_version` draws `rm_version_valid`); and a single `invalid_shape` at `/` for each shape body.
+- **Wire assertion:** In-repo property: each body draws exactly the findings [§ REQ-112 § Value-typed mandatory presence](clinical-modeling.md#value-typed-mandatory-presence) gives it:
+  - the subject arm's `required` at `/subject`, absent for the bare `PARTY_SELF`;
+  - the ARCHETYPED arm's one finding per missing member, `required` at the member's own path and nothing below it, at the root and at the nested ARCHETYPED alike, and the value walk's findings alone for a present key (an empty `rm_version` draws `rm_version_valid`);
+  - a single `invalid_shape` at `/` for each shape body.
+
   The interface-typed `name`, when absent, still draws `required` at `/name`.
 - **Modes:** In-repo (unit-level property; no backend).
 - **Status:** Implemented (inline).
@@ -591,7 +614,10 @@ Its client scenarios map to SDK coverage as follows:
 - **Title:** `canjson.WithMissing` and `canxml.WithMissing` report every RM-mandatory member a document leaves out, at any depth, by the same JSON Pointer in both formats, as [wire.md § REQ-175](wire.md#req-175--missing-members-on-decode) defines.
   `canxml.WithPresence` reports every member a canonical-XML document sends as `xsi:nil` or empty, mandatory or optional, by the same pointer with the form it took.
   `validation.ValidateJSON` and `ValidateXML` report each missing member as `required` at its own issue path, and `WithMissing`, given the report's text, and `WithMissingPointers`, given its pointer values, hand a caller's own decode report to the value-based entries with the same result.
-- **Preconditions:** One COMPOSITION instance in canonical JSON and in its canonical-XML form, with members left out at the root (`language`), in an ENTRY (`subject`), in a HISTORY (`origin`), and in data values of each value-typed kind: a `DV_QUANTITY` without `magnitude`, a `DV_COUNT` without `magnitude`, a `DV_BOOLEAN` without `value`, a `DV_PROPORTION` without `denominator`, a `DV_ORDINAL` without `symbol`, an `ELEMENT` whose ARCHETYPED lacks `rm_version`; rows sending a member as `null` (JSON), with `xsi:nil="true"` and as an empty primitive element (XML); and control rows with a present bare `PARTY_SELF`, a `magnitude` of 0, an empty `units` (canonical JSON only: an empty string element is missing in canonical XML), an absent interval flag, an absent EVENT `offset` and an `archetype_node_id` written as an XML attribute; and, in canonical XML only, rows sending an optional member empty and nilled (a `DV_QUANTITY` `precision`, an ELEMENT `null_flavour`).
+- **Preconditions:** One COMPOSITION instance in canonical JSON and in its canonical-XML form, with members left out at the root (`language`), in an ENTRY (`subject`), in a HISTORY (`origin`), and in data values of each value-typed kind: a `DV_QUANTITY` without `magnitude`, a `DV_COUNT` without `magnitude`, a `DV_BOOLEAN` without `value`, a `DV_PROPORTION` without `denominator`, a `DV_ORDINAL` without `symbol`, an `ELEMENT` whose ARCHETYPED lacks `rm_version`.
+  Rows sending a member as `null` (JSON), with `xsi:nil="true"` and as an empty primitive element (XML).
+  Control rows with a present bare `PARTY_SELF`, a `magnitude` of 0, an empty `units` (canonical JSON only: an empty string element is missing in canonical XML), an absent interval flag, an absent EVENT `offset` and an `archetype_node_id` written as an XML attribute.
+  In canonical XML only, rows sending an optional member empty and nilled (a `DV_QUANTITY` `precision`, an ELEMENT `null_flavour`).
 - **Wire assertion:** In-repo property.
   Each codec's report option receives, once each, exactly the pointers of the members left out, null, nil or empty, and none for a control row; the pointers the canonical-XML form reports equal the canonical-JSON form's; the default decode of each row returns the same value with or without the option, and strict refuses none of them.
   `canxml.WithPresence` receives, once each, the pointer and form of every nil and empty row, mandatory and optional, and nothing for an absent or control row, while `WithMissing` on the same rows is unchanged.
@@ -608,7 +634,9 @@ Its client scenarios map to SDK coverage as follows:
 - **Preconditions:** Every `.opt` file under `testkit/corpus/`, found by walking the tree rather than from `fixtures.ListAllOPTs`, which leaves out those under `crossformat/`, and the pinned ITS-XML closure under `resources/its-xml/` with `Template.xsd` among its roots.
   An OPT the pinned schemas refuse as written is listed in a ratchet with its reason and goes through the round-trip leg only, until a re-pin admits it.
 - **Wire assertion:** In-repo property, two legs.
-  Round trip: `canxml.Unmarshal` with the report option returns no unmatched item, and with `WithStrict` refuses nothing; `canxml.Marshal` of the value and a second decode give an equal value; and the re-encoded document, read as elements, attributes and text, equals the input as [§ REQ-176 *Round trip*](clinical-modeling.md#round-trip) compares them, after the rewrites its *Shapes* section names: `match_negated` removed, a `timezone_validity` or `OPERATOR_KIND` word written as its integer code, an `ORDINAL` or `SCALE` `symbol` whose `value` is empty written without it, and `T_ARCHETYPE_ROOT` written as `C_ARCHETYPE_ROOT`.
+  Round trip: `canxml.Unmarshal` with the report option returns no unmatched item, and with `WithStrict` refuses nothing.
+  `canxml.Marshal` of the value and a second decode give an equal value.
+  The re-encoded document, read as elements, attributes and text, equals the input as [§ REQ-176 *Round trip*](clinical-modeling.md#round-trip) compares them, after the rewrites its *Shapes* section names: `match_negated` removed, a `timezone_validity` or `OPERATOR_KIND` word written as its integer code, an `ORDINAL` or `SCALE` `symbol` whose `value` is empty written without it, and `T_ARCHETYPE_ROOT` written as `C_ARCHETYPE_ROOT`.
   Schema: the re-encoded document of every OPT not in the ratchet validates against the pinned schemas, their `targetNamespace` read as `http://schemas.openehr.org/v1`, through `make operational-template-schema-check`, which `make ci` runs: it writes the re-encoded documents to a temporary folder and runs `xmllint` against `Template.xsd`.
   A can-fail control: with one operational template member withheld from the decoder, the round-trip leg fails on a corpus file that carries it.
 - **Modes:** In-repo (property across the vendored corpus; no backend).
@@ -670,7 +698,11 @@ Its client scenarios map to SDK coverage as follows:
 - **Title:** Every [REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes) underscore-attribute family round-trips FLAT → canonical RM → FLAT as a [wire-equivalent](#terms) document, and an RM composition populated with an in-scope attribute emits it without loss — per family, including the recursive shapes.
 - **Preconditions:** The PROBE-086 corpus, plus SDK-authored per-family fixtures against the vendored OPTs covering each row of the REQ-140 grammar table — including recursion (`_feeder_audit/…/provider/_identifier:N`, `dv_multimedia/_thumbnail`), `_null_flavour` beside an absent bare value, and the deliberate refusals.
 - **Wire assertion:** In-repo, not backend-facing.
-  Per grammar family: (a) **decode**: a FLAT body carrying the family's keys decodes into the typed RM attribute (never a `|raw` detour), and re-encoding reproduces the input as a [wire-equivalent](#terms) document; (b) **encode**: a composition populated with the attribute emits exactly the family's key set: no silent drop, and no `|raw` fallback where the grammar carries the value; (c) **refusals**: the `_instruction_details` keys fail with typed errors naming the key, and are never decoded and dropped; (d) **STRUCTURED**: the same fixtures interconvert FLAT ↔ STRUCTURED preserving the underscore vocabulary (`_`-keys as members, arrays for `:N`).
+  Per grammar family:
+  (a) **decode**: a FLAT body carrying the family's keys decodes into the typed RM attribute (never a `|raw` detour), and re-encoding reproduces the input as a [wire-equivalent](#terms) document.
+  (b) **encode**: a composition populated with the attribute emits exactly the family's key set: no silent drop, and no `|raw` fallback where the grammar carries the value.
+  (c) **refusals**: the `_instruction_details` keys fail with typed errors naming the key, and are never decoded and dropped.
+  (d) **STRUCTURED**: the same fixtures interconvert FLAT ↔ STRUCTURED preserving the underscore vocabulary (`_`-keys as members, arrays for `:N`).
   The PROBE-086 census moves in step: the `path not in web template` excluded family shrinks by the underscore keys a family carries, and the per-fixture compared and excluded pins are re-baselined in the same change, so a family whose corpus keys stay excluded fails this probe rather than becoming a census footnote.
 - **Modes:** In-repo (round-trip property against vendored fixtures; no backend).
 - **Status:** Implemented (inline) — the census movement is recorded in [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md).
@@ -678,7 +710,8 @@ Its client scenarios map to SDK coverage as follows:
 
 #### PROBE-105 — Upstream cross-format parity
 
-- **Title:** For each vendored upstream set that gives one composition in two or more of canonical JSON, canonical XML, FLAT and STRUCTURED, the SDK codecs carry the composition across every leg below whose two formats the set gives and agree with the upstream sibling over the subset they model; every place they do not agree is a recorded outcome with its reason, never a silent waiver.
+- **Title:** For each vendored upstream set that gives one composition in two or more of canonical JSON, canonical XML, FLAT and STRUCTURED, the SDK codecs carry the composition across every leg below whose two formats the set gives and agree with the upstream sibling over the subset they model.
+  Every place they do not agree is a recorded outcome with its reason, never a silent waiver.
 - **Preconditions:** The sets under `testkit/corpus/crossformat/` ([probe-harness.md § Vendored fixtures](../probe-harness.md#vendored-fixtures)), each with the OPT of its template, from which the probe builds the Web Template (`templatecompile.Compile` + `webtemplate.Build`).
 - **Wire assertion:** In-repo, not backend-facing.
   Per set, every leg whose two formats the set carries:
@@ -706,7 +739,12 @@ Its client scenarios map to SDK coverage as follows:
 - **Title:** Decoding a canonical-JSON RM value and re-encoding it, then decoding and encoding that output again, recovers the same value and a document wire-equivalent to the first, and the recovered value satisfies the reference-model floor.
 - **Preconditions:** A canonical-JSON RM root fixture from the top-level files of `testkit/corpus/compositions/` and `testkit/corpus/rm/` ([probe-harness.md § Vendored fixtures](../probe-harness.md#vendored-fixtures)): a COMPOSITION, or another root sample such as an EHR_STATUS or a FOLDER.
   The probe's leaf values, a DV_QUANTITY and a DV_CODED_TEXT, are inline in the probe.
-- **Wire assertion:** Decode, Encode (`b1`), Decode (`A`), Encode (`b2`), Decode (`B`), then the comparison [§ REQ-052](wire.md#req-052) gives a round trip: `A` and `B` equal by typed deep comparison (`reflect.DeepEqual` over the decoded RM values, which compares an interface-typed field by its dynamic type and value, so it covers every substitutable slot and every `DV_INTERVAL[T]` bound with no comparison options); `B` clean under `validation.ValidateRM` ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)); `b1` and `b2` [wire-equivalent](#terms); and `b1` wire-equivalent to the input's expected form, so a member the decoder reads with the wrong meaning, a wrongly defaulted interval flag among them, fails the probe.
+- **Wire assertion:** Decode, Encode (`b1`), Decode (`A`), Encode (`b2`), Decode (`B`), then the comparison [§ REQ-052](wire.md#req-052) gives a round trip:
+  - `A` and `B` equal by typed deep comparison (`reflect.DeepEqual` over the decoded RM values, which compares an interface-typed field by its dynamic type and value, so it covers every substitutable slot and every `DV_INTERVAL[T]` bound with no comparison options);
+  - `B` clean under `validation.ValidateRM` ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor));
+  - `b1` and `b2` [wire-equivalent](#terms);
+  - `b1` wire-equivalent to the input's expected form, so a member the decoder reads with the wrong meaning, a wrongly defaulted interval flag among them, fails the probe.
+
   No byte equality is checked anywhere.
   An input whose vendored content carries an RM-floor finding unrelated to the round trip is held out of the `ValidateRM` leg only, named in the probe with the finding, while the fidelity legs still run on it.
 - **Modes:** In-repo (round-trip property against vendored fixtures; no backend).
@@ -786,7 +824,9 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 
 - **Title:** `POST /ehr` with an initial `EHR_STATUS` body answers with a `Location` naming the assigned `ehr_id`, the SDK surfaces that id, and a follow-up `GET` of the EHR_STATUS returns the status that was committed.
 - **Preconditions:** Backend supports server-assigned `ehr_id`.
-- **Wire assertion:** The create is one `POST` on the exact service-relative `/ehr` path whose captured body decodes back (through the SDK codec, not the write path) as the submitted EHR_STATUS (`archetype_node_id`, `is_queryable`, `is_modifiable`); the response carries a `Location` ending in `/ehr/{ehr_id}` for the id the SDK recovered; the read-back is one `GET` on `/ehr/{ehr_id}/ehr_status` for that id and returns the same fields.
+- **Wire assertion:** The create is one `POST` on the exact service-relative `/ehr` path whose captured body decodes back (through the SDK codec, not the write path) as the submitted EHR_STATUS (`archetype_node_id`, `is_queryable`, `is_modifiable`).
+  The response carries a `Location` ending in `/ehr/{ehr_id}` for the id the SDK recovered.
+  The read-back is one `GET` on `/ehr/{ehr_id}/ehr_status` for that id and returns the same fields.
   The `201` status itself is consumed by the transport (a non-2xx fails the call) and is not surfaced by the leaf, so the probe does not assert the number.
 - **Effect:** mutating.
 - **Modes:** Sandbox, Live (snapshot).
@@ -954,7 +994,9 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 
 - **Title:** A path parameter that is `.` or `..`, is empty, or contains `/`, `\`, or a control character is refused before any HTTP request is issued, on every path-interpolating leaf package.
 - **Preconditions:** A transport client whose `*http.Client` records whether any request was issued (httptest or a tripwire RoundTripper).
-- **Wire assertion:** For each leaf package that interpolates a path parameter, at least two hostile inputs — one of them the separator-smuggling id (`foo/bar` on a `Route`-set request), the only input that exercises the route-arity rule; the other drawn from a traversal id (`a/../../definition/query/evil`, `..`), a backslash-bearing id, or a control character — each fail with a non-nil error and a captured request count of zero: the call fails closed with no bytes on the wire.
+- **Wire assertion:** For each leaf package that interpolates a path parameter, at least two hostile inputs each fail with a non-nil error and a captured request count of zero: the call fails closed with no bytes on the wire.
+  One of them is the separator-smuggling id (`foo/bar` on a `Route`-set request), the only input that exercises the route-arity rule.
+  The other is drawn from a traversal id (`a/../../definition/query/evil`, `..`), a backslash-bearing id, or a control character.
   A well-formed id that only needs percent-encoding (a space or dots in a template id, `Blood Pressure.v1`) still issues exactly one request whose path is encoded once (REQ-050), and the service root `"/"` — the System API's only operation — passes validation and issues its request (the REQ-150 exemption's positive control).
   Sentinel identity (`ErrInvalidPathSegment`, `ErrInvalidConfig`) is pinned by `transport/` unit tests, not by this probe.
 - **Effect:** read-only — the hostile arms assert that NO request reaches the wire, and the positive control issues a read.
@@ -989,7 +1031,9 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Title:** A 200 whose body cannot be decoded as the requested representation fails the call rather than returning a silently zero-valued result — on the shared transport decode and on a hand-rolled Definition list decode alike — while a non-2xx on the same route keeps failing as it always did.
 - **Preconditions:** A sandbox server that can serve, on demand, a 200 whose JSON body does not match the requested type, a 404, and a list route answering a JSON object where an array is expected.
 - **Wire assertion:** Three arms, kept at observable-behaviour level.
-  (a) A read served a 200 with an undecodable body fails with a non-nil error, and the returned resource is never a zero value paired with a nil error — a silent zero-valued success is the exact defect this probe exists to catch — and nothing is handed back beside that error: the returned resource is nil, since a failed decode has nothing to return.
+  (a) A read served a 200 with an undecodable body fails with a non-nil error, and the returned resource is never a zero value paired with a nil error.
+  A silent zero-valued success is the exact defect this probe exists to catch.
+  Nothing is handed back beside that error: the returned resource is nil, since a failed decode has nothing to return.
   (b) The same read served a 404 fails with a non-nil error, likewise with a nil resource beside it.
   (c) A Definition list leaf served a JSON object where an array is expected fails with a non-nil error, and the slice beside that error carries zero entries — reporting an empty catalog for a body that did not decode would read a failure as success, which [REQ-151](transport.md#req-151--typed-2xx-decode-failure)'s keyed exclusion admits only for an empty *body*.
   Each arm also issues exactly one request: without that count, a leaf refusing the call before it reached the wire would credit the probe with a failure the server never provoked, and the probe would pass against an SDK that decodes nothing at all.
@@ -1049,7 +1093,8 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Title:** The composition and EHR_STATUS leaves issue the eight `versioned_composition_*` and `versioned_ehr_status_*` reads of the vendored EHR API and decode their bodies, and a `version_at_time` the SDK sends keeps its fraction of a second.
 - **Preconditions:** A sandbox server answering each route with a canonical-JSON body: a `VERSIONED_COMPOSITION`, a `VERSIONED_EHR_STATUS`, a `REVISION_HISTORY`, an `ORIGINAL_VERSION` of each payload family, and an `IMPORTED_VERSION` for the refusal row.
 - **Wire assertion:** Each captured request's method, path and `Accept: application/json` match the pinned operation; the latest-version read carries no `version_at_time`, and the version-at-time read carries the instant in UTC with every sub-second digit it holds (the pin's example time carried to nanoseconds, `2015-01-20T19:30:22.765432101+01:00`, is sent as `2015-01-20T18:30:22.765432101Z`, so a value cut to milliseconds fails).
-  Each 200 decodes to its RM type, and a version read's `data` to a `COMPOSITION` or an `EHR_STATUS` (a version without `data` passes only when its lifecycle state is `deleted`, code `523`, the RM's logical deletion; any other version without `data` fails the probe, so a leaf that drops the data it was served fails too); an `IMPORTED_VERSION` body fails as a typed decode error, its request held to the same method, path and `Accept`.
+  Each 200 decodes to its RM type, and a version read's `data` to a `COMPOSITION` or an `EHR_STATUS` (a version without `data` passes only when its lifecycle state is `deleted`, code `523`, the RM's logical deletion; any other version without `data` fails the probe, so a leaf that drops the data it was served fails too).
+  An `IMPORTED_VERSION` body fails as a typed decode error, its request held to the same method, path and `Accept`.
   The same sub-second value reaches the wire from the composition read by a `Ref` with a time, the EHR_STATUS and directory reads at a time, and the `VERSIONED_PARTY` version-at-time read; those four rows judge the request only, not the read's result.
   Sentinel identity (`ErrInvalidConfig`, `ErrNotFound`, `ErrInvalidShape`) is pinned by the leaf unit tests, not by this probe.
 - **Effect:** read-only (`GET`, no state change).
@@ -1084,7 +1129,8 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
   Immediate parents equal the BMM `ancestors` list filtered to the universe, in declaration order; transitive ancestors equal the closure of that filtered edge set; concrete descendants equal the non-abstract members of the inverse closure, plus the class itself when it is not abstract.
   (c) **Closure of the class graph** — every class name a class-graph answer returns is in the universe, and for every class whose BMM ancestors mix an RM class with a filtered one (`DV_ORDERED`, `DV_INTERVAL`, `DV_DATE`, `DV_PROPORTION`, …), the RM ancestor survives.
   Every dropped edge is accounted to one of the universe rule's declared exclusions, and the classes left with no in-universe ancestor are pinned in both directions.
-  (d) **Declaration site and completeness** — for every class and every attribute the flattened tables report on it, the three observable properties of [§ The flattened attribute tables stay flattened](reference-model.md#the-flattened-attribute-tables-stay-flattened) hold, `Interval` being the one out-of-universe site on the pinned RM, pinned by name; the probe reads the container flag from the raw BMM, and the behaviour suite beside it compares the full triple with the site.
+  (d) **Declaration site and completeness** — for every class and every attribute the flattened tables report on it, the three observable properties of [§ The flattened attribute tables stay flattened](reference-model.md#the-flattened-attribute-tables-stay-flattened) hold, `Interval` being the one out-of-universe site on the pinned RM, pinned by name.
+  The probe reads the container flag from the raw BMM, and the behaviour suite beside it compares the full triple with the site.
   The shipped attribute-name set per class equals the BMM's effective property set minus the named exemption pins of [§ The attribute tables are complete against the BMM](reference-model.md#the-attribute-tables-are-complete-against-the-bmm), held two-sidedly: an unpinned drop fails, and so does a stale pin whose drop has since been fixed.
   (e) **Negative space** — [§ Three answers, never conflated](reference-model.md#three-answers-never-conflated) over the pinned RM.
   The shapes the pinned RM cannot supply (a dead-end abstract class with a *named* identity, a class whose parent is absent from the data set) are exercised through REQ-048's synthetic-model seam in the behaviour suite beside this probe.
@@ -1094,7 +1140,8 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 
 #### PROBE-098 — Absence reasons account for the universe's negative space
 
-- **Title:** For every name the pinned schemas declare and the class universe omits, the compiled-in absence table reports the reason an independent reduction of the pinned BMM derives — in both directions, under the fixed precedence of [§ REQ-048 § Absence reasons](reference-model.md#absence-reasons) — while universe members report *none* and names no schema declares report *undeclared* with no stored entry backing them.
+- **Title:** For every name the pinned schemas declare and the class universe omits, the compiled-in absence table reports the reason an independent reduction of the pinned BMM derives, in both directions, under the fixed precedence of [§ REQ-048 § Absence reasons](reference-model.md#absence-reasons).
+  Universe members report *none*, and names no schema declares report *undeclared* with no stored entry backing them.
 - **Preconditions:** As PROBE-094: the pinned primary RM schema and its includes under [`resources/bmm/`](../../resources/bmm) (REQ-041), reduced in-test through the `openehr/bmm` loader (REQ-045) — never through the generator's own reduction, which would make the comparison tautological — with the generator's exclusion lists restated as literals so a silent change to either side fails the probe.
 - **Wire assertion:** In-repo property, not backend-facing, over the rules of [§ REQ-048 § Absence reasons](reference-model.md#absence-reasons), which this entry does not restate.
   (a) **Accounting, both directions** — every declared name the universe omits gets the reduction's reason from the shipped surface, and every stored table entry is a declared-but-omitted name carrying that same reason; an entry on one side only fails either way.
