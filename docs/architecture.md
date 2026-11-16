@@ -162,7 +162,7 @@ The RM and AOM 1.4 types are generated from the pinned BMM corpus, the one part 
 
 | Area | Location | Notes |
 |---|---|---|
-| Pinned BMM corpus | [`resources/bmm/`](../resources/bmm/) | `openehr_*.bmm.json` files; see [ADR 0001](adr/0001-bmm-version-bump-runbook.md). Each target generates from an SDK-authored root schema under `resources/bmm/sdk/`, which includes the pinned schemas and declares what they lack; [ADR 0034](adr/0034-sdk-authored-root-schemas.md) |
+| Pinned BMM corpus | [`resources/bmm/`](../resources/bmm/) | `openehr_*.bmm.json` files; see [`resources/bmm/README.md` § Updating](../resources/bmm/README.md#updating) for a bump. Each target generates from an SDK-authored root schema under `resources/bmm/sdk/`, which includes the pinned schemas and declares what they lack; [ADR 0034](adr/0034-sdk-authored-root-schemas.md) |
 | Pinned ITS-XML schemas | [`resources/its-xml/`](../resources/its-xml/) | The generator takes the child order of each canonical-XML encoder from these schemas, which the BMM does not give; [ADR 0002](adr/0002-bmm-codegen-decisions.md) D10 |
 | BMM loader | [`openehr/bmm/`](../openehr/bmm/) | `LoadAll`, `FSResolver`, descendant-shadows-ancestor merge |
 | Code generator | [`internal/bmmgen/`](../internal/bmmgen/), [`cmd/bmmgen`](../cmd/bmmgen) | `make codegen` / `make codegen-check` (chained in `make test`) |

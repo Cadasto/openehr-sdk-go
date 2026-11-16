@@ -25,7 +25,7 @@ The repo pins four versions independently, and the git tag tracks only the first
 | **SDK semver** | git tag `vX.Y.Z` | every release |
 | Go toolchain (minimum) | `go.mod` `go` line | a new stable Go minor line ([§ Minimum Go version](#minimum-go-version)) |
 | openEHR REST | [REQ-050](specifications/wire.md#req-050) → `1.1.0` | spec bump; discovery mismatch fails fast |
-| BMM corpus | `resources/bmm/*.bmm.json` | [ADR 0001](adr/0001-bmm-version-bump-runbook.md) |
+| BMM corpus | `resources/bmm/*.bmm.json` | [`resources/bmm/README.md` § Updating](../resources/bmm/README.md#updating) |
 
 ### Minimum Go version
 

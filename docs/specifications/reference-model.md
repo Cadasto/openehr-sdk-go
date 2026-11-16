@@ -56,7 +56,7 @@ if q, ok := el.Value.(*rm.DVQuantity); ok {
 | Abstract RM category (DATA_VALUE, ITEM_STRUCTURE, …) | abstract Go interface | type assert | type assert |
 | Concrete parent without subtypes | concrete struct | direct field access | direct field access |
 
-Adding a new subtype on a BMM bump is documented in [ADR 0001 § Procedure step 10](../adr/0001-bmm-version-bump-runbook.md).
+Adding a new subtype on a BMM bump is documented in [`resources/bmm/README.md` § Updating, step 10](../../resources/bmm/README.md#updating).
 
 ### What is NOT in scope here
 

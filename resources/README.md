@@ -10,6 +10,6 @@ In-tree, version-pinned inputs for code generation, validation, and conformance.
 | [`its-xml/`](its-xml/README.md) | openEHR ITS-XML schemas (`*.xsd`, RM Release-1.1.0, BASE Release-1.2.0, AM Release-1.4, with their includes): the source of the child-element order the canonical-XML encoders write (ADR 0002 D10). Synced via `make its-xml-sync` |
 | [`terminology/`](terminology/README.md) | The openEHR Terminology (`openehr_terminology.xml`, `openehr_external_terminologies.xml` and the property-unit table `PropertyUnitData.xml`, TERM Release-3.0.0), the source of truth for the generated `openehr/terminology` accessor. Synced via `make terminology-sync` |
 
-See [`bmm/README.md`](bmm/README.md) for the schema inventory, provenance, and the BMM version-bump procedure (ADR 0001). See [`its-rest/README.md`](its-rest/README.md) for the REST API spec inventory and the sync/pin procedure.
+See [`bmm/README.md`](bmm/README.md) for the schema inventory, provenance, and the BMM version-bump procedure. See [`its-rest/README.md`](its-rest/README.md) for the REST API spec inventory and the sync/pin procedure.
 
 Every subdirectory except `aql/` carries a `MANIFEST.txt` that its sync script writes: the upstream commit and each file's `sha256`. The AQL grammar records its source in `aql/grammar/baseline/PIN`.
