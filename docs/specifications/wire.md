@@ -1060,24 +1060,31 @@ The codecs **MUST** read and write each, in FLAT and in STRUCTURED:
 
 | Key | RM attribute | Value |
 |---|---|---|
-| `<event>\|sample_count`, at an EVENT or INTERVAL_EVENT node or a folded EVENT | INTERVAL_EVENT `sample_count` | an RM `Integer`, refused where it does not fit, as a suffix value is (above) |
-| `<event>/math_function`, at an EVENT node or a folded EVENT | INTERVAL_EVENT `math_function` | a DV_CODED_TEXT leaf |
-| `<event>/width`, at an EVENT node or a folded EVENT | INTERVAL_EVENT `width` | a DV_DURATION leaf |
+| `<event>\|sample_count`, at an EVENT or INTERVAL_EVENT node or a folded event | INTERVAL_EVENT `sample_count` | an RM `Integer`, refused where it does not fit, as a suffix value is (above) |
+| `<event>/math_function`, at an EVENT node or a folded event | INTERVAL_EVENT `math_function` | a DV_CODED_TEXT leaf |
+| `<event>/width`, at an EVENT node or a folded event | INTERVAL_EVENT `width` | a DV_DURATION leaf |
 | `<observation>/history_origin` | `origin` of the OBSERVATION's `data` HISTORY | a DV_DATE_TIME leaf |
 
-An INTERVAL_EVENT node has `math_function` and `width` leaves of its own.
-A folded EVENT is the abstract EVENT the Web Template lifts into its OBSERVATION's node, one that occurs at most once ([clinical-modeling.md § *Output shape*](clinical-modeling.md#output-shape)); its `<event>` is the OBSERVATION's path, as the reference writes it.
-Decode **MUST** rebuild an event at an EVENT node or a folded EVENT as an INTERVAL_EVENT where the body gives it any of the three INTERVAL_EVENT keys, and as a POINT_EVENT otherwise.
+An INTERVAL_EVENT node has `math_function` and `width` leaves of its own, and a folded INTERVAL_EVENT has them among its OBSERVATION's node's children.
+A folded event is the event the Web Template lifts into its OBSERVATION's node: its HISTORY's only event, of any type, that occurs at most once ([clinical-modeling.md § *Output shape*](clinical-modeling.md#output-shape)).
+Its `<event>` is the OBSERVATION's path, as the reference writes it.
+Decode **MUST** rebuild an event at an EVENT node or a folded event as follows:
+
+- a folded INTERVAL_EVENT as an INTERVAL_EVENT;
+- in a decode with the template, a folded event the template types POINT_EVENT as a POINT_EVENT, where the three INTERVAL_EVENT keys are unmatched content (§ REQ-170);
+- any other as an INTERVAL_EVENT where the body gives it any of the three INTERVAL_EVENT keys, and as a POINT_EVENT otherwise.
+
+Without the template, a folded POINT_EVENT reads as a folded abstract EVENT, since the Web Template gives the two the same children.
 Each key is single-valued, so an index past `:0` on it is past its bound (§ REQ-170).
 
 Encode **MUST** write:
 
 - `|sample_count` where the INTERVAL_EVENT holds one;
-- `math_function` and `width` for an INTERVAL_EVENT at an EVENT node or a folded EVENT;
+- `math_function` and `width` for an INTERVAL_EVENT at an EVENT node or a folded event;
 - `history_origin`, unless the origin sets `value` alone and that value is, as written, the earliest time its events carry, the origin decode gives a HISTORY with no `history_origin`; an origin that sets any other attribute, such as `magnitude_status`, is written.
 
-Where an EVENT node, or the OBSERVATION node a folded EVENT is spelled at, has a child whose `id` is `math_function` or `width`, that key is the child's, which decode reads as the child, so encode refuses an INTERVAL_EVENT there, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
-An OBSERVATION that folds in two or more EVENTs gives the three keys to none of them: decode reads them there as unmatched content (§ REQ-170), and encode refuses an INTERVAL_EVENT among those events that holds any of the three, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+Where an EVENT node, or the OBSERVATION node a folded event is spelled at, has a child whose `id` is `math_function` or `width` and which is not that event's own leaf of the attribute, that key is the child's, which decode reads as the child, so encode refuses an INTERVAL_EVENT there, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+An OBSERVATION that folds in two or more events, a Web Template neither this SDK nor the reference builds, gives the three keys to none of them: decode reads them there as unmatched content (§ REQ-170), and encode refuses an INTERVAL_EVENT among those events that holds any of the three, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
 Every other spelling of the four, such as `<event>/sample_count` or `<observation>|history_origin`, is unmatched content (§ REQ-170).
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
