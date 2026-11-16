@@ -642,7 +642,7 @@ Recording a decline never widens the profile: admitting an engine extension is a
 - Empty / whitespace-only input **MUST** yield code `aql_empty` (before parse).
 - Input that does not parse as `selectQuery` per the profile **MUST** yield code `aql_syntax`.
 - The `aql_syntax` `Detail` **SHOULD** carry the parser's `line:column` when the parser reports a position, and **SHOULD NOT** invent one when it does not, because a reader takes a printed coordinate for a real one: a `parse.SyntaxError` whose `Pos` is zero prints no `0:0` from `Error()`, and its `Detail` carries no `L:C:` prefix.
-- `parse.Parse` returns a `*parse.SyntaxError` wrapping the building-block sentinel `aql.ErrSyntax`; the `validation.ValidateAQL` bridge maps `aql_syntax` / `aql_empty` to `validation.ErrAQLSyntax` via `Issue.Err()`.
+- `parse.Parse` returns a `*parse.SyntaxError` wrapping the building-block sentinel `aql.ErrSyntax`; the `validation.ValidateAQL` bridge maps `aql_syntax` / `aql_empty` to `validation.ErrAQLSyntax` via `validation.Issue.Err`.
 
 ### Layer 2 — Shape (AST walk, no CDR)
 
