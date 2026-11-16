@@ -12,7 +12,7 @@
 # listed in SRC_PATHS below, byte-identical to one upstream commit, so a build
 # never fetches them and a change to any of them is a reviewable commit.
 #
-# A version bump (ADR 0001) is an edit to SRC_PATHS: add the new path, run
+# A version bump (resources/bmm/README.md § Updating) is an edit to SRC_PATHS: add the new path, run
 # `BMM_REF=master make bmm-sync`, regenerate, and drop the old path and file
 # in the same commit.
 #
@@ -229,7 +229,7 @@ cmd_sync() {
     for root in "$ROOTS"/*.bmm.json; do
       while IFS= read -r incl; do
         [[ -f "$DEST/$incl.bmm.json" || -f "$ROOTS/$incl.bmm.json" ]] \
-          || echo "  root $(basename "$root") includes $incl, which the pin no longer holds: name the new id (ADR 0001 step 1)"
+          || echo "  root $(basename "$root") includes $incl, which the pin no longer holds: name the new id (resources/bmm/README.md § Updating, step 1)"
       done < <(jq -r '.includes // {} | keys[]' "$root")
     done
     echo "Roots under resources/bmm/sdk/ include the pinned schemas: run the root check and remove each correction it reports as closed:"
@@ -386,7 +386,7 @@ cmd_check() {
     echo "Every pinned schema is byte-identical at $REPO@$DEFAULT_BRANCH; no newer version."
   else
     [[ $changed -eq 0 ]] || echo "Run 'BMM_REF=$DEFAULT_BRANCH make bmm-sync' to take the changed files."
-    [[ $newer -eq 0 ]] || echo "A version bump follows ADR 0001: add the new path to SRC_PATHS in scripts/sync-bmm.sh."
+    [[ $newer -eq 0 ]] || echo "A version bump follows resources/bmm/README.md § Updating: add the new path to SRC_PATHS in scripts/sync-bmm.sh."
   fi
 }
 

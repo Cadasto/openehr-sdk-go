@@ -11,7 +11,7 @@ package rm
 // table. The dispatch path stays registry-driven (REQ-040 / typereg)
 // for every wire codec; these methods are pure ergonomic glue on top.
 //
-// BMM-BUMP AUDIT (ADR 0001 step):
+// BMM-BUMP AUDIT (resources/bmm/README.md § Updating, step 10):
 //
 //   When a BMM bump introduces a NEW concrete subtype of any class in
 //   this file's interface set:

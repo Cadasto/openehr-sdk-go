@@ -17,7 +17,7 @@
 #    its absence.
 #
 # This workflow is intentionally lean — only first-party actions and
-# the pre-installed gh CLI. See docs/adr/0001-bmm-version-bump-runbook.md
+# the pre-installed gh CLI. See resources/bmm/README.md § Updating
 # for the operational procedure that follows on drift detection.
 name: codegen-drift
 
@@ -90,7 +90,7 @@ jobs:
             tail -200 codegen-check.out
             echo '```'
             echo ""
-            echo "See [docs/adr/0001-bmm-version-bump-runbook.md](../blob/main/docs/adr/0001-bmm-version-bump-runbook.md) for the procedure."
+            echo "See [resources/bmm/README.md § Updating](../blob/main/resources/bmm/README.md#updating) for the procedure."
           } > "$BODY_FILE"
 
           if [ -z "$ISSUE_NUMBER" ]; then

@@ -380,7 +380,7 @@ The decoder falls back to the **declared parent's concrete type** when the wire 
 
 The full substitution semantics are pinned by [PROBE-038](conformance.md#probe-038--rm-polymorphic-decode-coverage) (decode + re-marshal preserves every input `_type` discriminator on a member the RM defines).
 An empty bound beside an open flag is dropped on re-encode by [§ REQ-052](#req-052), which is outside that probe.
-What a BMM bump that adds a subtype owes the codec is step 10 of [ADR 0001](../adr/0001-bmm-version-bump-runbook.md).
+What a BMM bump that adds a subtype owes the codec is step 10 of [`resources/bmm/README.md` § Updating](../../resources/bmm/README.md#updating).
 
 ## Canonical XML
 

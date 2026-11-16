@@ -78,17 +78,59 @@ Until 2026-10 the pins were audited by hand against [`openEHR/BMM-publisher`](ht
 
 ## Updating
 
-A BMM version bump is always deliberate and follows [ADR 0001: BMM version-bump runbook](../../docs/adr/0001-bmm-version-bump-runbook.md), the canonical procedure. In outline:
+A BMM version bump is deliberate, and [ADR 0001](../../docs/adr/0001-bmm-version-bump-runbook.md) records why it takes this shape: one pull request per bump, the new file added and the old one removed in the same commit, and one version per schema id.
+The impact on the SDK's version is decided under [`module-layout.md` § Versioning](../../docs/specifications/module-layout.md#versioning), not here.
 
-1. Add the new file's upstream path to `SRC_PATHS` in [`scripts/sync-bmm.sh`](../../scripts/sync-bmm.sh), beside the old one, and run `BMM_REF=master make bmm-sync` (e.g. `openehr_rm_1.2.1.bmm.json` lands next to `openehr_rm_1.2.0.bmm.json`). Do **not** overwrite the old file.
-2. Move the roots under `sdk/` with the pin: a root that includes the bumped schema names its new id, and a class it declares again that the new schema now carries in the same form goes, which the root check (`go test ./internal/bmmgen -run RootSchemas -count=1`) reports. Then run `make codegen` and `make codegen-check`. Optionally inspect the semantic diff with `go run ./cmd/bmmdiff <old> <new>`.
-3. Update version pins in [`../../docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) and the schema ID table above.
-4. Propose the one-line CHANGELOG bullet in the PR body; the CHANGELOG follows the rule in [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) (ADR 0001 step 8).
-5. Remove the old path from `SRC_PATHS` and re-run `make bmm-sync`, which deletes the old file, **in the same commit** once the regen and tests pass.
+1. **Stage the new file beside the old.**
+   Add its upstream path to `SRC_PATHS` in [`scripts/sync-bmm.sh`](../../scripts/sync-bmm.sh), beside the old one, and run `BMM_REF=master make bmm-sync`: it fetches, say, `openehr_rm_1.2.1.bmm.json` next to `openehr_rm_1.2.0.bmm.json` and records both in `MANIFEST.txt`.
+   Do **not** overwrite the old file: the diff shows the rename as a paired add and remove.
 
-See ADR 0001 for the full procedure, roles, and tooling notes. The weekly drift bot ([`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml)) catches accidental hand-edits or generator-template changes between bumps.
+   **Then move the roots.**
+   Each root under [`sdk/`](#sdk-authored-root-schemas-sdk) includes a pinned schema by id, and the sync never touches it.
+   A root that includes the bumped schema names its new id in `includes`; the RM root also takes the new `rm_release`, which changes its id and file name (`openehr_reference_model_1.2.1`) and `TargetRM.RootID` in `internal/bmmgen/target.go` with them.
+   Then run the root check, `go test ./internal/bmmgen -run RootSchemas -count=1`.
+   A class a root declares again that the new schema now carries in the same form fails it, as a correction the upstream fix has closed: remove that declaration from the root in this pull request.
+2. **Regenerate.**
+   Run `make codegen`. It rewrites every `_gen.go` file under `openehr/rm/`, `openehr/aom/aom14/` and the other targets, and never touches a `*_ext.go` companion.
+3. **Check that the regeneration is reproducible.**
+   Run `make codegen-check`; on a freshly regenerated tree it exits 0.
+   If it does not, a non-deterministic generator is a bug, not a consequence of the bump.
+4. **Inspect the semantic diff** (optional, recommended).
+   `go run ./cmd/bmmdiff resources/bmm/openehr_rm_1.2.0.bmm.json resources/bmm/openehr_rm_1.2.1.bmm.json` summarises added and removed classes, per-class property changes, and cardinality and function changes; `-suggest-changelog` adds a one-line CHANGELOG suggestion.
+5. **Audit the hand-written companions.**
+   A removed class or renamed property breaks every `*_ext.go` companion that names it.
+   Run `go build ./...`, and fix or remove the affected companions in this pull request.
+6. **Update the version pins** in [`reference-model.md` § Schema → Go package set](../../docs/specifications/reference-model.md#schema--go-package-set): the schema id and `bmm_version`.
+7. **Update this file**: the [Files](#files) table (schema id, `bmm_version`, class count) and any prose here that names a version.
+8. **Propose the CHANGELOG bullet in the pull request body.**
+   `CHANGELOG.md` follows the rule in [`AGENTS.md` § Code style and conventions](../../AGENTS.md#code-style-and-conventions) and is not edited in the bump, so the body carries one short, high-level line, one artefact class, for the maintainer to fold in.
+   The `bmmdiff -suggest-changelog` output is a starting point a person reviews.
+9. **Remove the old file in the same commit.**
+   Drop its path from `SRC_PATHS` and re-run `make bmm-sync`, which deletes the file and rewrites the manifest.
+   Never leave both versions here.
+10. **Audit the narrow-interface accessors** (REQ-052, PROBE-038).
+    If `bmmdiff -suggest-changelog` reports an added class whose `ancestors` include `DV_TEXT`, `DV_URI`, `AUDIT_DETAILS`, `PARTY_IDENTIFIED` or `OBJECT_REF`, the generator's field-lift picks the new subtype up, but two hand-written files need it too:
+    - [`openehr/rm/like_interfaces.go`](../../openehr/rm/like_interfaces.go): the marker line `func (NewSubtype) is<Parent>Like() {}` and a method body for every accessor on the parent interface (`GetValue`, `GetDefiningCode`, …); without them the new subtype does not satisfy `<Parent>Like`, and the codec does not compile.
+    - [`openehr/rm/like_accessors.go`](../../openehr/rm/like_accessors.go): a `case *NewSubtype:` arm in the matching `*Base` closed type switch, so the helpers recover the parent struct from the new subtype.
+
+    Then add a round-trip case for the new subtype to [`openehr/serialize/canjson/polymorphic_decode_test.go`](../../openehr/serialize/canjson/polymorphic_decode_test.go), so PROBE-038 covers it.
+11. **Open the pull request.**
+    Its CI runs `make test`, which runs `make codegen-check`.
 
 Mid-version evolution (`openehr_rm_1.2.0` → `openehr_rm_1.2.0.2`, i.e. a `schema_revision` change without a `rm_release` change) is recorded by moving its path in `SRC_PATHS`, re-syncing, and noting it in the CHANGELOG. If no semantic content changed, no code regeneration is required. A re-pin of this kind can still land an upstream fix a root carries: run the root check, and remove each shadow it reports in the same commit.
+
+### Roles
+
+- The **author** runs the steps and opens the pull request.
+- The **reviewer** checks that the BMM diff (step 4's output, ideally pasted into the pull request body) matches the scope of the Go diff, and that the proposed CHANGELOG bullet describes the change.
+- The **drift bot**, the weekly [`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml), re-runs `make codegen-check` on a clean checkout after the merge: a green run shows the bump landed cleanly, and between bumps it catches hand-edits to `_gen.go` files and generator-template changes.
+
+### Tooling
+
+- `make test` runs `make codegen-check`, so a passing `make test` shows the regeneration is reproducible.
+- `cmd/bmmdiff` is an inspection tool: it always exits 0 and writes to standard output, for pull request bodies and CHANGELOG drafts.
+- The drift bot keeps one open issue labelled `bmm-drift` and comments on it on a later failure rather than opening another.
+- [`internal/bmmgen/sim_bump_test.go`](../../internal/bmmgen/sim_bump_test.go) simulates a bump on every CI run, so the regeneration path is exercised between bumps.
 
 ## Integrity
 
