@@ -18,7 +18,11 @@ What it prints, in order:
 2. Each base sentence with a keyword that no longer appears word for word in
    the same files of the working tree, with the closest working-tree sentence
    and its keywords. The closest sentence is looked up in every spec file, so
-   a sentence moved to another file shows where it went. Each one is marked:
+   a sentence moved to another file shows where it went. A working-tree
+   sentence that ends a line in a colon is also tried joined with the list
+   that follows it, so a sentence split into a list pairs with the whole
+   list; that pairing points at the colon's sentence and ends "with its
+   list". Each one is marked:
      KEYWORDS CHANGED  the closest sentence has other keywords: a demotion,
                        a promotion, a dropped or an added rule;
      NO CLOSE MATCH    nothing in the working tree is close: a deleted rule
@@ -122,17 +126,87 @@ def blocks(text):
         yield first, "\n".join(lines)
 
 
+def split(first, block):
+    """Return (line number, normalised sentence) for every sentence of one block."""
+    out = []
+    start = 0
+    breaks = [m.span() for m in SENTENCE_BREAK.finditer(block)] + [(len(block), len(block))]
+    for end, after in breaks:
+        sentence = normalise(block[start:end])
+        if sentence:
+            out.append((first + block.count("\n", 0, start), sentence))
+        start = after
+    return out
+
+
 def sentences(text):
     """Return (line number, normalised sentence) for every sentence of a Markdown text."""
     out = []
     for first, block in blocks(text):
-        start = 0
-        breaks = [m.span() for m in SENTENCE_BREAK.finditer(block)] + [(len(block), len(block))]
-        for end, after in breaks:
-            sentence = normalise(block[start:end])
-            if sentence:
-                out.append((first + block.count("\n", 0, start), sentence))
-            start = after
+        out.extend(split(first, block))
+    return out
+
+
+def indent(line):
+    return len(line) - len(line.lstrip())
+
+
+def list_after(lines, last):
+    """Return the lines of the list that follows line number last, item markers removed, or [] when none follows.
+
+    The list runs over its items and their indented continuation lines, and
+    over a blank line only when an item follows it. An item must be indented
+    at least as deep as line last, and deeper when line last is itself an
+    item, so a sibling of a nested list's parent ends the nested list.
+    """
+    stem = lines[last - 1]
+    floor = indent(stem) + (1 if LIST_ITEM.match(stem.strip()) else 0)
+    out = []
+    item_indent = None
+    i = last
+    while i < len(lines):
+        line = lines[i].strip()
+        if FENCE.match(line):
+            break
+        if not line:
+            k = i + 1
+            while k < len(lines) and not lines[k].strip():
+                k += 1
+            if k < len(lines) and LIST_ITEM.match(lines[k].strip()) and indent(lines[k]) >= floor:
+                i = k
+                continue
+            break
+        if LIST_ITEM.match(line):
+            if indent(lines[i]) < floor:
+                break
+            item_indent = indent(lines[i])
+            out.append(LIST_ITEM.sub("", line, count=1))
+        elif item_indent is not None and indent(lines[i]) > item_indent:
+            out.append(line)
+        else:
+            break
+        i += 1
+    return out
+
+
+def list_splits(text):
+    """Return (line number, normalised text) for each sentence that ends a line in a colon and a list follows.
+
+    The text is the sentence joined with the whole list, as one sentence; the
+    line number is the sentence's own.
+    """
+    lines = text.split("\n")
+    out = []
+    for first, block in blocks(text):
+        last = first + block.count("\n")
+        line = lines[last - 1].strip()
+        if not normalise(block).endswith(":") or line.startswith("|") or HEADING.match(line):
+            continue
+        items = list_after(lines, last)
+        stem = split(first, block)
+        if items and stem:
+            number, sentence = stem[-1]
+            out.append((number, normalise(sentence + " " + " ".join(items))))
     return out
 
 
@@ -208,8 +282,11 @@ def main():
     names = wanted or sorted(set(base_paths) | set(head_paths))
 
     head_all = {}  # every head file, for the closest-sentence lookup
+    head_lists = {}  # every head sentence joined with the list it introduces
     for name, path in head_paths.items():
-        head_all[name] = sentences(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        head_all[name] = sentences(text)
+        head_lists[name] = list_splits(text)
     base_all = {}
     for name in names:
         if name in base_paths:
@@ -235,6 +312,13 @@ def main():
         if keywords(s) and s not in head_kept
     ]
     pool = [(name, line, s) for name in sorted(head_all) for line, s in head_all[name]]
+    # A sentence split into a list also has its introducing sentence joined
+    # with the whole list as a candidate, so it is not paired with whichever
+    # item is closest. These candidates come after every single sentence and
+    # are ranked apart, so the single sentences tried stay the same.
+    singles = len(pool)
+    pool += [(name, line, s) for name in sorted(head_lists) for line, s in head_lists[name]]
+    joined = {s for _, _, s in pool[singles:]}
     where = {}
     index = collections.defaultdict(list)
     for i, (name, line, s) in enumerate(pool):
@@ -251,7 +335,8 @@ def main():
         # then file order. Sets iterate in a different order in each run, so
         # without a full order the pick would change from run to run.
         ranked = sorted(votes, key=lambda i: (-votes[i], pool[i][0] != name, i))
-        candidates = [pool[i][2] for i in ranked[:60]]
+        candidates = [pool[i][2] for i in ranked if i < singles][:60]
+        candidates += [pool[i][2] for i in ranked if i >= singles][:20]
         best = difflib.get_close_matches(s, candidates, n=1, cutoff=0.45)
         if not best:
             groups["NO CLOSE MATCH"].append((name, line, s, None))
@@ -274,7 +359,11 @@ def main():
             else:
                 head_name, head_line = where[best]
                 head_kw = ",".join(keywords(best)) or "none"
-                print("\n- {}  {}:{} [{}] -> {}:{} [{}]".format(mark, name, line, base_kw, head_name, head_line, head_kw))
+                print(
+                    "\n- {}  {}:{} [{}] -> {}:{} [{}]{}".format(
+                        mark, name, line, base_kw, head_name, head_line, head_kw, " with its list" if best in joined else ""
+                    )
+                )
             print("    base: " + s[:SHOW])
             if best is not None:
                 print("    head: " + best[:SHOW])
