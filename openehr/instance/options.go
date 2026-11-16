@@ -84,16 +84,21 @@ const (
 	// optional child that holds only such content: optional archetype
 	// roots each get theirs, of one archetype or of several, whether the
 	// template tells them apart by a name or not, and so do optional
-	// siblings of one node id. It stops short of the ITS-REST template
-	// example's detail_level=complete (every data point the template
-	// allows), which no level of its own builds yet. The composition
-	// builder seeds a Builder with Large short of the second members.
+	// siblings of one node id. Large also writes a fixed set of optional
+	// RM attributes where the template does not name them: a
+	// COMPOSITION's feeder_audit, an EVENT_CONTEXT's end_time,
+	// health_care_facility and one participation, an ENTRY's provider and
+	// one other participation, and an ACTIVITY's timing. It is the SDK's
+	// complete level: unlike the ITS-REST template example's
+	// detail_level=complete, every data point the template allows, as
+	// reference guidance, every root it returns meets the template and the
+	// RM, so it can be committed. The composition builder seeds a Builder
+	// with Large short of the second members and those RM attributes.
 	Large
 
 	// Minimal is another name for Required.
 	Minimal = Required
-	// Complete is another name for Large, until a level of its own
-	// builds the ITS-REST template example's detail_level=complete.
+	// Complete is another name for Large, the SDK's complete level.
 	Complete = Large
 )
 

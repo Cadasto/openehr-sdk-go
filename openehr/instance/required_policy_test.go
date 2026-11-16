@@ -91,8 +91,9 @@ type policyLevel struct {
 // policies build the three levels of the ITS-REST template example:
 // Required holds fewer JSON values than Medium, and Medium no more than
 // Large. Large builds a member of every optional archetype the template
-// names and of every use of one, and two of each that may occur more
-// than once; Medium builds one member of each optional archetype under an
+// names and of every use of one, two of each that may occur more than
+// once, and a fixed set of optional RM attributes the template does not
+// name; Medium builds one member of each optional archetype under an
 // attribute, and of a later use of one only where it holds other
 // archetypes, so it builds every archetype Large builds, with one member
 // where Large builds two, on vital_signs and social, which use no archetype
@@ -120,7 +121,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "vital_signs",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 794, archetypes: map[string]int{
+				instance.Large: {values: 977, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.blood_pressure.v1":   2,
 					"openEHR-EHR-OBSERVATION.body_temperature.v1": 2,
@@ -146,7 +147,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "social",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 1646, archetypes: map[string]int{
+				instance.Large: {values: 1905, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.livingsituation.v1":        2,
 					"openEHR-EHR-OBSERVATION.languageproficiency.v1":    2,
@@ -181,7 +182,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 			name:    "Corona_Anamnese",
 			compile: compileCoronaAnamnese,
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 4411, archetypes: map[string]int{
+				instance.Large: {values: 5028, archetypes: map[string]int{
 					report:                                              1,
 					"openEHR-EHR-CLUSTER.address_cc.v0":                 8,
 					"openEHR-EHR-CLUSTER.dwelling.v0":                   4,

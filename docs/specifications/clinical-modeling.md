@@ -730,7 +730,7 @@ type Policy int
 const (
     Medium   Policy = iota // the default: required attributes and those with an allowed OPT child, a member of each optional archetype
     Required               // required attributes, a composition's context, a member of each entry the content names at its mandatory parts
-    Large                  // every attribute the visit rule allows, a member of each optional archetype and of each use of one, two of each repeating node
+    Large                  // every attribute the visit rule allows, a member of each optional archetype and of each use of one, two of each repeating node, a few optional RM attributes
 
     Minimal  = Required // alias
     Complete = Large    // alias
@@ -835,7 +835,10 @@ A structure the RM or the OPT requires, as the BMM requires `EVENT.data`, or as 
 
 ##### What each policy visits
 
-Of the attributes the rules above leave, `Generate` **MUST** visit those this table gives for the policy in force and no other, and write a `COMPOSITION`'s `context` under every policy, the one exception to the table, built under the OPT's constraints as `Medium` does:
+Of the attributes the rules above leave, `Generate` **MUST** visit those the table below gives for the policy in force and no other, with two exceptions:
+
+- a `COMPOSITION`'s `context`, which it writes under every policy, built under the OPT's constraints as `Medium` does;
+- the optional RM attributes `Large` writes where the OPT does not name them (*Optional RM attributes under `Large`*).
 
 | Policy | `Generate` visits |
 |---|---|
@@ -849,9 +852,10 @@ The three follow the levels of the ITS-REST template example's `detail_level` ([
 
 - `Required` builds its `required` level, the data points the template makes mandatory, a composition's `context`, and a member of each entry the content names, at its mandatory parts (*Members of a list*);
 - `Medium` its `medium` level, with a member of each optional archetype under an attribute, and of a further use of one only where that use holds another archetype (*Sibling identity*);
-- `Large`, short of the `complete` level (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *The `Complete` level*):
+- `Large` the SDK's own `complete` level (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *The `Complete` level*):
   - a member of every optional archetype the template names that needs no undescribed content (§ [Slot fills](#slot-fills)), and of every use of one, named or not;
-  - two members of each node that may occur more than once (*Members of a list*).
+  - two members of each node that may occur more than once (*Members of a list*);
+  - the optional RM attributes *Optional RM attributes under `Large`* lists.
 
 An attribute the BMM marks mandatory that a compiled node does not carry, as under `templatecompile.WithoutImplicitAttributes`, is visited as if the node carried it with no OPT child.
 
@@ -975,7 +979,7 @@ Under every policy, a primitive leaf the generator writes for an OPT primitive c
 
 #### Clock
 
-Every `DV_DATE_TIME` the generator writes whose OPT node carries no primitive constraint and gets no OPT value, `HISTORY.origin`, `EVENT.time`, `ACTION.time` and `EVENT_CONTEXT.start_time` included, **MUST** take its value from `Options.Now`, written in UTC as RFC 3339.
+Every `DV_DATE_TIME` the generator writes whose OPT node carries no primitive constraint and gets no OPT value, `HISTORY.origin`, `EVENT.time`, `ACTION.time` and `EVENT_CONTEXT.start_time` and `end_time` included, **MUST** take its value from `Options.Now`, written in UTC as RFC 3339.
 
 #### Placeholders
 
@@ -1017,6 +1021,20 @@ A `COMPOSITION`'s `context` is written under every policy, `Required` included, 
 - a `DV_MULTIMEDIA`'s `media_type`: `text/plain` in `IANA_media-types`, so that `Media_type_valid` holds; and its `uri`, where § [Precedence](#precedence) 2 has it written and the OPT names no allowed child for it: `http://example.com`.
 
 Every `DV_MULTIMEDIA` the generator writes **SHOULD** carry inline `data`, a non-empty example payload that is the same under both `ValueFill` values, unless the OPT prohibits `data`, and a `size` that is the number of bytes of that `data`, which the RM defines as the original size of the unencoded data, unless the OPT's constraint on `size` rejects that number, when the size the walk wrote stays (§ [Precedence](#precedence) 1): the value then carries its content and meets DV_MULTIMEDIA `Not_empty` without a URI to resolve.
+
+##### Optional RM attributes under `Large`
+
+Under `Large`, `Generate` **MUST** write the optional RM attributes below where the OPT node of the object that holds one does not name it, or no OPT node describes that object, as for the `context` *RM defaults* writes where the OPT names none:
+
+- a `COMPOSITION`'s `feeder_audit`: a `FEEDER_AUDIT` whose `originating_system_audit` has a `system_id` and a `time` *Clock* gives;
+- an `EVENT_CONTEXT`'s `end_time`, which *Clock* gives, its `health_care_facility`, a `PARTY_IDENTIFIED` whose `name` is `example`, and one member of its `participations`;
+- an ENTRY's `provider`, a `PARTY_SELF`, and one member of its `other_participations`;
+- an `ACTIVITY`'s `timing`: a `DV_PARSABLE` whose `formalism` is `ISO8601` and whose `value` is an ISO 8601 recurring interval, `R/`, the date-time *Clock* gives and `/P1D`, the form the RM prefers for it (RM `ACTIVITY.timing`: "the preferred syntax is ISO8601 'R' format").
+
+Each participation has a `PARTY_SELF` performer, the `mode` `openehr` `193|not specified|` with its rubric, and a `function` that is a plain `DV_TEXT` whose `value` is `unknown`, the rubric of its RM default `253`, since FLAT's `|function` key carries only a plain `DV_TEXT` ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes)) and `Function_valid` binds only a coded `function`.
+An attribute the OPT node names is the visit's: `Large` builds it under the OPT's constraints where the OPT allows it, and leaves it out where the OPT prohibits it.
+`Large` writes no other optional RM attribute the OPT does not name, such as an ENTRY's `workflow_id` or `guideline_id`, a LOCATABLE's `links`, or a `HISTORY`'s `duration` or `period`.
+The skeleton the composition builder seeds a `Builder` with under `Large` holds none of them ([§ REQ-101](#req-101--generic-opt-driven-composition-builder)).
 
 ##### The text of a coded value
 
@@ -1241,7 +1259,8 @@ The known gaps below describe the generator as it is; they are informative.
 
 #### Known gap: attributes the generator cannot write
 
-The generator has no writer for a LOCATABLE's `links` and `feeder_audit`, for an EHR_ACCESS's `settings`, whose RM type ACCESS_CONTROL_SETTINGS has no concrete class, or for a list whose items the RM types as primitive values other than a DV_MULTIMEDIA's `data`, such as its `integrity_check`; the RM requires none of them.
+The generator has no writer for a LOCATABLE's `links`, for a `feeder_audit` the OPT names, for an EHR_ACCESS's `settings`, whose RM type ACCESS_CONTROL_SETTINGS has no concrete class, or for a list whose items the RM types as primitive values other than a DV_MULTIMEDIA's `data`, such as its `integrity_check`; the RM requires none of them.
+The one `feeder_audit` it writes is the `COMPOSITION`'s that `Large` writes where the OPT does not name it (§ Contract *Optional RM attributes under `Large`*), which no OPT constraint reaches.
 So `Generate` leaves such an attribute unwritten, whatever the OPT puts under it, as § Contract *Visit rule* says.
 Where the visit rule does not, as for an optional `links` that holds a mandatory LINK, the node that holds the attribute needs undescribed content (§ [Slot fills](#slot-fills)), and `Generate` returns `ErrConstraintUnsatisfiable` and no root (§ [Errors](#errors)) only where the walk builds that node all the same:
 
@@ -1284,7 +1303,9 @@ The composition builder surfaces the seam as `composition.WithValueFill` / `comp
 
 #### The `Complete` level
 
-The ITS-REST `detail_level=complete` level, every data point the template allows as reference guidance and not expected to be committable, is not part of the `Policy` contract.
+`Complete` is `Large`, the SDK's own `complete` level.
+It differs from the ITS-REST `detail_level=complete` level, every data point the template allows, which that level gives as reference guidance not expected to be committable.
+Every root `Large` builds meets § Contract *Output*, so it can be committed, and it holds the optional RM attributes *Optional RM attributes under `Large`* lists, not every one the RM allows.
 
 ### Trust model
 

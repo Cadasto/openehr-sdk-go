@@ -94,8 +94,9 @@ func NewBuilder(ctx context.Context, c *templatecompile.Compiled, opts ...Option
 	default:
 		return nil, errUndefinedPolicy("composition.NewBuilder", cfg.policy)
 	}
-	// The builder's seed is Large short of its repeats: Set routes a value
-	// into a node by its path, and one member of each is the node.
+	// The builder's seed is Large short of its repeats and of the optional
+	// RM attributes Large adds where the template names none: Set routes a
+	// value into a node by its path, and one member of each is the node.
 	skel, err := newSkeleton(builderseed.With(ctx), c, cfg)
 	if err != nil {
 		return nil, err

@@ -146,7 +146,8 @@ var mediumHollowBodies = []string{
 // Large rows: under Large every optional child that needs no undescribed
 // content gets its members, each use of one archetype, named or not,
 // included, and two of each child that may occur more than once (REQ-107
-// What a visit writes). So Large builds
+// What a visit writes); a fixed set of optional RM attributes the template
+// does not name is written too (What each policy visits). So Large builds
 // members of each optional archetype use under an attribute, and reaches
 // the TestPerson.v2 identifier clusters, two of each, the
 // clinical_content_validation EVALUATION and each of the four named
@@ -157,7 +158,7 @@ var mediumHollowBodies = []string{
 // generic_folder.v1, which constrain no ELEMENT by design and have their
 // hollow_body rows: any other hollow_body failure there fails the ratchet.
 // The builder builds on Large when no WithPolicy is given, short of its
-// repeats (REQ-101), so its rows are Large
+// repeats and its optional RM attributes (REQ-101), so its rows are Large
 // rows, under either fill. It has none: every COMPOSITION root it builds
 // passes under both fills and every seed, and each row below is on a root
 // it does not build (TestPerson.v2 is PERSON-rooted, the two generic

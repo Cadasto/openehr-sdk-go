@@ -54,11 +54,11 @@ import (
 // A list whose children's occurrences lower bounds add up past its
 // cardinality upper bound, where the walk visits it, an attribute the
 // template requires that the generator has no writer for, such as a
-// LOCATABLE's feeder_audit or links, other than a list that only its
-// existence or its cardinality asks a member of, and the two bounds of a
-// DV_INTERVAL over an abstract ordered class where they name types no one
-// interval holds, make Generate return an error wrapping
-// [ErrConstraintUnsatisfiable] and no root. A list that sits
+// LOCATABLE's feeder_audit or links where the template names it, other
+// than a list that only its existence or its cardinality asks a member
+// of, and the two bounds of a DV_INTERVAL over an abstract ordered class
+// where they name types no one interval holds, make Generate return an
+// error wrapping [ErrConstraintUnsatisfiable] and no root. A list that sits
 // in an optional node the policy builds no member of, as Required builds
 // none of an optional child other than an entry or a SECTION on the way to
 // one, is not visited, and the root leaves it out. An
@@ -120,7 +120,7 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 		compiled: c,
 		opts:     opts,
 		// The composition builder seeds a Builder with Large short of its
-		// repeats (builderseed).
+		// repeats and optional RM attributes (builderseed).
 		fullLarge: opts.Policy == Large && !builderseed.Asked(ctx),
 	}
 	if opts.ValueFill == RandomFill {
@@ -161,7 +161,9 @@ type generator struct {
 	opts     Options
 	// fullLarge is set under Large, except on the call that seeds the
 	// composition builder: a child that may occur more than once then gets
-	// a second member (ownMembers).
+	// a second member (ownMembers), and a fixed set of optional RM
+	// attributes the template does not name is written
+	// (writeOptionalRMAttributes).
 	fullLarge bool
 	// valueSampler draws in-constraint leaf values when opts.ValueFill
 	// is RandomFill; the zero value (used under ExampleFill) is never
@@ -273,6 +275,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		}
 	}
 	g.fillUncarriedRequired(optNode, rmValue)
+	g.writeOptionalRMAttributes(optNode, rmValue)
 	if err := g.writeRMNeeded(optNode, rmValue); err != nil {
 		return err
 	}
@@ -596,7 +599,10 @@ func multimediaData(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute
 // whose RM type ACCESS_CONTROL_SETTINGS has no concrete class, and a list
 // whose items the pinned RM types as primitive values (primitiveList), such
 // as a DV_MULTIMEDIA's integrity_check, other than its data, which
-// walkSkips leaves to settleMultimedia. The RM requires none of them.
+// walkSkips leaves to settleMultimedia. The RM requires none of them. The
+// feeder_audit writeOptionalRMAttributes gives a COMPOSITION under Large is
+// written only where the template does not name the attribute, so it never
+// meets a constraint of the template's.
 func noWriter(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	class := nodeClass(optNode)
 	switch name := attr.Name(); name {
@@ -3196,6 +3202,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 		// gets the RM default, 238|other care|, where the OPT admits it.
 		c.Context = &rm.EventContext{}
 		g.settleCoded(contextNode, c.Context)
+		g.writeOptionalRMAttributes(contextNode, c.Context)
 	}
 	if c.Context.StartTime.Value == "" && !prohibited(contextNode, "start_time") {
 		c.Context.StartTime = rm.DVDateTime{Value: g.dateTimeDefault()}

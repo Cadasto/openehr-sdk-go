@@ -84,11 +84,26 @@
 //     attribute's cardinality. So Large builds a member of every optional
 //     archetype the template names, and of every use of one, except one
 //     that holds only content the template does not describe (below), and
-//     a second member of each that may repeat. It stops short of the
-//     complete level, every data point the template allows, which no
-//     level of its own builds yet. The composition builder seeds a
-//     Builder with Large short of the second members, the nodes its Set
-//     routes values into.
+//     a second member of each that may repeat. It also writes a fixed set
+//     of optional RM attributes the template does not name, where the
+//     template does not prohibit them: a composition's feeder_audit, whose
+//     originating system audit has a system id and the clock as its time;
+//     an event context's end_time, from the clock, its
+//     health_care_facility, a PARTY_IDENTIFIED named example, and one
+//     participation; an entry's provider, a PARTY_SELF, and one other
+//     participation; and an activity's timing, an ISO 8601 recurring
+//     interval in the formalism ISO8601. Each participation has a
+//     PARTY_SELF performer, the mode openehr 193|not specified| and the
+//     function text unknown. An attribute the template names is built as
+//     the template says, or left out where the template prohibits it. Not
+//     written are an entry's workflow_id and guideline_id, a locatable's
+//     links, and a history's duration and period. Large is the SDK's
+//     complete level: every root it returns meets the template and the RM,
+//     so it can be committed, where the ITS-REST complete level, every
+//     data point the template allows, is reference guidance. The
+//     composition builder seeds a Builder with Large short of the second
+//     members and of these RM attributes, the nodes its Set routes values
+//     into.
 //
 // Under Large and Medium the generator builds an optional node only where
 // it holds more than content the template does not describe: a slot fill;
@@ -137,8 +152,8 @@
 // is an archetype root, and its node id otherwise, and a sibling that is a
 // slot carries none.
 //
-// [Minimal] is another name for Required, and [Complete] for Large until
-// the complete level lands. [ParsePolicy] reads a policy from the names
+// [Minimal] is another name for Required, and [Complete] for Large, the
+// SDK's complete level. [ParsePolicy] reads a policy from the names
 // required, minimal, medium, large and complete, in any case. Generate
 // refuses any other Policy value with [ErrUnsupportedPolicy], before it
 // builds anything.

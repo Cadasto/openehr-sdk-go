@@ -281,7 +281,7 @@ go run ./cmd/examples/generate-example \
 | Flag | Default | Values |
 |---|---|---|
 | `-opt` | `vital_signs.opt` fixture | Path to an ADL 1.4 OPT |
-| `-policy` | `medium` | `required`, `medium` or `large`, listed below; `minimal` is another name for `required`, and `complete` for `large` for now. Case does not matter |
+| `-policy` | `medium` | `required`, `medium` or `large`, listed below; `minimal` is another name for `required`, and `complete` for `large`. Case does not matter |
 | `-territory` | `NL` | ISO 3166-1 code; a COMPOSITION root requires one |
 | `-composer-name` | `Example Composer` | Name recorded as the composition's composer |
 
@@ -289,9 +289,9 @@ The policies:
 
 - `required` builds the data points the template makes mandatory, a composition's context, and one member of each entry the content names, with the sections that lead to it, each with only its mandatory parts. Elsewhere it builds an optional list where the list holds a mandatory item, not where only the list's minimum item count asks for an item.
 - `medium` also builds every attribute the template constrains, with a member of each optional archetype under it whose content the template describes, and of a further use of one archetype only where that use holds another archetype.
-- `large` builds every attribute and a member of every optional archetype the template names, each of several uses of one archetype included, named or not.
+- `large` builds every attribute and a member of every optional archetype the template names, each of several uses of one archetype included, named or not. It builds two members of each node that may occur more than once, within the list's maximum item count. Where the template does not name them, it also writes a composition's `feeder_audit`, a context's `end_time`, `health_care_facility` and one participation, an entry's `provider` and one other participation, and an activity's `timing`.
 
-`required` and `medium` are the ITS-REST template example's `detail_level` levels of those names; `large` stops short of its `complete` level. Under every policy:
+`required` and `medium` are the ITS-REST template example's `detail_level` levels of those names. `large` is the SDK's `complete` level: the ITS-REST `complete` level shows every data point the template allows, as guidance, while every document `large` builds still meets the template and the RM. Under every policy:
 
 - No optional node is built whose only content the template leaves undescribed, such as a cluster that holds nothing but an open slot.
 - No optional structure is built that would hold no item, such as a protocol whose tree holds nothing but an open slot.
