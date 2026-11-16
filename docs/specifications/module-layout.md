@@ -16,7 +16,9 @@ The SDK **MUST** be published as the Go module `github.com/cadasto/openehr-sdk-g
 
 The path is all lowercase, matching idiomatic Go module naming and the GitHub organisation login, and consumer imports use this exact spelling.
 
-The path is locked. Renaming it is a change [§ REQ-004](#req-004--semantic-versioning) maps to major, and a rename **MUST** follow a deprecation cycle of at least one minor release. A patch release **MUST NOT** change the module path. The `/vN` suffix that REQ-004 requires for major versions v2 and beyond is Go's semantic import version of this same path, not a rename, so the deprecation cycle does not apply to it.
+The path is locked.
+Renaming it is a change [§ REQ-004](#req-004--semantic-versioning) maps to major, so no patch release makes it, and a rename **MUST** follow a deprecation cycle of at least one minor release.
+The `/vN` suffix that REQ-004 requires for major versions v2 and beyond is Go's semantic import version of this same path, not a rename, so the deprecation cycle does not apply to it.
 
 The module is licensed **MIT** ([licensing.md](../licensing.md)) and targets **Go 1.27.x**, tracking the current stable Go release line (N) as a deliberate project policy ([releases.md § Minimum Go version](../releases.md#minimum-go-version)).
 
@@ -48,7 +50,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `openehr/serialize/canxml/` | Canonical XML codec (REQ-056). |
 | `openehr/serialize/simplified/` | FLAT and STRUCTURED codecs (REQ-053). |
 | `openehr/validation/` | Validation interfaces and implementations: Composition vs OPT, demographic structural validation, AQL syntax / path resolution. |
-| `openehr/template/` | The ADL 1.4 operational template (OPT) path grammar (`ParsePath`) and the small types the compiled template shares (`Cardinality`, `Multiplicity`, `ArchetypeTerm`, `TermBinding`, `CodedTermRef`, the path errors), over types of its own: it imports nothing under `openehr/aom/` or `openehr/rm/` ([§ REQ-013](#req-013--building-block-independence)). OET (`.oet`) is out of scope for v1. |
+| `openehr/template/` | The ADL 1.4 operational template (OPT) path grammar (`ParsePath`) and the small types the compiled template shares (`Cardinality`, `Multiplicity`, `ArchetypeTerm`, `TermBinding`, `CodedTermRef`, the path errors), over types of its own: it imports nothing under `openehr/aom/` or `openehr/rm/` ([§ REQ-013](#req-013--building-block-independence)). OET (`.oet`) is out of scope. |
 | `openehr/template/constraints/` | Typed primitive constraint values of leaf template nodes (REQ-103). |
 | `openehr/templatecompile/` | Public compiled-template bridge (REQ-111): `Compile(opt)` turns an OPT read into the operational template model of `openehr/aom/aom14/` into the `Compiled` form the composition builder, instance synthesiser, validator, and AQL lint accept, with path lookup over it. Thin alias re-export over `internal/templatecompile`; sibling of `openehr/template/` because it needs `openehr/rm/rminfo` and the model ([ADR 0010](../adr/0010-public-compiled-template-bridge.md), [ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md)). |
 | `openehr/instance/` | Template-driven RM instance example generator (REQ-107). |
@@ -78,7 +80,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 
 ### Cadasto extras
 
-Application-specific layer. Shipped in the same module in v1 for adoption convenience; the `cadasto/` subtree is a single cut line for later conditional extraction (STRAND-08).
+Application-specific layer. Shipped in the same module for adoption convenience; the `cadasto/` subtree is a single cut line for later conditional extraction (STRAND-08).
 
 | Package | Scope |
 |---|---|
@@ -229,7 +231,17 @@ When adding to `internal/`:
 
 The SDK **MUST** follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Major versions `v2` and beyond **MUST** use Go's semantic-import-versioning convention (`…/v2/`).
 
-A release **MUST** take the highest bump that any of its changes maps to in the table below. For this table, a field added to an exported struct is not a breaking change, and that includes a slice, map, or function field. Callers still see three effects, and none of them changes the bump: positional struct literals no longer compile, which [idiom.md § Public-API stability](idiom.md#public-api-stability) tells consumers not to write; a slice, map, or function field makes the struct incomparable; a new field can clash with a promoted name. While on `v0.x`, a change the table maps to major takes a minor bump instead, and the release notes **MUST** name it.
+A release **MUST** take the highest bump that any of its changes maps to in the table below.
+While on `v0.x`, a change the table maps to major takes a minor bump instead, and the release notes **MUST** name it.
+
+Anything outside `internal/` is public surface for this table:
+
+- Renaming or removing a public symbol is a breaking change.
+- Loosening a return type, such as `(*X, error)` to `(any, error)`, is a breaking change even when the new type is a superset.
+- Adding a method to a public interface is a breaking change for a consumer that implements it, so the SDK prefers to add optional behaviour as a new interface, discovered by runtime type assertion.
+- Adding a field to an exported struct is not a breaking change, a slice, map or function field included.
+  Callers still see three effects, and none of them changes the bump: positional struct literals no longer compile; a slice, map or function field makes the struct incomparable; a new field can clash with a promoted name.
+  A caller **SHOULD** therefore write struct literals of SDK types with field names, because a positional one stops compiling when a field is added.
 
 | Change | Bump |
 |---|---|
@@ -249,10 +261,4 @@ A release **MUST** take the highest bump that any of its changes maps to in the 
 | Module path change ([§ REQ-001](#req-001--module-path)) | major, after a deprecation cycle |
 | Tightened validation: an input that passed now fails | major (a breaking change) |
 
-`v0.x` is in motion until the openEHR-core surface and conformance probe set stabilise. `v1.0.0` lands when:
-
-- Every REQ in [REQ.md](REQ.md) is `Impl. landed` or `retired` — the per-REQ axis, with `retired` terminal (it satisfies the gate rather than blocking it). `Status:` is a per-**file** promise per [README.md § Status header](README.md#status-header); promoting each spec file `Draft → Stable` is part of the cut, not a precondition for it.
-- The openEHR wire-conformance probe suite in `conformance.md` passes.
-- A reference openEHR deployment passes the probe suite.
-
-Major-version bumps are deliberate, not accidental — a `v0.x → v1.0.0` doc-only relicense or a missing import-path bump is a release defect.
+The `v1.0.0` gate is [releases.md § `v1.0.0` gate](../releases.md#v100-gate)'s.

@@ -403,14 +403,14 @@ On refresh failure:
   Until then `Token` returns the held token without a request.
   A successful renewal, or new tokens (a code exchange, `SetTokens`, `Revoke`, a new exchange), ends the backoff.
   Past `ExpiresAt`, a transient failure surfaces as `auth.ErrRefreshFailed` (`auth.ErrTokenExchangeFailed` in `auth/clientcreds` and `auth/jwtbearer`), so the consumer can retry.
-  In `auth/clientcreds` and `auth/jwtbearer`, an exchange that fails only because the context of the `Token` call that sent it ended returns that context's error and starts no backoff; [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026) says what the calls that joined it get.
+  In `auth/clientcreds` and `auth/jwtbearer`, an exchange that fails only because the context of the `Token` call that sent it ended starts no backoff; what that call and the calls that joined it get is [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026)'s.
   `Reauth` and `RefreshIfNeeded` do not wait for the backoff: they send their request at once and return its failure, and a token that `Reauth` marked for renewal is not served this way.
 - The expired token **MUST NOT** be used silently.
 - Concurrent `Token` calls on one source that find its token due for renewal **MUST** share one renewal request: with a rotating refresh token, a second request would present the refresh token the first already spent.
   The calls that share it get the same outcome, the held token included when a transient failure leaves it to be served.
 - In `auth/smart` the refresh request **MUST NOT** be ended by the context of the call that started it, so a refresh token the server has already rotated is installed and reported to the `WithTokenChange` hook even when that call gives up.
   The request runs for at most 30 seconds.
-  A call whose context ends before the refresh answers returns that context's error at once, and the other calls get the refresh's own result; [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026) covers a panic in it.
+  A call whose context ends before the refresh answers returns at once, with the error [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026) gives it, and the other calls get the refresh's own result; REQ-026 also covers a panic in the refresh.
   A refresh whose goroutine exits without an answer (`runtime.Goexit`) ends as a transient failure.
 
 If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return an error matching `auth.ErrReauthRequired`, so the consumer restarts the launch flow.
@@ -830,8 +830,7 @@ The discovery cache **MUST**:
   The declared TTL follows [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html): it is 0 when `Cache-Control` carries `no-store` or `no-cache`, else the `Cache-Control` `max-age` in seconds, else the time from `Date`, or from receipt without one, to `Expires`, where a past or invalid `Expires` declares 0; a TTL of 0 leaves the entry stale at once.
   When the response declares none, a default TTL applies, which **SHOULD** be 15 minutes, so a change a Platform makes to its document reaches its clients within that time.
 - Honour `ETag` / `If-None-Match` for conditional refresh: a `304 Not Modified` to a conditional request renews the cached entry's TTL from the TTL the `304` declares, or the default when it declares none, without replacing the body, and a `304 Not Modified` to a request without `If-None-Match` is a failed fetch ([§ Refresh API](#refresh-api)).
-- Coalesce concurrent resolution attempts as [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026) says: one caller fetches and the others wait.
-  A caller **MUST** get an error that `errors.Is` matches to its own context's error when that context ends while it waits on a fetch another caller started, or when its context's end alone fails the fetch it started.
+- Coalesce concurrent resolution attempts as [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026) says, which also gives the error of a caller whose own context ends: one caller fetches and the others wait.
   A failure that only the starting caller's context caused, or a panic in the fetch or in the `Cache` call that records its result, each part of the attempt REQ-026 names, **MUST NOT** make the resolver write or drop the cached entry, since it says nothing about the Platform.
 - Key every entry by the Platform base URL the caller resolved, never by the document's `issuer` ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).
   A cached catalog whose `BaseURL` is not the base URL it is found under **MUST** be treated as absent: the resolver fetches with a plain request, as on a miss, and the result replaces the entry.
