@@ -797,10 +797,15 @@ Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-
 
 **FLAT** is a single-level map of `path → primitive | object`.
 **STRUCTURED** is the same data as nested JSON keyed by the same segment `id`s, where every data value is wrapped in an **array** (even at cardinality `0..1` / `1..1`) and attribute suffixes appear as `|`-prefixed keys.
-A leaf's **bare** FLAT value is the array element itself; where the same leaf also carries `|`-suffixes or nested members (a DV_MULTIMEDIA's uri beside its mandatory `|mediatype`, a DV_TEXT beside `|formatting`, any bare leaf carrying a `_`-attribute, § REQ-140), that element **MUST** be an object whose `"|"` member holds the bare value: the `"|"+suffix` convention with the empty suffix the FLAT key itself spells.
-OPT-free interconversion reads and writes it as that empty suffix in both directions, which is what makes the mapping reversible without a template where `|value` would not be (DV_ORDINAL and DV_CODED_TEXT spell a real `|value`).
+A leaf's **bare** FLAT value is the array element itself.
+Where the same leaf also carries `|`-suffixes or nested members (a DV_MULTIMEDIA's uri beside its mandatory `|mediatype`, a DV_TEXT beside `|formatting`, any bare leaf carrying a `_`-attribute, § REQ-140), that element **MUST** be an object whose `|value` member holds the bare value, the reference implementation's spelling.
+Two values never share one member: where the leaf also carries a `|value` of its own, the bare value **MUST** stay the `"|"` member, the `"|"+suffix` convention with the empty suffix the FLAT key spells, and so **MUST** a null bare value, which OPT-free conversion carries as written.
+Decode **MUST** read the `|value`, `"|"` and `""` members as the bare value at every datatype that has one, and refuse two of them that disagree (§ REQ-170); DV_CODED_TEXT, DV_ORDINAL and DV_SCALE have no bare value, and their `|value` is their own.
+OPT-free STRUCTURED → FLAT stays safe without a template by leaving that choice to decode: it writes `"|"` and `""` as the bare key and `|value` as `x|value`, which FLAT decode reads by the leaf's datatype (*Input shorthands*, below).
+So STRUCTURED → FLAT → STRUCTURED gives back exactly every document encode writes, and FLAT → STRUCTURED → FLAT gives a bare value back as `x|value`, which decode reads alike wherever the datatype has a bare value.
+A bare value beside members where the datatype has none, which encode never writes, comes back as a `|value` the datatype reads as its own or not at all.
 The member appears only where the alternative is a scalar/object collision: a leaf carrying nothing but a bare value **MUST** stay a bare scalar, so a leaf that cannot collide is spelled identically either way.
-*Not corpus-pinned:* no vendored STRUCTURED body exercises the shape, so `"|"` is this specification's choice within the format's own conventions — the same standing as the DV_SCALE suffix set (§ REQ-140) — and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears.
+*Reference-pinned:* the reference implementation's template examples write `|value` here, so [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) makes it the spelling; `""` is another implementation's, and `"|"` the one earlier releases of this codec wrote.
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
 #### Composition-level metadata
@@ -967,7 +972,7 @@ Each applies at a **Web Template leaf** — reachable with no `_`-segment in the
 
 | Leaf datatype | Suffix set |
 |---|---|
-| DV_PARSABLE | bare value + `\|formalism`, both RM-mandatory, so a DV_PARSABLE at a leaf is always fully captured and never rides `\|raw`. Decode also reads the value spelled `\|value`, as the *Simplified Formats* spec lists it. Encode writes the bare value, except at INSTRUCTION `_wf_definition`, where it writes `\|value` (§ REQ-140). Its `_charset` / `_language` members are § REQ-140 rows |
+| DV_PARSABLE | bare value + `\|formalism`, both RM-mandatory, so a DV_PARSABLE at a leaf is always fully captured and never rides `\|raw`. Decode also reads the value spelled `\|value`, as the *Simplified Formats* spec lists it and *Input shorthands* below reads it at every datatype with a bare value. Encode writes the bare value, except at INSTRUCTION `_wf_definition`, where it writes `\|value` (§ REQ-140). Its `_charset` / `_language` members are § REQ-140 rows |
 | DV_MULTIMEDIA | the bare key is the **`uri`** (a plain DV_URI); `\|mediatype` and `\|size` are RM-mandatory; `\|data` and `\|integrity_check` carry the base64 of the RM's `Byte[]`; `\|alternatetext`, `\|integrity_check_algorithm`, `\|compression_algorithm` optional. Note the reference's spellings: `\|mediatype` and `\|alternatetext` carry no underscore where the RM attribute does. Its `_charset` / `_language` / `_thumbnail` members are § REQ-140 rows, and the bare-code rule for its three CODE_PHRASE-valued attributes is § REQ-140's *DV_MULTIMEDIA coded attributes* behavioural rule |
 | STRING | bare value only: a JSON string carrying the RM `String` as written, with no suffix. The Web Template gives one RM `String` attribute a leaf of its own, the in-context ACTIVITY `action_archetype_id`, which is RM-mandatory; the reference writes it at the leaf's bare key (`…/current_activity/action_archetype_id: "/openEHR-EHR-CLUSTER.conformance_action.v0/"` in the PROBE-086 corpus). Decode refuses an empty one, and encode leaves it out (*A value its RM class forbids*, above) |
 | DV_INTERVAL&lt;T&gt; | not a suffix set at all: the § REQ-140 **interval grammar** (`_normal_range`'s row and the *Interval boundary flags* rule govern it in both positions), anchored on the bound datatype the Web Template names inside the angle brackets (`DV_INTERVAL<DV_QUANTITY>`, …), the only place the anchor can come from. `/lower` and `/upper` are not Web Template children, so the leaf's own keys reach no node and the codec resolves them against the leaf itself. A value of another type rides `\|raw` at the leaf, as at every other leaf, and decode reads a `\|raw` there as the whole value, refusing it beside the interval's own keys |
@@ -975,7 +980,8 @@ Each applies at a **Web Template leaf** — reachable with no `_`-segment in the
 ##### Input shorthands
 
 The *Simplified Formats* spec lets a client leave out two suffixes.
-Decode **MUST** read a `DV_IDENTIFIER`'s bare value as its `|id` ("For the input |id might be left out"), and a `DV_TEXT`'s `|value`, where no `|code` selects a `DV_CODED_TEXT`, as its bare value, wherever the datatype is read.
+Decode **MUST** read a `DV_IDENTIFIER`'s bare value as its `|id` ("For the input |id might be left out"), wherever the datatype is read.
+Decode **MUST** read `|value` as the bare value of every datatype that has one, wherever the datatype is read: a `DV_TEXT`'s where no `|code` selects a `DV_CODED_TEXT`, and a STRUCTURED bare value beside its leaf's members (§ REQ-053, above).
 Two spellings of one value that disagree are refused (§ REQ-170).
 Encode writes `|id` and the bare value.
 
@@ -1111,7 +1117,7 @@ STRUCTURED carries the same vocabulary as nested members (`_`-keys as object mem
 
 **DV_SCALE** takes the `DV_ORDINAL` suffix set — `|code` + `|value` + `|ordinal`, with `|ordinal` carrying DV_SCALE's **Real** `value`.
 The two classes differ only in that value's type, so decode **MUST** read, and encode write, the same three keys at a `DV_SCALE` leaf as at a `DV_ORDINAL` one.
-*Not corpus-pinned:* no vendored body and no reference sample spells a `DV_SCALE`, so this is this codec's choice within the format's conventions — the same standing as the STRUCTURED `"|"` member — and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears.
+*Not corpus-pinned:* no vendored body and no reference sample spells a `DV_SCALE`, so this is this codec's choice within the format's conventions, and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears.
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
 #### Interval boundary flags

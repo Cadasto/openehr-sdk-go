@@ -730,34 +730,38 @@ back** before re-encoding (so an underscore value the canonical form does not mo
 survive), the deliberate refusals with the sentinel each boundary declares, and the STRUCTURED
 vocabulary as array-valued members.
 
-**A bare leaf value beside the same leaf's members: the `"|"` STRUCTURED member — closed
-2026-08-05 (REQ-140 Phase C3).** STRUCTURED gives one array element per FLAT segment, and
-that element is *either* the leaf's bare value or an object holding the segment's members —
-so a leaf spelled bare that also carries a `|suffix` (`…/dv_text` + `|formatting`), an
-underscore family (`…/dv_count/_normal_range/lower`, C0's `…/dv_count/_uid`) or a sub-path
-needs both at once, and `FlatToStructured` used to **refuse**, loudly. The bare value now
-takes the `"|"` member on that object: the `"|"+suffix` convention with the empty suffix the
-FLAT key itself spells, which makes the inverse mapping unambiguous **without** an OPT —
-`"|value"` would not be, since DV_ORDINAL and DV_CODED_TEXT spell a real `|value`. A leaf
-carrying nothing but a bare value stays a bare scalar, so every STRUCTURED body this codec
-emitted before C3 is byte-identical. Phase C3 forced the closure rather than choosing it: a
-DV_MULTIMEDIA leaf always carries a bare uri *and* RM-mandatory `|mediatype` / `|size`, so
-without a spelling it could not interconvert at all and two green PROBE-076 legs would have
-turned red. Round-tripped both ways in `structured_test.go`
-(`TestBareLeafBesideMembersThroughStructured`, `TestBareStructuredMemberIsTheEmptySuffix`) for
-every shape that used to collide. **Not corpus-pinned:** no vendored STRUCTURED fixture
-exercises the shape, so `"|"` is this codec's choice within the format's own conventions, and
-wire.md § REQ-053 states it normatively as such — the object form, the empty-suffix reading in
-both interconversion directions, and the bare-scalar rule for a leaf that cannot collide.
+**A bare leaf value beside the same leaf's members: the `|value` STRUCTURED member — closed
+2026-08-05 (REQ-140 Phase C3), respelled 2026-11-16 (issue 454).** STRUCTURED gives one array
+element per FLAT segment, and that element is *either* the leaf's bare value or an object
+holding the segment's members — so a leaf spelled bare that also carries a `|suffix`
+(`…/dv_text` + `|formatting`), an underscore family (`…/dv_count/_normal_range/lower`, C0's
+`…/dv_count/_uid`) or a sub-path needs both at once, and `FlatToStructured` used to
+**refuse**, loudly. Phase C3 forced a spelling, since a DV_MULTIMEDIA leaf always carries a
+bare uri *and* RM-mandatory `|mediatype` / `|size`, and chose the `"|"` member, the
+`"|"+suffix` convention with the empty suffix. No reference CDR reads it: the reference
+implementation's template examples write `|value`, and another CDR writes `""`. Encode now
+writes `|value`, the reference's spelling ([ADR 0014](../../../docs/adr/0014-webtemplate-reference-implementation-lock.md)),
+and keeps `"|"` in two places: beside a `|value` of the leaf's own, so two values never share
+a member, and for a null bare value, which OPT-free conversion carries as written. Decode reads
+`|value`, `"|"` and `""` as the bare value at every datatype that has one, and refuses two
+that disagree. OPT-free STRUCTURED → FLAT writes `|value` as `x|value`, which the FLAT decode
+reads as the bare value of every datatype that has one and as the own `|value` of
+DV_CODED_TEXT, DV_ORDINAL and DV_SCALE, so the template decides at decode what the conversion
+cannot. A leaf carrying nothing but a bare value stays a bare scalar. Pinned in
+`structured_bare_value_test.go` against the `Test_dv_parsable_open_constraint` and
+`Test_dv_multimedia_open_constraint` corpus templates, in `bare_value_internal_test.go` at
+every datatype with a bare value, and round-tripped both ways in `structured_test.go`
+(`TestBareLeafBesideMembersThroughStructured`, `TestBareStructuredMemberIsTheValueSuffix`).
+wire.md § REQ-053 states it normatively.
 
 **DV_SCALE takes the DV_ORDINAL suffix set — CLOSED 2026-08-06 (PR #89 review).** DV_SCALE
 is DV_ORDINAL with a Real `value`, and was the one `DV_*` with no `capturedKeys` and no
 `allowedSuffixes` entry: it rode `|raw` on encode and its suffix form was *refused* on decode,
 an unregistered gap rather than a decision. It now takes `|code` + `|value` + `|ordinal`,
 `|ordinal` carrying the Real. **Not corpus-pinned:** no vendored body and no reference sample
-spells a DV_SCALE, so — like the `"|"` member above — this is this codec's choice within the
-format's conventions; reusing the sibling's spelling for the sibling's attribute is the same
-move the party `|type` suffix makes. Should a reference sample later spell it otherwise,
+spells a DV_SCALE, so this is this codec's choice within the format's conventions; reusing the
+sibling's spelling for the sibling's attribute is the same move the party `|type` suffix makes.
+Should a reference sample later spell it otherwise,
 [ADR 0014](../../../docs/adr/0014-webtemplate-reference-implementation-lock.md) means the
 reference wins. No census movement: DV_SCALE appears in no fixture.
 
