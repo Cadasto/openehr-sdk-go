@@ -11,10 +11,14 @@ package validation_test
 // one.
 //
 // The walk writes the path of each finding it reports, and that path grows
-// with the member's depth however the report came. So each call validates
-// the spine without its leaves: the call reads the whole report into the
-// trie it threads down the walk, and the walk reads that trie down the
-// spine, but it reaches no reported member and writes no path.
+// with the member's depth however the report came. So the tests of reading
+// the report validate the spine without its leaves: the call reads the whole
+// report into the trie it threads down the walk, and the walk reads that trie
+// down the spine, but it reaches no reported member and writes no path. The
+// last test validates the whole document, leaves included, and compares what
+// the deep call allocates with the length of the paths it reports: the walk
+// writes the path of each reported member once, for the issue that reports
+// it.
 
 import (
 	"strings"
@@ -44,20 +48,29 @@ func folderSpine(depth, leaves int, leaf string) []byte {
 	return []byte(b.String())
 }
 
-// reportedFolderPointers returns the pointers canjson's WithMissing option
-// passes for a FOLDER nested depth deep whose innermost folder holds leaves
-// FOLDERs, each missing its name, and that FOLDER's spine decoded without
-// them.
-func reportedFolderPointers(t *testing.T, depth, leaves int) ([]canjson.Pointer, *rm.Folder) {
+// reportedFolder returns the pointers canjson's WithMissing option passes
+// for a FOLDER nested depth deep whose innermost folder holds leaves
+// FOLDERs, each missing its name, and that FOLDER as decoded, leaves
+// included.
+func reportedFolder(t *testing.T, depth, leaves int) ([]canjson.Pointer, *rm.Folder) {
 	t.Helper()
 	var pointers []canjson.Pointer
 	keep := canjson.WithMissing(func(p canjson.Pointer) { pointers = append(pointers, p) })
-	if err := canjson.Unmarshal(folderSpine(depth, leaves, `{"_type":"FOLDER","archetype_node_id":"a"}`), new(rm.Folder), keep); err != nil {
+	folder := new(rm.Folder)
+	if err := canjson.Unmarshal(folderSpine(depth, leaves, `{"_type":"FOLDER","archetype_node_id":"a"}`), folder, keep); err != nil {
 		t.Fatalf("canjson.Unmarshal(depth %d, WithMissing) = %v, want nil", depth, err)
 	}
 	if len(pointers) != leaves {
 		t.Fatalf("canjson.Unmarshal(depth %d) reported %d members, want %d", depth, len(pointers), leaves)
 	}
+	return pointers, folder
+}
+
+// reportedFolderPointers returns the pointers [reportedFolder] returns and
+// that FOLDER's spine decoded without the leaves.
+func reportedFolderPointers(t *testing.T, depth, leaves int) ([]canjson.Pointer, *rm.Folder) {
+	t.Helper()
+	pointers, _ := reportedFolder(t, depth, leaves)
 	spine := new(rm.Folder)
 	if err := canjson.Unmarshal(folderSpine(depth, 0, ""), spine); err != nil {
 		t.Fatalf("canjson.Unmarshal(the spine of depth %d) = %v, want nil", depth, err)
@@ -179,5 +192,54 @@ func TestWithMissingPointers_REQ112_MeetsASharedParentOnce(t *testing.T) {
 	if high > factor*low {
 		t.Errorf("WithMissingPointers(%d members) asks for %d parents at depth %d and %d at depth %d, want at most %d times as many",
 			leaves, low, shallow, high, deep, factor)
+	}
+}
+
+// TestWithMissingPointers_REQ112_WritesEachReportedPathOnce pins that the walk
+// writes the path of each reported member it reports as missing once, for
+// the issue that reports it, though it also records that path to withdraw
+// the findings at or below it. Across two depths of the spine, the bytes the
+// call allocates grow by about the bytes the reported paths grow by; a second
+// copy of each path would double them.
+func TestWithMissingPointers_REQ112_WritesEachReportedPathOnce(t *testing.T) {
+	const (
+		leaves  = 1000
+		shallow = 2
+		deep    = 250
+		// factor bounds the growth of the bytes allocated against the growth
+		// of the bytes of the reported paths. A path is written into an
+		// allocation of the next size class up, about a tenth longer at the
+		// deep depth; writing each path twice gives about twice as many.
+		factor = 1.5
+	)
+	measure := func(depth int) (allocated uint64, written int) {
+		pointers, folder := reportedFolder(t, depth, leaves)
+		var r validation.Result
+		allocated = leastAllocated(func() {
+			r = validation.ValidateRM(folder, validation.WithMissingPointers(pointers))
+		})
+		if len(r.Issues) != leaves {
+			t.Fatalf("ValidateRM(depth %d, WithMissingPointers of %d members) reports %d issues, want one for each member: %q", depth, leaves, len(r.Issues), issueKeys(r.Issues))
+		}
+		for _, iss := range r.Issues {
+			if iss.Code != "required" || !strings.HasSuffix(iss.Path, "/name") {
+				t.Fatalf("ValidateRM(depth %d, WithMissingPointers) issue %q at %s, want required at a leaf's name: the default limits cut no walk at this depth", depth, iss.Code, iss.Path)
+			}
+			written += len(iss.Path)
+		}
+		return allocated, written
+	}
+	lowAllocated, lowWritten := measure(shallow)
+	highAllocated, highWritten := measure(deep)
+	if highAllocated <= lowAllocated || highWritten <= lowWritten {
+		t.Fatalf("ValidateRM(WithMissingPointers of %d members) allocates %d bytes and reports %d bytes of paths at depth %d, %d and %d at depth %d, want both to grow with the depth",
+			leaves, lowAllocated, lowWritten, shallow, highAllocated, highWritten, deep)
+	}
+	grown, longer := highAllocated-lowAllocated, highWritten-lowWritten
+	ratio := float64(grown) / float64(longer)
+	t.Logf("depth %d to %d: %d more bytes allocated for %d more bytes of reported paths, %.2f times as many", shallow, deep, grown, longer, ratio)
+	if ratio > factor {
+		t.Errorf("ValidateRM(WithMissingPointers of %d members) allocates %d more bytes at depth %d than at depth %d for %d more bytes of reported paths, %.2f times as many, want at most %.1f: the path of each reported member is written once",
+			leaves, grown, deep, shallow, longer, ratio, factor)
 	}
 }

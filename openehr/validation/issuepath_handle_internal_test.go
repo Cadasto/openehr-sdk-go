@@ -1,16 +1,17 @@
 package validation
 
 // issuepath_handle_internal_test.go: REQ-102 § Issue paths — the issue
-// paths the walk writes only when something records them. The path rule's
-// own cases are in issuepath_internal_test.go; these hold that the handle of
-// a node's path writes the path by that rule, and that the ways the walk
-// applies the rule, counting a long list's ids into maps and a short one's
-// by a scan, give the same predicates.
+// paths the walk writes only when something records them, and once. The path
+// rule's own cases are in issuepath_internal_test.go; these hold that the
+// handle of a node's path writes the path by that rule, and that the ways
+// the walk applies the rule, counting a long list's ids into maps and a
+// short one's by a scan, give the same predicates.
 
 import (
 	"fmt"
 	"slices"
 	"testing"
+	"unsafe"
 )
 
 // byID, byName and byPosition return the predicate of an item written by its
@@ -166,6 +167,56 @@ func TestIssuePath_REQ102_KeepsItsStepsWhileTheWalkGoesDeeper(t *testing.T) {
 	}
 	if got, want := content.String(), "/content"; got != want {
 		t.Errorf("the content's path after the walk visited below it = %q, want %q", got, want)
+	}
+}
+
+// A handle writes its path once: a second String of the handle returns the
+// string the first wrote, so whatever keeps the path twice, a reported
+// member's absence and the issue that reports it, shares one string. A step
+// the walk replaces at a depth gives the handle that replaces it its own
+// path, never the string written for the step it replaced, and a sub-path of
+// a handle is still written in full.
+func TestIssuePath_REQ102_WritesAPathOnce(t *testing.T) {
+	var s pathStack
+	content := s.attribute(issuePath{}, "content")
+	items := s.attribute(s.item(content, byPosition(1)), "items")
+	first, again := items.String(), items.String()
+	if first != "/content[1]/items" || again != first {
+		t.Fatalf("the path of items written twice = %q and %q, want %q both times", first, again, "/content[1]/items")
+	}
+	if unsafe.StringData(again) != unsafe.StringData(first) {
+		t.Errorf("the path of items written twice = %q at %p and at %p, want one string", first, unsafe.StringData(first), unsafe.StringData(again))
+	}
+	if got, want := items.join("/name"), "/content[1]/items/name"; got != want {
+		t.Errorf("a sub-path of items once its path is written = %q, want %q", got, want)
+	}
+	if got, want := (issuePath{}).String(), "/"; got != want {
+		t.Errorf("the root's path = %q, want %q", got, want)
+	}
+
+	// Each replacement below takes the place of a step whose path was
+	// written, at its depth or above it.
+	tests := []struct {
+		name string
+		push func() issuePath
+		want string
+	}{
+		{name: "the next attribute of the item", push: func() issuePath { return s.attribute(s.item(content, byPosition(1)), "name") }, want: "/content[1]/name"},
+		{name: "the same attribute of the next item", push: func() issuePath { return s.attribute(s.item(content, byPosition(2)), "items") }, want: "/content[2]/items"},
+		{name: "the next item", push: func() issuePath { return s.item(content, byID("at0001")) }, want: "/content[at0001]"},
+		{name: "the next attribute of the root", push: func() issuePath { return s.attribute(issuePath{}, "context") }, want: "/context"},
+		{name: "the same attribute below the next attribute of the root", push: func() issuePath {
+			return s.attribute(s.item(s.attribute(issuePath{}, "context"), byPosition(1)), "items")
+		}, want: "/context[1]/items"},
+	}
+	for _, tc := range tests {
+		p := tc.push()
+		if got := p.String(); got != tc.want {
+			t.Errorf("%s: the path = %q, want %q", tc.name, got, tc.want)
+		}
+		if got := p.String(); got != tc.want {
+			t.Errorf("%s: the path written again = %q, want %q", tc.name, got, tc.want)
+		}
 	}
 }
 
