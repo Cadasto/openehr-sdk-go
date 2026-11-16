@@ -17,7 +17,9 @@ import (
 // the policy builds is added (under instance.Medium, a member of each
 // optional archetype under an attribute, and of a further use of one where
 // that use holds another archetype; under instance.Large, also one of
-// every use of an archetype; under instance.Required, a member of each
+// every use of an archetype, two of each that may occur more than once and
+// a fixed set of optional RM attributes the template does not name; under
+// instance.Required, a member of each
 // entry the content names, with only its mandatory parts),
 // and primitive leaves carry ExampleValue defaults, so the resulting tree
 // is valid against `validation.ValidateComposition`.
@@ -42,7 +44,9 @@ func NewSkeleton(ctx context.Context, c *templatecompile.Compiled, opts ...Optio
 
 // newSkeleton is NewSkeleton on the options cfg holds. NewSkeleton passes
 // the zero Policy, the instance package's default, when no WithPolicy is
-// given; NewBuilder passes Large in that case.
+// given; NewBuilder passes Large in that case, and a ctx marked as the
+// builder's seed (builderseed), on which instance.Generate builds Large
+// short of its second members and optional RM attributes.
 func newSkeleton(ctx context.Context, c *templatecompile.Compiled, cfg *config) (*rm.Composition, error) {
 	if c == nil || c.Root() == nil {
 		return nil, instance.ErrNilCompiled

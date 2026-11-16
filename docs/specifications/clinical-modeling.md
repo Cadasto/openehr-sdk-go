@@ -1371,7 +1371,7 @@ Two entry points:
 
 1. **`NewSkeleton(ctx, c, opts...) (*rm.Composition, error)`** — produces a structurally-conformant default composition whose leaves hold REQ-107's example values.
    Delegates to `instance.Generate` with the policy `WithPolicy` selects, `Medium`, the instance package's default, when none is given, and unwraps the root via `instance.AsComposition`.
-2. **`NewBuilder(ctx, c, opts...) (*Builder, error)`** — seeds a `Builder` from a `Large` skeleton, then accepts `Set(path, value)` calls.
+2. **`NewBuilder(ctx, c, opts...) (*Builder, error)`** — seeds a `Builder` from a `Large` skeleton short of its repeats and its optional RM attributes (*Skeleton policy* below), then accepts `Set(path, value)` calls.
    `Build()` returns the populated graph and aggregates per-path errors.
 
 ### Contract
@@ -1384,6 +1384,11 @@ Two entry points:
 - **Skeleton policy** — `WithPolicy(p)` selects the [§ REQ-107](#req-107--template-driven-rm-instance-example-generator) `instance.Policy` the entry point passes to `instance.Generate`.
   With no `WithPolicy`, `NewSkeleton` **SHOULD** use `Medium`, the zero value, so a skeleton holds what `instance.Generate` builds from default `Options`, and `NewBuilder` `Large`, the one policy it accepts, for the reason below.
   `Set` routes a value into a node the skeleton already holds and does not build a missing one, so it needs a member of every optional archetype and of every named use of one, which only `Large` builds.
+  `NewBuilder` **MUST** seed a `Builder` with what `Large` builds short of two parts ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator)):
+  - the second member `Large` gives a node that may occur more than once, so each node gets `max(occurrences.lower, 1)` members (*Members of a list*);
+  - the optional RM attributes `Large` writes where the OPT does not name them (*Optional RM attributes under `Large`*).
+
+  It asks the generator for that skeleton through a switch only this module's packages can set, so neither `instance.Options` nor the composition options carry it.
   A later use of one identity that pins no name ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *What a visit writes*: its archetype id or `node_id`) has the compiled path of the first, so `Set` reaches the first use's member alone, and the member `Large` builds for the later use keeps the values the skeleton gave it.
   `NewSkeleton` and `NewBuilder` **MUST** accept and refuse the policy `WithPolicy` gives as this table says, a refusal returning no skeleton or `Builder`, before either builds a skeleton:
 

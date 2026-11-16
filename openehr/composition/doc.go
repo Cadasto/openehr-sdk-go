@@ -23,8 +23,12 @@
 // mandatory, a composition's context and each entry the content names,
 // with only its mandatory parts, and
 // `WithPolicy(instance.Large)` one with a member of every optional
-// archetype and of every use of one. NewBuilder builds on instance.Large
-// when no WithPolicy is given, and refuses Medium and Required with
+// archetype and of every use of one, two of each that may occur more than
+// once, and a fixed set of optional RM attributes the template does not
+// name. NewBuilder builds on instance.Large when no WithPolicy is given,
+// short of those second members and RM attributes: its skeleton holds one
+// member of every optional archetype and of every use of one, the nodes Set
+// routes values into. It refuses Medium and Required with
 // [ErrUnsupportedPolicy], because Set needs a member of every optional
 // archetype and of every use of one, which only Large builds. Both entry
 // points refuse a Policy value the instance package does not define with

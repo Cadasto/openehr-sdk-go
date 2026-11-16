@@ -77,15 +77,19 @@ func WithNow(t time.Time) Option {
 // builds a member of each optional archetype under an attribute, and of a
 // further use of one only where that use holds another archetype.
 // instance.Large builds a member of every optional archetype the template
-// names and of every use of one, the nodes Set needs to route a value
-// into, and instance.Required builds what the template makes mandatory, a
+// names and of every use of one, two of each that may occur more than
+// once, and a fixed set of optional RM attributes the template does not
+// name, and instance.Required builds what the template makes mandatory, a
 // composition's context and each entry the content names, with only its
 // mandatory parts; instance.Complete and
 // instance.Minimal are other names for Large and Required. NewSkeleton
 // accepts the three. NewBuilder builds on
 // Large when no WithPolicy is given and accepts only Large, since Set does
 // not build a node the skeleton lacks: it refuses an explicit
-// WithPolicy(instance.Medium), though Medium is the zero value. Each
+// WithPolicy(instance.Medium), though Medium is the zero value. Its
+// skeleton is Large short of the second members and those RM attributes:
+// one member of every optional archetype and of every use of one, the nodes
+// Set routes a value into. Each
 // returns ErrUnsupportedPolicy for a Policy value it does not accept, and
 // for one the instance package does not define an error that also wraps
 // instance.ErrUnsupportedPolicy.

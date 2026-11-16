@@ -65,12 +65,15 @@ type pendingAssignment struct {
 // not build a missing one, so the skeleton must carry a member of every
 // optional archetype the template names, which only instance.Large builds.
 // NewBuilder builds on instance.Large when no WithPolicy is given, and
-// accepts only instance.Large. It refuses instance.Medium and
-// instance.Required, naming the policy, and any Policy value the instance
-// package does not define, before generating anything, with an error
-// wrapping ErrUnsupportedPolicy and no Builder. Only the refusal of an
-// undefined value also wraps instance.ErrUnsupportedPolicy, since the
-// instance package defines Medium and Required.
+// accepts only instance.Large. Its skeleton is Large short of the second
+// member Large gives a node that may occur more than once and of the
+// optional RM attributes Large writes where the template names none: one
+// member of every optional archetype and of every use of one. It refuses
+// instance.Medium and instance.Required, naming the policy, and any Policy
+// value the instance package does not define, before generating anything,
+// with an error wrapping ErrUnsupportedPolicy and no Builder. Only the
+// refusal of an undefined value also wraps instance.ErrUnsupportedPolicy,
+// since the instance package defines Medium and Required.
 func NewBuilder(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*Builder, error) {
 	if c == nil {
 		// Wrap instance.ErrNilCompiled (the sentinel NewSkeleton /
