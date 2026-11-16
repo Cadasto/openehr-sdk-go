@@ -19,7 +19,7 @@ These files are the SDK's source of truth for the openEHR Reference Model, Arche
 | `openehr_lang_1.1.0.bmm.json` | `openehr_lang_1.1.0` | 2.4 | 86 | base 1.3.0 | **deferred** (reference only) | LANG types: BMM meta-model + `P_BMM` persistence classes. Used as documentation while `openehr/bmm/` is hand-written. |
 | `openehr_term_3.1.0.bmm.json` | `openehr_term_3.1.0` | — | (terminology service interface) | — | **deferred** | Terminology service interface |
 
-**Primary** files drive v1 code generation, each target through its root schema under [`sdk/`](#sdk-authored-root-schemas-sdk). **Deferred** files stay here and are not removed. They are kept for future generation phases or as cross-references. See [`../../docs/specifications/scope.md`](../../docs/specifications/scope.md#out-of-scope-v1) and [`../../docs/specifications/reference-model.md § v1 scope summary`](../../docs/specifications/reference-model.md#v1-scope-summary).
+**Primary** files drive v1 code generation, each target through its root schema under [`sdk/`](#sdk-authored-root-schemas-sdk). **Deferred** files stay here and are not removed. They are kept for future generation phases or as cross-references. See [`../../docs/specifications/scope.md`](../../docs/specifications/scope.md#out-of-scope-v1) and [`../../docs/specifications/reference-model.md § The BMM substrate`](../../docs/specifications/reference-model.md#the-bmm-substrate).
 
 Schema dependencies (transitive `includes`):
 
