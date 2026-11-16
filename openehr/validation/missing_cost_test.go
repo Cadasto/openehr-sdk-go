@@ -209,7 +209,9 @@ func TestWithMissingPointers_REQ112_WritesEachReportedPathOnce(t *testing.T) {
 		// factor bounds the growth of the bytes allocated against the growth
 		// of the bytes of the reported paths. A path is written into an
 		// allocation of the next size class up, about a tenth longer at the
-		// deep depth; writing each path twice gives about twice as many.
+		// deep depth, and the call reads the longer spine of the report too:
+		// about 1.2 times as many bytes in all. Writing each path twice gives
+		// about 2.3 times as many.
 		factor = 1.5
 	)
 	measure := func(depth int) (allocated uint64, written int) {

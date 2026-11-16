@@ -11,9 +11,9 @@ import (
 // item of a multi-valued attribute in [Issue.Path], with a template and
 // without one, and the handle the walk carries for the path of each node
 // and attribute it visits, which writes the path only when something keeps
-// it. The template rules (walk_composition.go) and the RM rules (rmfloor.go)
-// report at the paths the walk writes, so one node gets one path whichever
-// of them reports it.
+// it, and once. The template rules (walk_composition.go) and the RM rules
+// (rmfloor.go) report at the paths the walk writes, so one node gets one
+// path whichever of them reports it.
 
 // pathItem is what the path rule reads of one item of a multi-valued
 // attribute.
@@ -61,7 +61,9 @@ type predicate struct {
 // as a string: the root's path when n is 0, the first n steps below the root
 // otherwise. The walk writes the string only when something keeps the path
 // ([issuePath.String]), so that the paths of the nodes nothing reports at
-// are never written.
+// are never written, and writes it once: the string is kept on the path's
+// last step, so that whatever else keeps the same path, such as the record
+// of a reported member's absence and the issue that reports it, shares it.
 //
 // A handle is valid only during the visit that pushed its last step. The
 // walk replaces the step at a depth when it moves on to the next attribute
@@ -96,6 +98,12 @@ type pathStep struct {
 	// isItem marks the step of an item, set only by [pathStack.item]; the
 	// step of an attribute is told apart by it, never by an empty attr.
 	isItem bool
+	// text is the path through the step, as [issuePath.String] wrote it for
+	// the handle whose last step this is, or "" until it does; no path is
+	// empty. A step is pushed new, with no text ([pathStack.attribute],
+	// [pathStack.item]), so the text never outlives the step it was written
+	// for.
+	text string
 }
 
 // attribute returns the path of the attribute name of the node at p, which
@@ -116,9 +124,18 @@ func (s *pathStack) item(p issuePath, pred predicate) issuePath {
 
 // String writes the path: "/" for the root, "/name" for an attribute of the
 // root, parent + "/name" for an attribute of any other node, and the path of
-// its attribute followed by its predicate for an item.
+// its attribute followed by its predicate for an item. It writes the path of
+// a step once and keeps it on the step ([pathStep].text): a later call for
+// the same step returns the same string.
 func (p issuePath) String() string {
-	return p.join()
+	if p.n == 0 {
+		return "/"
+	}
+	last := &p.stack.steps[:p.n][p.n-1]
+	if last.text == "" {
+		last.text = p.join()
+	}
+	return last.text
 }
 
 // join writes the path with segments appended in order, in one step; the
