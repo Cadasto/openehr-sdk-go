@@ -290,6 +290,98 @@ func TestREQ053StartTimeValueIsTheStartTime(t *testing.T) {
 	}
 }
 
+// TestREQ140EndTimeValueIsTheEndTime — REQ-140, REQ-053: EVENT_CONTEXT's
+// `_end_time` is a DV_DATE_TIME, a datatype with a bare value, so its `|value`
+// spells that value again, in FLAT, with the `:0` OPT-free conversion writes,
+// and as a STRUCTURED `|value` member. Each decodes under strict to what the
+// bare key decodes to; beside an equal bare key it is read once, and beside
+// one of another value the pair is refused in every mode with ErrUnknownPath
+// naming both keys and neither value.
+func TestREQ140EndTimeValueIsTheEndTime(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const endTime = "2021-12-21T15:19:31.649613+01:00"
+	key := rmattrContext + "/_end_time"
+	want, err := UnmarshalFlat(mustJSON(t, rmattrBody(map[string]any{key: endTime})), wt, WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalFlat(bare key, strict) = %v", err)
+	}
+	if want.Context == nil || want.Context.EndTime == nil || want.Context.EndTime.Value != endTime {
+		t.Fatalf("fixture: the bare key decodes to context %+v, want end_time %s", want.Context, endTime)
+	}
+	for name, keys := range map[string]map[string]any{
+		"|value":               {key + "|value": endTime},
+		":0|value":             {key + ":0|value": endTime},
+		"bare and equal|value": {key: endTime, key + "|value": endTime},
+	} {
+		body := rmattrBody(keys)
+		t.Run("FLAT/"+name, func(t *testing.T) {
+			got, err := UnmarshalFlat(mustJSON(t, body), wt, WithStrict())
+			if err != nil {
+				t.Fatalf("UnmarshalFlat(%v, strict) = %v", keys, err)
+			}
+			if !bytes.Equal(canonical(t, got), canonical(t, want)) {
+				t.Errorf("UnmarshalFlat(%v) =\n%s\nwant what the bare key decodes to\n%s", keys, canonical(t, got), canonical(t, want))
+			}
+		})
+		t.Run("STRUCTURED/"+name, func(t *testing.T) {
+			doc, err := FlatToStructured(mustJSON(t, body))
+			if err != nil {
+				t.Fatalf("FlatToStructured = %v", err)
+			}
+			got, err := UnmarshalStructured(doc, wt, WithStrict())
+			if err != nil {
+				t.Fatalf("UnmarshalStructured(%s, strict) = %v", doc, err)
+			}
+			if !bytes.Equal(canonical(t, got), canonical(t, want)) {
+				t.Errorf("UnmarshalStructured(%s) =\n%s\nwant what the bare key decodes to\n%s", doc, canonical(t, got), canonical(t, want))
+			}
+		})
+	}
+
+	differ := rmattrBody(map[string]any{key: "2021-12-21T15:19:31+01:00", key + "|value": "2020-01-01T00:00:00Z"})
+	err = refusedInEveryMode(t, wt, differ)
+	if !errors.Is(err, ErrUnknownPath) {
+		t.Errorf("decode of a bare key and |value that disagree = %v, want ErrUnknownPath", err)
+	}
+	for _, k := range []string{key, key + "|value"} {
+		if !strings.Contains(err.Error(), strconv.Quote(k)) {
+			t.Errorf("decode = %v, want it to name %q", err, k)
+		}
+	}
+	for _, v := range []string{"2021-12-21", "2020-01-01"} {
+		if strings.Contains(err.Error(), v) {
+			t.Errorf("decode = %v carries a value", err)
+		}
+	}
+}
+
+// TestREQ140UnderscoreValueSpellsTheBareValueOfADataValueOnly — REQ-140,
+// REQ-053: a `_`-attribute whose value is a data value with a bare value reads
+// its `|value` as that value, as the temporal `_accuracy`, a DV_DURATION, does;
+// `_uid` and `_location`, a UID and a String rather than data values, have no
+// `|value`, which is unmatched content there.
+func TestREQ140UnderscoreValueSpellsTheBareValueOfADataValueOnly(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	accuracy := rmattrDateTime + "/_accuracy"
+	want, err := UnmarshalFlat(mustJSON(t, rmattrBody(map[string]any{rmattrDateTime: "2022-01-12T13:22:34+01:00", accuracy: "PT1S"})), wt, WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalFlat(bare _accuracy, strict) = %v", err)
+	}
+	got, err := UnmarshalFlat(mustJSON(t, rmattrBody(map[string]any{rmattrDateTime: "2022-01-12T13:22:34+01:00", accuracy + "|value": "PT1S"})), wt, WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalFlat(_accuracy|value, strict) = %v", err)
+	}
+	if !bytes.Equal(canonical(t, got), canonical(t, want)) {
+		t.Errorf("UnmarshalFlat(_accuracy|value) =\n%s\nwant what the bare _accuracy decodes to\n%s", canonical(t, got), canonical(t, want))
+	}
+
+	for _, key := range []string{rmattrObs + "/_uid|value", rmattrContext + "/_location|value"} {
+		t.Run(key, func(t *testing.T) {
+			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
+		})
+	}
+}
+
 // withoutKeys is body without keys.
 func withoutKeys(body map[string]any, keys ...string) map[string]any {
 	out := maps.Clone(body)

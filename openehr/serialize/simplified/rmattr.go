@@ -775,10 +775,43 @@ func rmattrTailLabel(tail string) string {
 	return tail
 }
 
-// rmattrBareOnly is the grammar of a bare-value family: the key itself and
-// nothing beside it, so a stray suffix or subpath is refused rather than
-// dropped.
+// rmattrBareOnly is the grammar of a bare-value family whose value is no data
+// value, a UID or a String: the key itself and nothing beside it, so a stray
+// suffix or subpath is unmatched content.
 var rmattrBareOnly = map[string]bool{"": true}
+
+// rmattrBareValueTails is the grammar of a bare-value family whose value is a
+// data value with a bare value: the key itself, or its [bareValueSuffix],
+// which spells that value again (REQ-053).
+var rmattrBareValueTails = map[string]bool{"": true, "|" + bareValueSuffix: true}
+
+// rmattrBareValue returns the bare value of g, a family read by
+// [rmattrBareValueTails] with no tail left that holds null: the bare key's, or
+// its |value's where the body spells it so. Both may be present when they hold
+// the same value; two that differ are refused naming both keys and neither
+// value, rather than one being chosen.
+func rmattrBareValue(g rmattrGroup) (string, error) {
+	spelled := "|" + bareValueSuffix
+	if _, has := g.tails[spelled]; !has {
+		return rmattrString(g, "")
+	}
+	value, err := rmattrString(g, spelled)
+	if err != nil {
+		return "", err
+	}
+	if _, bare := g.tails[""]; !bare {
+		return value, nil
+	}
+	plain, err := rmattrString(g, "")
+	if err != nil {
+		return "", err
+	}
+	if plain != value {
+		return "", fmt.Errorf("%w: %q and %q spell the bare value twice and disagree; remove one",
+			ErrUnknownPath, g.key(""), g.key(spelled))
+	}
+	return plain, nil
+}
 
 // --- families -----------------------------------------------------------
 
@@ -890,12 +923,13 @@ func decodeRMAttrObjectRef(g rmattrGroup, _ string) (any, error) {
 
 // decodeRMAttrEndTime decodes EVENT_CONTEXT's `_end_time` — a bare DV_DATE_TIME
 // value (ADR 0016: the EVENT_CONTEXT optionals ride the underscore grammar
-// under the real `context` segment, not the ITS `ctx/` sketches).
+// under the real `context` segment, not the ITS `ctx/` sketches), which its
+// |value spells too, as at every datatype with a bare value.
 func decodeRMAttrEndTime(g rmattrGroup, _ string) (any, error) {
-	if err := checkRMAttrTails(g, rmattrBareOnly); err != nil {
+	if err := checkRMAttrTails(g, rmattrBareValueTails); err != nil {
 		return nil, err
 	}
-	value, err := rmattrString(g, "")
+	value, err := rmattrBareValue(g)
 	if err != nil {
 		return nil, err
 	}

@@ -2183,6 +2183,7 @@ requirements:
       - openehr/serialize/simplified
     tests:
       - openehr/serialize/simplified/archetype_details_test.go
+      - openehr/serialize/simplified/bare_value_internal_test.go
       - openehr/serialize/simplified/composer_test.go
       - openehr/serialize/simplified/composition_name_corpus_test.go
       - openehr/serialize/simplified/composition_name_test.go

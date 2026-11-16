@@ -988,6 +988,7 @@ The RM holds no magnitude, so without both a numerator and a denominator the bar
 The *Simplified Formats* spec lets a client leave out two suffixes.
 Decode **MUST** read a `DV_IDENTIFIER`'s bare value as its `|id` ("For the input |id might be left out"), wherever the datatype is read.
 Decode **MUST** read `|value` as the bare value of every datatype that has one, wherever the datatype is read: a `DV_TEXT`'s where no `|code` selects a `DV_CODED_TEXT`, and a STRUCTURED bare value beside its leaf's members (§ REQ-053, above).
+That covers an underscore attribute whose value is such a datatype, `_end_time`'s among them (§ REQ-140), but not `_uid` or `_location`, a UID and a String rather than data values, which stay bare-only, like the STRING leaf.
 Two spellings of one value that disagree are refused (§ REQ-170).
 Encode writes `|id` and the bare value.
 
@@ -1078,7 +1079,7 @@ The codec **MUST** support, in **both** directions — encode emitting every pop
 | ACTION | `_instruction_details` | INSTRUCTION_DETAILS — `\|composition_uid` and `\|activity_id`, both RM-mandatory, and `\|path`. Decode builds `instruction_id` as a LOCATABLE_REF of namespace `local` and type `INSTRUCTION`, its `id` a HIER_OBJECT_ID from `\|composition_uid` and its `path` from `\|path`, an empty `\|path` read as absent. Encode writes `\|path` only when it is not empty. Any other suffix is unmatched content, the reference's `\|instruction_uid`, `\|wt_path`, `\|instruction_index` and `\|activity_index` among them |
 | EVENT_CONTEXT (under the real `context` segment) | `_health_care_facility` | PARTY_IDENTIFIED (below) |
 | | `_participation:N` | PARTICIPATION (below) |
-| | `_end_time` | bare value (DV_DATE_TIME) |
+| | `_end_time` | bare value (DV_DATE_TIME), which decode also reads as `\|value` (§ REQ-053 *Input shorthands*) |
 | | `_location` | bare value (String) |
 | DV_ORDERED leaf | `_normal_range` | DV_INTERVAL — `/lower` + `/upper` carrying the anchor datatype's own suffix form, `\|lower_included`, `\|upper_included`, `\|lower_unbounded`, `\|upper_unbounded` |
 | | `_other_reference_ranges:N` | REFERENCE_RANGE — the interval grammar (the RM's intervening `range` level **elided**) + `/meaning` (DV_TEXT / DV_CODED_TEXT) |
