@@ -7,12 +7,14 @@ package simplified
 // leaves under its node, which an INTERVAL_EVENT node already has; and an
 // OBSERVATION's `history_origin`, a leaf under its node. An abstract EVENT the
 // Web Template folds into its OBSERVATION has no node, so its three are
-// spelled at the OBSERVATION's (issue 456). The reference implementation gives
-// none of them a Web Template node either, so the codec reads and writes them
-// itself, and the Web Template stays the reference's.
+// spelled at the OBSERVATION's (issue 456); where it folds in more than one,
+// those keys name none of them. The reference implementation gives none of
+// them a Web Template node either, so the codec reads and writes them itself,
+// and the Web Template stays the reference's.
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -92,30 +94,42 @@ func intervalEventOf(parent, leaf *webtemplate.Node) (string, bool) {
 	return "", false
 }
 
-// foldedEvent returns the abstract EVENT an OBSERVATION node folds in. The Web
-// Template gives an abstract EVENT that occurs at most once no node: it lifts
-// the event's children into the OBSERVATION's node, its `time` leaf among
-// them, each at its path through the event ([webtemplate.Build]). The node
-// returned stands for the event and holds its path, read off that `time`
-// leaf. It reports false where obs folds in no event, or more than one.
+// foldedEvent returns the abstract EVENT an OBSERVATION node folds in, where
+// it folds in exactly one ([foldedEventPaths]). The node returned stands for
+// the event and holds its path. It reports false where obs folds in no event,
+// or more than one, whose keys at the OBSERVATION name none of them.
 func foldedEvent(obs *webtemplate.Node) (*webtemplate.Node, bool) {
+	paths := foldedEventPaths(obs)
+	if len(paths) != 1 {
+		return nil, false
+	}
+	return foldedEventNode(paths[0]), true
+}
+
+// foldedEventNode is the node that stands for the folded event at path.
+func foldedEventNode(path string) *webtemplate.Node {
+	return &webtemplate.Node{RMType: "EVENT", Max: 1, AQLPath: path}
+}
+
+// foldedEventPaths returns the paths of the abstract EVENTs an OBSERVATION
+// node folds in, in the order of their `time` leaves. The Web Template gives
+// an abstract EVENT that occurs at most once no node: it lifts the event's
+// children into the OBSERVATION's node, its `time` leaf among them, each at
+// its path through the event ([webtemplate.Build]), so each path is read off
+// a `time` leaf.
+func foldedEventPaths(obs *webtemplate.Node) []string {
 	depth := len(parseAQL(obs.AQLPath))
-	path := ""
+	var paths []string
 	for _, ch := range obs.Children {
 		segs := parseAQL(ch.AQLPath)
 		if len(segs) != depth+3 || segs[depth].attr != "data" || segs[depth+1].attr != "events" || segs[depth+2].attr != "time" {
 			continue
 		}
-		event := ch.AQLPath[:segs[depth+1].end]
-		if path != "" && path != event {
-			return nil, false
+		if event := ch.AQLPath[:segs[depth+1].end]; !slices.Contains(paths, event) {
+			paths = append(paths, event)
 		}
-		path = event
 	}
-	if path == "" {
-		return nil, false
-	}
-	return &webtemplate.Node{RMType: "EVENT", Max: 1, AQLPath: path}, true
+	return paths
 }
 
 // historyNodeID returns the node id of the HISTORY an OBSERVATION node's
@@ -236,21 +250,71 @@ func emitIntervalAttrs(out map[string]any, node *webtemplate.Node, flatPath stri
 // OBSERVATION node folds in ([foldedEvent]) under flatPath, the OBSERVATION's,
 // where the instance there is an INTERVAL_EVENT. root, the OBSERVATION, and
 // rootAql are the resolution root the event resolves against.
+//
+// Where the node folds in more than one event, its keys name none of them,
+// and decode reads them as unmatched content: an INTERVAL_EVENT among them
+// that holds an attribute the keys would carry is refused, wrapping
+// [ErrUnsupportedDatatype] and naming the first such key, rather than written
+// where no event takes it or dropped.
 func emitFoldedEvent(out map[string]any, node *webtemplate.Node, flatPath string, root rm.Locatable, rootAql string, sib *reusedSiblings) error {
-	event, folded := foldedEvent(node)
-	if !folded {
-		return nil
+	paths := foldedEventPaths(node)
+	for _, path := range paths {
+		ev, ok, err := foldedIntervalEvent(path, root, rootAql, sib)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		if len(paths) == 1 {
+			return emitIntervalAttrs(out, node, flatPath, ev, root, rootAql, sib)
+		}
+		attr, err := heldIntervalAttr(path, flatPath, ev, root, rootAql, sib)
+		if err != nil {
+			return err
+		}
+		if attr != "" {
+			key := flatPath + "|" + sampleCountSuffix
+			if attr != sampleCountSuffix {
+				key = flatPath + "/" + attr
+			}
+			return fmt.Errorf("%w: %q names no single event at an OBSERVATION that folds in %d events, so an INTERVAL_EVENT's %s has no key there",
+				ErrUnsupportedDatatype, key, len(paths), attr)
+		}
 	}
-	relPath := strings.TrimPrefix(sib.nodePath(event), rootAql)
+	return nil
+}
+
+// foldedIntervalEvent returns the instance of the folded event at path, under
+// root, where it is an INTERVAL_EVENT. It reports false where the instance is
+// absent or of another type.
+func foldedIntervalEvent(path string, root rm.Locatable, rootAql string, sib *reusedSiblings) (rm.IntervalEvent[rm.ItemStructure], bool, error) {
+	relPath := strings.TrimPrefix(sib.nodePath(foldedEventNode(path)), rootAql)
 	v, err := scope{root: root, path: rootAql, sib: sib}.itemAt(relPath)
 	if err != nil {
-		return skipNotFound(err, relPath)
+		return rm.IntervalEvent[rm.ItemStructure]{}, false, skipNotFound(err, relPath)
 	}
 	ev, ok := as[rm.IntervalEvent[rm.ItemStructure]](v)
-	if !ok {
-		return nil
+	return ev, ok, nil
+}
+
+// heldIntervalAttr returns the first of width, math_function and sample_count
+// that encode would write under flatPath for ev, the INTERVAL_EVENT of the
+// folded event at eventPath, or "" where it writes none of them.
+func heldIntervalAttr(eventPath, flatPath string, ev rm.IntervalEvent[rm.ItemStructure], root rm.Locatable, rootAql string, sib *reusedSiblings) (string, error) {
+	for _, id := range []string{widthSeg, mathFunctionSeg} {
+		probe := make(map[string]any)
+		if err := emitNode(probe, intervalAttrLeaf(eventPath, id), flatPath, root, rootAql, sib); err != nil {
+			return "", err
+		}
+		if len(probe) > 0 {
+			return id, nil
+		}
 	}
-	return emitIntervalAttrs(out, node, flatPath, ev, root, rootAql, sib)
+	if ev.SampleCount != nil {
+		return sampleCountSuffix, nil
+	}
+	return "", nil
 }
 
 // emitHistoryOrigin writes h's origin at flatPath, unless it is the origin

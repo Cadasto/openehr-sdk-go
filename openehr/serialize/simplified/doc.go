@@ -90,7 +90,10 @@
 // "time" leaf. Its three interval keys are then spelled at the OBSERVATION,
 // as "<observation>/width", "<observation>/math_function" and
 // "<observation>|sample_count", and read and written there as at an EVENT
-// node.
+// node. An OBSERVATION that folds in two or more such events gives those keys
+// to none of them: decode reads them as unmatched content, and encode refuses
+// an INTERVAL_EVENT among the events that holds any of the three with
+// [ErrUnsupportedDatatype].
 //
 // # An ELEMENT with several value types
 //

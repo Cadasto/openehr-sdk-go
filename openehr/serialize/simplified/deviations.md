@@ -129,7 +129,11 @@ Concretely:
   content and encode dropped an INTERVAL_EVENT's three there. Where the node has a child whose
   id is `math_function` or `width`, the key is the child's, and decode reads it as the child:
   encode then refuses an INTERVAL_EVENT there with `ErrUnsupportedDatatype` naming the key,
-  where it wrote the attribute at the child's key. Each is
+  where it wrote the attribute at the child's key. Where the OBSERVATION folds in two or more
+  abstract EVENTs, the keys name none of them: decode reads them as unmatched content, and
+  encode refuses an INTERVAL_EVENT among them that holds any of the three with
+  `ErrUnsupportedDatatype` naming the key (since 2026-11-16), where it wrote none of them, so
+  decode rebuilt the event as a POINT_EVENT. Each is
   single-valued, so an index past `:0` on it is refused whatever follows it, and a segment
   below it is unmatched content, as below any leaf. Until
   then decode refused all four in every mode. Each other spelling of them

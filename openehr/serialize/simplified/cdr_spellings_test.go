@@ -11,6 +11,7 @@ import (
 	"errors"
 	"maps"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -502,5 +503,100 @@ func TestREQ053IntervalAttributeKeyTakenByAChildIsRefused(t *testing.T) {
 		if _, err := marshal(interval, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) || !strings.Contains(err.Error(), key) {
 			t.Errorf("Marshal%s of an INTERVAL_EVENT whose width key a child takes = %v, want ErrUnsupportedDatatype naming %s", name, err, key)
 		}
+	}
+}
+
+// twoFoldedEventsTemplate is clinical_notes.v0 with a second abstract EVENT,
+// at0003, that can occur once beside story_history's at0002: the Web Template
+// folds both into the OBSERVATION, whose node then holds a `time` leaf for
+// each.
+func twoFoldedEventsTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	raw, err := os.ReadFile(fixtures.TemplateOpt("clinical_notes.v0"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const anchor = "<children xsi:type=\"C_COMPLEX_OBJECT\">\n                <rm_type_name>EVENT</rm_type_name>"
+	if n := strings.Count(string(raw), anchor); n != 1 {
+		t.Fatalf("clinical_notes.v0 holds its EVENT anchor %d times, want once", n)
+	}
+	const second = `<children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>EVENT</rm_type_name>
+                <occurrences>
+                  <lower_included>true</lower_included>
+                  <upper_included>true</upper_included>
+                  <lower_unbounded>false</lower_unbounded>
+                  <upper_unbounded>false</upper_unbounded>
+                  <lower>0</lower>
+                  <upper>1</upper>
+                </occurrences>
+                <node_id>at0003</node_id>
+              </children>
+              `
+	model, err := aom14.ReadOperationalTemplate(strings.NewReader(strings.Replace(string(raw), anchor, second+anchor, 1)))
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	wt, compiled := compileTemplate(t, "clinical_notes.v0", model)
+	var times []string
+	var walk func(n *webtemplate.Node)
+	walk = func(n *webtemplate.Node) {
+		for _, ch := range n.Children {
+			if n.ID == "story_history" && strings.HasPrefix(ch.ID, "time") {
+				times = append(times, ch.ID)
+			}
+			walk(ch)
+		}
+	}
+	walk(wt.Tree)
+	if len(times) != 2 {
+		t.Fatalf("story_history's node holds the time leaves %q, want two", times)
+	}
+	return wt, compiled
+}
+
+// TestREQ053TwoFoldedEventsIntervalAttributesAreRefused — REQ-053. Where an
+// OBSERVATION folds in two abstract EVENTs, the keys at the OBSERVATION name
+// no single event: decode reads `<observation>/width`, `/math_function` and
+// `|sample_count` there as unmatched content, and encode refuses an
+// INTERVAL_EVENT among them with ErrUnsupportedDatatype naming the key, where
+// it wrote none and so turned the event into a POINT_EVENT. A POINT_EVENT
+// there encodes and round-trips.
+func TestREQ053TwoFoldedEventsIntervalAttributesAreRefused(t *testing.T) {
+	wt, compiled := twoFoldedEventsTemplate(t)
+	for _, key := range slices.Sorted(maps.Keys(storyIntervalKeys())) {
+		for _, opts := range [][]simplified.Option{{simplified.WithStrict()}, {simplified.WithStrict(), simplified.WithTemplate(compiled)}} {
+			_, err := simplified.UnmarshalFlat(mustJSON(t, storyBody(map[string]any{key: storyIntervalKeys()[key]})), wt, opts...)
+			if !errors.Is(err, simplified.ErrUnknownPath) || !strings.Contains(err.Error(), "unmatched content") {
+				t.Errorf("UnmarshalFlat(%s, strict) = %v, want it refused as unmatched content", key, err)
+			}
+		}
+	}
+
+	point := decodeWith(t, wt, storyBody(nil), simplified.WithStrict(), simplified.WithTemplate(compiled))
+	back := decodeAs(t, "FLAT", mustJSON(t, flatOf(t, point, wt)), wt, simplified.WithStrict(), simplified.WithTemplate(compiled))
+	if !bytes.Equal(canonicalComposition(t, back), canonicalComposition(t, point)) {
+		t.Errorf("a POINT_EVENT at an OBSERVATION folding two events did not round-trip:\n%s\nwant\n%s", canonicalComposition(t, back), canonicalComposition(t, point))
+	}
+
+	// The event the original template folds alone, at the same path, is an
+	// INTERVAL_EVENT carrying the three.
+	single, singleCompiled := templateOf(t, "clinical_notes.v0")
+	interval := decodeWith(t, single, storyBody(storyIntervalKeys()), simplified.WithStrict(), simplified.WithTemplate(singleCompiled))
+	intervalEvent(t, onlyEvent(t, single, interval, "story_history"))
+	key := strconv.Quote(storyObs + "/width")
+	for name, marshal := range map[string]func(*rm.Composition, *webtemplate.WebTemplate) ([]byte, error){
+		"FLAT": simplified.MarshalFlat, "STRUCTURED": simplified.MarshalStructured,
+	} {
+		if _, err := marshal(interval, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) || !strings.Contains(err.Error(), key) {
+			t.Errorf("Marshal%s of an INTERVAL_EVENT at an OBSERVATION folding two events = %v, want ErrUnsupportedDatatype naming %s", name, err, key)
+		}
+	}
+	ev := intervalEvent(t, onlyEvent(t, single, interval, "story_history"))
+	ev.Width = rm.DVDuration{}
+	ev.MathFunction = rm.DVCodedText{}
+	key = strconv.Quote(storyObs + "|sample_count")
+	if _, err := simplified.MarshalFlat(interval, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) || !strings.Contains(err.Error(), key) {
+		t.Errorf("MarshalFlat of an INTERVAL_EVENT holding a sample_count alone = %v, want ErrUnsupportedDatatype naming %s", err, key)
 	}
 }
