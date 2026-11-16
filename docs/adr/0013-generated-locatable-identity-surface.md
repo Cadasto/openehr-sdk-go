@@ -8,13 +8,10 @@ date: 2026-07-12
 
 # ADR 0013 — Generated LOCATABLE identity surface and reverse type lookup
 
-- **Status:** Accepted, 2026-07-12 — maintainer acceptance after two review rounds (field-accurate types, corrected counts, completed getter quartet, typed-nil predicate); implementation lands in the same PR.
-- **Supersedes:** —
-- **Superseded by:** —
+- **Status:** Accepted, 2026-07-12.
 - **Amended by:** [ADR 0028](0028-generated-rm-attribute-access.md), which removed `openehr/validation/rmread`, its `IsTypedNilPointer` and the `handles_test.go` pin; a test now holds the generated attribute access to every class the registry decodes.
 - **Strand:** cross-references [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance) (RM polymorphism; does **not** resolve it — the codec question stays open).
 - **Introduces:** — (no new `REQ`). **Amends:** REQ-031, REQ-040, REQ-043. **Applies:** REQ-013, REQ-014, REQ-024, REQ-042, REQ-044.
-- **Landed in:** [PR 72](https://github.com/Cadasto/openehr-sdk-go/pull/72) (the modernise-and-simplify pass).
 - **Related:** [ADR 0011](0011-rm-behavioural-functions-surface.md) governs the hand-realised RM behavioural-function surface; the accessors here are SDK-idiom *generated* additions beside it (same `rm` method surface, different emission path) and reuse its sealed-interface and no-panic conventions. [ADR 0002](0002-bmm-codegen-decisions.md) D4/D6/D7 constrain the generator mechanics.
 
 ## Context
@@ -29,8 +26,6 @@ files hand-maintain parallel reflection-free `case *rm.X` switches (~341 arms to
 `nameValueOf` are 36 byte-identical arms *each*), `internal/templateinstance/rmwrite/write.go`
 (59), `openehr/validation/composition.go` (58), `openehr/composition/typecheck.go` (36) —
 plus `openehr/instance/locatable.go`'s 18 identity arms (`applyLocatableIdentity`).
-(Counts as of pre-consolidation `main` @ 15f02f1; plan Phase 4 has since landed via PR #72,
-removing 13 *coercion* arms from `write.go` — disjoint from the identity/nil arms here.)
 Their own comments demand lock-step maintenance; every BMM bump grows each switch by hand.
 `internal/bmmgen` already emits the *forward* registry (`typereg_gen.go`: RM name →
 constructor) and per-type attribute metadata (`rminfo/lookup_gen.go`), but neither the
@@ -130,9 +125,6 @@ reduced set.
 - **Naming:** the `Get<Field>` prefix trades Effective Go's omit-`Get` guideline for
   collision-freedom, mechanical derivability, and consistency with the existing
   `*Like`-interface accessors — a deliberate, house-precedented choice.
-- **Spec impact:** `reference-model.md` prose (REQ-031 layering, REQ-040 registry — which gains a
-  reverse direction, REQ-043 mapping rules) must be updated in the same PR as the generator
-  change; `traceability.yaml` gains the ADR references on those REQ entries at implementation.
 - **Risk accepted:** if a future BMM class legitimately needs different identity semantics
   (e.g. a name outside the `DV_TEXT` family entirely), the generated surface must grow a per-type override
   mechanism (D7-style skip set) — deferred until a concrete case exists.
@@ -150,11 +142,3 @@ reduced set.
 - **Setters on `Locatable` itself** (single interface): silently removes value-type
   satisfaction of `Locatable` — a subtle behavioural break for existing code holding values;
   rejected in favour of the getter/setter split.
-
-## Acceptance gate
-
-Per the plan's Definition of Ready, implementation was blocked until this ADR reached
-**Accepted** (maintainer decision, 2026-07-12). The implementation PR carries the
-`architecture.md` narrative note, the REQ/traceability wiring, and Phase 5's generator +
-consumer-refactor tasks, verified by `make codegen` + `codegen-check`, the
-`handles_test.go` 54-type taxonomy pin, and the full race-enabled test suite.

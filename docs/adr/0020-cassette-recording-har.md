@@ -9,8 +9,6 @@ date: 2026-09-07
 # ADR 0020 — Cassette recordings are HTTP Archive 1.2
 
 - **Status:** Accepted, 2026-09-07.
-- **Supersedes:** —
-- **Superseded by:** —
 - **Strand:** [STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml).
 - **Introduces:** —. **Amends:** [REQ-082](../specifications/conformance.md#req-082--runnability) Cassette encoding.
 - **Related:** the side-by-side capture in [strand-11-recording-format](../analysis/strand-11-recording-format/).
@@ -41,7 +39,7 @@ which file a second implementation (or a reviewer) can treat as the recording.
 
 ## Consequences
 
-- The recordings, once captured under `testkit/recordings/`, will be `.har`. A recording without
+- The recordings under `testkit/recordings/` are `.har`. A recording without
   `_req082.provenance` or without `_req082.redaction.ran: true` is discarded, not replayed.
 - Review diffs are larger and noisier than the YAML alternative. That cost is accepted so
   the recordings stay in a published interchange format rather than an SDK-private schema.

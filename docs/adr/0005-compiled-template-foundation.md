@@ -9,10 +9,8 @@ date: 2026-05-22
 # ADR 0005 — Compiled OPT foundation (rminfo + internal templatecompile)
 
 - **Status:** Accepted, 2026-05-22.
-- **Supersedes:** —
-- **Superseded by:** —
 - **Amended by:** [ADR 0010](0010-public-compiled-template-bridge.md) (C2: the public bridge is `openehr/templatecompile`) and [ADR 0035](0035-compile-step-reads-operational-template-model.md) (`Compile` takes the generated `*aom14.OperationalTemplate`, and the OPT parser and its tree are gone).
-- **Tracks:** the REQ-100 follow-ups that landed the compiled template tree ([PR 12](https://github.com/Cadasto/openehr-sdk-go/pull/12)). Phases 5 (walker pattern at `internal/templatecompile/walk/`) and 6 (REQ-103 primitive constraints at `openehr/template/constraints/`) build on this foundation without changing C1–C6.
+- **Related:** the OPT walker at `internal/templatecompile/walk/` and the primitive constraints of REQ-103 at `openehr/template/constraints/` build on this foundation without changing C1–C6.
 
 ## Context
 
@@ -31,7 +29,7 @@ The public export shape (`template.Compile` / `template.Compiled`) is deferred u
 - Expose a small `Lookup` interface + `Default` accessor; no runtime BMM parse in consumers.
 - `RequiredAttributes` order follows BMM declaration order for implicit injection.
 
-**Extended by [REQ-048](../specifications/reference-model.md#req-048--rm-meta-model-introspection-surface)** (2026-08-19), without changing this decision's shape: the same generated, stdlib-only, no-runtime-BMM table also carries the RM **class graph** (abstractness, immediate parents, and the attribute declaration site the fold erases), and its emitted class set widens from the attribute-BEARING classes to every class the RM target types — a descendant expansion rooted at `DATA_VALUE` or `PATHABLE` was unanswerable while those classes were absent. `KnownRMTypes()` therefore reports 139 classes rather than 125. The compiled-in / no-runtime-parse rule is unchanged and is now normative in that requirement rather than only here.
+**Extended by [REQ-048](../specifications/reference-model.md#req-048--rm-meta-model-introspection-surface)**, without changing this decision's shape: the same generated, stdlib-only, no-runtime-BMM table also carries the RM **class graph** (abstractness, immediate parents, and the attribute declaration site the fold erases), and its emitted class set widens from the attribute-BEARING classes to every class the RM target types — a descendant expansion rooted at `DATA_VALUE` or `PATHABLE` was unanswerable while those classes were absent. `KnownRMTypes()` therefore reports 139 classes rather than 125. The compiled-in / no-runtime-parse rule is unchanged and is now normative in that requirement rather than only here.
 
 ### C2 — `templatecompile` stays under `internal/` until REQ-101 lands
 
@@ -65,6 +63,6 @@ The public export shape (`template.Compile` / `template.Compiled`) is deferred u
 
 - **Positive:** REQ-101/102 can share one compiled tree; rminfo is reusable without importing `templatecompile`.
 - **Positive:** Codegen drift check recurses into `openehr/rm/rminfo/` (idempotent emit).
-- **Negative (REQ-048 extension, 2026-08-19):** the emitted class set widens 125 → 139, so a caller that counted on 125 `KnownRMTypes()` entries breaks; and two questions stay open against the widened surface — [STRAND-12](../specifications/research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) (BMM-interface abstractness) and [STRAND-13](../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) (a property inherited from a primitive-mapped ancestor is dropped).
+- **Negative (REQ-048 extension):** the emitted class set widens 125 → 139, so a caller that counted on 125 `KnownRMTypes()` entries breaks; and two questions stay open against the widened surface — [STRAND-12](../specifications/research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) (BMM-interface abstractness) and [STRAND-13](../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) (a property inherited from a primitive-mapped ancestor is dropped).
 - **Negative:** Two path resolution semantics, exact lookup (`NodeAt`) and tree walk (`Resolve`), both on the compiled template since [ADR 0035](0035-compile-step-reads-operational-template-model.md); the package doc states the difference.
 - **Negative:** Public API promotion requires a follow-up ADR amendment or supersession when `template.Compile` is exported.

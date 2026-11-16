@@ -9,9 +9,7 @@ date: 2026-06-15
 # ADR 0007 — AQL parser: ANTLR + SDK grammar profile
 
 - **Status:** Accepted, 2026-06-15.
-- **Supersedes:** —
-- **Superseded by:** —
-- **Tracks:** REQ-109 AQL static lint ([PR 39](https://github.com/Cadasto/openehr-sdk-go/pull/39)). Related: [ADR 0001](0001-bmm-version-bump-runbook.md) (version-bump runbook spirit, reused for grammar rebases).
+- **Tracks:** REQ-109 AQL static lint. Related: [ADR 0001](0001-bmm-version-bump-runbook.md) (version-bump runbook spirit, reused for grammar rebases).
 
 ## Context
 

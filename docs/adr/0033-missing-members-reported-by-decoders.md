@@ -8,9 +8,7 @@ date: 2026-10-26
 
 # ADR 0033 — A missing mandatory member is reported by the decoder and read by the validators, not recorded on the value
 
-- **Status:** Accepted, 2026-10-26 — maintainer decision on issue [#319](https://github.com/Cadasto/openehr-sdk-go/issues/319), delivered as one rule for every RM class and both canonical formats.
-- **Supersedes:** —
-- **Superseded by:** —
+- **Status:** Accepted, 2026-10-26 — maintainer decision on issue [#319](https://github.com/Cadasto/openehr-sdk-go/issues/319).
 - **Strand:** resolves the presence question of [STRAND-15](../specifications/research-strands.md#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types); its capture question, whether unmatched members are kept on the value, stays open.
 - **Amends:** [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (*Value-typed mandatory presence*, now the rule for every level and both formats), [REQ-171](../specifications/clinical-modeling.md#req-171--validation-engine) (*Surface*, *One finding per defect*, *Structural access* and *Out of scope*), [ADR 0002](0002-bmm-codegen-decisions.md) (D9: the generated canonical-XML decoders hand their runtime a description of the class on entry). **Introduces:** [REQ-175](../specifications/wire.md#req-175--missing-members-on-decode).
 - **Related:** [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode) (the dual rule, for content the decoder does not read), [REQ-052](../specifications/wire.md#req-052) (how an absent mandatory member is written back), [REQ-169](../specifications/wire.md#req-169--interval-boundary-flag-defaults) (the flags that take a value when absent), [REQ-168](../specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics).

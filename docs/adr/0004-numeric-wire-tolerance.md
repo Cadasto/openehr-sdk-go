@@ -10,8 +10,7 @@ date: 2026-05-16
 
 - **Status:** Accepted, 2026-05-16.
 - **Tracks:** REQ-046 (BMM primitive mapping, since retired into REQ-041), REQ-052 (canonical-JSON wire profile), STRAND-04 (RM polymorphism + codec performance).
-- **Amended 2026-10-15** (maintainer decision): `Integer` decode also accepts a whole number written with a zero fraction or an exponent (`1.0`, `1e0`), bare or quoted, as that integer, and refuses one with a non-zero fraction; the reference's own FLAT writes a DV_PROPORTION `type` as `1.0`. The rule's normative home is [wire.md § Floating-point precision](../specifications/wire.md#floating-point-precision); `Integer64` stays out of scope as below.
-- **Amended 2026-10-19** (maintainer decision): `Integer64` takes the `Integer` decode rule above, as the defined type `rm.Integer64` (underlying `int64`), which supersedes its exclusion in the 2026-10-15 amendment. `DV_COUNT.magnitude`, the RM's one `Integer64` attribute, refused `2.0`, `2e0` and `"2"`, which a `DV_QUANTITY.precision` accepts; one RM integer rule now covers both widths. The cost is an API break: `DVCount.Magnitude` changes from `int64` to `rm.Integer64`, so a caller that assigns or compares a typed `int64` needs a conversion (untyped constants still work). `Double` stays out of scope.
+- **Amended:** `Integer` decode also reads a whole number written with a zero fraction or an exponent (`1.0`, `1e0`), and `Integer64` takes the same rule as the defined type `rm.Integer64`, so one RM integer rule covers both widths; [wire.md § Floating-point precision](../specifications/wire.md#floating-point-precision) states both.
 
 ## Context
 
@@ -37,7 +36,7 @@ The SDK adopts asymmetric numeric tolerance:
 - **Encode (`MarshalJSON`):** every `Real`/`Integer` value is emitted as a JSON number per REQ-052. No quoted output, ever. This is the only permitted behaviour.
 - **Decode (`UnmarshalJSON`):** every `Real`/`Integer` field accepts EITHER a JSON number OR a quoted decimal string. A quoted form decodes as if it were the corresponding number; a malformed string returns a typed error.
 
-To carry the asymmetric decode tolerance the SDK introduces **defined types** rather than direct aliases, two at first and a third, `Integer64`, since the 2026-10-19 amendment:
+To carry the asymmetric decode tolerance the SDK introduces **defined types** rather than direct aliases:
 
 ```go
 package rm
@@ -53,7 +52,7 @@ Each is emitted by the BMM generator wherever the BMM primitive `Real` / `Intege
 
 ### Out of scope for this ADR
 
-- **`Double`**: keeps its direct alias (`float64`) for now. No vendored fixture currently exercises quoted variants for it, and a precedent in PHP / CDR has not yet been observed. Promote it to a defined type if and when a fixture demonstrates the need. (`Integer64` was listed here until the 2026-10-19 amendment.)
+- **`Double`**: keeps its direct alias (`float64`) for now. No vendored fixture currently exercises quoted variants for it, and a precedent in PHP / CDR has not yet been observed. Promote it to a defined type if and when a fixture demonstrates the need.
 - **Other numeric primitives** (`Octet`, `Character`): not affected — they're not floating-point and openEHR producers do not quote them.
 - **Validating numeric precision** beyond IEEE 754 (REQ-052): out of scope; an overflow on decode still surfaces via `strconv.ParseFloat` / `strconv.ParseInt` and is wrapped in a typed error.
 
@@ -63,6 +62,7 @@ Each is emitted by the BMM generator wherever the BMM primitive `Real` / `Intege
 - openEHR wire conformance (REQ-080): any conforming client has to handle quoted magnitudes the same way on decode to keep fixture round-trip semantics identical. Without this ADR a strict-number-only decoder would reject the `"magnitude": "354"` form that real CDRs emit. (The earlier wire-level cross-SDK parity requirement, REQ-081, has since been retired.)
 - Consumers that need strict-number-only decode can wrap `canjson.Unmarshal` with a pre-pass that rejects quoted numerics, but the SDK itself does not offer a strict-decode mode in v1 — the loss of fixture interoperability outweighs the strictness benefit at this stage.
 - The generated `MarshalJSONTo` for every concrete RM type continues to emit numbers (no behaviour change on the encode side).
+- `DVCount.Magnitude` is `rm.Integer64`, not `int64`, so a caller that assigns or compares a typed `int64` needs a conversion; untyped constants still work.
 - Documentation: the fixed primitive mapping, now REQ-041's *Primitive types* rule, stays as written; it pertains to the underlying type only. The Floating-point precision section of REQ-052 references this ADR for decode tolerance. The note that `primitiveGoType` emits the alias type name (not the raw primitive) is captured in [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) § Primitive type mapping.
 
 ## References

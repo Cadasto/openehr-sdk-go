@@ -8,10 +8,7 @@ date: 2026-11-11
 
 # ADR 0036 — Web Template ids: a duplicate sibling takes the format's `_1` suffix and an interval alternative the IPS spelling, departing from the reference's code
 
-- **Status:** Accepted, 2026-11-11. Maintainer decisions taken while settling the Simplified Formats issues: the duplicate-sibling suffix on 2026-11-10, the interval alternative's id and the decode of the earlier spelling on 2026-11-11.
-- **Supersedes:** —
-- **Superseded by:** —
-- **Strand:** none — a direct decision.
+- **Status:** Accepted, 2026-11-11 — maintainer decision.
 - **Amends:** [ADR 0014](0014-webtemplate-reference-implementation-lock.md) decision 2 (the reference's sibling-disambiguation rule) and its consequence "we adopt EHRbase's id choices verbatim", [REQ-106](../specifications/clinical-modeling.md#id-generation-adr-0014) (`id` generation), [REQ-053](../specifications/wire.md#req-053) (path segments). **Applies:** PROBE-075, PROBE-086, PROBE-105.
 - **Related:** [ADR 0029](0029-composer-real-path-carrier.md) took the same route for the composer: the reference's spelling is read on decode beside the one the SDK writes.
 

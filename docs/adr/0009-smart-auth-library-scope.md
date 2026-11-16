@@ -9,10 +9,7 @@ date: 2026-06-18
 # ADR 0009 — SMART-on-openEHR auth library scope and dependency model
 
 - **Status:** Accepted, 2026-06-18.
-- **Amended:** 2026-10-04 — PR 210 removed the RFC 7662 introspection client from current SDK scope; discovery continues to surface `introspection_endpoint`. 2026-10-05 — the capability table places ID-token verification in `auth/smart`, re-exported by `smart`.
-- **Supersedes:** —
-- **Superseded by:** —
-- **Tracks:** the SMART-on-openEHR auth conformance audit ([PR 45](https://github.com/Cadasto/openehr-sdk-go/pull/45)). Resolves: [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library). Amends: REQ-061, REQ-062, REQ-063, REQ-064.
+- **Resolves:** [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library). **Amends:** REQ-061, REQ-062, REQ-063, REQ-064.
 
 ## Context
 
@@ -21,7 +18,7 @@ date: 2026-06-18
 1. **What auth library should the SDK build?** REQ-061..064 define the contract — PKCE, JWKS rotation, token refresh, launch context — but the scope of the implementation (which flows, which launch modes, how far along the SMART conformance profile) was open.
 2. **Hand-roll or adopt ecosystem libraries?** The SDK previously held an "OpenTelemetry-only runtime dependency" rule to keep the dependency graph minimal. SMART-on-openEHR requires OAuth2 code flows, PKCE, JWKS rotation, JOSE signing (RS384, ES384 baseline), and OIDC ID-token verification. The question was whether to hand-roll these security-sensitive primitives or adopt audited ecosystem libraries.
 
-The auth conformance audit (Phase 1–6) produced concrete evidence: a full SMART-on-openEHR auth library was built across `auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, `auth/basic`, `auth/introspect`, and `smart/discovery`. The dependency question was resolved in favour of adopting ecosystem libraries during Phase 3a (client-assertion signing) and Phase 3e (ID-token verification).
+The auth conformance audit produced concrete evidence: a full SMART-on-openEHR auth library was built across `auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, `auth/basic` and `smart/discovery`, and the dependency question was resolved in favour of adopting ecosystem libraries for client-assertion signing and ID-token verification.
 
 ## Decision
 
@@ -29,21 +26,22 @@ The auth conformance audit (Phase 1–6) produced concrete evidence: a full SMAR
 
 The audit delivered the following scope across `auth/` and `smart/`:
 
-| Capability | Package | Phase |
-|---|---|---|
-| SMART discovery (`/.well-known/smart-configuration`, canonical `services` map) | `smart/discovery` | 1 (F-A, ADR 0008) |
-| PKCE public-client authorization-code flow | `auth/smart` | 2 (REQ-061) |
-| Confidential symmetric (`client_secret_basic`) | `auth/smart` | 3b (F-C) |
-| Confidential asymmetric `private_key_jwt` (authorization-code) | `auth/smart` | 3b (F-C) |
-| SMART Backend Services (`client_credentials` + `private_key_jwt`) | `auth/clientcreds` | 3c (F-C) |
-| JWT Bearer Token Grant (RFC 7523) | `auth/jwtbearer` | 3a (F-I) |
-| ID-token verification (RS256/RS384/ES256/ES384) | `auth/smart` (re-exported by `smart`) | 3e (F-M) |
-| Token refresh + F-L terminal/transient classification | `auth/smart` | 4a (REQ-063) |
-| Transport 401→reauth safety net | `transport` | 4b (F-D) |
-| Launch context (`ehrId`, `episodeId`, `fhirUser`, …) | `smart` | REQ-064 |
-| Platform principal claims | `smart` | REQ-067 |
-| RFC 7662 token introspection client (opt-in, resource-server scope; removed from current SDK scope by the 2026-10-04 amendment) | `auth/introspect` | 5b (F-J) |
-| Launch-context scope helpers (`ScopeLaunch*`, `ScopeOfflineAccess`, …) | `auth` | 6a (F-F) |
+| Capability | Package |
+|---|---|
+| SMART discovery (`/.well-known/smart-configuration`, canonical `services` map, [ADR 0008](0008-smart-discovery-services-shape.md)) | `smart/discovery` |
+| PKCE public-client authorization-code flow (REQ-061) | `auth/smart` |
+| Confidential symmetric (`client_secret_basic`) | `auth/smart` |
+| Confidential asymmetric `private_key_jwt` (authorization-code) | `auth/smart` |
+| SMART Backend Services (`client_credentials` + `private_key_jwt`) | `auth/clientcreds` |
+| JWT Bearer Token Grant (RFC 7523) | `auth/jwtbearer` |
+| ID-token verification (RS256/RS384/ES256/ES384) | `auth/smart` (re-exported by `smart`) |
+| Token refresh with terminal/transient classification (REQ-063) | `auth/smart` |
+| Transport 401→reauth safety net | `transport` |
+| Launch context (`ehrId`, `episodeId`, `fhirUser`, …, REQ-064) | `smart` |
+| Platform principal claims (REQ-067) | `smart` |
+| Launch-context scope helpers (`ScopeLaunch*`, `ScopeOfflineAccess`, …) | `auth` |
+
+Token introspection (RFC 7662) is a resource-server operation outside the SDK's client scope ([auth.md § What is NOT in scope here](../specifications/auth.md#what-is-not-in-scope-here)); discovery still surfaces `introspection_endpoint`.
 
 **Four flows** (PKCE public, confidential symmetric, confidential asymmetric, Backend Services / JWT Bearer) and **three launch modes** (standalone, embedded/EHR-launch, backend) are covered and exercised by PROBE-001..009 in the auth conformance probe suite (see `docs/specifications/conformance.md`).
 
@@ -57,7 +55,7 @@ The SDK adopts three new runtime dependencies, scoped to `auth/` and `smart/`:
 | `github.com/coreos/go-oidc/v3` | ID-token signature verification (RS256/RS384/ES256/ES384 via `go-jose`) |
 | `github.com/go-jose/go-jose/v4` _(direct; also required by `go-oidc/v3`)_ | JWS signing for `client_assertion` / JWT Bearer grant; JWK→`crypto.PublicKey` parsing; ECDSA r‖s byte-padding |
 
-> **Note — dependency classification.** `go-jose/v4` is a **direct** dependency in `go.mod`: `auth/jwtbearer` and `auth/smart` import it directly for JWS signing and JWK parsing. It is *also* required by `go-oidc/v3`, so adopting it added no separate supply-chain surface. (An earlier draft of this table tagged the row *transitive*, capturing only the latter fact.)
+> **Note — dependency classification.** `go-jose/v4` is a **direct** dependency in `go.mod`: `auth/jwtbearer` and `auth/smart` import it directly for JWS signing and JWK parsing. It is *also* required by `go-oidc/v3`, so adopting it added no separate supply-chain surface.
 
 **Rationale for adoption.** The pre-audit implementation hand-rolled RSA signature verification and JWK parsing. This was a correctness and coverage risk:
 
@@ -68,8 +66,6 @@ The SDK adopts three new runtime dependencies, scoped to `auth/` and `smart/`:
 `go-jose/v4` and `go-oidc/v3` are widely deployed, receive regular security audits, and are the de-facto Go substrate for JOSE/OIDC. The supply-chain cost (three additional direct deps plus their transitive closure) is accepted in exchange for crypto correctness. The previous OTel-only rule was a heuristic, not a hard constraint — it served early development when auth was minimal. At SMART-on-openEHR scope, maintaining that heuristic would require writing and owning security-sensitive crypto code the ecosystem already provides correctly.
 
 **Scope boundary.** The new deps are consumed only within `auth/` and `smart/`. Packages without auth concerns (`openehr/rm`, `openehr/aql`, `openehr/serialize`, `openehr/validation`, `transport`, etc.) do not transitively import them.
-
-**Evidence.** Auth conformance probes PROBE-001..009 pass in Sandbox. RS384/ES384 baseline is met (`auth/jwtbearer.ClaimsSigner` default = RS384; ES384 supported). ID-token alg agility covers RS256/RS384/ES256/ES384 (`smart.ValidateIDToken` via `go-oidc/v3`). The `alg:none` and alg/key-type-mismatch paths are both rejected (unit-tested in `smart/idtoken_test.go`). Hand-rolled RSA verify and `rsaPublicKeyFromJWK` have been removed.
 
 ### (c) `auth.FromOAuth2TokenSource` adapter — feasible in-core, deferred
 

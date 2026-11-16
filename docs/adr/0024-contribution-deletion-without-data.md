@@ -9,8 +9,6 @@ date: 2026-10-07
 # ADR 0024 — A contribution deletion built without a payload carries no data, departing from the pinned UpdateVersion schema
 
 - **Status:** Accepted, 2026-10-07.
-- **Supersedes:** —
-- **Superseded by:** —
 - **Strand:** none — direct decision, recorded from the maintainer's issue [#246](https://github.com/Cadasto/openehr-sdk-go/issues/246) (its *Proposed solution* and *Alternatives considered*).
 - **Amends:** REQ-095 (OpenAPI authoritative source), since retired into [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative) — one keyed exception, carried by REQ-050's section rather than asserted from here — and [REQ-130](../specifications/wire.md#req-130--contribution-builder) (Contribution builder), whose § *Deletion* carries the mechanics.
 - **Related:** [ADR 0019](0019-definition-timestamp-tolerance.md) (the first keyed exception to REQ-095, and the form this one follows).

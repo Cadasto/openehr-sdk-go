@@ -9,10 +9,8 @@ date: 2026-06-17
 # ADR 0008 — SMART discovery: canonical `services` map shape
 
 - **Status:** Accepted, 2026-06-17.
-- **Supersedes:** —
-- **Superseded by:** —
 - **Amended:** introspection left the SDK's client scope and `revocation_endpoint` is consumed by [REQ-167](../specifications/auth.md#req-167--token-revocation) (see (a)); with `WithAcceptedSpecVersions` set, an entry that advertises no `spec_version` has its `version` compared (see (b)).
-- **Tracks:** the SMART-on-openEHR auth conformance audit ([PR 45](https://github.com/Cadasto/openehr-sdk-go/pull/45)). Fixes: REQ-070 (wire decoder), REQ-072 (version-gate softening).
+- **Requirements:** REQ-070 (wire decoder), REQ-072 (version-gate softening).
 
 ## Context
 

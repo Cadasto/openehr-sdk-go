@@ -9,9 +9,6 @@ date: 2026-10-26
 # ADR 0032 — The composition and EHR_STATUS version reads accept an ORIGINAL_VERSION without data, the RM's logical deletion, departing from the pinned version schemas
 
 - **Status:** Accepted, 2026-10-26.
-- **Supersedes:** —
-- **Superseded by:** —
-- **Strand:** —
 - **Amends:** [REQ-174](../specifications/wire.md#req-174--versioned-object-reads) (Versioned-object reads), which states the reading, and REQ-095 (OpenAPI authoritative source), since retired into [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative), which carries the keyed exception.
 - **Related:** [ADR 0024](0024-contribution-deletion-without-data.md), the write-side twin: a contribution deletion built without a payload carries no data.
 

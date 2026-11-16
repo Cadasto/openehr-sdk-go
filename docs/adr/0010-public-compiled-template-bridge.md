@@ -9,11 +9,9 @@ date: 2026-06-17
 # ADR 0010 — Public compiled-template bridge placement
 
 - **Status:** Accepted, 2026-06-17.
-- **Supersedes:** —
-- **Superseded by:** —
 - **Revises:** [ADR 0005](0005-compiled-template-foundation.md) §C2 (the `template.Compile` / `template.Compiled` re-export proposal).
 - **Amended by:** [ADR 0035](0035-compile-step-reads-operational-template-model.md): `Compile` takes the generated `*aom14.OperationalTemplate`, the OPT parser and its tree are gone, and REQ-100 is retired; `openehr/template` keeps its stdlib-only closure under the `openehr/template` row of [REQ-013](../specifications/module-layout.md#req-013--building-block-independence).
-- **Tracks:** the public compiled-template bridge ([PR 44](https://github.com/Cadasto/openehr-sdk-go/pull/44)). Implements [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge); unblocks external callers of REQ-101 / REQ-102 / REQ-107 / REQ-110.
+- **Tracks:** implements [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge); unblocks external callers of REQ-101 / REQ-102 / REQ-107 / REQ-110.
 
 ## Context
 
@@ -36,7 +34,7 @@ The public compiled-template bridge **lives** in the sibling package `openehr/te
 - `func Compile(opt *template.OperationalTemplate, opts ...Option) (*Compiled, error)` delegating to the engine, with functional `Option`s (`WithRMInfo`, `WithoutImplicitAttributes`) that keep the engine's option struct out of the public surface.
 - `ErrInvalidInput` / `ErrPathNotFound` re-exported as the same `error` vars so `errors.Is` works across the boundary.
 
-The **committed public surface is `Compile` + `Compiled` + the introspection tree (`CompiledNode`, `CompiledAttribute`) + the options + the two sentinels**, all type aliases of the engine forms. The node types are exposed (not merely reachable through `Compiled`'s methods) so downstream code can navigate the compiled template and hold the types in its own function signatures and struct fields — the form-generation, path-discovery, and custom mapping/validation use cases. Everything reachable as a method on `Compiled` / `CompiledNode` / `CompiledAttribute` is committed, including the slot accessors (`SlotIncludes`, `SlotExcludes`, `SlotRules`, `AllowsArchetypeID`, `ExampleSlotFillArchetypeID`). What stays internal is the compile engine itself and free helpers that are not methods on the exported types — notably `IsAOMPrimitiveShortName`. The owner accepted the larger semver surface (2026-06-18); the one area flagged as likely to change pre-1.0 is multi-language term resolution (`CompiledNode.Term`'s `lang` parameter, REQ-105).
+The **committed public surface is `Compile` + `Compiled` + the introspection tree (`CompiledNode`, `CompiledAttribute`) + the options + the two sentinels**, all type aliases of the engine forms. The node types are exposed (not merely reachable through `Compiled`'s methods) so downstream code can navigate the compiled template and hold the types in its own function signatures and struct fields — the form-generation, path-discovery, and custom mapping/validation use cases. Everything reachable as a method on `Compiled` / `CompiledNode` / `CompiledAttribute` is committed, including the slot accessors (`SlotIncludes`, `SlotExcludes`, `SlotRules`, `AllowsArchetypeID`, `ExampleSlotFillArchetypeID`). What stays internal is the compile engine itself and free helpers that are not methods on the exported types — notably `IsAOMPrimitiveShortName`. The owner accepted the larger semver surface; the one area flagged as likely to change pre-1.0 is multi-language term resolution (`CompiledNode.Term`'s `lang` parameter, REQ-105).
 
 Consuming packages reference the public `*templatecompile.Compiled` in their **exported** signatures (clean rendered docs); unexported code that needs the node-level types imports the internal engine directly (aliased `tcimpl`). Type-alias identity makes the two interchangeable.
 

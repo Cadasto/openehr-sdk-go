@@ -8,10 +8,7 @@ date: 2026-10-15
 
 # ADR 0029 — FLAT: the composer rides its real path when the `ctx/` short forms cannot carry it
 
-- **Status:** Accepted, 2026-10-15 — maintainer decision, taken to close the composer boundary [ADR 0015](0015-flat-metadata-spelling.md) left open ("closing it needs a `ctx/` or real-path carrier — a new decision, not a codec change").
-- **Supersedes:** —
-- **Superseded by:** —
-- **Strand:** none — a direct decision.
+- **Status:** Accepted, 2026-10-15 — maintainer decision, closing the composer boundary [ADR 0015](0015-flat-metadata-spelling.md) left open.
 - **Amends:** [ADR 0015](0015-flat-metadata-spelling.md) decision 5 (its first bullet, the composer's `external_ref`) and decision 2 (encode writes `ctx/` only, now except a composer those forms cannot carry), [REQ-053](../specifications/wire.md#req-053) (the composition-level metadata rule), [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes) (the out-of-scope classes and the deliberate exclusions), [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode) (the carrier-less keys). **Applies:** PROBE-086, PROBE-089, PROBE-105.
 - **Related:** [ADR 0014](0014-webtemplate-reference-implementation-lock.md) pins the reference whose spelling this adopts; [ADR 0016](0016-event-context-optionals-underscore-spelling.md) took the same route for the EVENT_CONTEXT optionals, a real path rather than new `ctx/` short forms.
 

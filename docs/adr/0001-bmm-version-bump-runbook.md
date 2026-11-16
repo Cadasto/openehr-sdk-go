@@ -9,10 +9,6 @@ date: 2026-05-16
 # ADR 0001 — BMM version-bump runbook
 
 - **Status:** Accepted, 2026-05-16.
-- **Supersedes:** —
-- **Superseded by:** —
-- **Amended:** steps 1 and 9, 2026-10-26 (the schemas are fetched and removed by `make bmm-sync`, pinned in `resources/bmm/MANIFEST.txt`); step 1, 2026-11-03 (the SDK-authored root schemas under `resources/bmm/sdk/` move with the pin, [ADR 0034](0034-sdk-authored-root-schemas.md)).
-- **Tracks:** part of the BMM code generator delivery (drift bot and version-bump runbook).
 - **Requirements:** [REQ-041](../specifications/reference-model.md#req-041--pinned-bmm-sources) (the pinned BMM sources a version bump moves).
 
 ## Context

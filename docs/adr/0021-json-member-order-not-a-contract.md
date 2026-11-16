@@ -8,12 +8,9 @@ date: 2026-09-14
 
 # ADR 0021 — Encoded JSON member order is not part of the canonical JSON contract
 
-- **Status:** Accepted, 2026-09-14 (maintainer sign-off on the plan, PR 171); implementation landed in [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171).
-- **Supersedes:** —
-- **Superseded by:** —
+- **Status:** Accepted, 2026-09-14.
 - **Strand:** retires the byte-stability premise in [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance)'s remaining evidence item.
 - **Introduces:** —. **Amends:** [REQ-052](../specifications/wire.md#req-052) (the field-order profile and the probe obligation it carries).
-- **Landed in:** [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171) (the `encoding/json/v2` migration).
 - **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (the codec decision this one unblocks); [REQ-056](../specifications/wire.md#req-056) (canonical XML, deliberately **not** relaxed: element order is part of an XML document's identity in a way member order is not part of a JSON object's, so PROBE-033 keeps its byte assertion); [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the validation floor the rewritten PROBE-030 asserts).
 
 ## Context
@@ -38,7 +35,7 @@ The promise has a price. It constrains the codec: any encoder the SDK adopts mus
 
 ## Consequences
 
-- **A consumer that hashed, diffed or signed SDK output loses a guarantee it may have relied on.** Pre-1.0 this folds into an `### Added` CHANGELOG entry (the repository's pre-1.0 policy was then `### Added` only — AGENTS.md) and a minor bump, not a deprecation cycle. A consumer needing a stable digest computes it over a canonicalisation of its own choosing. The SDK does not ship one, because an SDK-blessed canonical form would be the same promise wearing a different name.
+- **A consumer that hashed, diffed or signed SDK output loses a guarantee it may have relied on.** Pre-1.0 this ships in a minor release, not a deprecation cycle. A consumer needing a stable digest computes it over a canonicalisation of its own choosing. The SDK does not ship one, because an SDK-blessed canonical form would be the same promise wearing a different name.
 - **The probe suite gets stronger, not weaker.** A byte comparison of two encodes passes whenever the encoder is self-consistent, including when it drops a field on both passes. Typed deep comparison plus `ValidateRM` catches exactly that class. This is the substantive argument for the change, not its mitigation.
 - **Two documented re-encode collapses become visible.** [REQ-052](../specifications/wire.md#req-052) records, in its `DV_TEXT.mappings` and `DV_MULTIMEDIA.data` re-encode-collapse clauses, that both lose the present-but-empty distinction on re-encode, so the decode of a fixture and the decode of its re-encode can legitimately differ. PROBE-030 therefore compares the values on either side of the *second* encode, where both derive from SDK output. The collapses themselves are unchanged.
 - **Canonical XML is untouched.** [REQ-056](../specifications/wire.md#req-056)'s element-order profile and PROBE-033's byte assertion stand. The asymmetry is principled: element order is part of an XML document's identity in a way member order is not part of a JSON object's.
