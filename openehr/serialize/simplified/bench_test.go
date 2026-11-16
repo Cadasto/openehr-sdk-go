@@ -1,8 +1,8 @@
 package simplified_test
 
 // bench_test.go: FLAT codec baselines for the move of the canonical-JSON path
-// to encoding/json/v2 (PR 171; results in docs/specifications/research-strands.md,
-// STRAND-04).
+// to encoding/json/v2 (PR 171 records the results; ADR 0022 sets the regression
+// budget).
 //
 // This package stays on encoding/json, so these benchmarks are not measuring a
 // package that changes. They measure what the change reaches indirectly: the

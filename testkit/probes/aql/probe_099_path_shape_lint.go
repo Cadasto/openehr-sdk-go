@@ -343,8 +343,8 @@ func Probe099PathShapeLint(c PathShapeCorpus) (Result, error) { // PROBE-099 (RE
 		// asserts the FULL issue-code multiset, so a REQ-161 code gained on a
 		// fixture that carries no REQ-161 defect breaks the baseline here. The
 		// codes two of these fixtures DO gain are a deliberate, recorded
-		// re-baseline (REQ-161 § Additivity, recorded in conformance.md's
-		// PROBE-099 entry) — a change to what the caller passes in, not to what
+		// re-baseline (PROBE-099's additivity guard, recorded in conformance.md's
+		// PROBE-028 entry) — a change to what the caller passes in, not to what
 		// this guard does.
 		if msg := runLintCase(tc); msg != "" {
 			failures = append(failures, fmt.Sprintf("additivity/%s: %s", tc.Name, msg))

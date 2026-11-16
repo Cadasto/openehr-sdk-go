@@ -563,7 +563,7 @@ type renderedItem struct {
 // Every refusal it returns carries the ITEM INDEX, including the ones the
 // operand raises for itself — a shape error, a name the grammar cannot lex, an
 // argument that escapes its slot. The coordinate is the whole diagnostic here
-// (REQ-119 § Emission verified after emission): the text may not be quoted, so
+// (REQ-163 § `Build()` verifies the projection it emitted): the text may not be quoted, so
 // a caller with a ten-item projection has nothing else to locate the defect by.
 func (f SelectField) render(idx int) (renderedItem, error) {
 	if f.expr == nil {

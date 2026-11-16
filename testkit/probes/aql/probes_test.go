@@ -1040,8 +1040,8 @@ func TestProbe097RequiresEveryCorpusArm(t *testing.T) {
 // Arm (b): the PROBE-028 corpus ([probe028Cases], the same three fixtures
 // TestProbe028AQLLint wires) re-run under the completed REQ-161 linter. Two of
 // the three gained aql_select_no_alias — a defect those queries genuinely carry
-// — which is the deliberate, recorded re-baseline REQ-161 § Additivity defines,
-// recorded in conformance.md's PROBE-099 entry.
+// — which is the deliberate re-baseline PROBE-099's additivity guard allows,
+// recorded in conformance.md's PROBE-028 entry.
 //
 // The queries below are the shapes openehr/aql/lint's own pathshape_*_test.go
 // files pin at unit level. They are re-spelled here rather than imported: a
@@ -1451,9 +1451,9 @@ func probe099SilentCases() []aqlprobes.PathShapeSilentCase {
 // missing_archetype.aql each project a column with no AS alias — a defect those
 // queries genuinely carry — so each gained aql_select_no_alias and nothing else,
 // while bad_syntax.aql gained nothing at all (it fails at Layer 1, so Layer 2
-// never runs). That re-baseline is recorded in conformance.md's PROBE-099 entry,
-// as REQ-161 § Additivity requires; probe028Cases carries it in the table
-// itself.
+// never runs). That re-baseline is recorded in conformance.md's PROBE-028 entry,
+// as PROBE-099's additivity guard requires; probe028Cases carries it in the
+// table itself.
 func probe099AdditivityCases(t *testing.T) []aqlprobes.LintCase {
 	t.Helper()
 	return probe028Cases(t)

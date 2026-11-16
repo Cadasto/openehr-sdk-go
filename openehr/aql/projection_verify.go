@@ -60,7 +60,7 @@ package aql
 // Diagnostics stay value-free: a refusal names the COORDINATE — the item index,
 // the clause, and where a keyword is at fault its spelling from the SDK's own
 // fixed vocabulary — and never reproduces the offending projection text
-// (REQ-119 § Emission verified after emission).
+// (REQ-163 § `Build()` verifies the projection it emitted).
 
 import (
 	"fmt"
@@ -297,7 +297,7 @@ func compareSelectShape(got derivedProjection, rec recordedProjection) error {
 // coordinate names the item a byte offset falls in, or the clause when it falls
 // in none (the DISTINCT / TOP prefix, or a separator the emitter wrote). It
 // reproduces no projection text — the coordinate is the whole diagnostic
-// (REQ-119 § Emission verified after emission).
+// (REQ-163 § `Build()` verifies the projection it emitted).
 func (r recordedProjection) coordinate(pos int) string {
 	for i, it := range r.items {
 		if pos >= it.start && pos < it.end {
