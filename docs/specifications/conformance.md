@@ -6,7 +6,7 @@ kind: specification
 
 **Status:** Draft
 
-The conformance probe catalogue for this SDK, and the requirements that hold the probe harness to the people who use it: the sandbox backend, recording safety and the live-write opt-in (REQ-082), and the `cadasto/admin` health probes (REQ-083).
+The conformance probe catalogue for this SDK, and the requirements that hold the probe harness to the people who use it: the sandbox backend, recording safety and the live-write opt-in (REQ-082), and the `cadasto/admin` health checks (REQ-083).
 
 A **conformance probe** is an executable assertion that the SDK exercises against either:
 
@@ -22,15 +22,18 @@ Each probe has a stable `PROBE-NNN` ID, one catalogue entry here, and a pass/fai
 
 ### REQ-082 — Runnability
 
-A backend-facing probe runs in up to three modes: **Sandbox**, against the in-memory `sandbox/` transport; **Cassette**, against a replayed recording; and **Live**, against a reference openEHR deployment. An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output and reaches no server in any mode. Each catalogue entry's **Modes** line says which applies: 37 of the 83 catalog entries are in-repo by construction. Today 8 entries declare all three modes; a mode missing from a backend-facing entry is open work in this requirement, not a defect in the probe ([roadmap.md](../roadmap.md)).
+A backend-facing probe runs in up to three modes: **Sandbox**, against the in-memory `sandbox/` transport; **Cassette**, against a replayed recording; and **Live**, against a reference openEHR deployment.
+An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output and reaches no server in any mode.
+Each catalogue entry's **Modes** line says which applies: 37 of the 83 catalog entries are in-repo by construction.
+Today 8 entries declare all three modes.
 
-How the runner selects a mode, what a probe reports and each mode's working rules are in [development-process.md § Conformance probes](../development-process.md#conformance-probes). This section holds what an SDK consumer, or the operator of a deployment a probe writes to, relies on.
+How the runner selects a mode, what a probe reports and each mode's working rules are in [development-process.md § Conformance probes](../development-process.md#conformance-probes).
+This section holds what an SDK consumer, or the operator of a deployment a probe writes to, relies on.
 
 #### Sandbox mode
 
-The `sandbox/` transport is a published building block, not test-only scaffolding.
+The `sandbox/` transport is a published building block, not test-only scaffolding, and serves a probe without a network listener or credentials.
 
-- It **MUST** serve every backend-facing probe in the catalogue without a network listener or credentials.
 - It **MUST** be reachable by an SDK consumer testing their own application, injected as the transport of the HTTP client the consumer hands the SDK.
 - Sandbox state **MUST** be per-run and isolated: two probes running against one sandbox instance observe each other's writes only when the probe definition says they share an EHR.
 
@@ -38,12 +41,15 @@ Its non-test source imports neither `auth/` nor `transport/`, and neither of the
 
 #### Cassette mode
 
-A recording is a captured HTTP exchange: method, URL, request and response headers, status and both bodies. Its encoding is HTTP Archive 1.2 (`.har`), settled by [ADR 0020](../adr/0020-cassette-recording-har.md); provenance and the redaction record sit on `log` as a `_req082` object, since HAR has no native slot for them.
+A recording is a captured HTTP exchange: method, URL, request and response headers, status and both bodies.
+Its encoding is HTTP Archive 1.2 (`.har`), settled by [ADR 0020](../adr/0020-cassette-recording-har.md); provenance and the redaction record sit on `log` as a `_req082` object, since HAR has no native slot for them.
 
-- Credentials (`Authorization`, cookies, tokens, client secrets, JWKS private material) and patient-identifying data **MUST NOT** reach disk. The recorder redacts them at capture time, never at review time, and the recording records that redaction ran, so an unredacted capture is detectable rather than merely unlikely.
-- A recording **MUST** record that redaction ran; one that does not, or that still carries a credential, **MUST** be refused rather than replayed.
-- A recording **MUST** carry its provenance: the deployment it came from, the date, and the SDK commit that captured it. A recording whose provenance cannot be stated **MUST** be refused rather than replayed.
-- The replayer **MUST** fail an unmatched request, and **MUST NOT** pass a request through to a network or synthesise a plausible response: a recording with a gap is recaptured.
+- Credentials (`Authorization`, cookies, tokens, client secrets, JWKS private material) and patient-identifying data **MUST NOT** reach disk.
+  The recorder redacts them at capture time, never at review time, and the recording records that redaction ran, so an unredacted capture is detectable rather than merely unlikely.
+- The replayer **MUST** refuse a recording that does not record that redaction ran, or that still carries a credential.
+- A recording carries its provenance: the deployment it came from, the date, and the SDK commit that captured it.
+  The replayer **MUST** refuse a recording whose provenance cannot be stated.
+- The replayer **MUST** fail an unmatched request rather than pass it through to a network or synthesise a plausible response: a recording with a gap is recaptured.
 
 #### Live mode
 
@@ -55,19 +61,25 @@ The CDR cross-check tool (`make cdr-crosscheck`) measures live CDRs and the SDK 
 
 ### REQ-083 — Cadasto platform API conformance
 
-The `cadasto/` extras have no openEHR specification: their wire contract is the Cadasto platform API, its OpenAPI document where one exists, and otherwise fixture documents captured from a reference Cadasto deployment. Their probes check the SDK's wire shape against that contract, not against another SDK.
+The `cadasto/` extras have no openEHR specification: their wire contract is the Cadasto platform API, its OpenAPI document where one exists, and otherwise fixture documents captured from a reference Cadasto deployment.
+Their probes check the SDK's wire shape against that contract, not against another SDK.
 
-#### Health probes (`cadasto/admin`)
+#### Health checks (`cadasto/admin`)
 
-`cadasto/admin` exposes deployment liveness/readiness probes (`Live`, `Ready`, `ReadyBody`) with a wire contract independent of the (planned) Cadasto platform API surface. They are distinct from the ITS-REST Admin client, `openehr/client/admin`.
+`cadasto/admin` exposes deployment liveness and readiness checks (`Live`, `Ready`, `ReadyBody`) with a wire contract of their own, independent of the rest of the Cadasto platform API.
+They are distinct from the ITS-REST Admin client, `openehr/client/admin`.
 
 - **Default paths** `DefaultLivePath = "/health/live"`, `DefaultReadyPath = "/health/ready"`, each overridable per call via `WithLivePath` / `WithReadyPath` (e.g. `/healthz`).
 - **Guards.** A path that is empty or does not start with `/` returns `ErrInvalidPath`, and a nil `*transport.Client` an error matching `transport.ErrInvalidConfig`; either way no request is sent.
-- **URL derivation.** The probe URL derives from the **origin (scheme + host) of the openEHR REST service entry** — the openEHR REST API path prefix is **NOT** inherited.
-- **Public / no auth.** Health endpoints are public: the SDK **MUST NOT** send an `Authorization` header on a probe.
-- **Status mapping** (`errors.Is`-compatible): `2xx → nil`. Every non-2xx returns a `*admin.StatusError` carrying the probe path and the status code, which unwraps to `transport.ErrUnauthorized` for `401`, `transport.ErrForbidden` for `403`, `transport.ErrNotFound` for `404` and `transport.ErrServerError` for `5xx`, or to `admin.ErrUnexpectedStatus` for any other code (400, 405, 408, 429, …).
-- Probes borrow `transport`'s sentinel taxonomy (REQ-093) but **bypass** `transport.Client.Do` — no openEHR error-envelope decoding, no OTel spans, no retries. Use `openehr/client/admin` when those concerns matter.
-- **Bounded drain.** A probe drains the 2xx body `Live` and `Ready` discard, and any body that is not 2xx, so the connection can be reused. It **MUST** read at most a fixed number of bytes of that body, for at most a fixed time, before closing it: a body that never ends, streamed fast or trickled, **MUST NOT** hold a probe until its context ends. A `ReadyBody` 2xx body is read under *The readiness body* below instead.
+- **URL derivation.** The check's URL derives from the **origin (scheme + host) of the openEHR REST service entry** — the openEHR REST API path prefix is **NOT** inherited.
+- **Public / no auth.** Health endpoints are public: the SDK **MUST NOT** send an `Authorization` header on a health check.
+- **Status mapping** (`errors.Is`-compatible): `2xx → nil`.
+  Every non-2xx returns a `*admin.StatusError` carrying the check's path and the status code, which unwraps to `transport.ErrUnauthorized` for `401`, `transport.ErrForbidden` for `403`, `transport.ErrNotFound` for `404` and `transport.ErrServerError` for `5xx`, or to `admin.ErrUnexpectedStatus` for any other code (400, 405, 408, 429, …).
+- The checks borrow `transport`'s sentinel taxonomy (REQ-093) but **bypass** `transport.Client.Do` — no openEHR error-envelope decoding, no OTel spans, no retries.
+  Use `openehr/client/admin` when those concerns matter.
+- **Bounded drain.** A check drains the 2xx body `Live` and `Ready` discard, and any body that is not 2xx, so the connection can be reused.
+  It **MUST** read at most a fixed number of bytes of that body, for at most a fixed time, before closing it: a body that never ends, streamed fast or trickled, **MUST NOT** hold a check until its context ends.
+  A `ReadyBody` 2xx body is read under *The readiness body* below instead.
 
 ##### The readiness body
 
