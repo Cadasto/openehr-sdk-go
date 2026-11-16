@@ -676,6 +676,7 @@ Recording a decline never widens the profile: admitting an engine extension is a
 ### Layer 2 — Shape (AST walk, no CDR)
 
 Each code in this table and in the § Layer 3 table **MUST** be raised exactly when its *Fires when* cell holds, at the severity the table gives.
+`aql_select_star` is the one exception: it **SHOULD** be raised when its cell holds, and **MUST NOT** be raised for `COUNT(*)`.
 
 | Check | Code | Severity | Fires when |
 |---|---|---|---|
