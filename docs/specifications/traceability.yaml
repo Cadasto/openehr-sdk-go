@@ -1848,6 +1848,7 @@ requirements:
     tests:
       - internal/bmmtype/bmmtype_test.go
       - internal/bmmtype/formal_parameters_test.go
+      - internal/templatecompile/coded_name_test.go
       - internal/templatecompile/compile_generic_test.go
       - internal/templatecompile/compile_model_test.go
       - internal/templatecompile/compile_nodename_test.go

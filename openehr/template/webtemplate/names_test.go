@@ -188,3 +188,38 @@ func childByID(n *webtemplate.Node, id string) *webtemplate.Node {
 	}
 	return nil
 }
+
+// TestREQ106CodedPinnedNameNamesTheNode — REQ-106, issue 455: the IDCR - Vital
+// Signs Encounter.v1 template names the pulse rate ELEMENT, whose archetype
+// term is "Rate", with the local code at1027, whose term text is "Heart Rate".
+// The node takes that text as its name and localized names, derives its id
+// from it, and carries it as the name predicate of its aqlPath, as the
+// reference names it; its description stays the archetype term's.
+func TestREQ106CodedPinnedNameNamesTheNode(t *testing.T) {
+	const (
+		pinned = "Heart Rate"
+		path   = "/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data[at0002]/events[at0003]/data[at0001]/items[at0004,'Heart Rate']/value"
+	)
+	wt := buildOPT(t, readFile(t, "../../../testkit/corpus/templates/IDCR - Vital Signs Encounter.v1.opt"))
+	var rate *webtemplate.Node
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		if n.RMType == "DV_QUANTITY" && n.NodeID == "at0004" && strings.Contains(n.AQLPath, "OBSERVATION.pulse.v1") {
+			rate = n
+		}
+	})
+	if rate == nil {
+		t.Fatal("no DV_QUANTITY leaf at0004 under the pulse OBSERVATION — fixture changed?")
+	}
+	if rate.ID != "heart_rate" || rate.AQLPath != path {
+		t.Errorf("pulse rate id = %q, aqlPath = %q, want heart_rate at %s", rate.ID, rate.AQLPath, path)
+	}
+	got := nodeNames{rate.Name, rate.LocalizedName, rate.LocalizedNames}
+	want := nodeNames{pinned, pinned, map[string]string{wt.DefaultLanguage: pinned}}
+	if !got.equal(want) {
+		t.Errorf("pulse rate names = %+v, want %+v", got, want)
+	}
+	const description = "The rate, measured in beats per minute."
+	if d := rate.LocalizedDescriptions[wt.DefaultLanguage]; d != description {
+		t.Errorf("pulse rate description = %q, want the archetype term's %q", d, description)
+	}
+}
