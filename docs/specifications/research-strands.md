@@ -131,14 +131,14 @@ Resolved by the REST probes PROBE-062, PROBE-102, PROBE-103 and PROBE-104, and b
 **Question:** does `rmpath.ItemAtPath` need to tell *attribute unknown to the navigator* from *attribute known but unpopulated*, instead of returning `ErrPathNotFound` for both?
 
 **Why it's open:** the FLAT encoder treats resolution failure as an absent optional (`skipNotFound`), which is correct for the unpopulated case and silent data loss for the unknown-attribute case, the defect class PROBE-086 surfaced.
-Because the encoder cannot tell the two conditions apart, the coverage rule in [reference-model.md § REQ-121](reference-model.md#req-121--locatable-path-read-access) is enforced by a hand-kept guard test and exemption list rather than derived from the API.
+Because the encoder cannot tell the two conditions apart, the coverage rule in [wire.md § Web Template leaf coverage](wire.md#web-template-leaf-coverage) is enforced by a hand-kept guard test and exemption list rather than derived from the API.
 
 **Resolution options:** a distinct sentinel (e.g. `ErrUnknownAttribute`) letting `skipNotFound` fail loudly on unmodelled attributes and retiring the exemption list; or keeping the single sentinel and the guard-test enforcement.
 The first adds an exported error to a landed surface ([idiom.md § API conventions](idiom.md#api-conventions) compatibility question); the second keeps the hazard class alive but contained.
 
 **Evidence needed:** whether the exemption list churns (each churn is an argument for the sentinel, and it has churned once); whether any consumer outside the encoder needs the distinction.
 
-**Resolution form:** ADR-NNN; the REQ-121 open-question paragraph and the guard-test exemption mechanism are updated together with it.
+**Resolution form:** ADR-NNN; [wire.md § Web Template leaf coverage](wire.md#web-template-leaf-coverage) and the guard-test exemption mechanism are updated together with it.
 
 ---
 
@@ -226,7 +226,7 @@ The capture question below stays open.
 **Question:** do the generated RM types capture, at decode, the members the decoder matched to nothing?
 And if they do, are those kept on the value so a read, modify and write round trip is lossless, or discarded once reported?
 
-**Why it is open:** [REQ-170](wire.md#req-170--unmatched-content-on-decode)'s report and strict options for canonical JSON read the bytes again after the decode to compare each member name with the class's attribute list, in one pass when every object's `_type` is its first member and otherwise in two, the first to find every `_type`.
+**Why it's open:** [REQ-170](wire.md#req-170--unmatched-content-on-decode)'s report and strict options for canonical JSON read the bytes again after the decode to compare each member name with the class's attribute list, in one pass when every object's `_type` is its first member and otherwise in two, the first to find every `_type`.
 That name pass links the RM attribute tables into every program that imports `canjson`.
 The standard library can do it in one pass: `encoding/json/v2`'s embedded fallback (the `embed` option on a `jsontext.Value` or `map[string]T` field) receives every member the struct does not match.
 
@@ -273,7 +273,7 @@ Three candidates are named and none is built:
    An option that keeps every value check and suppresses the presence and lower-bound count findings of both layers would serve that case without any switch that turns the RM rules off, which [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md) refuses.
    It is additive; what it means for `Result.OK` and `Coverage` is the open part.
 
-**Why it is open:** each candidate is additive on REQ-171's options and cheap to add, and each changes what a `Result` means to the caller who reads it.
+**Why it's open:** each candidate is additive on REQ-171's options and cheap to add, and each changes what a `Result` means to the caller who reads it.
 None has a consumer asking for it yet except the warn-or-reject policy, which a server that validates on commit needs in some form.
 Adding an option nobody uses is the second kind of waste ADR 0025 named.
 
@@ -309,6 +309,6 @@ Resolved by [ADR 0035](../adr/0035-compile-step-reads-operational-template-model
 | [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-041, REQ-048 |
 | [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-041, REQ-048 |
 | [STRAND-14](#strand-14) | Template-driven validation and the RM floor | Resolved | REQ-102, REQ-112 |
-| [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Partly resolved | REQ-040, REQ-052, REQ-112, REQ-170, REQ-175 |
+| [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Partially resolved | REQ-040, REQ-052, REQ-112, REQ-170, REQ-175 |
 | [STRAND-16](#strand-16--validator-policy-beyond-the-limits) | Validator policy beyond the limits | Open | REQ-102, REQ-171 |
 | [STRAND-17](#strand-17--the-opt-parser-and-the-generated-operational-template-model) | The OPT parser and the generated OPT model | Resolved | REQ-013, REQ-100, REQ-103, REQ-107, REQ-108, REQ-111, REQ-176 |

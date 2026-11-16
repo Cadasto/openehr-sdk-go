@@ -21,10 +21,10 @@ In this SDK the RM Go types are **generated** from the SDK-authored RM root over
 **BMM (Basic Meta-Model)**
 The openEHR meta-model that describes information models (RM, AM, BASE, LANG, TERM) as a compact, computable alternative to UML/XMI.
 Defined in the openEHR LANG specification.
-In this SDK the BMM files in [`../resources/bmm/`](../../resources/bmm) are the source of truth for the openEHR domain model; see [reference-model.md](reference-model.md).
+In this SDK the BMM files in [`resources/bmm/`](../../resources/bmm) are the source of truth for the openEHR domain model; see [reference-model.md](reference-model.md).
 
 **P_BMM**
-The persistence (serialisation) form of BMM — typically a JSON document (the `.bmm.json` files in [`../resources/bmm/`](../../resources/bmm)) keyed by `schema_id` (e.g. `openehr_rm_1.2.0`).
+The persistence (serialisation) form of BMM — typically a JSON document (the `.bmm.json` files in [`resources/bmm/`](../../resources/bmm)) keyed by `schema_id` (e.g. `openehr_rm_1.2.0`).
 On-disk attribute names appear as `P_BMM_*` (e.g. `P_BMM_SINGLE_PROPERTY`, `P_BMM_CONTAINER_TYPE`, `P_BMM_GENERIC_PROPERTY`); the in-memory model uses the abstract `BMM_*` equivalents.
 
 **Archetype Object Model (AOM)**
