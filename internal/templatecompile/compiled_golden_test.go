@@ -1,6 +1,10 @@
 package templatecompile_test
 
-// REQ-111 § Recorded compiled trees — the compiled-tree golden.
+// REQ-111 § Reading the model and REQ-176 § What the reader tolerates — the
+// compiled-tree golden. The parity fixtures hold at least one operational
+// template for each reading REQ-176 § What the reader tolerates and REQ-111
+// § What the compile step tolerates allow, and for each default-value
+// placement REQ-111 § Reading the model names.
 //
 // For every operational template the corpus vendors, walked as PROBE-111
 // walks them, for every parity fixture (testdata/parity) and for every

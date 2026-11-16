@@ -2725,6 +2725,8 @@ requirements:
       - internal/bmmgen/render_xmlnames_test.go
       - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/bmmgen/sdk_extensions_test.go
+      - internal/templatecompile/compiled_golden_test.go
+      - internal/templatecompile/parity_exceptions_test.go
       - openehr/aom/aom14/code_phrase_code_list_xml_test.go
       - openehr/aom/aom14/expr_leaf_item_json_test.go
       - openehr/aom/aom14/expr_leaf_item_xml_test.go
