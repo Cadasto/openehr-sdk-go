@@ -615,6 +615,7 @@ requirements:
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/history_origin_test.go
       - openehr/serialize/simplified/index_bound_test.go
+      - openehr/serialize/simplified/instruction_details_test.go
       - openehr/serialize/simplified/interval_event_test.go
       - openehr/serialize/simplified/interval_unbounded_test.go
       - openehr/serialize/simplified/ism_transition_merged_test.go
@@ -2192,6 +2193,7 @@ requirements:
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/index_bound_test.go
+      - openehr/serialize/simplified/instruction_details_test.go
       - openehr/serialize/simplified/interval_leaf_anchor_test.go
       - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
@@ -2545,6 +2547,7 @@ requirements:
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/history_origin_test.go
       - openehr/serialize/simplified/index_bound_test.go
+      - openehr/serialize/simplified/instruction_details_test.go
       - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/malformed_key_test.go
