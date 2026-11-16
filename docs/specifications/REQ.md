@@ -6,9 +6,11 @@ kind: specification
 
 **Status:** Draft
 
-Index of the normative `REQ-NNN` identifiers for `github.com/cadasto/openehr-sdk-go`. Each requirement's normative text lives in the linked topic spec, never here.
+Index of the normative `REQ-NNN` identifiers for `github.com/cadasto/openehr-sdk-go`.
+Each requirement's normative text lives in the linked topic spec, never here.
 
-The table is generated from [`traceability.yaml`](traceability.yaml) by `make spec-generate`, and `make spec-check` fails when it is stale. To change a title, a canonical link, the spec stability or the implementation status, edit the map and regenerate; do not edit the table.
+The table is generated from [`traceability.yaml`](traceability.yaml) by `make spec-generate`, and `make spec-check` fails when it is stale.
+To change a title, a canonical link, the spec stability or the implementation status, edit the map and regenerate; do not edit the table.
 
 **Adding a requirement:** take the next free number (see [Numbering policy](#numbering-policy)), write the normative text in the canonical topic spec, add an entry to `traceability.yaml`, then run `make spec-generate`.
 
@@ -144,11 +146,14 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 
 ## Numbering policy
 
-A new requirement takes the **next free number above the highest registered one**, whatever its topic. The number carries no topic meaning; the canonical link says where the requirement belongs. Earlier requirements were numbered in topic bands (001–005 packaging, 010–014 layout, and so on); those numbers stay as they are, but the bands are no longer allocated from.
+A new requirement takes the **next free number above the highest registered one**, whatever its topic.
+The number carries no topic meaning; the canonical link says where the requirement belongs.
+Earlier requirements were numbered in topic bands (001–005 packaging, 010–014 layout, and so on); those numbers stay as they are, but the bands are no longer allocated from.
 
 Identifiers are stable once published: never renumbered and never reused.
 
-Numbers released without becoming a requirement are listed below. The list is prose, not a table, so the registry stays the only index table in this file.
+Numbers released without becoming a requirement are listed below.
+The list is prose, not a table, so the registry stays the only index table in this file.
 
 - REQ-114 and REQ-115: retired, never reused; they were reserved for an OPT author validator and a FLAT author linter that were never started.
 - REQ-124 and REQ-125: retired, never reused; they were reserved for the deferred RM-function stubs, which [reference-model.md](reference-model.md) records as out of scope.

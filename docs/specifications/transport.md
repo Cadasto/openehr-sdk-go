@@ -71,7 +71,8 @@ Rules:
 
 ### Retrying after a body read failure
 
-A request whose 2xx body could not be read ([§ REQ-151](#req-151--typed-2xx-decode-failure) *A body that cannot be read*) **MUST NOT** be sent again unless its method is `GET`, `HEAD` or `OPTIONS`, which RFC 9110 §9.2.1 defines as safe, even when `RetryNonIdempotent` is set: the server has acted on it, and a second `PUT` carrying the same `If-Match` would fail as a stale precondition and hide the version the first one made.
+A request whose 2xx body could not be read ([§ REQ-151](#req-151--typed-2xx-decode-failure) *A body that cannot be read*) **MUST NOT** be sent again unless its method is `GET`, `HEAD` or `OPTIONS`, which RFC 9110 §9.2.1 defines as safe, even when `RetryNonIdempotent` is set.
+The server has acted on it, and a second `PUT` carrying the same `If-Match` would fail as a stale precondition and hide the version the first one made.
 The non-2xx arm is retried by its status, as any `*WireError` is.
 A request whose body could not be read, on either arm, **MUST NOT** be sent again once its context has ended, and when the context ends during the wait before a retry, `Client.Do` **MUST** still return that arm's error and `*Response`, with the context's error wrapped beside it.
 
@@ -274,7 +275,8 @@ When `Request.Route` is set, the transport **MUST** therefore also refuse a deco
 The check runs only when `Route` is set, so every path-interpolating leaf request sets it, and the check reads the `Route` field itself, never a helper that falls back to `Path` (a path's arity compared against itself never fires).
 
 Leaf clients do not re-implement the check.
-On every `openehr/client/*` operation, a path parameter that contains `/` **MUST** be refused, with an error wrapping `transport.ErrInvalidPathSegment` and `transport.ErrInvalidConfig`, and no request issued: a parameter that is a well-formed openEHR identifier satisfies every rule above and passes, and a `/` is refused as a smuggled separator, never let through on the expectation that openEHR identifiers carry no separator, which is exactly the expectation a hostile identifier exploits.
+On every `openehr/client/*` operation, a path parameter that contains `/` **MUST** be refused, with an error wrapping `transport.ErrInvalidPathSegment` and `transport.ErrInvalidConfig`, and no request issued.
+A parameter that is a well-formed openEHR identifier satisfies every rule above and passes, and a `/` is refused as a smuggled separator, never let through on the expectation that openEHR identifiers carry no separator, which is exactly the expectation a hostile identifier exploits.
 
 Out of scope: a breaking `PathSegment` named type on every leaf; validating the service base URL; the `cadasto/admin` health-probe paths (`WithLivePath` / `WithReadyPath`), which bypass `transport.Do` by design and keep their own non-empty / leading-`/` guard.
 
@@ -316,7 +318,11 @@ Beneath a read failure that is `io.ErrUnexpectedEOF` for a connection cut mid-bo
 
 ### `Error()` stays value-free
 
-The `Error()` of each typed error in the table **MUST** follow the [REQ-093](#req-093--openehr-error-envelope-mapping) discipline: it names the classification and the request fields the error holds, the method and route template of a `DecodeError` and the status too for a `BodyReadError`, with the route under REQ-093's *Unrouted requests render a placeholder* rule, and it never names a header value, a body byte or the cause's own text.
+The `Error()` of each typed error in the table **MUST** follow the [REQ-093](#req-093--openehr-error-envelope-mapping) discipline:
+
+- it names the classification and the request fields the error holds, the method and route template of a `DecodeError` and the status too for a `BodyReadError`, with the route under REQ-093's *Unrouted requests render a placeholder* rule;
+- and it never names a header value, a body byte or the cause's own text.
+
 That text can carry the offending value or bytes the server sent: a `*strconv.NumError` beneath a decode failure always quotes its input, as a `*json.SemanticError` can beneath a `canjson.DecodeError` whose own text carries none ([wire.md § REQ-052](wire.md#req-052)), and net/http quotes a malformed chunked trailer in a read failure.
 The cause is reachable only by unwrapping.
 For a body over the ceiling the message names the limit, as REQ-093 requires; the limit is the caller's own setting, not a payload value.

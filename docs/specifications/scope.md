@@ -6,7 +6,8 @@ kind: specification
 
 **Status:** Draft
 
-What the `openehr-sdk-go` v1 surface includes and excludes, and the consumers that justify it. Out-of-scope items are not gaps — they are deliberate boundaries with named handling elsewhere.
+What the `openehr-sdk-go` v1 surface includes and excludes, and the consumers that justify it.
+Out-of-scope items are not gaps — they are deliberate boundaries with named handling elsewhere.
 
 ## In scope
 
@@ -54,17 +55,22 @@ What the `openehr-sdk-go` v1 surface includes and excludes, and the consumers th
 
 Items occasionally confused with SDK scope:
 
-- The SDK is a **library**, not a service: no listening sockets, no database driver. The `cmd/` programs are developer tools and illustrative examples.
-- A CDR implements the *server* side of openEHR REST; this SDK implements the *client* side. They share no runtime code.
-- The MCP server use case is a target, not a deliverable. The SDK ships method signatures that map 1:1 to MCP tool definitions; the MCP framework integration is the consuming MCP server's responsibility.
+- The SDK is a **library**, not a service: no listening sockets, no database driver.
+  The `cmd/` programs are developer tools and illustrative examples.
+- A CDR implements the *server* side of openEHR REST; this SDK implements the *client* side.
+  They share no runtime code.
+- The MCP server use case is a target, not a deliverable.
+  The SDK ships method signatures that map 1:1 to MCP tool definitions; the MCP framework integration is the consuming MCP server's responsibility.
 
 ## Use cases
 
-The SDK is not built in a vacuum: every public-surface decision is justified by at least one named consumer. If a feature has no consumer, it does not ship in v1.
+The SDK is not built in a vacuum: every public-surface decision is justified by at least one named consumer.
+If a feature has no consumer, it does not ship in v1.
 
 ### Primary use cases
 
-Five named consumers drive the SDK's primary surface. For each: what the SDK provides, what stays bespoke in the consumer.
+Five named consumers drive the SDK's primary surface.
+For each: what the SDK provides, what stays bespoke in the consumer.
 
 #### Benchmark
 
@@ -116,7 +122,8 @@ Fan-out over multiple openEHR backends with per-node spec pinning, partial-failu
 | Independent `*http.Client` per node (REQ-021) | Identity reconciliation across nodes, a Cadasto MPI research track outside this SDK |
 | `context.Context` propagation across goroutines | Routing decisions (which subset of nodes to call) |
 
-Federation policy is the subject of a separate research track once MPI lands. The SDK provides the *primitives*; the policy is bespoke.
+Federation policy is the subject of a separate research track once MPI lands.
+The SDK provides the *primitives*; the policy is bespoke.
 
 #### openEHR SMART app (Go backend)
 
@@ -131,7 +138,8 @@ A server-side web or API service that performs a SMART-on-openEHR launch, handle
 
 ### Building-block use cases
 
-The building blocks [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence) lists are importable and useful without an authenticated client. Consumers such as these motivate the rule:
+The building blocks [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence) lists are importable and useful without an authenticated client.
+Consumers such as these motivate the rule:
 
 | Building block | Consumer pattern |
 |---|---|
@@ -146,7 +154,11 @@ The building blocks [module-layout.md § REQ-013](module-layout.md#req-013--buil
 
 Documented to prevent scope-creep PRs:
 
-- **Browser-side openEHR client.** The SDK is server-side / CLI; no browser-side bindings, no WebAssembly export, no fetch-API polyfill. A consumer needing this can build it on top of `openehr/rm/` and `openehr/serialize/`, but the SDK doesn't ship a browser shape.
-- **Mobile SDKs.** Not a Go consumer pattern. iOS / Android need different SDKs (Swift / Kotlin) which are out of scope.
-- **Realtime / streaming.** No openEHR REST 1.1.0 streaming endpoints in v1. Server-Sent Events for outbox publication is an openEHR-side concern, not an SDK concern in v1.
-- **CLI for end-users.** The SDK ships `cmd/examples/` for illustration only. A "Cadasto CLI" is a separate downstream product that *consumes* this SDK.
+- **Browser-side openEHR client.** The SDK is server-side / CLI; no browser-side bindings, no WebAssembly export, no fetch-API polyfill.
+  A consumer needing this can build it on top of `openehr/rm/` and `openehr/serialize/`, but the SDK doesn't ship a browser shape.
+- **Mobile SDKs.** Not a Go consumer pattern.
+  iOS / Android need different SDKs (Swift / Kotlin) which are out of scope.
+- **Realtime / streaming.** No openEHR REST 1.1.0 streaming endpoints in v1.
+  Server-Sent Events for outbox publication is an openEHR-side concern, not an SDK concern in v1.
+- **CLI for end-users.** The SDK ships `cmd/examples/` for illustration only.
+  A "Cadasto CLI" is a separate downstream product that *consumes* this SDK.

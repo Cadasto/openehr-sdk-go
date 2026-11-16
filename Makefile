@@ -84,6 +84,9 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 ##= REQ=094 | the requirement spec-context bundles
 ##= OUTLINE=1 | spec-context: the section's outline in place of its text
 ##= RULE=<name> | spec-context: only that rule of the section, by its anchor or heading
+##= BASE=<ref> | spec-kwdiff: the commit to compare with (default origin/main)
+##= FILES=<names> | spec-kwdiff: only these spec files, e.g. FILES="wire.md auth.md"
+##= CHECK=1 | spec-kwdiff: fail when a file's keyword counts change
 ##= ARGS='-base URL -deployment NAME ...' | probe-record flags
 ##= BMM_REF= ITS_XML_REF= ... | pin a Vendor sync (ITS_REST_REF, TERMINOLOGY_REF too; EHRbase pins: testkit/corpus/UPSTREAM_PINS.txt)
 ##= DOCS_SYNC=docs-sync-offline | build the docs site from the cached brand files
@@ -98,7 +101,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check its-xml-check flat-check crossformat-check ehrbase-service-check corpus-pins-check terminology-check \
         operational-template-schema-check \
         spec-check sdd-check ci \
-        spec-context probe-status probe-record cdr-crosscheck \
+        spec-context spec-kwdiff probe-status probe-record cdr-crosscheck \
         docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean
 
 ##@ Setup
@@ -341,6 +344,9 @@ sdd-check: ## Print the SDD gate's full report, warnings included
 
 spec-context: ## Print the SDD context bundle of one REQ (REQ=094; OUTLINE=1 or RULE=<name> to read less)
 	@OUTLINE="$(OUTLINE)" RULE="$(RULE)" bash scripts/spec-context.sh $(REQ)
+
+spec-kwdiff: ## Show the specs' RFC-2119 keyword changes since BASE
+	@python3 scripts/spec-kwdiff.py $(if $(filter 1,$(CHECK)),--check) "$(if $(BASE),$(BASE),origin/main)" $(FILES)
 
 probe-status: ## Show each PROBE's status and whether its test exists
 	@bash scripts/probe-status.sh
