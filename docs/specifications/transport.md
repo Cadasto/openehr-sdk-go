@@ -53,7 +53,7 @@ Rules:
   `POST` and `PATCH` are not idempotent (RFC 9110 §9.2.2), and an openEHR `PUT` or `DELETE` names the version it changes (`If-Match`, a version uid), so a retry after a `502`, `503` or `504` that hid a committed write would answer `412` or `409` for a write that succeeded.
   The SDK checks the method before it looks at the error or the status, so a token or network failure on such a request is not retried either.
 - Retries **MUST** respect `ctx` cancellation: no attempt starts once `ctx` has ended.
-- The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
+- The OTel span **SHOULD** carry the retry budget as `retry.attempt` and `retry.backoff_ms`, so a trace shows how many attempts a call took and how long it waited.
 - Two requests **MUST NOT** be sent again, since every attempt would fail the same way: a request `Client.Do` refuses with `transport.ErrInsecureRedirect` ([§ REQ-092](#req-092--tls-posture) *No downgrade with a credential*), and a request that cannot be built (`http.NewRequestWithContext` refuses it).
 
 ### Disabling retries
@@ -135,8 +135,9 @@ The SDK **MUST**:
   Neither a numeric `code` nor a body that carries `validationErrors` with no `code` or no `message` leaves the envelope undecoded.
 - Attach the parsed envelope to `transport.WireError` as `OpenEHRErrorDetail{Message, Code, CodedText, ValidationErrors}`.
 - Map the HTTP status to typed sentinels per [idiom.md § Errors](idiom.md#errors-req-025): `ErrNotFound` (404), `ErrUnauthorized` (401), `ErrForbidden` (403), `ErrVersionConflict` (409), `ErrPreconditionFailed` (412), `ErrUnprocessable` (422), `ErrPreconditionRequired` (428).
-  The status set follows the openEHR contract: a **422** signals a well-formed-but-semantically-invalid request (validation / template failure — the ITS-REST overview, § *HTTP status codes*; used on EHR and demographic writes) and **MUST** map to `ErrUnprocessable`.
-  A **409** spans a conflict with the resource's current state (the Composition delete of a version that is not the latest) and a resource-already-exists collision; the openEHR error `code` on `OpenEHRErrorDetail` disambiguates and `ErrVersionConflict` remains the sentinel for both. openEHR signals a stale `If-Match` as **412** and a missing-but-expected `If-Match` as **400** (the ITS-REST overview, § *If-Match and accidental overwrites*) — **not** 428; `ErrPreconditionRequired` (428) is retained only as a defensive mapping for non-conformant servers and is **not** an openEHR-canonical status.
+  The status set follows the openEHR contract: a **422** signals a well-formed-but-semantically-invalid request (validation / template failure — the ITS-REST overview, § *HTTP status codes*; used on EHR and demographic writes).
+  A **409** spans a conflict with the resource's current state (the Composition delete of a version that is not the latest) and a resource-already-exists collision; the openEHR error `code` on `OpenEHRErrorDetail` disambiguates and `ErrVersionConflict` remains the sentinel for both.
+  openEHR signals a stale `If-Match` as **412** and a missing-but-expected `If-Match` as **400** (the ITS-REST overview, § *If-Match and accidental overwrites*) — **not** 428; `ErrPreconditionRequired` (428) is retained only as a defensive mapping for non-conformant servers and is **not** an openEHR-canonical status.
   A **400** with no more specific sentinel surfaces as a bare `WireError` whose openEHR `code` remains reachable via `errors.As`.
 
 ### PHI-safe error surfaces by default
@@ -144,7 +145,7 @@ The SDK **MUST**:
 openEHR error bodies routinely carry patient identifiers and clinical detail.
 `WireError.Error()` **MUST NOT** interpolate `OpenEHR.Message`, a `CodedText` item's `Value` or the raw response bytes.
 It **MUST** carry HTTP status, route template, and the openEHR error *code* (codes are not PHI).
-Callers that need the full server payload for diagnostics **MUST** opt in via `transport.WithRawErrorBodies(true)`; only then are `OpenEHR.Message`, `OpenEHR.ValidationErrors`, each `OpenEHR.CodedText` item's `Value` (free text, like the message) and `WireError.RawBody` populated.
+`OpenEHR.Message`, `OpenEHR.ValidationErrors`, each `OpenEHR.CodedText` item's `Value` (free text, like the message) and `WireError.RawBody` **MUST** stay empty unless the client is built with `transport.WithRawErrorBodies(true)`, the opt-in for a caller that needs the full server payload for diagnostics.
 `OpenEHR.Code` and each `OpenEHR.CodedText` item's terminology and code string remain available via `errors.As` regardless of the opt-in (structured codes, not free-text clinical narrative).
 
 `WireError.Error()` values flow into REQ-098 observers and REQ-090 OTel span status; the PHI-safe default applies there too unless the consumer opts into raw bodies.
@@ -254,7 +255,6 @@ Every remaining segment of any other path **MUST** be non-empty and **MUST NOT**
 - contain a control character (bytes `< 0x20` or `DEL` `0x7F`).
 
 A space or any other percent-encodable octet **MUST** be accepted — encoding remains the transport's job (REQ-050).
-Validation **MUST** run on the decoded path the transport already requires.
 A literal `%2e%2e` that was not decoded is an ordinary segment, not a separator.
 
 The transport **MUST NOT** honour a caller-populated `url.URL.RawPath` when building the request URI: the encoded form is derived from the validated decoded path alone (REQ-050), so a pre-encoded spelling cannot bypass validation.
@@ -401,7 +401,7 @@ type BearerChallenge struct {
 ```
 
 - The parser **MUST** match auth-param names in any letter case (`Error`, `SCOPE` and `Resource_Metadata` are read as `error`, `scope` and `resource_metadata`), keeping every other auth-param in `Params` under its lower-case name, so a caller reads `Params["resource_metadata"]` whatever case the server wrote.
-- A response without a `Bearer` challenge **MUST** leave `Challenge` nil; a challenge the transport cannot parse **MUST** leave it nil too, and the response **MUST** still map to its status sentinel.
+- A response without a `Bearer` challenge, or with one the transport cannot parse, **MUST** leave `Challenge` nil and still map to its status sentinel.
   The parser **MUST** ignore empty list elements (RFC 9110 §5.6.1.2).
 - The work spent on a challenge **MUST** stay bounded: a `WWW-Authenticate` field line whose value is longer than the parser's limit, 8 KiB, is treated as unparseable without being parsed, while the other lines are still read (RFC 9110 §5.4 lets a recipient ignore a field line it does not wish to process; real Bearer challenges are far shorter).
 - `WireError.Error()` **MUST NOT** include challenge values; they stay reachable through `errors.As`, under the same discipline as the openEHR error envelope (REQ-093): `Error`, `Scope`, `Realm`, `ErrorURI` and `Params` are always populated, while `ErrorDescription`, free text from the server, **MUST** be populated only when the client is built with `WithRawErrorBodies(true)`.
@@ -410,7 +410,7 @@ type BearerChallenge struct {
 
 `transport.WithReauthOn401(r auth.Reauther)` installs an opt-in retry for a wire `401`; without it, a `401` returns `transport.ErrUnauthorized` after one upstream call.
 It backs up the proactive renewal of a token source ([auth.md § REQ-063](auth.md#req-063--token-refresh)), for a token that expires between that check and the wire round trip.
-`auth.Reauther`, `auth.ReautherFunc` and the providers that implement them are auth.md's ([§ Forced refresh](auth.md#forced-refresh)).
+[auth.md § Forced refresh](auth.md#forced-refresh) specifies `auth.Reauther`, `auth.ReautherFunc` and the providers that implement them.
 
 When a `401` arrives:
 
@@ -435,7 +435,7 @@ This deliberately differs from [§ REQ-091](#req-091--retry-policy), which never
 
 When the SDK is consumed by an AI-facing surface (MCP server, agent integration), the consumer can record AI-mediated provenance on outgoing requests: which agent identifier acted, which model provider was involved, the upstream trace context.
 
-The SDK **MUST** provide an opt-in carriage path for this metadata.
+The SDK **MUST** provide an opt-in carriage path for this metadata, and send none of it unless the caller sets it.
 Two equivalent shapes:
 
 ```go
@@ -458,7 +458,6 @@ Transport carriage:
 - The SDK **MUST** emit the attribution metadata as both:
   - A configurable HTTP header (default: `X-Cadasto-Caller-Attribution`, value: JSON-encoded), and
   - OTel span attributes (`caller.agent_id`, `caller.model_provider`, `caller.*`).
-- The mechanism **MUST** be **opt-in** — no defaults are sent automatically.
 - The SDK **MUST NOT** add a claim about the user to the attribution metadata.
 - Callers **SHOULD NOT** put personally identifying claims about the *user* in the attribution metadata, because it travels as a plain header and as span attributes into logs and traces; the user's identity flows through the token and claim path, not through caller attribution.
 

@@ -284,7 +284,7 @@ An application can also choose it per call, as an MCP server that accepts standa
 
 ### REQ-061 — PKCE flow
 
-`auth/smart` **MUST** implement the SMART App Launch flow with PKCE (RFC 7636), adapted for openEHR-specific scope syntax and launch context.
+`auth/smart` implements the SMART App Launch flow with PKCE (RFC 7636), adapted for openEHR-specific scope syntax and launch context.
 
 A launch runs through three calls of the source:
 
@@ -319,8 +319,9 @@ The checks **MUST** run in this order:
 1. The `state` check of the PKCE rules above.
 2. **The issuer (RFC 9207).** The issuer check applies when the callback carries a non-empty `iss` or the authorization server advertises `authorization_response_iss_parameter_supported: true`.
    An empty `iss` counts as absent, and without either the check **MUST NOT** run.
-   When the check applies and the request's `Issuer` is empty, the call **MUST** fail with `auth.ErrInvalidConfig`, not `ErrLaunchIssuerMismatch`, because there is nothing to compare with.
-   Otherwise the callback's `iss` **MUST** equal `req.Issuer` exactly, and a callback without `iss` **MUST** be refused, because that callback is missing `iss` where the server advertises the parameter (RFC 9207 §2.4); either failure is `ErrLaunchIssuerMismatch`.
+   When the check applies, the call **MUST** fail with:
+   - `auth.ErrInvalidConfig`, not `ErrLaunchIssuerMismatch`, when the request's `Issuer` is empty, because there is nothing to compare with;
+   - otherwise `ErrLaunchIssuerMismatch`, when the callback's `iss` does not equal `req.Issuer` exactly, or the callback has no `iss` where the server advertises the parameter (RFC 9207 §2.4).
 3. When the callback carries `error` (RFC 6749 §4.1.2.1), or carries neither `error` nor `code`, the call **MUST** fail with an error that `errors.Is` matches to `ErrAuthorizationRejected` and, for `error`, from which `errors.As` extracts an `*auth.OAuth2Error` holding `error`, `error_description` and `error_uri`.
 4. The code is then exchanged exactly as `ExchangeAuthorizationCode` exchanges it, including the ID-token rules of § REQ-064.
 
@@ -412,17 +413,15 @@ On refresh failure:
   A call whose context ends before the refresh answers returns that context's error at once, and the other calls get the refresh's own result; [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026) covers a panic in it.
   A refresh whose goroutine exits without an answer (`runtime.Goexit`) ends as a transient failure.
 
-If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return a typed error directing the consumer to restart the launch flow.
+If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return an error matching `auth.ErrReauthRequired`, so the consumer restarts the launch flow.
 
 #### A maximum token lifetime
 
 RFC 6749 §5.1 only recommends `expires_in`, so a token without one can still lapse at the server.
 `auth/clientcreds` and `auth/jwtbearer` **MUST** provide `WithMaxTokenLifetime(d time.Duration)`, which bounds how long the source trusts a token from its token endpoint:
 
-- A token without a declared expiry **MUST** get an `ExpiresAt` of the time its response arrived plus `d`, so the refresh threshold renews it as it renews a token with `expires_in`.
-- A token whose declared expiry is later than that time **MUST** be capped at it; an earlier declared expiry is kept.
-- `WithMaxTokenLifetime` with a `d` of zero or below **MUST** fail construction with `auth.ErrInvalidConfig`.
-- A negative `Config.MaxTokenLifetime` **MUST** fail construction the same way; a zero one sets no bound.
+- A token **MUST** get the earlier of its declared expiry and the time its response arrived plus `d` as its `ExpiresAt`, and a token without a declared expiry the latter, so the refresh threshold renews it as it renews a token with `expires_in`.
+- `WithMaxTokenLifetime` with a `d` of zero or below, and a negative `Config.MaxTokenLifetime`, **MUST** fail construction with `auth.ErrInvalidConfig`; a zero `Config.MaxTokenLifetime` sets no bound.
 
 The capped `ExpiresAt` is the token's `ExpiresAt` for every rule of this requirement, the transient-failure backoff included.
 
@@ -561,7 +560,7 @@ All of these fields are also available untyped via `Raw`.
 
 #### Platform principal claims
 
-When the token-endpoint response or ID token carries platform-issued principal claims, the SDK **MUST** surface them on `LaunchContext` (or the equivalent for non-SMART providers) verbatim:
+When the token-endpoint response or ID token carries platform-issued principal claims, the SDK **MUST** surface them on `LaunchContext` (or the equivalent for non-SMART providers) verbatim, never coercing the principal type and never inventing a `Principal` value:
 
 ```go
 type LaunchContext struct {
@@ -589,8 +588,8 @@ const (
 
 Its rules:
 
-- The SDK **MUST NOT** coerce the principal type — if the claim is missing or carries an unrecognised value, `Type` is `PrincipalTypeUnknown` and consumers handle it.
-- The SDK **MUST NOT** invent a `Principal` value when no claim is present — `LaunchContext.Principal` is `nil` in that case.
+- A type claim that is missing or carries an unrecognised value gives `Type` the value `PrincipalTypeUnknown`, which consumers handle.
+- Without a principal claim, `LaunchContext.Principal` is `nil`.
 - Claim names (`principal_uid`, `principal_type`) are configurable via `smart.WithPrincipalClaimNames(...)` when building a `LaunchContext`.
   Principal claims are read from the validated ID token when present, otherwise from the token-endpoint JSON body (`TokenResponse.Raw`).
 
@@ -686,9 +685,7 @@ How the SDK resolves service base URLs from a SMART-on-openEHR deployment, and h
 
 A SMART-on-openEHR deployment advertises **service base URLs** via a discovery document (canonical spec: [ITS-REST/development § SMART App Launch](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html)).
 The relevant service identifiers for this SDK include `org.openehr.rest` (the openEHR REST API) plus deployment-specific identifiers for Cadasto Extra, Datamap, Admin, and other extras.
-On a Cadasto deployment, the same discovery document advertises **`org.openehr.rest`** *and* **`org.fhir.rest`** — the openEHR-side SDK consumes the former and ignores the latter, while a FHIR-side SDK does the reverse.
-
-The SDK treats discovery as a **first-class step**, not an implementation detail of constructor convenience.
+A document can also advertise `org.fhir.rest`, which the SDK ignores ([§ What is NOT in scope here](#what-is-not-in-scope-here)).
 
 ### ServiceCatalog
 
@@ -903,16 +900,22 @@ On every resolution and every refresh, the SDK **MUST**:
   When the entry advertises none (absent or empty), the compared value is the entry's `version` if the caller has narrowed the accepted set with `WithAcceptedSpecVersions`, and otherwise there is none: the entry **MUST** pass, and its `version` **MUST NOT** be compared: absence is acceptable (ADR 0008), and a Platform advertises its own API version in `version`.
   The compared value **MUST** match the SDK's pinned target (REQ-050) or, when the caller sets `WithAcceptedSpecVersions`, one of the versions it names; that list replaces the pinned target, so a caller who still accepts the pin names it too.
   A mismatch **MUST** produce a typed `DiscoveryError`.
-- SMART App Launch 2.2.0 lists `token_endpoint` as required, and requires `issuer` when `capabilities` contains `sso-openid-connect`.
-  The anonymous-only relaxation, and passing a document without `issuer`, are the SDK's own choice.
-  A document that declares none of `authorization_endpoint`, `token_endpoint` or `jwks_uri`, and advertises none of `launch-ehr`, `launch-standalone` or `sso-openid-connect`, is an anonymous-only deployment and **MUST** pass.
-  Otherwise `token_endpoint` **MUST** be present; `authorization_endpoint` **MUST** be present when `capabilities` contains `launch-ehr` or `launch-standalone`; `jwks_uri` **MUST** be present when `capabilities` contains `sso-openid-connect`.
-  A document that omits a member it needs **MUST** produce `DiscoveryError{Reason: ReasonAuthEndpointsMissing}`.
-  No other member is needed, and this rule **MUST NOT** refuse a document for any other missing member: neither a missing `issuer`, even with `sso-openid-connect`, nor a missing `authorization_endpoint` on a backend-only document.
+- Verify that the document declares the auth endpoints it needs, as the table below says.
 - Validate URL well-formedness.
   Malformed `BaseURL` / `AuthorizationEndpoint` / etc. **MUST** produce a typed `DiscoveryError`.
 
-Soft compatibility (forward-compatible spec micro-versions) **MAY** be allowed via a functional option:
+| The document | Needs |
+|---|---|
+| declares none of `authorization_endpoint`, `token_endpoint` or `jwks_uri`, and advertises none of the capabilities `launch-ehr`, `launch-standalone` or `sso-openid-connect`: an anonymous-only deployment | nothing |
+| is any other document | `token_endpoint` |
+| lists `launch-ehr` or `launch-standalone` in `capabilities` | `authorization_endpoint` as well |
+| lists `sso-openid-connect` in `capabilities` | `jwks_uri` as well |
+
+A document that lacks a member the table says it needs **MUST** produce `DiscoveryError{Reason: ReasonAuthEndpointsMissing}`, and one that lacks none **MUST** pass this check.
+No other member is needed, and this check **MUST NOT** refuse a document for any other missing member: neither a missing `issuer`, even with `sso-openid-connect`, nor a missing `authorization_endpoint` on a backend-only document.
+SMART App Launch 2.2.0 lists `token_endpoint` as required, and requires `issuer` when `capabilities` contains `sso-openid-connect`; the anonymous-only relaxation, and passing a document without `issuer`, are the SDK's own choice.
+
+`WithAcceptedSpecVersions` sets the accepted versions, for example to admit forward-compatible micro-versions:
 
 ```go
 discovery.WithAcceptedSpecVersions("1.1.0", "1.1.1")
@@ -956,15 +959,17 @@ SMART configuration documents and their auth endpoints are untrusted input until
 On every resolution and refresh the SDK **MUST** apply the rules below, except on a fresh cache hit, which runs only the checks [§ REQ-071](#req-071) names.
 The plaintext warnings are not repeated on a hit either: they are logged when the document is fetched or a cached catalog is renewed on a `304`.
 
-- **Issuer ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).** When the fetched document declares an `"issuer"` member, the SDK **MUST** accept it as the catalog's `Issuer` whether or not it equals the Platform base URL, provided it is an absolute URL with the `https` scheme and no query or fragment (OIDC Core 1.0 §2).
-  A malformed issuer **MUST** produce `DiscoveryError{Reason: ReasonMalformedURL}`; an `http` issuer **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}` unless the resolver is constructed with `WithAllowInsecure()`.
+- **Issuer ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).** When the fetched document declares an `"issuer"` member, the SDK **MUST** accept it as the catalog's `Issuer` whether or not it equals the Platform base URL, provided it is an absolute URL with the `https` scheme, or `http` under *Plaintext URLs* below, and no query or fragment (OIDC Core 1.0 §2).
+  A malformed issuer **MUST** produce `DiscoveryError{Reason: ReasonMalformedURL}`.
   The document's issuer **MUST NOT** replace the base URL: the base URL the caller resolved stays the catalog's `BaseURL` and its cache key.
-- **OIDC cross-check.** When the document declares an `issuer` that differs from the Platform base URL, the resolver **MUST**, whenever it fetches the document or renews a cached one on a `304`, fetch `<issuer>/.well-known/openid-configuration` (OIDC Discovery 1.0 §4, the path appended to the issuer's own path) and require its `issuer` member to equal the catalog's `Issuer` exactly (OIDC Discovery 1.0 §4.3) and, when both documents declare `jwks_uri`, the two values to be equal.
+- **OIDC cross-check.** When the document declares an `issuer` that differs from the Platform base URL, the resolver **MUST**, whenever it fetches the document or renews a cached one on a `304`, fetch `<issuer>/.well-known/openid-configuration` (OIDC Discovery 1.0 §4, the path appended to the issuer's own path) and require:
+  - its `issuer` member to equal the catalog's `Issuer` exactly (OIDC Discovery 1.0 §4.3);
+  - when both documents declare `jwks_uri`, the two values to be equal.
+
   A mismatch **MUST** produce `DiscoveryError{Reason: ReasonIssuerMismatch}`, and a failed fetch `DiscoveryError{Reason: ReasonFetchFailed}`; an OIDC document that does not parse, or names no `issuer`, is a failed fetch, not a mismatch.
   The resolver **MUST NOT** fetch the OIDC document when it is constructed with `WithoutOpenIDConfigurationCheck()`, or when the document declares no `issuer` or an `issuer` equal to the base URL.
-- **Platform base URL.** A plaintext Platform base URL **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}` unless the resolver is constructed with `WithAllowInsecure()`.
-- **HTTPS on auth endpoints.** `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `registration_endpoint` (when present) **MUST** use the `https` scheme unless the resolver is constructed with `WithAllowInsecure()`.
-  Plaintext URLs **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`.
+- **Plaintext URLs.** The auth endpoints `authorization_endpoint`, `token_endpoint`, `jwks_uri` and, when present, `registration_endpoint` **MUST** use the `https` scheme, or `http` under `WithAllowInsecure()`.
+  A Platform base URL, a declared `issuer` or an auth endpoint whose scheme is `http` **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}` unless the resolver is constructed with `WithAllowInsecure()`.
 - **No downgrade on redirect.** While fetching the SMART configuration document or the OIDC document of the cross-check, the resolver **MUST NOT** follow a redirect to a URL whose scheme is not `https`, unless it is constructed with `WithAllowInsecure()`; such a redirect **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`.
   Otherwise the injected client's own redirect policy applies.
 - **Plaintext warnings.** The resolver **SHOULD** log a warning when a catalog it resolved holds a plaintext `http` URL, a service's `services.<id>.baseUrl` or an auth endpoint accepted under `WithAllowInsecure()`, and when it fetched the SMART configuration document over `http`, a redirect to `http` included.
