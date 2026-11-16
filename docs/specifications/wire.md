@@ -6,13 +6,17 @@ kind: specification
 
 **Status:** Draft
 
-The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 (the REST 1.1.0 pin and its OpenAPI files), REQ-052 to REQ-057 and REQ-059 (wire surface and openEHR headers), REQ-099 (Admin client surface), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-143 (template list filters), REQ-144 (Definition metadata decoding), REQ-169 (interval boundary flag defaults), REQ-170 (unmatched content on decode), REQ-173 (composition representation formats), REQ-174 (versioned-object reads), REQ-175 (missing members on decode), and REQ-177 (template representations). Transport hygiene (REQ-066, REQ-090 to REQ-094, REQ-098, REQ-150, REQ-151, REQ-166) lives in [transport.md](transport.md).
+The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others).
+Covers REQ-050 (the REST 1.1.0 pin and its OpenAPI files), REQ-052 to REQ-057 and REQ-059 (wire surface and openEHR headers), REQ-099 (Admin client surface), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-143 (template list filters), REQ-144 (Definition metadata decoding), REQ-169 (interval boundary flag defaults), REQ-170 (unmatched content on decode), REQ-173 (composition representation formats), REQ-174 (versioned-object reads), REQ-175 (missing members on decode), and REQ-177 (template representations).
+Transport hygiene (REQ-066, REQ-090 to REQ-094, REQ-098, REQ-150, REQ-151, REQ-166) lives in [transport.md](transport.md).
 
-The premise: correctness is wire-level. The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
+The premise: correctness is wire-level.
+The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
 
 ## Functional API areas
 
-openEHR REST 1.1.0 partitions the surface into **six** functional areas. The SDK provides a typed leaf package per area under `openehr/client/`:
+openEHR REST 1.1.0 partitions the surface into **six** functional areas.
+The SDK provides a typed leaf package per area under `openehr/client/`:
 
 | Area | Scope | SDK package |
 |---|---|---|
@@ -29,17 +33,26 @@ A consumer who needs only AQL imports `openehr/client/query/` without pulling in
 
 ### REQ-050
 
-The SDK targets **openEHR REST `1.1.0`** as its primary contract surface. Concretely:
+The SDK targets **openEHR REST `1.1.0`** as its primary contract surface.
+Concretely:
 
 - Endpoint shapes, request/response envelopes, and status-code semantics follow the 1.1.0 specification, the ITS-REST `Release-1.1.0` tag vendored in [`resources/its-rest/`](../../resources/its-rest/README.md).
 - Earlier versions (1.0.3, 1.0.2) are not targeted.
   The SDK does not promise compatibility across REST major or minor versions.
 
-The version pin is enforced at discovery time (REQ-072), not on the first request. A mismatched advertised version **MUST** fail fast with a typed `DiscoveryError`.
+The version pin is enforced at discovery time (REQ-072), not on the first request.
+A mismatched advertised version **MUST** fail fast with a typed `DiscoveryError`.
 
-**System descriptor.** `system.Capabilities` decodes the `OPTIONS /` response into `ServiceCapabilities`, the descriptor that advertises the pinned `restapi_specs_version`. It is the third descriptor [§ REQ-144 *Unknown response keys*](#req-144--definition-metadata-decoding) governs — that rule, not a copy of it here, is what preserves its unknown response keys on decode and re-emits them on encode — so a deployment-specific capability the pin does not name survives a round trip through the SDK.
+#### System descriptor
 
-**The Cadasto spec-version header.** `Cadasto-OpenEhr-Spec-Version` (for example `Cadasto-OpenEhr-Spec-Version: 1.1.0`) is a Cadasto-platform signal, not part of openEHR REST, and a generic backend can refuse a header it does not know. The SDK **MUST** keep it off by default and send it only from a client built with `transport.WithCadastoSpecVersionHeader(true)`. Its value is the version `transport.WithSpecVersion` sets, and it changes no request body or path.
+`system.Capabilities` decodes the `OPTIONS /` response into `ServiceCapabilities`, the descriptor that advertises the pinned `restapi_specs_version`.
+It is the third descriptor [§ REQ-144 *Unknown response keys*](#req-144--definition-metadata-decoding) governs — that rule, not a copy of it here, is what preserves its unknown response keys on decode and re-emits them on encode — so a deployment-specific capability the pin does not name survives a round trip through the SDK.
+
+#### The Cadasto spec-version header
+
+`Cadasto-OpenEhr-Spec-Version` (for example `Cadasto-OpenEhr-Spec-Version: 1.1.0`) is a Cadasto-platform signal, not part of openEHR REST, and a generic backend can refuse a header it does not know.
+The SDK **MUST** keep it off by default and send it only from a client built with `transport.WithCadastoSpecVersionHeader(true)`.
+Its value is the version `transport.WithSpecVersion` sets, and it changes no request body or path.
 
 #### The OpenAPI files are authoritative
 
@@ -49,7 +62,10 @@ The pin is the vendored `Release-1.1.0` tag above, whose manifest records the up
 
 When the OpenAPI files and any in-repo prose disagree, the OpenAPI wins; the prose is updated, not the wire behaviour.
 
-**Keyed exceptions.** The SDK departs from the pin in the six places below, each specified by its own section and decided by its own ADR. A departure this list does not name is a defect, not an exception, and a new one is added here with the section and the decision that key it.
+##### Keyed exceptions
+
+The SDK departs from the pin in the six places below, each specified by its own section and decided by its own ADR.
+A departure this list does not name is a defect, not an exception, and a new one is added here with the section and the decision that key it.
 
 | Departure from the pin | Specified by | Decided by |
 |---|---|---|
@@ -60,13 +76,53 @@ When the OpenAPI files and any in-repo prose disagree, the OpenAPI wins; the pro
 | A version read of a composition or an EHR_STATUS refuses an `IMPORTED_VERSION` body, which the pin's `UVersionOfComposition` and `UVersionOfEhrStatus` admit | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | [ADR 0031](../adr/0031-version-reads-refuse-imported-version.md) |
 | A version read of a composition or an EHR_STATUS accepts an `ORIGINAL_VERSION` without `data`, which the pin's `UMOriginalVersionOfComposition` and `UMOriginalVersionOfEhrStatus` list as required | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | [ADR 0032](../adr/0032-version-reads-accept-logical-deletion.md) |
 
-**Path-parameter encoding.** A request path **MUST** conform to the OAS path template: each path parameter is percent-encoded exactly once on the wire. The transport is the one place that encodes a path. `transport.Request.Path` is a decoded path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out, so a leaf client (`openehr/client/*`) puts the raw, decoded id into `Request.Path` and does not escape it first with `url.PathEscape`: a pre-escaped parameter is encoded twice (a template id `Referral Request.v1` becomes `%20`, then `%2520`), which a strict server unescapes to a literal `%20` and answers `404`. Which characters a segment may hold is a separate question, answered by [REQ-150](transport.md#req-150--path-parameter-segment-validation), which also ignores `url.URL.RawPath`, so an encoded spelling cannot carry a separator past the validator. Decoding a server-supplied value, such as the `Location` header with `url.PathUnescape`, is unaffected: the rule is about forming the request path, not reading a response.
+#### Path-parameter encoding
+
+A request path **MUST** conform to the OAS path template: each path parameter is percent-encoded exactly once on the wire.
+The transport is the one place that encodes a path.
+`transport.Request.Path` is a decoded path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out, so a leaf client (`openehr/client/*`) puts the raw, decoded id into `Request.Path` and does not escape it first with `url.PathEscape`: a pre-escaped parameter is encoded twice (a template id `Referral Request.v1` becomes `%20`, then `%2520`), which a strict server unescapes to a literal `%20` and answers `404`.
+Which characters a segment may hold is a separate question, answered by [REQ-150](transport.md#req-150--path-parameter-segment-validation), which also ignores `url.URL.RawPath`, so an encoded spelling cannot carry a separator past the validator.
+Decoding a server-supplied value, such as the `Location` header with `url.PathUnescape`, is unaffected: the rule is about forming the request path, not reading a response.
+
+#### ITS-REST envelopes
+
+The openEHR REST 1.1.0 specification defines envelope shapes for typical responses (collections, errors, version metadata).
+The SDK **MUST**:
+
+- Decode well-formed envelopes into typed Go structs.
+- Surface envelope-level metadata (e.g. paging hints, conformance hints) on the typed response, not as a parallel `map[string]any`.
+
+The exact envelope shapes are openEHR REST 1.1.0; this spec does not re-define them, it pins to them.
+A 2xx envelope that does not decode fails as [transport.md § REQ-151](transport.md#req-151--typed-2xx-decode-failure) says, and a non-2xx error envelope is decoded best-effort ([§ REQ-093](transport.md#req-093--openehr-error-envelope-mapping)).
+
+#### Request vs response shape asymmetry
+
+Two endpoints carry **distinct request and response shapes** that are easy to conflate because the RM ships only the persisted (response) form:
+
+- **`POST /ehr/{ehr_id}/composition`** and **`PUT /ehr/{ehr_id}/composition/{vo_uid}`** ([PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition)).
+  Request body: a bare `COMPOSITION` payload.
+  Response body under `Prefer: return=representation`: a bare `COMPOSITION` per ITS-REST `201_COMPOSITION` / `200_COMPOSITION_updated`, **not** the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope.
+  The persisted envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`).
+  Same shape applies to `directory.Save` / `Update`.
+- **`POST /ehr/{ehr_id}/contribution`** ([PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)).
+  Request body: ITS-REST `Contribution_create` — `{audit, versions: [ORIGINAL_VERSION<T> with inline data: T]}` for `T ∈ {COMPOSITION, EHR_STATUS, FOLDER, EHR_ACCESS}`, except that a deletion built without a payload carries no `data` ([§ REQ-130](#req-130--contribution-builder) *Deletion*).
+  Response body: persisted `CONTRIBUTION` whose `versions[]` is `[]OBJECT_REF` (the references the server assigned).
+  A submission body shaped like the persisted `CONTRIBUTION` is rejected by spec-conformant CDRs because its `OBJECT_REF`s point at versions that do not yet exist.
+  - **Commit-audit DTO asymmetry (SPECITS-95 / [ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)).**
+    The request-side commit audit (the batch `audit` and each version's `commit_audit`) is the `UPDATE_AUDIT` DTO, not the persisted `AUDIT_DETAILS`: it has no server-assigned `time_committed` ([§ REQ-130](#req-130--contribution-builder) *Audit*), treats `system_id` as optional, and types `change_type` (and `UpdateVersion.lifecycle_state`) as `DV_CODED_TEXT`, never the withdrawn flat `TERMINOLOGY_CODE`.
+    Upstream asks a client to send `_type:"UPDATE_AUDIT"` and a server to accept `AUDIT_DETAILS` or an omitted `_type`.
+    The SDK emits `AUDIT_DETAILS` by default (`contribution.UpdateAudit`) and offers `AuditType` to send `UPDATE_AUDIT` to a server that accepts only that form.
+    *Informative:* EHRbase 2.37.1 validates the batch `audit` and each `commit_audit` as the RM `AUDIT_DETAILS`: it refuses one, typed `AUDIT_DETAILS` or untyped, whose `system_id` is absent or empty, and accepts any non-empty value, recording its own system id instead.
+    It also refuses `UPDATE_AUDIT`, which names the REST commit DTO and no RM class, so a client sets `WithSystemID` and keeps the default type.
+
+Which shape each submission path sends, and which server-assigned fields a request body omits, is [§ REQ-130](#req-130--contribution-builder)'s.
 
 ## openEHR custom header family
 
 ### REQ-059
 
-openEHR REST 1.1.0 defines a family of `openehr-*` custom headers carrying RM and template-level metadata at the wire layer. The SDK **MUST** support them via **typed per-call options**, never via raw header maps on the consumer's surface.
+openEHR REST 1.1.0 defines a family of `openehr-*` custom headers carrying RM and template-level metadata at the wire layer.
+The SDK **MUST** support them via **typed per-call options**, never via raw header maps on the consumer's surface.
 
 | Header | Direction | Carries | Typed option |
 |---|---|---|---|
@@ -80,49 +136,141 @@ openEHR REST 1.1.0 defines a family of `openehr-*` custom headers carrying RM an
 
 Response headers in this family **MUST** be surfaced on the typed response metadata returned by each method (alongside `ETag`, `Location`).
 
-**Header grammar (not JSON).** The `openehr-audit-details` and `openehr-version` **request headers** carry their payload as the openEHR dotted-attribute grammar — a comma-separated list of `attribute.path="value"` assignments — **not** as a JSON object. The SDK **MUST** encode `openehr-audit-details` from an `AUDIT_DETAILS` as the documented attributes (`change_type.code_string`, `description.value`, `committer.name`, `committer.external_ref.{id,namespace,type}`, `system_id`) and `openehr-version` as `lifecycle_state.code_string="<code>"`. Canonical-JSON and canonical-XML serialisation of `AUDIT_DETAILS` applies only to the contribution request body (the `commit_audit` and `UpdateAudit` field of [§ REQ-130](#req-130--contribution-builder)), never to these headers. The grammar and worked examples are normative in the upstream contract, `resources/its-rest/overview-validation.openapi.yaml` § *"openehr-version and openehr-audit-details"*, which [§ REQ-050](#the-openapi-files-are-authoritative) makes authoritative here.
+#### Header grammar (not JSON)
 
-**Control characters.** The SDK **MUST** refuse a request-header value of this family that contains a control character, a byte below `0x20` other than tab or the byte `DEL` (`0x7F`): an `openehr-item-tag` key, value or target path, or a value written into `openehr-audit-details` or `openehr-version`. A caller-supplied value with an embedded CR or LF is a caller error, not something to clean up, since it would inject a header.
+The `openehr-audit-details` and `openehr-version` **request headers** carry their payload as the openEHR dotted-attribute grammar — a comma-separated list of `attribute.path="value"` assignments — **not** as a JSON object.
+The SDK **MUST** encode `openehr-audit-details` from an `AUDIT_DETAILS` as the documented attributes (`change_type.code_string`, `description.value`, `committer.name`, `committer.external_ref.{id,namespace,type}`, `system_id`) and `openehr-version` as `lifecycle_state.code_string="<code>"`.
+Canonical-JSON and canonical-XML serialisation of `AUDIT_DETAILS` applies only to the contribution request body (the `commit_audit` and `UpdateAudit` field of [§ REQ-130](#req-130--contribution-builder)), never to these headers.
+The grammar and worked examples are normative in the upstream contract, `resources/its-rest/overview-validation.openapi.yaml` § *"openehr-version and openehr-audit-details"*, which [§ REQ-050](#the-openapi-files-are-authoritative) makes authoritative here.
+
+#### Control characters
+
+The SDK **MUST** refuse a request-header value of this family that contains a control character, a byte below `0x20` other than tab or the byte `DEL` (`0x7F`): an `openehr-item-tag` key, value or target path, or a value written into `openehr-audit-details` or `openehr-version`.
+A caller-supplied value with an embedded CR or LF is a caller error, not something to clean up, since it would inject a header.
 
 ## `Prefer` negotiation and error envelope
 
-REQ-094 (`Prefer`) and REQ-093 (structured error envelope) are normative in [transport.md](transport.md). Leaf clients under `openehr/client/*` consume them via `transport.Client`.
+REQ-094 (`Prefer`) and REQ-093 (structured error envelope) are normative in [transport.md](transport.md).
+Leaf clients under `openehr/client/*` consume them via `transport.Client`.
 
 ## Canonical JSON
 
 ### REQ-052
 
-The SDK's primary write payload **MUST** be openEHR canonical JSON. Read payloads **MUST** be accepted in canonical JSON; FLAT and STRUCTURED inputs flow through codec conversion in `openehr/serialize`.
+The SDK's primary write payload **MUST** be openEHR canonical JSON.
+Read payloads **MUST** be accepted in canonical JSON; FLAT and STRUCTURED inputs flow through codec conversion in `openehr/serialize`.
 
 Canonical-JSON properties:
 
-- Every RM type instance carries `_type`. The encoder **MUST** emit it; the decoder resolves it through the type registry (REQ-040).
-- **Member order.** The encoder **SHOULD** emit `_type` as the first member of every encoded concrete RM value, so that a consumer decoding as a stream can select the concrete type before reading the rest of the object. Beyond that, the order in which the encoder writes members is unspecified: JSON object member order carries no meaning (RFC 8259 § 4), the openEHR specifications prescribe none, and CDR implementations differ in the order they emit. The decoder **MUST** accept members in any order, `_type` included. The SDK asserts no order for another implementation's output, and it does not defer to a future openEHR member-order rule. [REQ-056](#req-056)'s element-order profile for canonical XML is deliberately not relaxed: element order is part of an XML document's identity in a way member order is not part of a JSON object's.
-
-  A round trip is therefore compared by value, never by bytes: the decoded values are equal, the recovered value passes the reference-model validation floor ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)), and a check on the encoded form is a *wire-equivalent* comparison ([conformance.md § Terms](conformance.md#terms)). Compared with the input, the output matches the input's *expected form*: the input with every member that names no attribute of its object's RM type removed, the unmatched content [§ REQ-170](#req-170--unmatched-content-on-decode) ignores; every boundary flag [§ REQ-169](#req-169--interval-boundary-flag-defaults) defaults written out with its default; and every spelling this section normalises on re-encode replaced by the encoded one, that is a `null` member as absent, an elided `_type` as present (§ Polymorphic substitution), an empty bound beside its open flag as absent, an empty list an optional attribute holds as absent, such as `mappings`, `LOCATABLE.links` or the base64 `DV_MULTIMEDIA.data` and `integrity_check` (the item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` stay, and so does an empty optional map, which the SDK holds through a pointer: the encoder writes a present one, as § *An absent mandatory member* below says), a `null` mandatory primitive member as the zero the encoder writes for it (the empty string for a `String`, `0` for an `Integer`, `Integer64`, `Real` or `Double` and `false` for a `Boolean`, since a Go value of those types holds no null), except an interval boundary flag, which takes its default as above, and a number, quoted or not, as the literal the encoder writes for its value ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)). Member order is ignored, and any other difference between the output and the expected form is a defect. An input that carries such a member, or omits such a flag, therefore re-encodes to a document that differs from it, and the SDK makes no byte-level output promise a consumer can hash, diff or sign against: a consumer that needs a stable digest of an RM value computes it over a canonicalisation of its own choosing.
-
-  Canonical-JSON member names are matched exactly. The Definition, System and AQL result surfaces are not on this codec path: they decode with v1 `encoding/json`, which matches a documented field name case-insensitively, while their `Extras` routing compares names exactly ([§ REQ-144 *Unknown response keys*](#req-144--definition-metadata-decoding)), so a differently cased key fills the field and is also preserved in `Extras`.
-
-- **Decode state after a failure.** The state a receiver is left in after a failed decode is unspecified. The generated decoders fill the receiver in place as members are read, so a failed interval decode (a bad member, a `_type` mismatch, a duplicate member) leaves the members it had read; that is the current behaviour, not a contract.
-- **Map-valued (`Hash`) members.** The encoder **SHOULD** write the members of a `Hash` (`map[K]V`) value in lexicographic key order, so that two encodes of one unchanged value spell it the same way: Go randomises map iteration, and an encoder that did not sort would leave equality, caching and diff tooling unable to treat the two as one artefact. This is a determinism property of the encoder, not an order promise to a consumer: member order stays unspecified.
+- Every RM type instance carries `_type`.
+  The encoder **MUST** emit it; the decoder resolves it through the type registry (REQ-040).
 - Numbers, booleans, strings, arrays, objects are JSON-vanilla — no openEHR-flavoured encoding tricks.
 - `DV_QUANTITY` magnitudes are emitted as JSON numbers, not strings, unless the spec mandates otherwise (some implementations have used strings to avoid float-precision loss; the SDK takes a position — see § Floating-point precision below).
-- `TERM_MAPPING.match` (an `rm.Character`) **MUST** be encoded as a JSON string holding exactly one character, never as a number; encode refuses any other value, through `canjson.ErrInvalidValue` like any other encode failure. Decode **MUST** accept a string holding exactly one character, U+FFFD included (BASE `Character` excludes nothing), written as the literal character or as the JSON escape `\ufffd`, and refuse an empty or longer string (§ Decode-side shape sentinel below classifies that refusal). A bare number also decodes, for older producers, as the code point it names; that arm refuses `0` and a value that is not a Unicode scalar value (negative, a surrogate half, or past U+10FFFF), and `65533` (U+FFFD) decodes like any other legal code point. The tokenizer refuses invalid UTF-8 and a lone surrogate escape before `rm.Character` sees the value, as a syntactic error carrying no SDK sentinel (the **Malformed JSON** exclusion below). As with a preserved `Extras` value (§ Unknown response keys), the codec leaves `<` and `>` unescaped; the rule binds the decoded character, not the literal bytes. The one-character rule belongs to the `Character` primitive, not to the JSON codec: `rm.Character` also implements `encoding.TextMarshaler` and `encoding.TextUnmarshaler`, so canonical XML ([§ REQ-056](#req-056)) holds the same rule (valid UTF-8, exactly one character) on element content, with no JSON sentinel. There `encoding/xml` refuses invalid UTF-8 and a character reference past U+10FFFF itself, but turns a surrogate-half character reference such as `&#xD800;` into U+FFFD with no error, and that U+FFFD is read as a genuine one.
-- **`DV_TEXT.mappings` re-encode collapse.** Decode preserves the distinction: `"mappings": []` decodes to a non-nil, empty `[]TermMapping`, while `"mappings": null` and an absent `mappings` key both decode to a nil slice — REQ-112's `Mappings_valid` floor check (`ValidateRM` and its typed sugars) depends on exactly this nilness to flag a present-but-empty list. Re-encode is where the distinction is lost: `omitempty` treats a nil and a non-nil-but-empty slice alike, so all three inputs re-encode to the same absent-key wire form. A caller needing the *wire-level* distinction (the post-decode nilness is already available) reads JSON-key presence at the decode boundary itself: the codecs' report of missing members ([§ REQ-175](#req-175--missing-members-on-decode)) lists mandatory members only, and `mappings` is optional; canonical XML, which cannot carry an empty list, reports the members a document sends without a value (§ REQ-175 *Sent without a value*), and canonical JSON has no such report. `omitempty` is intentionally unchanged: emitting `[]` would be RM-invalid (`Mappings_valid`), and emitting `null` is a spelling nothing needs.
-- **Typed-nil in an optional polymorphic slot.** An interface-typed optional attribute (`ELEMENT.value`, `ELEMENT.null_reason`, `LOCATABLE.uid`) holding a typed-nil pointer encodes as **absent** — the reading `rm.IsTypedNil`, `ValidateRM` and the simplified encoders already give it — and a `null` on decode yields a nil interface. This is a `canjson` contract: a v1 `encoding/json` caller marshalling the same value spells it `null`, under v1's legacy `omitempty`, so the two entry points are not byte-identical here (as they are not under HTML escaping either).
-- **An absent mandatory member.** A mandatory attribute whose Go field holds no value, a nil list, map, pointer or interface, or a polymorphic RM slot (a Go interface over RM classes) holding a typed-nil pointer, **MUST** be omitted on encode, as an absent optional attribute is, never written as `null`. A present empty **mandatory** list or map **MUST** be written as it is, `[]` or `{}`; a present empty **optional** one is left out where the field is the list or map itself, as `mappings` is above, and written where the field points to it, a `Hash` or `List` the generator holds as `*map[string]V` or `*[]T` ([reference-model.md § Mapping rules](reference-model.md#mapping-rules)). The optional item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` are the exception and are written as a mandatory list is: an archetype can make them mandatory by existence, so a present empty one is written as `[]`, a nil one is left out, and a decoded `[]` re-encodes as `[]` ([reference-model.md § Property → Go field](reference-model.md#property--go-field) holds the rule). An absent mandatory member leaves the instance RM-invalid; how the floor reports that, and a present empty list, is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, and on decode such a member is a missing member, which [§ REQ-175](#req-175--missing-members-on-decode) reports on request. A mandatory member held by value has no absent form and is written: `OBSERVATION.data`, or the `data` of an event over a concrete structure, such as `POINT_EVENT<ITEM_TREE>`. A mandatory `any` field holds a value, not an RM object, so a typed-nil pointer, a nil list or a nil map it holds is written as `null`. Canonical XML writes no element for an absent mandatory list, map, pointer or interface either ([§ REQ-056](#req-056)), and none for an empty `Hash`, whose entries it writes one element each ([clinical-modeling.md § REQ-176](clinical-modeling.md#round-trip)); a `Hash` whose values are `Hash`es is outside what that codec models ([§ REQ-170](#req-170--unmatched-content-on-decode)), and its encode fails on one, nil or not. As with the typed-nil bullet above, this is a `canjson` contract: a v1 `encoding/json` caller spells a typed-nil `null`.
-- **An open interval side carries no bound.** BASE `Interval` marks a side open with `lower_unbounded` / `upper_unbounded`, and an open side has no bound value. The canonical JSON and canonical XML ([§ REQ-056](#req-056)) encoders **MUST** omit the `lower` / `upper` member of a side marked unbounded when its bound is empty: nil, a typed-nil pointer, or the zero value of a concrete bound type (a `DVInterval[DVQuantity]` holds its bounds by value, so an unset one is a zero `DV_QUANTITY`). The rule binds the RM class `DV_INTERVAL` and the BASE classes `PROPER_INTERVAL` and `POINT_INTERVAL`, whose bound type is a `DV_ORDERED` data value, a BMM primitive or a Go built-in scalar, and the abstract BASE `Interval<T>`, so AOM 1.4's constraint intervals (`occurrences`, `existence`, `cardinality.interval`, …), which the SDK holds as `Interval<T>` of a BMM primitive (`Integer`, `Real`) or a string, omit an open side's zero bound the same way; a bound of any other Go type is emitted as it stands. `rm.IsEmptyIntervalBound` reports whether a bound is empty in this sense. The encoder **MUST NOT** drop a non-empty bound beside its own open flag: it emits the bound as it stands, where FLAT encode refuses the pair ([§ REQ-140](#req-140--underscore-prefixed-rm-attributes)), and how the floor reads either shape is [§ REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s. Decode keeps whatever bound it reads, so an empty bound another producer writes beside an open flag is dropped when the SDK re-encodes the value.
-- **Absent interval flags.** An interval that omits a boundary flag decodes by [§ REQ-169](#req-169--interval-boundary-flag-defaults), and an included open side decodes as written.
-- **Unmatched members.** A member that names no attribute of its object's RM type is unmatched content: [§ REQ-170](#req-170--unmatched-content-on-decode) says how the decoder treats it.
-- **`DV_MULTIMEDIA.data` / `integrity_check` (`[]byte`) encode as base64** — the correct canonical spelling, matching the FLAT conformance fixture and the text canonical XML carries ([§ REQ-056](#req-056)) — but carry the same re-encode collapse as `mappings` above: decode similarly preserves `[]` versus `null`/absent as a non-nil-versus-nil `[]byte`, and only `omitempty` on re-encode drops the distinction. This is not fixed: `size` already carries the unencoded byte count, so a present-but-empty inline `data` is not a distinction the SDK needs to preserve.
+- **Absent interval flags.**
+  An interval that omits a boundary flag decodes by [§ REQ-169](#req-169--interval-boundary-flag-defaults), and an included open side decodes as written.
+- **Unmatched members.**
+  A member that names no attribute of its object's RM type is unmatched content: [§ REQ-170](#req-170--unmatched-content-on-decode) says how the decoder treats it.
 
-**Encode-side refusal sentinel.** A `canjson.Marshal` or `canjson.MarshalIndent` failure **MUST** wrap the encode-only sentinel `canjson.ErrInvalidValue` and keep the underlying encoder error reachable through unwrapping, so a caller tells "this value cannot be encoded" from "these bytes cannot be decoded" with `errors.Is` alone, at no cost to the diagnostic. `canjson.ErrInvalidValue`, the decode-side `canjson.ErrInvalidShape` and the transport-level `transport.ErrInvalidShape` are three distinct sentinels: for an error the SDK's own codecs raise, `errors.Is` against one of them **MUST NOT** match an error raised for another, so `canjson.ErrInvalidValue` never appears on a decode path. A value whose custom `MarshalJSON` returns or wraps a canjson sentinel puts that classification into its own encode failure, outside this guarantee. The sentinel travels inside the `fmt.Errorf` wraps a leaf package adds around `canjson.Marshal`. The canonical-XML codec (`openehr/serialize/canxml`) uses one sentinel for both directions, and this paragraph does not bind it.
+#### Member order
 
-**Decode-side shape sentinel.** A decode failure raised **inside** a generated RM type's `UnmarshalJSONFrom` (the `canjson: <RM_TYPE>:` family, where the bytes are valid JSON but the wrong shape for the target type) **MUST** wrap the decode-only sentinel `canjson.ErrInvalidShape`, the counterpart of the encode-side clause above. The same sentinel also classifies two **hand-written primitive codecs**, each attached directly rather than through the generated funnel: `rm.Real` refusing a lossy decimal literal, valid JSON and a valid shape but a value a `float64` cannot hold at the literal's own precision (§ Floating-point precision below), and `rm.Character` refusing a value that is not exactly one character (§ REQ-052 above). The classification **MUST** leave the failure's message unchanged and the underlying codec error reachable through unwrapping, so the sentinel costs no diagnostic.
+The encoder **SHOULD** emit `_type` as the first member of every encoded concrete RM value, so that a consumer decoding as a stream can select the concrete type before reading the rest of the object.
+Beyond that, the order in which the encoder writes members is unspecified: JSON object member order carries no meaning (RFC 8259 § 4), the openEHR specifications prescribe none, and CDR implementations differ in the order they emit.
+The decoder **MUST** accept members in any order, `_type` included.
+The SDK asserts no order for another implementation's output, and it does not defer to a future openEHR member-order rule.
+[REQ-056](#req-056)'s element-order profile for canonical XML is deliberately not relaxed: element order is part of an XML document's identity in a way member order is not part of a JSON object's.
 
-A JSON object that carries the same member name twice **MUST** be refused with an error that wraps `canjson.ErrInvalidShape`. RFC 8259 § 4 asks for unique names, and an object carrying duplicates has no single defined value. This is distinct from the malformed-JSON exclusion below: the bytes parse, and it is the object's shape that is rejected.
+#### Round-trip comparison
 
-The duplicate-name refusal, the exact member-name matching above and the tokenizer's invalid-UTF-8 refusal bind the `canjson` entry points and a caller driving the generated methods through bare `encoding/json/v2` with its default options. A caller's own decode options govern the whole decode, polymorphic slots included. A bare v2 caller that sets, for example, `jsontext.AllowDuplicateNames(true)` or `json.MatchCaseInsensitiveNames(true)` gets that behaviour inside slots as well; v2's case-insensitive matching also ignores `_` and `-`, so a member named `type` then acts as the discriminator. A caller driving the generated methods through v1 `encoding/json` inherits v1's decode options in the same way, and those leniencies are v1's, not SDK promises: a duplicate name is accepted with the last value winning, member names match case-insensitively, invalid UTF-8 is accepted, and malformed bytes anywhere in the input are reported ahead of a shape failure, because v1 validates the whole input before any decode. The SDK's own code does not decode an RM or AOM 1.4 value (a target whose type is or contains a type declared in `openehr/rm` or `openehr/aom/aom14`) through v1 `encoding/json`.
+A round trip is therefore compared by value, never by bytes: the decoded values are equal, the recovered value passes the reference-model validation floor ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)), and a check on the encoded form is a *wire-equivalent* comparison ([conformance.md § Terms](conformance.md#terms)).
+Compared with the input, the output matches the input's *expected form*: the input with every member that names no attribute of its object's RM type removed, the unmatched content [§ REQ-170](#req-170--unmatched-content-on-decode) ignores; every boundary flag [§ REQ-169](#req-169--interval-boundary-flag-defaults) defaults written out with its default; and every spelling this section normalises on re-encode replaced by the encoded one, that is a `null` member as absent, an elided `_type` as present (§ Polymorphic substitution), an empty bound beside its open flag as absent, an empty list an optional attribute holds as absent, such as `mappings`, `LOCATABLE.links` or the base64 `DV_MULTIMEDIA.data` and `integrity_check` (the item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` stay, and so does an empty optional map, which the SDK holds through a pointer: the encoder writes a present one, as § *An absent mandatory member* below says), a `null` mandatory primitive member as the zero the encoder writes for it (the empty string for a `String`, `0` for an `Integer`, `Integer64`, `Real` or `Double` and `false` for a `Boolean`, since a Go value of those types holds no null), except an interval boundary flag, which takes its default as above, and a number, quoted or not, as the literal the encoder writes for its value ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
+Member order is ignored, and any other difference between the output and the expected form is a defect.
+An input that carries such a member, or omits such a flag, therefore re-encodes to a document that differs from it, and the SDK makes no byte-level output promise a consumer can hash, diff or sign against: a consumer that needs a stable digest of an RM value computes it over a canonicalisation of its own choosing.
+
+#### Member names
+
+Canonical-JSON member names are matched exactly.
+The Definition, System and AQL result surfaces are not on this codec path: they decode with v1 `encoding/json`, which matches a documented field name case-insensitively, while their `Extras` routing compares names exactly ([§ REQ-144 *Unknown response keys*](#req-144--definition-metadata-decoding)), so a differently cased key fills the field and is also preserved in `Extras`.
+
+#### Decode state after a failure
+
+The state a receiver is left in after a failed decode is unspecified.
+The generated decoders fill the receiver in place as members are read, so a failed interval decode (a bad member, a `_type` mismatch, a duplicate member) leaves the members it had read; that is the current behaviour, not a contract.
+
+#### Map-valued (`Hash`) members
+
+The encoder **SHOULD** write the members of a `Hash` (`map[K]V`) value in lexicographic key order, so that two encodes of one unchanged value spell it the same way: Go randomises map iteration, and an encoder that did not sort would leave equality, caching and diff tooling unable to treat the two as one artefact.
+This is a determinism property of the encoder, not an order promise to a consumer: member order stays unspecified.
+
+#### `TERM_MAPPING.match`
+
+`TERM_MAPPING.match` (an `rm.Character`) **MUST** be encoded as a JSON string holding exactly one character, never as a number; encode refuses any other value, through `canjson.ErrInvalidValue` like any other encode failure.
+Decode **MUST** accept a string holding exactly one character, U+FFFD included (BASE `Character` excludes nothing), written as the literal character or as the JSON escape `\ufffd`, and refuse an empty or longer string (§ Decode-side shape sentinel below classifies that refusal).
+A bare number also decodes, for older producers, as the code point it names; that arm refuses `0` and a value that is not a Unicode scalar value (negative, a surrogate half, or past U+10FFFF), and `65533` (U+FFFD) decodes like any other legal code point.
+The tokenizer refuses invalid UTF-8 and a lone surrogate escape before `rm.Character` sees the value, as a syntactic error carrying no SDK sentinel (the **Malformed JSON** exclusion below).
+As with a preserved `Extras` value (§ Unknown response keys), the codec leaves `<` and `>` unescaped; the rule binds the decoded character, not the literal bytes.
+The one-character rule belongs to the `Character` primitive, not to the JSON codec: `rm.Character` also implements `encoding.TextMarshaler` and `encoding.TextUnmarshaler`, so canonical XML ([§ REQ-056](#req-056)) holds the same rule (valid UTF-8, exactly one character) on element content, with no JSON sentinel.
+There `encoding/xml` refuses invalid UTF-8 and a character reference past U+10FFFF itself, but turns a surrogate-half character reference such as `&#xD800;` into U+FFFD with no error, and that U+FFFD is read as a genuine one.
+
+#### `DV_TEXT.mappings` re-encode collapse
+
+Decode preserves the distinction: `"mappings": []` decodes to a non-nil, empty `[]TermMapping`, while `"mappings": null` and an absent `mappings` key both decode to a nil slice — REQ-112's `Mappings_valid` floor check (`ValidateRM` and its typed sugars) depends on exactly this nilness to flag a present-but-empty list.
+Re-encode is where the distinction is lost: `omitempty` treats a nil and a non-nil-but-empty slice alike, so all three inputs re-encode to the same absent-key wire form.
+A caller needing the *wire-level* distinction (the post-decode nilness is already available) reads JSON-key presence at the decode boundary itself: the codecs' report of missing members ([§ REQ-175](#req-175--missing-members-on-decode)) lists mandatory members only, and `mappings` is optional; canonical XML, which cannot carry an empty list, reports the members a document sends without a value (§ REQ-175 *Sent without a value*), and canonical JSON has no such report.
+`omitempty` is intentionally unchanged: emitting `[]` would be RM-invalid (`Mappings_valid`), and emitting `null` is a spelling nothing needs.
+
+#### Typed-nil in an optional polymorphic slot
+
+An interface-typed optional attribute (`ELEMENT.value`, `ELEMENT.null_reason`, `LOCATABLE.uid`) holding a typed-nil pointer encodes as **absent** — the reading `rm.IsTypedNil`, `ValidateRM` and the simplified encoders already give it — and a `null` on decode yields a nil interface.
+This is a `canjson` contract: a v1 `encoding/json` caller marshalling the same value spells it `null`, under v1's legacy `omitempty`, so the two entry points are not byte-identical here (as they are not under HTML escaping either).
+
+#### An absent mandatory member
+
+A mandatory attribute whose Go field holds no value, a nil list, map, pointer or interface, or a polymorphic RM slot (a Go interface over RM classes) holding a typed-nil pointer, **MUST** be omitted on encode, as an absent optional attribute is, never written as `null`.
+A present empty **mandatory** list or map **MUST** be written as it is, `[]` or `{}`; a present empty **optional** one is left out where the field is the list or map itself, as `mappings` is above, and written where the field points to it, a `Hash` or `List` the generator holds as `*map[string]V` or `*[]T` ([reference-model.md § Mapping rules](reference-model.md#mapping-rules)).
+The optional item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` are the exception and are written as a mandatory list is: an archetype can make them mandatory by existence, so a present empty one is written as `[]`, a nil one is left out, and a decoded `[]` re-encodes as `[]` ([reference-model.md § Property → Go field](reference-model.md#property--go-field) holds the rule).
+An absent mandatory member leaves the instance RM-invalid; how the floor reports that, and a present empty list, is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, and on decode such a member is a missing member, which [§ REQ-175](#req-175--missing-members-on-decode) reports on request.
+A mandatory member held by value has no absent form and is written: `OBSERVATION.data`, or the `data` of an event over a concrete structure, such as `POINT_EVENT<ITEM_TREE>`.
+A mandatory `any` field holds a value, not an RM object, so a typed-nil pointer, a nil list or a nil map it holds is written as `null`.
+Canonical XML writes no element for an absent mandatory list, map, pointer or interface either ([§ REQ-056](#req-056)), and none for an empty `Hash`, whose entries it writes one element each ([clinical-modeling.md § REQ-176](clinical-modeling.md#round-trip)); a `Hash` whose values are `Hash`es is outside what that codec models ([§ REQ-170](#req-170--unmatched-content-on-decode)), and its encode fails on one, nil or not.
+As with the typed-nil bullet above, this is a `canjson` contract: a v1 `encoding/json` caller spells a typed-nil `null`.
+
+#### An open interval side carries no bound
+
+BASE `Interval` marks a side open with `lower_unbounded` / `upper_unbounded`, and an open side has no bound value.
+The canonical JSON and canonical XML ([§ REQ-056](#req-056)) encoders **MUST** omit the `lower` / `upper` member of a side marked unbounded when its bound is empty: nil, a typed-nil pointer, or the zero value of a concrete bound type (a `DVInterval[DVQuantity]` holds its bounds by value, so an unset one is a zero `DV_QUANTITY`).
+The rule binds the RM class `DV_INTERVAL` and the BASE classes `PROPER_INTERVAL` and `POINT_INTERVAL`, whose bound type is a `DV_ORDERED` data value, a BMM primitive or a Go built-in scalar, and the abstract BASE `Interval<T>`, so AOM 1.4's constraint intervals (`occurrences`, `existence`, `cardinality.interval`, …), which the SDK holds as `Interval<T>` of a BMM primitive (`Integer`, `Real`) or a string, omit an open side's zero bound the same way; a bound of any other Go type is emitted as it stands.
+`rm.IsEmptyIntervalBound` reports whether a bound is empty in this sense.
+The encoder **MUST NOT** drop a non-empty bound beside its own open flag: it emits the bound as it stands, where FLAT encode refuses the pair ([§ REQ-140](#req-140--underscore-prefixed-rm-attributes)), and how the floor reads either shape is [§ REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s.
+Decode keeps whatever bound it reads, so an empty bound another producer writes beside an open flag is dropped when the SDK re-encodes the value.
+
+#### `DV_MULTIMEDIA.data` and `integrity_check`
+
+`DV_MULTIMEDIA.data` / `integrity_check` (`[]byte`) encode as base64 — the correct canonical spelling, matching the FLAT conformance fixture and the text canonical XML carries ([§ REQ-056](#req-056)) — but carry the same re-encode collapse as `mappings` above: decode similarly preserves `[]` versus `null`/absent as a non-nil-versus-nil `[]byte`, and only `omitempty` on re-encode drops the distinction.
+This is not fixed: `size` already carries the unencoded byte count, so a present-but-empty inline `data` is not a distinction the SDK needs to preserve.
+
+#### Encode-side refusal sentinel
+
+A `canjson.Marshal` or `canjson.MarshalIndent` failure **MUST** wrap the encode-only sentinel `canjson.ErrInvalidValue` and keep the underlying encoder error reachable through unwrapping, so a caller tells "this value cannot be encoded" from "these bytes cannot be decoded" with `errors.Is` alone, at no cost to the diagnostic.
+`canjson.ErrInvalidValue`, the decode-side `canjson.ErrInvalidShape` and the transport-level `transport.ErrInvalidShape` are three distinct sentinels: for an error the SDK's own codecs raise, `errors.Is` against one of them **MUST NOT** match an error raised for another, so `canjson.ErrInvalidValue` never appears on a decode path.
+A value whose custom `MarshalJSON` returns or wraps a canjson sentinel puts that classification into its own encode failure, outside this guarantee.
+The sentinel travels inside the `fmt.Errorf` wraps a leaf package adds around `canjson.Marshal`.
+The canonical-XML codec (`openehr/serialize/canxml`) uses one sentinel for both directions, and this paragraph does not bind it.
+
+#### Decode-side shape sentinel
+
+A decode failure raised **inside** a generated RM type's `UnmarshalJSONFrom` (the `canjson: <RM_TYPE>:` family, where the bytes are valid JSON but the wrong shape for the target type) **MUST** wrap the decode-only sentinel `canjson.ErrInvalidShape`, the counterpart of the encode-side clause above.
+The same sentinel also classifies two **hand-written primitive codecs**, each attached directly rather than through the generated funnel: `rm.Real` refusing a lossy decimal literal, valid JSON and a valid shape but a value a `float64` cannot hold at the literal's own precision (§ Floating-point precision below), and `rm.Character` refusing a value that is not exactly one character (§ REQ-052 above).
+The classification **MUST** leave the failure's message unchanged and the underlying codec error reachable through unwrapping, so the sentinel costs no diagnostic.
+
+A JSON object that carries the same member name twice **MUST** be refused with an error that wraps `canjson.ErrInvalidShape`.
+RFC 8259 § 4 asks for unique names, and an object carrying duplicates has no single defined value.
+This is distinct from the malformed-JSON exclusion below: the bytes parse, and it is the object's shape that is rejected.
+
+The duplicate-name refusal, the exact member-name matching above and the tokenizer's invalid-UTF-8 refusal bind the `canjson` entry points and a caller driving the generated methods through bare `encoding/json/v2` with its default options.
+A caller's own decode options govern the whole decode, polymorphic slots included.
+A bare v2 caller that sets, for example, `jsontext.AllowDuplicateNames(true)` or `json.MatchCaseInsensitiveNames(true)` gets that behaviour inside slots as well; v2's case-insensitive matching also ignores `_` and `-`, so a member named `type` then acts as the discriminator.
+A caller driving the generated methods through v1 `encoding/json` inherits v1's decode options in the same way, and those leniencies are v1's, not SDK promises: a duplicate name is accepted with the last value winning, member names match case-insensitively, invalid UTF-8 is accepted, and malformed bytes anywhere in the input are reported ahead of a shape failure, because v1 validates the whole input before any decode.
+The SDK's own code does not decode an RM or AOM 1.4 value (a target whose type is or contains a type declared in `openehr/rm` or `openehr/aom/aom14`) through v1 `encoding/json`.
 
 Four decode failures stay outside the sentinel and **MUST NOT** carry it, however many values enclose them, and malformed JSON and a read error **MUST NOT** carry any SDK sentinel at all:
 
@@ -131,25 +279,46 @@ Four decode failures stay outside the sentinel and **MUST NOT** carry it, howeve
 - **A polymorphic dispatch failure**, a missing, unknown or mismatched `_type`, reported as a `typereg.DecodeError` (re-exported as `canjson.DecodeError`) carrying the path, either at a polymorphic slot or on `/_type` where the whole value's `_type` names a different class than the target.
 - **A nesting-depth refusal** ([REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds)), reported as `typereg.ErrMaxDepthExceeded`, inside a `typereg.DecodeError` on the `canjson` and generated-method routes and as a plain wrapped error from `Registry.Decode`.
 
-Which of a malformed value and a shape failure is reported first is not a contract. Inside a value the decoder reads whole before decoding it (`Registry.Decode` its whole document, `DecodePolymorphic` a polymorphic slot's value, and a `canjson.Decoder` given one of the § REQ-170 options each value), malformed bytes anywhere in it are reported ahead of a shape failure in it. Elsewhere, on the `canjson` entry points and for a bare `encoding/json/v2` caller, the tokenizer refuses malformed bytes as the value they malform is decoded, so the first failure in document order wins: a value that fails the target's shape before its malformed bytes are reached reports `canjson.ErrInvalidShape`, and the later bytes are never tokenized. A v1 `encoding/json` caller has the whole input validated first, so malformed bytes win there.
+Which of a malformed value and a shape failure is reported first is not a contract.
+Inside a value the decoder reads whole before decoding it (`Registry.Decode` its whole document, `DecodePolymorphic` a polymorphic slot's value, and a `canjson.Decoder` given one of the § REQ-170 options each value), malformed bytes anywhere in it are reported ahead of a shape failure in it.
+Elsewhere, on the `canjson` entry points and for a bare `encoding/json/v2` caller, the tokenizer refuses malformed bytes as the value they malform is decoded, so the first failure in document order wins: a value that fails the target's shape before its malformed bytes are reached reports `canjson.ErrInvalidShape`, and the later bytes are never tokenized.
+A v1 `encoding/json` caller has the whole input validated first, so malformed bytes win there.
 
-**Slot-nested shape failures.** A `DecodeError` **MUST NOT** strip a shape classification raised beneath it: when the concrete type selected at a polymorphic slot fails on shape, the resulting `DecodeError` names the slot on its path **and** `errors.Is(err, canjson.ErrInvalidShape)` holds, so a consumer keeps both the path and the kind. The sentinel is attached where the shape failure is raised, never by an envelope. `ErrInvalidShape` means "JSON-level shape", not "any decode failure".
+#### Slot-nested shape failures
 
-`canjson.ErrInvalidShape` and `typereg.ErrInvalidShape` are two names for one value, and the distinct-sentinel rule above binds it under either name. The AOM 1.4 companions (`openehr/aom/aom14`) classify on the same terms as the canonical-JSON RM surface this § governs.
+A `DecodeError` **MUST NOT** strip a shape classification raised beneath it: when the concrete type selected at a polymorphic slot fails on shape, the resulting `DecodeError` names the slot on its path **and** `errors.Is(err, canjson.ErrInvalidShape)` holds, so a consumer keeps both the path and the kind.
+The sentinel is attached where the shape failure is raised, never by an envelope.
+`ErrInvalidShape` means "JSON-level shape", not "any decode failure".
 
-**Value-free decode errors.** The text of a decode error travels to places a caller does not choose for clinical data, such as an HTTP error body or a log line, so it carries no value from the document, as the transport's boundary errors carry none ([§ REQ-093](transport.md#req-093--openehr-error-envelope-mapping), [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure)) and the validators' diagnostics carry none ([clinical-modeling.md § REQ-168](clinical-modeling.md#req-168--value-free-validation-diagnostics)):
+`canjson.ErrInvalidShape` and `typereg.ErrInvalidShape` are two names for one value, and the distinct-sentinel rule above binds it under either name.
+The AOM 1.4 companions (`openehr/aom/aom14`) classify on the same terms as the canonical-JSON RM surface this § governs.
 
-- Every error `canjson.Unmarshal` and `canjson.Decoder.Decode` return for a failure the input causes **MUST** be a `*canjson.DecodeError` (`typereg.DecodeError`), so `errors.AsType[*canjson.DecodeError]` finds it without unwrapping. The two errors the input does not cause **MUST** come back outside a `DecodeError`: `io.EOF` from a `Decoder` whose stream holds no further value comes back itself, so a caller's `err == io.EOF` holds, and a read error from the underlying reader comes back as `jsontext` reports it, with the reader's own error reachable through `errors.Is`.
-- The `Error()` of a `DecodeError` **MUST** name the failure's class (malformed JSON, a polymorphic dispatch failure, a wrong shape, a nesting-depth refusal, an unknown member under `WithStrict`) and, where the decoder knows it, the JSON Pointer of the failing value. It **MUST NOT** contain a value from the document: a number, the content of a string, an escape sequence, or a character the tokenizer refused. This binds a `DecodeError` wherever it is raised, canonical XML's included, and a cause beneath it whose text cannot be rendered without its value is named by its class alone, never quoted.
-- A member name, a `_type` value, and an RM type or attribute name are structure, not values. They **MAY** appear in the pointer or the text, including a member or a type the RM does not define.
+#### Value-free decode errors
+
+The text of a decode error travels to places a caller does not choose for clinical data, such as an HTTP error body or a log line, so it carries no value from the document, as the transport's boundary errors carry none ([§ REQ-093](transport.md#req-093--openehr-error-envelope-mapping), [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure)) and the validators' diagnostics carry none ([clinical-modeling.md § REQ-168](clinical-modeling.md#req-168--value-free-validation-diagnostics)):
+
+- Every error `canjson.Unmarshal` and `canjson.Decoder.Decode` return for a failure the input causes **MUST** be a `*canjson.DecodeError` (`typereg.DecodeError`), so `errors.AsType[*canjson.DecodeError]` finds it without unwrapping.
+  The two errors the input does not cause **MUST** come back outside a `DecodeError`: `io.EOF` from a `Decoder` whose stream holds no further value comes back itself, so a caller's `err == io.EOF` holds, and a read error from the underlying reader comes back as `jsontext` reports it, with the reader's own error reachable through `errors.Is`.
+- The `Error()` of a `DecodeError` **MUST** name the failure's class (malformed JSON, a polymorphic dispatch failure, a wrong shape, a nesting-depth refusal, an unknown member under `WithStrict`) and, where the decoder knows it, the JSON Pointer of the failing value.
+  It **MUST NOT** contain a value from the document: a number, the content of a string, an escape sequence, or a character the tokenizer refused.
+  This binds a `DecodeError` wherever it is raised, canonical XML's included, and a cause beneath it whose text cannot be rendered without its value is named by its class alone, never quoted.
+- A member name, a `_type` value, and an RM type or attribute name are structure, not values.
+  They **MAY** appear in the pointer or the text, including a member or a type the RM does not define.
 - The `DecodeError` an entry point returns **MUST** hold in `Value`, a `constraints.Redacted` ([§ REQ-168 *The redacting carrier*](clinical-modeling.md#the-redacting-carrier)), the JSON text of the value the decoder refused, as a string written as the document wrote it, in these two cases only, when the code that refused it holds that text, and leave `Value` empty for any other failure:
   - a number or string of the right JSON kind that the target Go type cannot hold, such as a fraction or an out-of-range number for an integer;
   - a value an SDK primitive codec refused: `rm.Real`, `rm.Integer` and `rm.Integer64` for a quoted literal they cannot parse, `rm.Real` for a lossy literal (§ Floating-point precision), and `rm.Character` for a value that is not exactly one character or not a usable code point.
 
   `Value` is empty, for instance, for a value of the wrong JSON kind for its target, a string that is not valid base64 for a byte field such as `DV_MULTIMEDIA` `data` (json/v2 records no literal for either), malformed JSON, a dispatch failure, a nesting-depth refusal, and an unknown member.
-- The original error **MUST** stay reachable through unwrapping, so every sentinel this § names, `jsontext.ErrDuplicateName`, `strconv.ErrSyntax` and `strconv.ErrRange` keep matching with `errors.Is`, and `*json.SemanticError`, `*jsontext.SyntacticError` and `*strconv.NumError` with `errors.As`. The text of such a cause **MAY** name the value: a caller that unwraps to it asks for the value, as one that reads `Value` does. A codec's own prefix does not repeat a value the wrapped cause already carries: `rm.Real`, `rm.Integer` and `rm.Integer64` report a quoted literal that fails to parse as `parse quoted literal: <cause>`, so the literal appears exactly once, in the cause.
+- The original error **MUST** stay reachable through unwrapping, so every sentinel this § names, `jsontext.ErrDuplicateName`, `strconv.ErrSyntax` and `strconv.ErrRange` keep matching with `errors.Is`, and `*json.SemanticError`, `*jsontext.SyntacticError` and `*strconv.NumError` with `errors.As`.
+  The text of such a cause **MAY** name the value: a caller that unwraps to it asks for the value, as one that reads `Value` does.
+  A codec's own prefix does not repeat a value the wrapped cause already carries: `rm.Real`, `rm.Integer` and `rm.Integer64` report a quoted literal that fails to parse as `parse quoted literal: <cause>`, so the literal appears exactly once, in the cause.
 
-*Known gaps.* The rule binds the two `canjson` entry points and the `DecodeError` type. A caller driving the generated methods through bare `encoding/json/v2` or v1 `encoding/json` gets that package's own errors, whose text may name the value. `typereg.Registry.Decode` and `typereg.DecodeAs` return their failures in a plain wrapped error, not in a `DecodeError` at the top of the chain, so their text may name the value. Canonical XML's own errors outside a `DecodeError`, such as a syntax error `encoding/xml` reports outside a polymorphic slot, and the FLAT and STRUCTURED decoders (§ REQ-053) may name the value as well. A canonical-XML primitive element whose text does not decode as its type is no such gap: that failure is a `DecodeError` ([§ REQ-056](#req-056)).
+*Known gaps.*
+The rule binds the two `canjson` entry points and the `DecodeError` type.
+A caller driving the generated methods through bare `encoding/json/v2` or v1 `encoding/json` gets that package's own errors, whose text may name the value.
+`typereg.Registry.Decode` and `typereg.DecodeAs` return their failures in a plain wrapped error, not in a `DecodeError` at the top of the chain, so their text may name the value.
+Canonical XML's own errors outside a `DecodeError`, such as a syntax error `encoding/xml` reports outside a polymorphic slot, and the FLAT and STRUCTURED decoders (§ REQ-053) may name the value as well.
+A canonical-XML primitive element whose text does not decode as its type is no such gap: that failure is a `DecodeError` ([§ REQ-056](#req-056)).
 
 **Acceptance (value-free decode errors):**
 
@@ -158,19 +327,31 @@ Which of a malformed value and a shape failure is reported first is not a contra
   - a `DV_QUANTITY` `precision` of `1.5` or `2147483648`;
   - a `DV_TEXT` `value` of `"Jane \q Doe"` (an invalid escape) or of the bare token `Jane` (a refused character).
 - In the same cases, `Value.Reveal()` returns the number as written for the four numeric inputs, and nothing for the two malformed ones.
-- `Value.Reveal()` returns the refused literal for a lossy `rm.Real` number and for a two-character value `rm.Character` refuses. It returns nothing for a value of the wrong JSON kind, such as a `DV_BOOLEAN` `value` of `"yes"`, or for a `DV_MULTIMEDIA` `data` string that is not valid base64.
+- `Value.Reveal()` returns the refused literal for a lossy `rm.Real` number and for a two-character value `rm.Character` refuses.
+  It returns nothing for a value of the wrong JSON kind, such as a `DV_BOOLEAN` `value` of `"yes"`, or for a `DV_MULTIMEDIA` `data` string that is not valid base64.
 - A reader that fails partway through a value, inside a polymorphic slot or under `WithStrict` included, comes back with no `DecodeError` in its chain and with the reader's own error reachable through `errors.Is`.
 - A duplicate member name and an unknown `_type` keep the name in `Error()`.
 - Each sentinel and cause the unwrapping bullet above names is reached through unwrapping on an input that raises it, and a test fails when the entry point drops one.
 - `io.EOF` from an exhausted `Decoder` comes back itself, so `err == io.EOF` holds.
 
-### Floating-point precision
+#### Floating-point precision
 
-Numeric magnitudes are serialised as IEEE 754 double-precision JSON numbers. The SDK **MUST NOT** silently coerce a magnitude through `float32` or a similarly lossy intermediate. A `Real` decode **MUST** refuse a **lossy** decimal literal with a typed error rather than round it. A literal is lossy when the `float64` it parses to, written back correctly rounded (ties to even) to as many significant decimal digits as the literal carries, does not denote the literal's own value. Significant digits are counted on the mantissa alone: the sign, the decimal point and the exponent are excluded, and so are leading zeros before the first nonzero digit and trailing zeros at the end of the digit run, so `1.10` carries two and `0.1` one. A literal of at most 15 significant digits whose magnitude is at least 2^-1022 (about `2.2e-308`, the smallest normal `float64`) is never lossy, since a `float64` gives back any decimal of 15 digits in that range, so the test reaches only longer literals and smaller ones. `9007199254740993` (2^53+1, which parses to `9007199254740992`), `1.2345678901234567890`, `1.23e-322` (which parses to `1.24e-322`) and `1e-400` (which parses to zero) are lossy. `18446744073709551616` (2^64, exact in `float64`), the `0.10000000000000001` a producer printing 17 digits writes for `0.1`, and the exact expansion `0.1000000000000000055511151231257827` are not.
+Numeric magnitudes are serialised as IEEE 754 double-precision JSON numbers.
+The SDK **MUST NOT** silently coerce a magnitude through `float32` or a similarly lossy intermediate.
+A `Real` decode **MUST** refuse a **lossy** decimal literal with a typed error rather than round it.
+A literal is lossy when the `float64` it parses to, written back correctly rounded (ties to even) to as many significant decimal digits as the literal carries, does not denote the literal's own value.
+Significant digits are counted on the mantissa alone: the sign, the decimal point and the exponent are excluded, and so are leading zeros before the first nonzero digit and trailing zeros at the end of the digit run, so `1.10` carries two and `0.1` one.
+A literal of at most 15 significant digits whose magnitude is at least 2^-1022 (about `2.2e-308`, the smallest normal `float64`) is never lossy, since a `float64` gives back any decimal of 15 digits in that range, so the test reaches only longer literals and smaller ones.
+`9007199254740993` (2^53+1, which parses to `9007199254740992`), `1.2345678901234567890`, `1.23e-322` (which parses to `1.24e-322`) and `1e-400` (which parses to zero) are lossy.
+`18446744073709551616` (2^64, exact in `float64`), the `0.10000000000000001` a producer printing 17 digits writes for `0.1`, and the exact expansion `0.1000000000000000055511151231257827` are not.
 
-Encode writes the shortest decimal that reads back as the same `float64`, so a decoded literal can change its spelling on re-encode (`1.10` becomes `1.1`, and `18446744073709551616` becomes `18446744073709552000` in canonical JSON and `1.8446744073709552e+19` in canonical XML) but not the `float64` it denotes. Neither format makes the spelling part of the value: `1.10` and `1.1` are one JSON number, and one value of the `xs:float` the ITS-XML schema gives `DV_QUANTITY.magnitude`. The number of decimal places a quantity was recorded to is the RM's `precision` attribute.
+Encode writes the shortest decimal that reads back as the same `float64`, so a decoded literal can change its spelling on re-encode (`1.10` becomes `1.1`, and `18446744073709551616` becomes `18446744073709552000` in canonical JSON and `1.8446744073709552e+19` in canonical XML) but not the `float64` it denotes.
+Neither format makes the spelling part of the value: `1.10` and `1.1` are one JSON number, and one value of the `xs:float` the ITS-XML schema gives `DV_QUANTITY.magnitude`.
+The number of decimal places a quantity was recorded to is the RM's `precision` attribute.
 
-The clause is met on both its arms: an out-of-range magnitude (e.g. `1e400`) fails with a typed codec error, reachable by `errors.As` through the generated `UnmarshalJSONFrom` wrapper; and a lossy literal fails decode wrapping `canjson.ErrInvalidShape`, in both the bare-number and quoted-decimal-string forms `Real` accepts. **Parse and range failures take precedence over the lossy test:** a malformed literal (fails JSON number or decimal-string syntax) or an out-of-range one (overflows `float64`) reports its own parse or range error first; the test applies only to a literal that parsed as a syntactically valid, in-range decimal. `rm.Real` is the sole primitive this clause governs; `DV_QUANTITY.magnitude`, `DV_PROPORTION.numerator`/`denominator` and every other `Real`-typed field inherit the check through the ordinary struct-field decode path, with no change to the generated code, in canonical XML as in canonical JSON ([§ REQ-056](#req-056)).
+The clause is met on both its arms: an out-of-range magnitude (e.g. `1e400`) fails with a typed codec error, reachable by `errors.As` through the generated `UnmarshalJSONFrom` wrapper; and a lossy literal fails decode wrapping `canjson.ErrInvalidShape`, in both the bare-number and quoted-decimal-string forms `Real` accepts.
+**Parse and range failures take precedence over the lossy test:** a malformed literal (fails JSON number or decimal-string syntax) or an out-of-range one (overflows `float64`) reports its own parse or range error first; the test applies only to a literal that parsed as a syntactically valid, in-range decimal.
+`rm.Real` is the sole primitive this clause governs; `DV_QUANTITY.magnitude`, `DV_PROPORTION.numerator`/`denominator` and every other `Real`-typed field inherit the check through the ordinary struct-field decode path, with no change to the generated code, in canonical XML as in canonical JSON ([§ REQ-056](#req-056)).
 
 **Acceptance (lossy Real literals):**
 
@@ -178,9 +359,15 @@ The clause is met on both its arms: an out-of-range magnitude (e.g. `1e400`) fai
 - In both codecs a `magnitude` of `18446744073709551616`, `0.10000000000000001`, `0.1000000000000000055511151231257827`, `1.10` or `72.5` decodes to the `float64` nearest the literal.
 - In canonical JSON, `1e400` is refused with its range error, a `*json.SemanticError` reachable with `errors.As`, never as a lossy literal.
 
-Some upstream producers (notably legacy CDR exporters) emit `Real`, `Integer` and `Integer64` magnitudes as quoted decimal strings. The SDK adopts **asymmetric tolerance**: encode is strict (numbers only); decode accepts either a JSON number or a quoted decimal string. The full rule and its rationale live in [`docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). The asymmetric profile is part of the openEHR wire contract this SDK follows.
+Some upstream producers (notably legacy CDR exporters) emit `Real`, `Integer` and `Integer64` magnitudes as quoted decimal strings.
+The SDK adopts **asymmetric tolerance**: encode is strict (numbers only); decode accepts either a JSON number or a quoted decimal string.
+The full rule and its rationale live in [`docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md).
+The asymmetric profile is part of the openEHR wire contract this SDK follows.
 
-An `Integer` or `Integer64` field **MUST** accept on decode a number whose value is a whole number however the literal writes it, with a zero fraction or an exponent (`1.0`, `1e0`), bare or quoted, and read it as that integer, since JSON gives `1.0` and `1` the same value, and refuse with a typed error, never truncating or rounding, a number with a non-zero fraction or one outside the field's range (32-bit for `Integer`, 64-bit for `Integer64`). Some producers write an integral RM value with a fraction (the reference's `test_all_types` FLAT writes a DV_PROPORTION `|type: 1.0`). Encode **MUST** write the integer form. `rm.Integer` and `rm.Integer64` are the primitives this rule governs; `DV_COUNT.magnitude` is the RM's one `Integer64` attribute, and `Double` keeps its plain decode ([ADR 0004](../adr/0004-numeric-wire-tolerance.md) *Out of scope*).
+An `Integer` or `Integer64` field **MUST** accept on decode a number whose value is a whole number however the literal writes it, with a zero fraction or an exponent (`1.0`, `1e0`), bare or quoted, and read it as that integer, since JSON gives `1.0` and `1` the same value, and refuse with a typed error, never truncating or rounding, a number with a non-zero fraction or one outside the field's range (32-bit for `Integer`, 64-bit for `Integer64`).
+Some producers write an integral RM value with a fraction (the reference's `test_all_types` FLAT writes a DV_PROPORTION `|type: 1.0`).
+Encode **MUST** write the integer form.
+`rm.Integer` and `rm.Integer64` are the primitives this rule governs; `DV_COUNT.magnitude` is the RM's one `Integer64` attribute, and `Double` keeps its plain decode ([ADR 0004](../adr/0004-numeric-wire-tolerance.md) *Out of scope*).
 
 **Acceptance (whole-number decode):**
 
@@ -188,69 +375,132 @@ An `Integer` or `Integer64` field **MUST** accept on decode a number whose value
 - A `magnitude` of `9223372036854775807`, `9223372036854775807.0` or `"9223372036854775807"` reads as that number; one of `9223372036854775808`, `-9223372036854775809`, `1e19` or `"1e19"` is refused, with `errors.Is(err, strconv.ErrRange)`.
 - A `magnitude` or `precision` of `2.5`, `"2.5"` or `25e-1` is refused, with `errors.Is(err, strconv.ErrSyntax)`, and is never read as 2 or 3.
 
-Golden canonical-JSON composition inputs for codec and PROBE-030 live under `testkit/corpus/compositions/` and `testkit/corpus/rm/` (see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus)). Example: `compositions/vital_signs.json` for quoted-number magnitudes ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
+Golden canonical-JSON composition inputs for codec and PROBE-030 live under `testkit/corpus/compositions/` and `testkit/corpus/rm/` (see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus)).
+Example: `compositions/vital_signs.json` for quoted-number magnitudes ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
 
-### Polymorphic substitution
+#### Polymorphic substitution
 
-The openEHR RM permits Liskov substitution at every property slot: a slot whose declared type is `T` admits any concrete subtype of `T` as a runtime instance, by AOM `valid_value` semantics. Two cases the canonical-JSON codec **MUST** handle losslessly:
+The openEHR RM permits Liskov substitution at every property slot: a slot whose declared type is `T` admits any concrete subtype of `T` as a runtime instance, by AOM `valid_value` semantics.
+Two cases the canonical-JSON codec **MUST** handle losslessly:
 
-1. **Substitutable subtype in a concrete-typed slot.** When a property's declared type is itself concrete but has registered subtypes per the BMM `ancestors` graph (`LOCATABLE.name: DV_TEXT` admitting `DV_CODED_TEXT`, `EVENT_CONTEXT.health_care_facility: PARTY_IDENTIFIED` admitting `PARTY_RELATED`, etc.), the wire `_type` discriminator drives dispatch. The SDK surfaces this via **narrow Go interfaces** (`<Parent>Like` — `DVTextLike`, `PartyIdentifiedLike`, `AuditDetailsLike`, `DVURILike`, `ObjectRefLike`) generated by `bmmgen` from the ancestors graph; the wire decoder routes through `typereg.DecodeAs[<Like>]`.
-2. **Generic type parameterised over an abstract bound.** When a generic class instantiates over an abstract bound (`DV_INTERVAL[T: DV_ORDERED]`), the field is dispatched via `typereg.DecodeAs[T]` at decode time; this handles both interface-T instantiations (`DVInterval[DVOrdered]` used by reference ranges) and concrete value-T instantiations (`DVInterval[DVQuantity]` used by `DVQuantity.NormalRange`).
+1. **Substitutable subtype in a concrete-typed slot.**
+   When a property's declared type is itself concrete but has registered subtypes per the BMM `ancestors` graph (`LOCATABLE.name: DV_TEXT` admitting `DV_CODED_TEXT`, `EVENT_CONTEXT.health_care_facility: PARTY_IDENTIFIED` admitting `PARTY_RELATED`, etc.), the wire `_type` discriminator drives dispatch.
+   The SDK surfaces this via **narrow Go interfaces** (`<Parent>Like` — `DVTextLike`, `PartyIdentifiedLike`, `AuditDetailsLike`, `DVURILike`, `ObjectRefLike`) generated by `bmmgen` from the ancestors graph; the wire decoder routes through `typereg.DecodeAs[<Like>]`.
+2. **Generic type parameterised over an abstract bound.**
+   When a generic class instantiates over an abstract bound (`DV_INTERVAL[T: DV_ORDERED]`), the field is dispatched via `typereg.DecodeAs[T]` at decode time; this handles both interface-T instantiations (`DVInterval[DVOrdered]` used by reference ranges) and concrete value-T instantiations (`DVInterval[DVQuantity]` used by `DVQuantity.NormalRange`).
 
-**Missing-`_type` tolerance:** canonical JSON carries `_type` everywhere in principle, but real-world fixtures elide it on concrete-typed slots where the static field fixes the subtype (e.g. `"name": {"value": "Tree"}` on an `ITEM_TREE`). The decoder falls back to the **declared parent's concrete type** when the wire omits `_type` on a narrow-interface slot; this preserves backward compatibility with permissive producers without compromising the strict-abstract-slot rule (`DATA_VALUE`, `DV_ORDERED`, `ITEM_STRUCTURE`, `PARTY_PROXY` still require `_type`).
+##### Missing-`_type` tolerance
 
-The full substitution semantics are pinned by [PROBE-038](conformance.md#probe-038--rm-polymorphic-decode-coverage) (decode + re-marshal preserves every input `_type` discriminator on a member the RM defines). An empty bound beside an open flag is dropped on re-encode by [§ REQ-052](#req-052), which is outside that probe. What a BMM bump that adds a subtype owes the codec is step 10 of [ADR 0001](../adr/0001-bmm-version-bump-runbook.md).
+canonical JSON carries `_type` everywhere in principle, but real-world fixtures elide it on concrete-typed slots where the static field fixes the subtype (e.g. `"name": {"value": "Tree"}` on an `ITEM_TREE`).
+The decoder falls back to the **declared parent's concrete type** when the wire omits `_type` on a narrow-interface slot; this preserves backward compatibility with permissive producers without compromising the strict-abstract-slot rule (`DATA_VALUE`, `DV_ORDERED`, `ITEM_STRUCTURE`, `PARTY_PROXY` still require `_type`).
+
+The full substitution semantics are pinned by [PROBE-038](conformance.md#probe-038--rm-polymorphic-decode-coverage) (decode + re-marshal preserves every input `_type` discriminator on a member the RM defines).
+An empty bound beside an open flag is dropped on re-encode by [§ REQ-052](#req-052), which is outside that probe.
+What a BMM bump that adds a subtype owes the codec is step 10 of [ADR 0001](../adr/0001-bmm-version-bump-runbook.md).
 
 ## Canonical XML
 
 ### REQ-056
 
-The SDK **MUST** provide a canonical XML codec, symmetric to the canonical JSON codec. Like that codec, it resolves types through the type registry (REQ-040) and does not depend on `transport/` (REQ-013).
+The SDK **MUST** provide a canonical XML codec, symmetric to the canonical JSON codec.
+Like that codec, it resolves types through the type registry (REQ-040) and does not depend on `transport/` (REQ-013).
 
-Canonical XML applies to the same RM surface as canonical JSON: Composition, EHR_STATUS, Directory, Contribution, demographic resources, and the `Interval<T>` fields of the AOM 1.4 types; [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) adds the ADL 1.4 operational template. Polymorphic discrimination uses the `xsi:type` attribute (XML Schema Instance namespace), not the JSON `_type` property. Element names **MUST** be snake_case BMM names (same as canonical JSON keys), including the elements of an AOM 1.4 constraint interval (`occurrences`, `existence`, `cardinality.interval`, …), which the SDK holds as the abstract BASE `Interval<T>`. Decode **SHOULD** also read the Go-field spelling SDK v0.28.0 and earlier wrote for that abstract interval (`Lower`, `LowerIncluded`, `LowerUnbounded`, `Upper`, `UpperIncluded`, `UpperUnbounded`); the encoder **MUST NOT** write it, and no other class is tolerant. The codec **MUST** carry its namespace declarations: the SDK writes the default namespace `http://schemas.openehr.org/v1`, and `xmlns:xsi` when `xsi:type` is present. The vendored ITS-XML schemas ([`resources/its-xml/`](../../resources/its-xml/README.md)) declare `targetNamespace` `http://schemas.openehr.org/v2`, and the generator reads only the XML binding from them, such as child-element order, never their namespace, so a validator run against them refuses SDK output on its namespace before it checks that order.
+Canonical XML applies to the same RM surface as canonical JSON: Composition, EHR_STATUS, Directory, Contribution, demographic resources, and the `Interval<T>` fields of the AOM 1.4 types; [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) adds the ADL 1.4 operational template.
+Polymorphic discrimination uses the `xsi:type` attribute (XML Schema Instance namespace), not the JSON `_type` property.
+Element names **MUST** be snake_case BMM names (same as canonical JSON keys), including the elements of an AOM 1.4 constraint interval (`occurrences`, `existence`, `cardinality.interval`, …), which the SDK holds as the abstract BASE `Interval<T>`.
+Decode **SHOULD** also read the Go-field spelling SDK v0.28.0 and earlier wrote for that abstract interval (`Lower`, `LowerIncluded`, `LowerUnbounded`, `Upper`, `UpperIncluded`, `UpperUnbounded`); the encoder **MUST NOT** write it, and no other class is tolerant.
+The codec **MUST** carry its namespace declarations: the SDK writes the default namespace `http://schemas.openehr.org/v1`, and `xmlns:xsi` when `xsi:type` is present.
+The vendored ITS-XML schemas ([`resources/its-xml/`](../../resources/its-xml/README.md)) declare `targetNamespace` `http://schemas.openehr.org/v2`, and the generator reads only the XML binding from them, such as child-element order, never their namespace, so a validator run against them refuses SDK output on its namespace before it checks that order.
 
-Canonical ordering for XML is its own deterministic profile, set out in the bullets below. Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-052)), element order is part of an XML document's identity, so the encoder **MUST** emit in the fixed order below:
+Canonical ordering for XML is its own deterministic profile, set out in the bullets below.
+Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-052)), element order is part of an XML document's identity, so the encoder **MUST** emit in the fixed order below:
 
-- Child elements **MUST** follow the `xs:sequence` that the openEHR ITS-XML schemas give the class's type, the elements of the type it extends first: RM Release-1.1.0 and BASE Release-1.2.0 for an RM class, AM Release-1.4 for an AOM 1.4 class. A reader that validates against those schemas then accepts the order of the elements they declare. A class the schemas do not name takes the type of its nearest ancestor. A property neither schema set declares comes after the declared ones; `EHR.tags`, which a later RM release added, is one. [ADR 0002 D10](../adr/0002-bmm-codegen-decisions.md#d10--the-generated-xml-encoders-take-their-child-order-from-the-its-xml-schemas) sets out the lookup, and where a property goes when only one of the two schema sets declares it. Decode accepts child elements in any order.
-- `xsi:type` is the **first attribute** on every encoded concrete RM value where a polymorphic site is being resolved; the encoder emits it on every concrete value boundary (deterministic profile), the decoder requires it at polymorphic sites. `canxml.WithRelaxedTypeDispatch` is accepted for parity with canonical JSON's option but does not relax this yet: a polymorphic site with no discriminator fails with `typereg.ErrMissingType` whatever the option.
-- An interval element that omits a boundary flag decodes by [§ REQ-169](#req-169--interval-boundary-flag-defaults). The ITS-XML schema (`BaseTypes.xsd`, type `Interval`) makes `lower_included` and `upper_included` optional (`minOccurs="0"`) and the two `*_unbounded` flags mandatory, so a schema-valid document may leave the included flags out.
+- Child elements **MUST** follow the `xs:sequence` that the openEHR ITS-XML schemas give the class's type, the elements of the type it extends first: RM Release-1.1.0 and BASE Release-1.2.0 for an RM class, AM Release-1.4 for an AOM 1.4 class.
+  A reader that validates against those schemas then accepts the order of the elements they declare.
+  A class the schemas do not name takes the type of its nearest ancestor.
+  A property neither schema set declares comes after the declared ones; `EHR.tags`, which a later RM release added, is one.
+  [ADR 0002 D10](../adr/0002-bmm-codegen-decisions.md#d10--the-generated-xml-encoders-take-their-child-order-from-the-its-xml-schemas) sets out the lookup, and where a property goes when only one of the two schema sets declares it.
+  Decode accepts child elements in any order.
+- `xsi:type` is the **first attribute** on every encoded concrete RM value where a polymorphic site is being resolved; the encoder emits it on every concrete value boundary (deterministic profile), the decoder requires it at polymorphic sites.
+  `canxml.WithRelaxedTypeDispatch` is accepted for parity with canonical JSON's option but does not relax this yet: a polymorphic site with no discriminator fails with `typereg.ErrMissingType` whatever the option.
+- An interval element that omits a boundary flag decodes by [§ REQ-169](#req-169--interval-boundary-flag-defaults).
+  The ITS-XML schema (`BaseTypes.xsd`, type `Interval`) makes `lower_included` and `upper_included` optional (`minOccurs="0"`) and the two `*_unbounded` flags mandatory, so a schema-valid document may leave the included flags out.
 - Content the decode does not read is unmatched content, as [§ REQ-170](#req-170--unmatched-content-on-decode) defines it and says how it is treated.
-- A member typed by a generic parameter that is bound to an interface, such as the `data` of an `ORIGINAL_VERSION` held as `any` or a bound of an `Interval<DV_ORDERED>`, is a polymorphic site: the decoder **MUST** resolve such a member that holds no value by its `xsi:type`, even when the element is empty, and **MUST** fail with `typereg.ErrMissingType` when it has none. A nilled interval bound is the exception: it is a `null` bound (below).
-- `DV_MULTIMEDIA.data` and `integrity_check` **MUST** each be one element whose text is the standard base64 of the bytes, the schema's `xs:base64Binary` and the string canonical JSON writes. The encoder **MUST NOT** write an element for an empty value. On decode, XML whitespace inside the text is ignored, an empty element reads as absent, and text that is not base64 is refused as the bullet on primitive elements below says.
-- The AOM 1.4 `ARCHETYPE.original_language` is written in the `CODE_PHRASE` shape the AOM 1.4 schema gives it, `terminology_id` holding a `value` child: the shape of the RM `common.resource` form of `AUTHORED_RESOURCE`, which [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) binds the model to. Decode also reads a `terminology_id` given as plain text.
-- Nil-pointer optional fields and empty containers with `cardinality.lower == 0` **MUST** be emitted as **ABSENT** (no element). Both ABSENT and an empty self-closing element are accepted on decode. That acceptance covers optionals and containers only, and not a member typed by a generic parameter bound to an interface, which needs its `xsi:type` even when empty (above): a mandatory primitive whose empty value is illegal — `TERM_MAPPING.match`, whose `Character` type rejects `""` through `encoding.TextUnmarshaler` — refuses an empty or self-closing element on decode and an empty or multi-character value on encode, the rule § REQ-052 states for JSON. *Informative:* canonical XML cannot carry a present empty list, because a list is its repeated child elements and an empty one has none. The item-structure lists canonical JSON writes as `[]` when present and empty (`ITEM_LIST.items`, `ITEM_TREE.items`, `ITEM_TABLE.rows`, [§ REQ-052](#req-052) *An absent mandatory member*) are therefore written as no element, and decode as absent, so a document read from canonical XML whose template requires such a list by its existence and gives it no member draws `required` there ([clinical-modeling.md § REQ-102](clinical-modeling.md#req-102--composition-validation) *An existence lower bound alone asks for no member*).
-- A single-valued member is sent without a value when its element carries `xsi:nil` set (`true` or `1`), whatever it holds, or, for a member of a primitive type, has no text, or XML whitespace only for a string. Decode **MUST** give such a member no value in every mode, unless `canxml.WithStringText` keeps the text of a member of a string type as the next bullet says:
+- A member typed by a generic parameter that is bound to an interface, such as the `data` of an `ORIGINAL_VERSION` held as `any` or a bound of an `Interval<DV_ORDERED>`, is a polymorphic site: the decoder **MUST** resolve such a member that holds no value by its `xsi:type`, even when the element is empty, and **MUST** fail with `typereg.ErrMissingType` when it has none.
+  A nilled interval bound is the exception: it is a `null` bound (below).
+- `DV_MULTIMEDIA.data` and `integrity_check` **MUST** each be one element whose text is the standard base64 of the bytes, the schema's `xs:base64Binary` and the string canonical JSON writes.
+  The encoder **MUST NOT** write an element for an empty value.
+  On decode, XML whitespace inside the text is ignored, an empty element reads as absent, and text that is not base64 is refused as the bullet on primitive elements below says.
+- The AOM 1.4 `ARCHETYPE.original_language` is written in the `CODE_PHRASE` shape the AOM 1.4 schema gives it, `terminology_id` holding a `value` child: the shape of the RM `common.resource` form of `AUTHORED_RESOURCE`, which [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) binds the model to.
+  Decode also reads a `terminology_id` given as plain text.
+- Nil-pointer optional fields and empty containers with `cardinality.lower == 0` **MUST** be emitted as **ABSENT** (no element).
+  Both ABSENT and an empty self-closing element are accepted on decode.
+  That acceptance covers optionals and containers only, and not a member typed by a generic parameter bound to an interface, which needs its `xsi:type` even when empty (above): a mandatory primitive whose empty value is illegal — `TERM_MAPPING.match`, whose `Character` type rejects `""` through `encoding.TextUnmarshaler` — refuses an empty or self-closing element on decode and an empty or multi-character value on encode, the rule § REQ-052 states for JSON.
+  *Informative:* canonical XML cannot carry a present empty list, because a list is its repeated child elements and an empty one has none.
+  The item-structure lists canonical JSON writes as `[]` when present and empty (`ITEM_LIST.items`, `ITEM_TREE.items`, `ITEM_TABLE.rows`, [§ REQ-052](#req-052) *An absent mandatory member*) are therefore written as no element, and decode as absent, so a document read from canonical XML whose template requires such a list by its existence and gives it no member draws `required` there ([clinical-modeling.md § REQ-102](clinical-modeling.md#req-102--composition-validation) *An existence lower bound alone asks for no member*).
+- A single-valued member is sent without a value when its element carries `xsi:nil` set (`true` or `1`), whatever it holds, or, for a member of a primitive type, has no text, or XML whitespace only for a string.
+  Decode **MUST** give such a member no value in every mode, unless `canxml.WithStringText` keeps the text of a member of a string type as the next bullet says:
   - an optional member holds a nil pointer, interface or slice, as a `null` member does in canonical JSON ([§ REQ-052](#req-052)), never a pointer to a zero or an empty struct;
   - a mandatory member is missing and holds its zero value, as [§ REQ-175](#req-175--missing-members-on-decode) asks, so a string of whitespace only reads as the empty string.
 
-  A nilled polymorphic member needs no `xsi:type`, unless its owner's generic parameter types it and it is no interval bound (above). The decode does not read what a nilled element holds: its attributes other than those in the XML Schema instance namespace, its child elements and its text are unmatched content ([§ REQ-170](#req-170--unmatched-content-on-decode)). A number or boolean element of whitespace only still fails as a primitive failure. A nilled interval bound is a `null` bound: it holds its zero value, and its side has no bound for [§ REQ-169](#req-169--interval-boundary-flag-defaults). An item of a multi-valued member, any other member typed by its owner's generic parameter and an empty struct element decode as before; § REQ-175 reports a mandatory member sent without a value.
-- Given `canxml.WithStringText`, decode **MUST** read a member of a string type, `String` or an ISO 8601 type, whose element is not nilled, as the text it carries, an empty or whitespace-only text included, as canonical JSON decodes the same string. Such a member is no missing member for § REQ-175's missing-member option, and its sent-without-a-value option still reports it as empty. A `Character` reads its text as sent in every mode, so the option leaves it as it is: one space is a value, and an empty element fails as the primitive failures below say.
-- An element that carries one attribute twice, by its name as written or as the namespaces in scope resolve it, a namespace declaration included, is not well-formed XML. Decode **MUST** refuse it in every mode, wherever the decode reads the element or skips it as unmatched content, with an error that wraps `canxml.ErrInvalidShape` and `canxml.ErrNotWellFormed`, names the element and the attribute and carries none of their values. An element inside a primitive element's text is unmatched content that a decode given none of `canxml.WithUnmatched`, `canxml.WithStrict`, `canxml.WithMissing`, `canxml.WithPresence`, `canxml.WithStringText` and a positive `canxml.WithMaxDepth` reads past without looking at it, so such a decode may accept a repeated attribute there; a decode given one of them refuses it.
+  A nilled polymorphic member needs no `xsi:type`, unless its owner's generic parameter types it and it is no interval bound (above).
+  The decode does not read what a nilled element holds: its attributes other than those in the XML Schema instance namespace, its child elements and its text are unmatched content ([§ REQ-170](#req-170--unmatched-content-on-decode)).
+  A number or boolean element of whitespace only still fails as a primitive failure.
+  A nilled interval bound is a `null` bound: it holds its zero value, and its side has no bound for [§ REQ-169](#req-169--interval-boundary-flag-defaults).
+  An item of a multi-valued member, any other member typed by its owner's generic parameter and an empty struct element decode as before; § REQ-175 reports a mandatory member sent without a value.
+- Given `canxml.WithStringText`, decode **MUST** read a member of a string type, `String` or an ISO 8601 type, whose element is not nilled, as the text it carries, an empty or whitespace-only text included, as canonical JSON decodes the same string.
+  Such a member is no missing member for § REQ-175's missing-member option, and its sent-without-a-value option still reports it as empty.
+  A `Character` reads its text as sent in every mode, so the option leaves it as it is: one space is a value, and an empty element fails as the primitive failures below say.
+- An element that carries one attribute twice, by its name as written or as the namespaces in scope resolve it, a namespace declaration included, is not well-formed XML.
+  Decode **MUST** refuse it in every mode, wherever the decode reads the element or skips it as unmatched content, with an error that wraps `canxml.ErrInvalidShape` and `canxml.ErrNotWellFormed`, names the element and the attribute and carries none of their values.
+  An element inside a primitive element's text is unmatched content that a decode given none of `canxml.WithUnmatched`, `canxml.WithStrict`, `canxml.WithMissing`, `canxml.WithPresence`, `canxml.WithStringText` and a positive `canxml.WithMaxDepth` reads past without looking at it, so such a decode may accept a repeated attribute there; a decode given one of them refuses it.
 - ISO 8601 dates/times/durations are passed through as element text content; the codec does not parse them at codec layer (REQ-041).
-- Numeric magnitudes use IEEE 754 double-precision, as in canonical JSON, and a `Real` element whose text is a lossy literal ([§ REQ-052 *Floating-point precision*](#floating-point-precision)) is refused as the bullet on primitive elements below says. The quoted decimal strings [ADR 0004](../adr/0004-numeric-wire-tolerance.md) admits are a canonical-JSON tolerance: element text is not quoted, and a quoted number is text that does not spell its type.
-- The text of a `Real` element is read in the `xs:double` lexical space, which the `xs:float` of `DV_QUANTITY.magnitude` shares: a decimal number with an optional sign, fraction and exponent (`72.5`, `-1.`, `.5`, `1E-3`), or `INF`, `+INF`, `-INF` or `NaN`, with XML whitespace around it. An element with no text carries no value and reads as `0`, as [§ REQ-175](#req-175--missing-members-on-decode) reads an empty primitive element. Decode **MUST** refuse any other text, whitespace alone included, such as the hexadecimal form `0x1p-2`, a digit separator (`1_000`), `Inf`, `Infinity` or `nan`, as the bullet on primitive elements below says. The encoder **MUST** write an infinity as `INF` or `-INF` and a not-a-number as `NaN`, and writes a finite value as the shortest decimal that reads back as the same `float64`.
-- A document holds one root element. In every mode, `canxml.Unmarshal` **MUST** refuse what is not well-formed XML around it:
+- Numeric magnitudes use IEEE 754 double-precision, as in canonical JSON, and a `Real` element whose text is a lossy literal ([§ REQ-052 *Floating-point precision*](#floating-point-precision)) is refused as the bullet on primitive elements below says.
+  The quoted decimal strings [ADR 0004](../adr/0004-numeric-wire-tolerance.md) admits are a canonical-JSON tolerance: element text is not quoted, and a quoted number is text that does not spell its type.
+- The text of a `Real` element is read in the `xs:double` lexical space, which the `xs:float` of `DV_QUANTITY.magnitude` shares: a decimal number with an optional sign, fraction and exponent (`72.5`, `-1.`, `.5`, `1E-3`), or `INF`, `+INF`, `-INF` or `NaN`, with XML whitespace around it.
+  An element with no text carries no value and reads as `0`, as [§ REQ-175](#req-175--missing-members-on-decode) reads an empty primitive element.
+  Decode **MUST** refuse any other text, whitespace alone included, such as the hexadecimal form `0x1p-2`, a digit separator (`1_000`), `Inf`, `Infinity` or `nan`, as the bullet on primitive elements below says.
+  The encoder **MUST** write an infinity as `INF` or `-INF` and a not-a-number as `NaN`, and writes a finite value as the shortest decimal that reads back as the same `float64`.
+- A document holds one root element.
+  In every mode, `canxml.Unmarshal` **MUST** refuse what is not well-formed XML around it:
   - before the root, anything other than the XML declaration, whitespace, comments, processing instructions and one document type declaration, such as text other than whitespace, an end element or a second `<!DOCTYPE>`;
   - after the root's end, anything other than whitespace, comments and processing instructions, such as text other than whitespace, an element or a `<!DOCTYPE>`;
   - inside the root, a markup declaration (`<!…>` other than a comment or a CDATA section), such as a `<!DOCTYPE>`.
 
-  Whitespace here is the space, tab, carriage return and line feed as written (XML 1.0 `S`). A CDATA section or a character reference is element content, so outside the root it is refused whatever it stands for.
+  Whitespace here is the space, tab, carriage return and line feed as written (XML 1.0 `S`).
+  A CDATA section or a character reference is element content, so outside the root it is refused whatever it stands for.
   The document type declaration passes only in the form XML 1.0's `doctypedecl` gives it:
   - a name after `DOCTYPE`;
   - optionally `SYSTEM` and a quoted literal, or `PUBLIC`, a quoted public id and a quoted literal;
   - optionally an internal subset of whitespace, comments, processing instructions, parameter-entity references and `<!ELEMENT`, `<!ATTLIST`, `<!ENTITY` or `<!NOTATION` declarations, each with a name.
 
-  After its name, a declaration in the subset is judged only for closed quoted literals and no `<` outside them. Content refused here is malformed input rather than unmatched content. The refusal **MUST** wrap both `canxml.ErrInvalidShape` and `canxml.ErrNotWellFormed`, and carries none of that content. Markup before the root that `encoding/xml` cannot read, which may be the root's own start tag, fails instead as its `*xml.SyntaxError`, as a syntax error inside the root does, unless content this bullet refuses comes before it. After the root's end, where it cannot be the root, such markup is refused like other content there. XML reserves the processing instruction target `xml`, in any letter case, for the XML declaration, which nothing but a UTF-8 byte order mark may precede. One anywhere else is not a processing instruction that passes, and is refused the same way:
+  After its name, a declaration in the subset is judged only for closed quoted literals and no `<` outside them.
+  Content refused here is malformed input rather than unmatched content.
+  The refusal **MUST** wrap both `canxml.ErrInvalidShape` and `canxml.ErrNotWellFormed`, and carries none of that content.
+  Markup before the root that `encoding/xml` cannot read, which may be the root's own start tag, fails instead as its `*xml.SyntaxError`, as a syntax error inside the root does, unless content this bullet refuses comes before it.
+  After the root's end, where it cannot be the root, such markup is refused like other content there.
+  XML reserves the processing instruction target `xml`, in any letter case, for the XML declaration, which nothing but a UTF-8 byte order mark may precede.
+  One anywhere else is not a processing instruction that passes, and is refused the same way:
   - before the root, such as one after whitespace, a second declaration, `<?XML …?>` or one in the internal subset of the `<!DOCTYPE>`;
   - inside the root, such as one inside an element;
   - after the root.
 
-  A target that only starts with those letters, such as `xml-stylesheet`, passes. A UTF-8 byte order mark at the very start of the data is the document's encoding signature, not content before the root. `canxml.Decoder` decodes one value per call, skips what precedes it as `encoding/xml` does, and leaves what follows to the next call. Inside the value, a `canxml.Decoder` given `canxml.WithUnmatched`, `canxml.WithStrict`, `canxml.WithMissing`, `canxml.WithPresence`, `canxml.WithStringText` or a positive `canxml.WithMaxDepth` refuses a processing instruction whose target is `xml`, and a markup declaration, with an error that wraps `canxml.ErrInvalidShape` and `canxml.ErrNotWellFormed`; one given none of them may read past either.
-- The text of a primitive element may fail to decode as its type, inside a polymorphic slot or not, such as a `Boolean`, `Integer`, `Integer64` or `Real` the text does not spell, a lossy `Real`, a `Character` that is not one character, or an Octet list that is not base64. Such text **MUST** fail the decode with a `*canxml.DecodeError` whose `Inner` wraps `canxml.ErrInvalidShape`, not `canxml.ErrNotWellFormed`, and keeps the conversion's own error, such as a `*strconv.NumError`, reachable through unwrapping. The error's text is value-free as [§ REQ-052](#req-052) *Value-free decode errors* says. `canxml.Unmarshal`, in every mode, and a `canxml.Decoder` given `WithUnmatched`, `WithStrict`, `WithMissing`, `WithPresence` or `WithStringText` **MUST** return it on its own, outside any slot envelope, with `Path` the element's path from the root in the form [§ REQ-170](#req-170--unmatched-content-on-decode)'s report uses, such as `/ehr_status[1]/is_queryable[1]`. A `canxml.Decoder` given none of the five **MUST** name the element alone, such as `/is_queryable`, inside the envelope of each slot the element sits in.
+  A target that only starts with those letters, such as `xml-stylesheet`, passes.
+  A UTF-8 byte order mark at the very start of the data is the document's encoding signature, not content before the root.
+  `canxml.Decoder` decodes one value per call, skips what precedes it as `encoding/xml` does, and leaves what follows to the next call.
+  Inside the value, a `canxml.Decoder` given `canxml.WithUnmatched`, `canxml.WithStrict`, `canxml.WithMissing`, `canxml.WithPresence`, `canxml.WithStringText` or a positive `canxml.WithMaxDepth` refuses a processing instruction whose target is `xml`, and a markup declaration, with an error that wraps `canxml.ErrInvalidShape` and `canxml.ErrNotWellFormed`; one given none of them may read past either.
+- The text of a primitive element may fail to decode as its type, inside a polymorphic slot or not, such as a `Boolean`, `Integer`, `Integer64` or `Real` the text does not spell, a lossy `Real`, a `Character` that is not one character, or an Octet list that is not base64.
+  Such text **MUST** fail the decode with a `*canxml.DecodeError` whose `Inner` wraps `canxml.ErrInvalidShape`, not `canxml.ErrNotWellFormed`, and keeps the conversion's own error, such as a `*strconv.NumError`, reachable through unwrapping.
+  The error's text is value-free as [§ REQ-052](#req-052) *Value-free decode errors* says.
+  `canxml.Unmarshal`, in every mode, and a `canxml.Decoder` given `WithUnmatched`, `WithStrict`, `WithMissing`, `WithPresence` or `WithStringText` **MUST** return it on its own, outside any slot envelope, with `Path` the element's path from the root in the form [§ REQ-170](#req-170--unmatched-content-on-decode)'s report uses, such as `/ehr_status[1]/is_queryable[1]`.
+  A `canxml.Decoder` given none of the five **MUST** name the element alone, such as `/is_queryable`, inside the envelope of each slot the element sits in.
 - `xmi:type` is **rejected** on decode with `ErrInvalidShape` and an explicit message — only `xsi:type` is recognised.
-- `xsi:type` discriminator **values** **MUST** be matched as **unprefixed** RM class names, with one exception: a value whose prefix is bound, where the attribute stands, to the XML Schema namespace `http://www.w3.org/2001/XMLSchema` names an XML Schema built-in datatype and reads as its BMM primitive, whatever the prefix, so `xsd:string` and `xs:string` both read as `String`; a literal `xsd:` prefix reads the same way where no in-scope declaration binds it. Any other **namespace-prefixed** discriminator value, such as the `xsi:type="ns2:DV_QUANTITY"` form some producers write with the RM namespace bound to a prefix rather than being the default, is **out of v1 scope**: the decoder **MUST** refuse it with `typereg.ErrUnknownType`, never resolving it. The `xsi:type` attribute itself is recognised only when the `xsi` prefix is bound to the XSI namespace; an `xsi:type` written with no in-scope `xmlns:xsi` declaration is treated as a **missing** discriminator (`encoding/xml` yields the unresolved prefix, not a match).
+- `xsi:type` discriminator **values** **MUST** be matched as **unprefixed** RM class names, with one exception: a value whose prefix is bound, where the attribute stands, to the XML Schema namespace `http://www.w3.org/2001/XMLSchema` names an XML Schema built-in datatype and reads as its BMM primitive, whatever the prefix, so `xsd:string` and `xs:string` both read as `String`; a literal `xsd:` prefix reads the same way where no in-scope declaration binds it.
+  Any other **namespace-prefixed** discriminator value, such as the `xsi:type="ns2:DV_QUANTITY"` form some producers write with the RM namespace bound to a prefix rather than being the default, is **out of v1 scope**: the decoder **MUST** refuse it with `typereg.ErrUnknownType`, never resolving it.
+  The `xsi:type` attribute itself is recognised only when the `xsi` prefix is bound to the XSI namespace; an `xsi:type` written with no in-scope `xmlns:xsi` declaration is treated as a **missing** discriminator (`encoding/xml` yields the unresolved prefix, not a match).
 
-XML is a second-class format on the wire today (REST 1.1.0 is JSON-first), but several integration scenarios pin to XML for legacy reasons. The SDK supports it without forcing it.
+XML is a second-class format on the wire today (REST 1.1.0 is JSON-first), but several integration scenarios pin to XML for legacy reasons.
+The SDK supports it without forcing it.
 
 Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/corpus/compositions/` and `testkit/corpus/rm/` (same layout as REQ-052; see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus)).
 
@@ -264,7 +514,9 @@ Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/corpus/c
 
   The same document with only a byte order mark, then the XML declaration first, and comments, processing instructions such as `<?xml-stylesheet …?>`, whitespace and one `<!DOCTYPE>` before its root decodes.
 - A `DV_QUANTITY` whose optional `precision` is `<precision></precision>` or `<precision xsi:nil="true"/>`, an ELEMENT whose optional `null_flavour` carries `xsi:nil="true"`, and an ENTRY whose optional `provider` carries `xsi:nil="true"` and no `xsi:type` decode, with and without `WithStrict`, to the value of the same document without the element, each member nil; `<precision>0</precision>` decodes to a precision of 0; a child element inside a nilled optional element is reported by `WithUnmatched` and refused by `WithStrict`.
-- Given `canxml.WithStringText`, the corpus `BMI.xml` with its COMPOSITION `name` as `<value>  </value>` decodes `Value` as `"  "`, as its canonical JSON with `"value": "  "` does, and an EHR_STATUS whose `feeder_audit/originating_system_audit/version_id` is `<version_id></version_id>` decodes it as the empty string, which `canjson.Marshal` writes. The sent-without-a-value option reports each once as empty, the missing-member option neither. A nilled string member still decodes as absent, and an empty `precision` as before.
+- Given `canxml.WithStringText`, the corpus `BMI.xml` with its COMPOSITION `name` as `<value>  </value>` decodes `Value` as `"  "`, as its canonical JSON with `"value": "  "` does, and an EHR_STATUS whose `feeder_audit/originating_system_audit/version_id` is `<version_id></version_id>` decodes it as the empty string, which `canjson.Marshal` writes.
+  The sent-without-a-value option reports each once as empty, the missing-member option neither.
+  A nilled string member still decodes as absent, and an empty `precision` as before.
 - A COMPOSITION carrying `archetype_node_id` twice, a primitive element, an element skipped as unmatched content and an `xsi:type` each carrying one attribute twice, and an element declaring one namespace prefix twice, fail `canxml.Unmarshal` in every mode with an error that wraps `canxml.ErrInvalidShape` and `canxml.ErrNotWellFormed`, names the attribute and carries neither value.
 - A primitive failure, such as an `is_queryable` of `maybe`, wraps `canxml.ErrInvalidShape` and not `canxml.ErrNotWellFormed`.
 - A `DV_QUANTITY` `magnitude` of `0x1p-2`, `1_000`, `Inf`, `Infinity` or `nan` fails `canxml.Unmarshal` with an error that wraps `canxml.ErrInvalidShape`; one of `INF`, `+INF`, `-INF`, `NaN`, `-1.`, `.5` or `1E-3` decodes; and `canxml.Marshal` writes a positive infinity as `INF`, a negative one as `-INF` and a not-a-number as `NaN`.
@@ -274,20 +526,37 @@ Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/corpus/c
 
 ### REQ-169 — Interval boundary flag defaults
 
-BASE `Interval<T>` declares its four boundary flags, `lower_unbounded`, `upper_unbounded`, `lower_included` and `upper_included`, mandatory and gives them no default; `Point_interval<T>` defaults `*_unbounded` to `false` and `*_included` to `true`, and ADL writes a range as closed unless an end is marked (`|0..<1000|` is `0 <= x < 1000`). Of the serialised forms, only the FLAT Simplified Format says how an omitted flag is read: `|*_unbounded` defaults to `false` and `|*_included` to `true` ([ITS-REST Simplified Formats](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html), *RM mapping*). ITS-JSON lists all four flags as required, ITS-XML and the AM 1.4 XML schemas an OPT follows make the two included flags optional with no default, and producers omit flags all the same. This section is the one reading the SDK applies: the FLAT defaults where they build an interval BASE admits, and a departure where they would build one it does not (*Where this goes further than FLAT*, below).
+BASE `Interval<T>` declares its four boundary flags, `lower_unbounded`, `upper_unbounded`, `lower_included` and `upper_included`, mandatory and gives them no default; `Point_interval<T>` defaults `*_unbounded` to `false` and `*_included` to `true`, and ADL writes a range as closed unless an end is marked (`|0..<1000|` is `0 <= x < 1000`).
+Of the serialised forms, only the FLAT Simplified Format says how an omitted flag is read: `|*_unbounded` defaults to `false` and `|*_included` to `true` ([ITS-REST Simplified Formats](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html), *RM mapping*).
+ITS-JSON lists all four flags as required, ITS-XML and the AM 1.4 XML schemas an OPT follows make the two included flags optional with no default, and producers omit flags all the same.
+This section is the one reading the SDK applies: the FLAT defaults where they build an interval BASE admits, and a departure where they would build one it does not (*Where this goes further than FLAT*, below).
 
 Wherever the SDK reads an interval of an RM instance, an archetype or a template from a serialised form, it **MUST** read an absent flag this way:
 
 - an absent `*_unbounded` as `false` when that side carries a bound, and as `true` when its bound is absent or `null` too, so an interval that gives only an upper bound is open below;
 - an absent `*_included` as `true`, a closed end, on a side not unbounded, and as `false` on a side unbounded, as written or as read by the rule above, the only value BASE `Lower_included_valid` / `Upper_included_valid` permit there.
 
-**Where this goes further than FLAT.** Read literally, FLAT's defaults apply on every side, the two the rule above treats otherwise included. On a side with no bound, an absent `*_unbounded` read as `false` names a closed end with no value (*A closed side with no bound*, below), so the rule reads it as `true`. On an open side, an absent `*_included` read as `true` breaks BASE `Lower_included_valid` or `Upper_included_valid`, so the rule reads it as `false`. FLAT's own examples never rely on the literal defaults there: every open side in them writes `|*_unbounded: true` together with `|*_included: false`.
-
 In canonical XML, a bound element that carries `xsi:nil` set is a `null` bound ([§ REQ-056](#req-056)).
 
-A flag that is present **MUST** be read as written, and an absent flag **MUST NOT** be a decode error. In canonical XML and in OPT XML an empty or whitespace-only flag element carries no boolean and **MUST** be read as an absent flag.
+A flag that is present **MUST** be read as written, and an absent flag **MUST NOT** be a decode error.
+In canonical XML and in OPT XML an empty or whitespace-only flag element carries no boolean and **MUST** be read as an absent flag.
 
-**A closed side with no bound.** A side whose `*_unbounded` is present and `false` but whose bound is absent or `null` names a closed end with no value. Where the SDK holds that bound by value, as it does for a concrete `T` (`DV_COUNT.normal_range`, an AOM 1.4 occurrences interval, an OPT numeric or temporal range), the Go value cannot hold the absence, and a reader that filled in the zero bound would change the interval's meaning. Every reader **MUST** refuse such a side, in every mode, wrapping its sentinel for malformed input: `canjson.ErrInvalidShape`, `canxml.ErrInvalidShape` and `simplified.ErrUnsupportedDatatype`. The operational template model's reader, `aom14.ReadOperationalTemplate`, decodes canonical XML, so it refuses such a side with `canxml.ErrInvalidShape`. Where the SDK holds the bound by pointer or as an interface, the side decodes as written, with no bound.
+#### Where this goes further than FLAT
+
+Read literally, FLAT's defaults apply on every side, the two the rule above treats otherwise included.
+On a side with no bound, an absent `*_unbounded` read as `false` names a closed end with no value (*A closed side with no bound*, below), so the rule reads it as `true`.
+On an open side, an absent `*_included` read as `true` breaks BASE `Lower_included_valid` or `Upper_included_valid`, so the rule reads it as `false`.
+FLAT's own examples never rely on the literal defaults there: every open side in them writes `|*_unbounded: true` together with `|*_included: false`.
+
+#### A closed side with no bound
+
+A side whose `*_unbounded` is present and `false` but whose bound is absent or `null` names a closed end with no value.
+Where the SDK holds that bound by value, as it does for a concrete `T` (`DV_COUNT.normal_range`, an AOM 1.4 occurrences interval, an OPT numeric or temporal range), the Go value cannot hold the absence, and a reader that filled in the zero bound would change the interval's meaning.
+Every reader **MUST** refuse such a side, in every mode, wrapping its sentinel for malformed input: `canjson.ErrInvalidShape`, `canxml.ErrInvalidShape` and `simplified.ErrUnsupportedDatatype`.
+The operational template model's reader, `aom14.ReadOperationalTemplate`, decodes canonical XML, so it refuses such a side with `canxml.ErrInvalidShape`.
+Where the SDK holds the bound by pointer or as an interface, the side decodes as written, with no bound.
+
+#### Readers
 
 The rule binds every such interval reader the SDK has:
 
@@ -296,17 +565,27 @@ The rule binds every such interval reader the SDK has:
 | canonical JSON ([§ REQ-052](#req-052)) and canonical XML ([§ REQ-056](#req-056)) | `DV_INTERVAL<T>`, BASE `Interval<T>` wherever an RM class holds one, and the AOM 1.4 companions' constraint intervals (`occurrences`, `existence`, `cardinality.interval`, and the ranges of the primitive constraints) |
 | FLAT and STRUCTURED ([§ REQ-140](#req-140--underscore-prefixed-rm-attributes)) | the four interval keys `\|lower_unbounded`, `\|upper_unbounded`, `\|lower_included` and `\|upper_included` |
 
-The reader of the operational template model ([clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)) decodes canonical XML, so the first row binds it, and the compile step closes the intervals it reads ([clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) *Reading the model*). The P_BMM schema loader (`openehr/bmm`) is not one of them: it reads schema data and keeps a container's `cardinality` as written.
+The reader of the operational template model ([clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)) decodes canonical XML, so the first row binds it, and the compile step closes the intervals it reads ([clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) *Reading the model*).
+The P_BMM schema loader (`openehr/bmm`) is not one of them: it reads schema data and keeps a container's `cardinality` as written.
 
-**An included open side.** A side that carries both `*_unbounded: true` and `*_included: true` breaks BASE `Lower_included_valid` or `Upper_included_valid`, but a typed value can still be built from it. Canonical JSON, canonical XML, FLAT and STRUCTURED decode **MUST** read it as written and **MUST NOT** refuse it; RM validation reports it ([clinical-modeling.md § REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)), and FLAT and STRUCTURED encode refuse it (§ REQ-140).
+#### An included open side
 
-**Encode.** The canonical JSON and XML encoders write all four flags of every interval they write, so an interval decoded with a defaulted flag re-encodes with that flag spelled out; [§ REQ-052](#req-052) says what a round trip of such an input is compared with.
+A side that carries both `*_unbounded: true` and `*_included: true` breaks BASE `Lower_included_valid` or `Upper_included_valid`, but a typed value can still be built from it.
+Canonical JSON, canonical XML, FLAT and STRUCTURED decode **MUST** read it as written and **MUST NOT** refuse it; RM validation reports it ([clinical-modeling.md § REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)), and FLAT and STRUCTURED encode refuse it (§ REQ-140).
 
-**Intervals built in Go.** The Go zero value of an interval sets every flag `false`, so a struct literal that sets only the two bounds excludes both of them, a reading no serialised form gives an omission. The `rm` package **MUST** offer a constructor for a closed interval, both bounds present and included, for BASE `Interval<T>` and for `DV_INTERVAL<T>`.
+#### Encode
+
+The canonical JSON and XML encoders write all four flags of every interval they write, so an interval decoded with a defaulted flag re-encodes with that flag spelled out; [§ REQ-052](#req-052) says what a round trip of such an input is compared with.
+
+#### Intervals built in Go
+
+The Go zero value of an interval sets every flag `false`, so a struct literal that sets only the two bounds excludes both of them, a reading no serialised form gives an omission.
+The `rm` package **MUST** offer a constructor for a closed interval, both bounds present and included, for BASE `Interval<T>` and for `DV_INTERVAL<T>`.
 
 **Acceptance:**
 
-- A canonical-JSON or canonical-XML `DV_INTERVAL` with both bounds and no `*_included` member decodes with both ends included; a side marked `*_unbounded: true` with no `*_included` decodes as not included; an absent `*_unbounded` decodes as `false` beside a bound and as `true` where the bound is absent or `null`, so `{"upper": …}` alone is open below. The same holds for an AOM 1.4 constraint interval in either canonical format and for the FLAT and STRUCTURED keys.
+- A canonical-JSON or canonical-XML `DV_INTERVAL` with both bounds and no `*_included` member decodes with both ends included; a side marked `*_unbounded: true` with no `*_included` decodes as not included; an absent `*_unbounded` decodes as `false` beside a bound and as `true` where the bound is absent or `null`, so `{"upper": …}` alone is open below.
+  The same holds for an AOM 1.4 constraint interval in either canonical format and for the FLAT and STRUCTURED keys.
 - A present flag is read as written in every reader; no default overrides it.
 - A side marked `*_unbounded: false` with an absent or `null` bound is refused in every reader and mode where the bound is held by value (a `DV_COUNT` normal range, an AOM 1.4 constraint interval, an OPT range), and decodes with no bound where it is held by pointer or as an interface (`DV_INTERVAL<DV_ORDERED>`).
 - An included open side decodes as written in canonical JSON, canonical XML, FLAT and STRUCTURED, and `ValidateRM` reports it.
@@ -318,9 +597,10 @@ The reader of the operational template model ([clinical-modeling.md § REQ-176](
 
 ### REQ-170 — Unmatched content on decode
 
-Every decoder of RM content, canonical JSON ([§ REQ-052](#req-052)), canonical XML ([§ REQ-056](#req-056)), FLAT and STRUCTURED ([§ REQ-053](#req-053), [§ REQ-140](#req-140--underscore-prefixed-rm-attributes)), meets input that matches nothing it reads. This section is the one rule for that input.
+Every decoder of RM content, canonical JSON ([§ REQ-052](#req-052)), canonical XML ([§ REQ-056](#req-056)), FLAT and STRUCTURED ([§ REQ-053](#req-053), [§ REQ-140](#req-140--underscore-prefixed-rm-attributes)), meets input that matches nothing it reads.
+This section is the one rule for that input.
 
-**What is unmatched.**
+#### What is unmatched
 
 | Format | Unmatched content |
 |---|---|
@@ -328,13 +608,16 @@ Every decoder of RM content, canonical JSON ([§ REQ-052](#req-052)), canonical 
 | canonical XML | an element or attribute that names no attribute of the RM type its element decodes as, other than namespace declarations and attributes in the XML Schema instance namespace (the `xsi:type` discriminator, `xsi:schemaLocation`, `xsi:nil`); an element in a namespace other than the openEHR one (an element in no namespace is read as openEHR's, since many producers omit the declaration); a `Hash` entry whose key an earlier entry of its member holds (below); a child element of a single-valued attribute that repeats an earlier child of that name (below); and text other than XML whitespace (space, tab, carriage return, line feed) directly inside an element whose content is elements, that is one that decodes as an RM class rather than a primitive, a CDATA section included, one item per element however many runs of text it holds. The text of a primitive element is its value. The root element is not matched by name, since the value decoded into says what it is, so its own namespace is not checked; a child that inherits a foreign default namespace from it is foreign |
 | FLAT and STRUCTURED | a key whose path the Web Template does not resolve, an unknown `_`-segment (§ REQ-140), a suffix outside its datatype's suffix set, and an unknown `ctx/` field, other than the reference spellings listed below and the keys § REQ-053 *Attributes with no Web Template node* reads, whatever the JSON shape of a STRUCTURED member's value |
 
-Input is matched when it names something the decoder reads, even where the decoder then refuses it. These refusals are not unmatched content and stay errors in every mode:
+Input is matched when it names something the decoder reads, even where the decoder then refuses it.
+These refusals are not unmatched content and stay errors in every mode:
 
 - a `_type` or `xsi:type` that names no RM class, a dispatch failure that would otherwise drop the whole subtree under it;
 - a FLAT or STRUCTURED key that resolves but has no carrier: PARTICIPATION `time`, FEEDER_AUDIT_DETAILS `other_details` and `_instruction_details` (§ REQ-140 *Deliberate exclusions*); and, at a leaf whose datatype has neither a suffix set nor a sub-path grammar, its bare value and a suffix that names an attribute of its RM class; a `null` one in this bullet reads as absent (§ REQ-053);
 - a FLAT or STRUCTURED key the decoder recognises as the reference's spelling of RM data the Web Template this SDK builds does not model, resolved or not, since ignoring it would drop that data or let a default replace it (the reference spellings, listed below); a `null` one in this bullet reads as absent (§ REQ-053);
 - matched content that is malformed: a value of the wrong shape, a missing required suffix (a `null` one among them, § REQ-053), two spellings of one field that disagree, an index past its bound;
-- a FLAT key that is not well formed, which names no path at all: one with an empty path segment (`a//b|`, or a leading or trailing `/`), a segment with no id before its `:index`, a second `|suffix`, or a segment after its `|suffix`. A last bare `|` is the empty suffix, read off any key before it is judged (§ REQ-053), so `x|` and `x|code|` are well formed. OPT-free FLAT → STRUCTURED conversion refuses such a key too.
+- a FLAT key that is not well formed, which names no path at all: one with an empty path segment (`a//b|`, or a leading or trailing `/`), a segment with no id before its `:index`, a second `|suffix`, or a segment after its `|suffix`.
+  A last bare `|` is the empty suffix, read off any key before it is judged (§ REQ-053), so `x|` and `x|code|` are well formed.
+  OPT-free FLAT → STRUCTURED conversion refuses such a key too.
 
 The reference spellings the decoder recognises are these, wherever the Web Template does not resolve them:
 
@@ -342,26 +625,58 @@ The reference spellings the decoder recognises are these, wherever the Web Templ
 - under an `ism_transition` segment the Web Template has no node for, a `_reason` family too;
 - the ACTION's own `time` leaf, with any suffix.
 
-A refusal of a key the *Simplified Formats* define and this SDK does not model, a reference spelling or `_instruction_details`, **MUST** wrap `simplified.ErrNotModelled`, a sentinel that also matches `simplified.ErrUnknownPath`. A caller can then tell such a key from unmatched content, whose strict refusal matches `simplified.ErrUnknownPath` alone. The refusal names the key, or its family instance, and no file of this repository.
+A refusal of a key the *Simplified Formats* define and this SDK does not model, a reference spelling or `_instruction_details`, **MUST** wrap `simplified.ErrNotModelled`, a sentinel that also matches `simplified.ErrUnknownPath`.
+A caller can then tell such a key from unmatched content, whose strict refusal matches `simplified.ErrUnknownPath` alone.
+The refusal names the key, or its family instance, and no file of this repository.
 
-**Default: ignored.** A decoder **MUST** ignore unmatched content by default: it decodes the rest of the input, and the value it returns holds what the input says without the unmatched content. It **MUST NOT** carry unmatched content into the value anywhere. A read, modify and write through the SDK therefore drops a producer's extension members; [§ REQ-052](#req-052)'s *expected form* says the same of a round trip.
+#### Default: ignored
 
-**Report.** Each codec **MUST** offer a decode option that passes every unmatched item, in document order, to a function the caller supplies, while the decode carries on as by default. An item is identified by the path at which it sits:
+A decoder **MUST** ignore unmatched content by default: it decodes the rest of the input, and the value it returns holds what the input says without the unmatched content.
+It **MUST NOT** carry unmatched content into the value anywhere.
+A read, modify and write through the SDK therefore drops a producer's extension members; [§ REQ-052](#req-052)'s *expected form* says the same of a round trip.
+
+#### Report
+
+Each codec **MUST** offer a decode option that passes every unmatched item, in document order, to a function the caller supplies, while the decode carries on as by default.
+An item is identified by the path at which it sits:
 
 - canonical JSON: a JSON Pointer (RFC 6901) into the input;
 - canonical XML: the slash-separated path of elements from the root, each written `name[n]`, where `n` is the number of earlier siblings with the same name, plus one, an attribute as a last `@name` segment and text as a last `text()` segment;
 - FLAT: the key as written;
 - STRUCTURED: the slash-joined member path, with each array position as a segment of its own (`root/obs/0/dv/0/|x_note`), so a repeated node can be told apart.
 
-In canonical JSON and canonical XML the function receives the path as a value that writes its text only when the caller asks for it and stays valid after the function returns, so a caller that counts or samples the items pays nothing for the text of the rest. The report options of canonical JSON and canonical XML, this one and the two of [§ REQ-175](#req-175--missing-members-on-decode), **MUST** cost the decode memory that grows with the size of the document, not with the depth of the items reported times their number. A path **MUST NOT** carry a value from the input. A decode that fails makes no promise about which items it reported before the failure.
+In canonical JSON and canonical XML the function receives the path as a value that writes its text only when the caller asks for it and stays valid after the function returns, so a caller that counts or samples the items pays nothing for the text of the rest.
+The report options of canonical JSON and canonical XML, this one and the two of [§ REQ-175](#req-175--missing-members-on-decode), **MUST** cost the decode memory that grows with the size of the document, not with the depth of the items reported times their number.
+A path **MUST NOT** carry a value from the input.
+A decode that fails makes no promise about which items it reported before the failure.
 
-**Strict.** Each codec **MUST** offer a strict decode option under which the first unmatched item refuses the decode with an error that names its path, carries no value from the input, and wraps the codec's sentinel for unmatched content, a sentinel of its own: `canjson.ErrUnknownMember`, distinct from `canjson.ErrInvalidShape` and `canjson.ErrInvalidValue` as [§ REQ-052](#req-052)'s sentinels are from each other, `canxml.ErrUnknownElement`, and `simplified.ErrUnknownPath`. An element in a foreign namespace also wraps `canxml.ErrNamespace`. Strict covers unmatched content only: an absent member, a boundary flag [§ REQ-169](#req-169--interval-boundary-flag-defaults) defaults among them, is never refused.
+#### Strict
 
-The canonical-XML codec reads a `Hash` (`map[K]V`) member one entry per element, in the shapes [clinical-modeling.md § REQ-176](clinical-modeling.md#round-trip) gives them, and an entry's key attribute is read, not unmatched. An entry whose key an earlier entry of the member holds is unmatched content: decode keeps the earlier entry, so by default it reads the member as if the repeat were absent, the report option reports the repeat's element as one item, and strict refuses it like unmatched content. In every mode, decode refuses an entry with no key, no key attribute or no language code with `canxml.ErrInvalidShape`, naming the entry's path and not its key. It does not model a `Hash` whose values are `Hash`es (RESOURCE_ANNOTATIONS `documentation`): by default it skips such an element, the report option reports the element as one item, and strict refuses it like unmatched content. It reads the content of a BMM `Any` member, the AOM 1.4 `EXPR_LEAF.item`, in the shape [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) gives it, so the item is not unmatched content, though what its own type does not read is; the AOM 1.4 `assumed_value`, `Any` in the BMM, has the type the schema gives it on each class that has one.
+Each codec **MUST** offer a strict decode option under which the first unmatched item refuses the decode with an error that names its path, carries no value from the input, and wraps the codec's sentinel for unmatched content, a sentinel of its own: `canjson.ErrUnknownMember`, distinct from `canjson.ErrInvalidShape` and `canjson.ErrInvalidValue` as [§ REQ-052](#req-052)'s sentinels are from each other, `canxml.ErrUnknownElement`, and `simplified.ErrUnknownPath`.
+An element in a foreign namespace also wraps `canxml.ErrNamespace`.
+Strict covers unmatched content only: an absent member, a boundary flag [§ REQ-169](#req-169--interval-boundary-flag-defaults) defaults among them, is never refused.
 
-A child element that repeats an earlier child of the same name under an attribute the Reference Model makes single-valued is unmatched content in the same way: decode keeps the earlier child's value, so by default it reads the member as if the repeat were absent, the report option reports the repeat's element as one item, by its path, such as `/composition[1]/language[2]`, and nothing inside it, and strict refuses it with `canxml.ErrUnknownElement`. The child elements of a multi-valued attribute are its items ([§ REQ-056](#req-056)) and never a repeat, except an Octet list, such as `DV_MULTIMEDIA.data`, which canonical XML writes as one base64 element and which counts as single-valued here. An element that repeats an attribute is not well-formed and is refused in every mode ([§ REQ-056](#req-056)). Canonical JSON refuses a repeated member name in every mode instead ([§ REQ-052](#req-052)).
+#### Canonical-XML `Hash` entries and repeated children
 
-**Scope.** The two options belong to the codecs' own decode entry points. In canonical JSON they check the members of RM classes against the RM's own attribute lists once the decode has succeeded, so a decode error such as an unknown `_type` is reported as itself; a value of a class outside the RM, such as an AOM 1.4 archetype, decodes as by default and its members are not checked. Nor is a BASE `Interval<T>`, which the BMM lists among its primitive types rather than its classes, whether it is the decode target or a member's value; its descendants `DV_INTERVAL`, `Point_interval` and `Proper_interval` are classes and are checked. What is checked is reached from the decode target: an RM class, or a slice, array or map of one, a generic class taking its parameter from the target's type argument; RM values held inside a type of the caller's own are not checked. In canonical XML they check, as the decode reads, every class the generated decoders read, AOM 1.4 included; because that decode streams, strict returns the first problem in document order, whether an unmatched item or a dispatch failure. REST reads through `transport` and the `openehr/client/*` packages decode with the default and offer neither option.
+The canonical-XML codec reads a `Hash` (`map[K]V`) member one entry per element, in the shapes [clinical-modeling.md § REQ-176](clinical-modeling.md#round-trip) gives them, and an entry's key attribute is read, not unmatched.
+An entry whose key an earlier entry of the member holds is unmatched content: decode keeps the earlier entry, so by default it reads the member as if the repeat were absent, the report option reports the repeat's element as one item, and strict refuses it like unmatched content.
+In every mode, decode refuses an entry with no key, no key attribute or no language code with `canxml.ErrInvalidShape`, naming the entry's path and not its key.
+It does not model a `Hash` whose values are `Hash`es (RESOURCE_ANNOTATIONS `documentation`): by default it skips such an element, the report option reports the element as one item, and strict refuses it like unmatched content.
+It reads the content of a BMM `Any` member, the AOM 1.4 `EXPR_LEAF.item`, in the shape [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) gives it, so the item is not unmatched content, though what its own type does not read is; the AOM 1.4 `assumed_value`, `Any` in the BMM, has the type the schema gives it on each class that has one.
+
+A child element that repeats an earlier child of the same name under an attribute the Reference Model makes single-valued is unmatched content in the same way: decode keeps the earlier child's value, so by default it reads the member as if the repeat were absent, the report option reports the repeat's element as one item, by its path, such as `/composition[1]/language[2]`, and nothing inside it, and strict refuses it with `canxml.ErrUnknownElement`.
+The child elements of a multi-valued attribute are its items ([§ REQ-056](#req-056)) and never a repeat, except an Octet list, such as `DV_MULTIMEDIA.data`, which canonical XML writes as one base64 element and which counts as single-valued here.
+An element that repeats an attribute is not well-formed and is refused in every mode ([§ REQ-056](#req-056)).
+Canonical JSON refuses a repeated member name in every mode instead ([§ REQ-052](#req-052)).
+
+#### Scope
+
+The two options belong to the codecs' own decode entry points.
+In canonical JSON they check the members of RM classes against the RM's own attribute lists once the decode has succeeded, so a decode error such as an unknown `_type` is reported as itself; a value of a class outside the RM, such as an AOM 1.4 archetype, decodes as by default and its members are not checked.
+Nor is a BASE `Interval<T>`, which the BMM lists among its primitive types rather than its classes, whether it is the decode target or a member's value; its descendants `DV_INTERVAL`, `Point_interval` and `Proper_interval` are classes and are checked.
+What is checked is reached from the decode target: an RM class, or a slice, array or map of one, a generic class taking its parameter from the target's type argument; RM values held inside a type of the caller's own are not checked.
+In canonical XML they check, as the decode reads, every class the generated decoders read, AOM 1.4 included; because that decode streams, strict returns the first problem in document order, whether an unmatched item or a dispatch failure.
+REST reads through `transport` and the `openehr/client/*` packages decode with the default and offer neither option.
 
 **Acceptance:**
 
@@ -372,10 +687,13 @@ A child element that repeats an earlier child of the same name under an attribut
 - An unknown `_type` or `xsi:type` fails in every mode; each carrier-less FLAT key above fails in every mode, except a `null` one, which § REQ-053 reads as absent; an absent mandatory member does not fail under strict.
 - Each reference spelling and `_instruction_details` fails in every mode with an error that matches both `simplified.ErrNotModelled` and `simplified.ErrUnknownPath` and names the key or its family instance; a mistyped key refused under strict does not match `simplified.ErrNotModelled`.
 - A FLAT body carrying `a//b|` fails in every mode with `simplified.ErrUnknownPath` naming that key, and so does its FLAT → STRUCTURED conversion.
-- A canonical-JSON document reporting 1000 items under a spine 150 levels deep allocates at most twice as much as the same items under a spine 2 levels deep, under the unmatched and the missing-member options. A canonical-XML document reporting one item per level, under each of the three options, allocates at most three times as much when its depth doubles from 400 levels to 800, where a cost of depth times items would give four times.
+- A canonical-JSON document reporting 1000 items under a spine 150 levels deep allocates at most twice as much as the same items under a spine 2 levels deep, under the unmatched and the missing-member options.
+  A canonical-XML document reporting one item per level, under each of the three options, allocates at most three times as much when its depth doubles from 400 levels to 800, where a cost of depth times items would give four times.
 - In canonical JSON and canonical XML, a path the report function keeps reads the same text after the decode returns as it read inside the function.
-- A canonical-XML EHR_STATUS carrying text other than whitespace inside `archetype_details` decodes by default to the value without it; the report option receives `/ehr_status[1]/archetype_details[1]/text()` once, however many runs of text, CDATA sections among them, the element holds; strict refuses it with `canxml.ErrUnknownElement`, naming that path and not the text. Whitespace between elements, as an indented document carries, is neither reported nor refused.
-- A canonical-XML COMPOSITION carrying `language` twice at its root decodes by default to the value of the first `language`, with no error; the report option receives `/composition[1]/language[2]` once and nothing inside it; strict refuses it with `canxml.ErrUnknownElement`, naming that path and none of the element's content. The same two elements under a multi-valued attribute, two `content` children, decode as two items and draw nothing.
+- A canonical-XML EHR_STATUS carrying text other than whitespace inside `archetype_details` decodes by default to the value without it; the report option receives `/ehr_status[1]/archetype_details[1]/text()` once, however many runs of text, CDATA sections among them, the element holds; strict refuses it with `canxml.ErrUnknownElement`, naming that path and not the text.
+  Whitespace between elements, as an indented document carries, is neither reported nor refused.
+- A canonical-XML COMPOSITION carrying `language` twice at its root decodes by default to the value of the first `language`, with no error; the report option receives `/composition[1]/language[2]` once and nothing inside it; strict refuses it with `canxml.ErrUnknownElement`, naming that path and none of the element's content.
+  The same two elements under a multi-valued attribute, two `content` children, decode as two items and draw nothing.
 
 - **Probes:** PROBE-086 and PROBE-105 (their exclusion reads the report option), PROBE-030 (the expected form).
 
@@ -383,31 +701,75 @@ A child element that repeats an earlier child of the same name under an attribut
 
 ### REQ-175 — Missing members on decode
 
-Every decoder of canonical JSON ([§ REQ-052](#req-052)) and canonical XML ([§ REQ-056](#req-056)) meets a document that leaves out a member the Reference Model requires. The value it returns cannot always say so: a member the SDK holds by value, a number, a boolean, a string or a value struct such as `PARTY_SELF` or `ARCHETYPE_ID`, decodes to its type's zero value whether the document carried it or not, and the RM rules read a number and a boolean as always present ([clinical-modeling.md § REQ-171 *Structural access*](clinical-modeling.md#structural-access)). This section is the one rule for that input, in both canonical formats; it is the dual of [§ REQ-170](#req-170--unmatched-content-on-decode), which covers the content a decoder does not read. FLAT and STRUCTURED resolve their keys against a Web Template and are outside it ([§ REQ-053](#req-053)).
+Every decoder of canonical JSON ([§ REQ-052](#req-052)) and canonical XML ([§ REQ-056](#req-056)) meets a document that leaves out a member the Reference Model requires.
+The value it returns cannot always say so: a member the SDK holds by value, a number, a boolean, a string or a value struct such as `PARTY_SELF` or `ARCHETYPE_ID`, decodes to its type's zero value whether the document carried it or not, and the RM rules read a number and a boolean as always present ([clinical-modeling.md § REQ-171 *Structural access*](clinical-modeling.md#structural-access)).
+This section is the one rule for that input, in both canonical formats; it is the dual of [§ REQ-170](#req-170--unmatched-content-on-decode), which covers the content a decoder does not read.
+FLAT and STRUCTURED resolve their keys against a Web Template and are outside it ([§ REQ-053](#req-053)).
 
-**What is missing.** A member is missing when the Reference Model the SDK pins makes the attribute mandatory on the class its object decodes as, the class its `_type` or `xsi:type` names, else the type the Reference Model declares where the object sits, as § REQ-170 reads it, and the document carries no value for it:
+#### What is missing
+
+A member is missing when the Reference Model the SDK pins makes the attribute mandatory on the class its object decodes as, the class its `_type` or `xsi:type` names, else the type the Reference Model declares where the object sits, as § REQ-170 reads it, and the document carries no value for it:
 
 | Format | A missing member |
 |---|---|
 | canonical JSON | the object has no member of that name, or holds `null` there |
 | canonical XML | the element has no child element of that name, and no XML attribute of that name where the ITS-XML schema carries the attribute as one (`archetype_node_id`, or the `code` of an AOM 1.4 `ARCHETYPE_TERM`), a child that § REQ-170 reads as unmatched content, one in a foreign namespace or a repeat, counting for none; or the child it has carries `xsi:nil` set (`true` or `1`); or the child is a primitive element with no text, or a string element with whitespace only, which carries no value, as [§ REQ-169](#req-169--interval-boundary-flag-defaults) reads an empty flag element. Under `canxml.WithStringText` a string element, empty or whitespace only, carries its text ([§ REQ-056](#req-056)). A number or boolean element written as whitespace fails as a primitive failure ([§ REQ-056](#req-056)) in every mode, and a `Character` of one space is a value. Canonical XML writes no element for an empty list ([§ REQ-056](#req-056)), so a mandatory list with no item is missing there, where canonical JSON's `[]` is present and empty |
 
-Three kinds of attribute are never missing: one no serialization carries, the set [clinical-modeling.md § REQ-112 *Driver*](clinical-modeling.md#driver) leaves out (every function the model computes, and RESOURCE_DESCRIPTION `parent_resource`); the four interval boundary flags, which § REQ-169 gives a value when absent; and `_type` and `xsi:type`, which name no attribute. A member that carries a value is never missing, whatever the value, and the RM rules judge it ([clinical-modeling.md § REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)): an empty string in canonical JSON, a zero, an empty list or object, a bare `{"_type":"PARTY_SELF"}` and a `Hash` of `Hash`es, which canonical XML does not model, are present. Canonical XML has no spelling that tells an empty string from no value, so an empty string element is missing there, as the table says, unless `canxml.WithStringText` keeps it.
+Three kinds of attribute are never missing: one no serialization carries, the set [clinical-modeling.md § REQ-112 *Driver*](clinical-modeling.md#driver) leaves out (every function the model computes, and RESOURCE_DESCRIPTION `parent_resource`); the four interval boundary flags, which § REQ-169 gives a value when absent; and `_type` and `xsi:type`, which name no attribute.
+A member that carries a value is never missing, whatever the value, and the RM rules judge it ([clinical-modeling.md § REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)): an empty string in canonical JSON, a zero, an empty list or object, a bare `{"_type":"PARTY_SELF"}` and a `Hash` of `Hash`es, which canonical XML does not model, are present.
+Canonical XML has no spelling that tells an empty string from no value, so an empty string element is missing there, as the table says, unless `canxml.WithStringText` keeps it.
 
-**Default: nothing.** By default a decoder **MUST** decode a document with missing members as it decodes one without: no error, and the value holding each member's zero value ([§ REQ-052](#req-052) *An absent mandatory member* says how such a value is written back). A missing member **MUST NOT** be a decode error in any mode: the strict option of § REQ-170 covers unmatched content only.
+#### Default: nothing
 
-**Report.** Each codec **MUST** offer a decode option that passes every missing member to a function the caller supplies, once each, while the decode carries on as by default and returns the same value as without the option. The members of one object are reported as the decoder finishes reading the object, in the order the Reference Model declares the attributes (an ancestor's before the class's own), and the objects in the order they close, so an object's missing members come after those of the objects inside it. In canonical JSON the members are checked once the decode has succeeded, so a decode that fails reports nothing; in canonical XML the check runs as the decode streams, and a decode that fails makes no promise about which members it reported before the failure, as § REQ-170 says of its items.
+By default a decoder **MUST** decode a document with missing members as it decodes one without: no error, and the value holding each member's zero value ([§ REQ-052](#req-052) *An absent mandatory member* says how such a value is written back).
+A missing member **MUST NOT** be a decode error in any mode: the strict option of § REQ-170 covers unmatched content only.
 
-**Identification.** A missing member is a member of the instance, not an item of the document, so both codecs **MUST** identify it the same way: by its JSON Pointer (RFC 6901) in the canonical-JSON form of the instance, from the root of the value. The pointer names each attribute by its name, each item of a multi-valued attribute by its position counted from 0, and each entry of a `Hash` by its key, as `/content/0/data/events/0/data/items/0/value/magnitude`. The function receives the pointer, and a report costs, as [§ REQ-170](#req-170--unmatched-content-on-decode) *Report* says. For canonical JSON that is the pointer the member would have in the input; for canonical XML it is the pointer the member has in the canonical-JSON form of the same instance, the n-th child element of a multi-valued attribute's name being its item at position n-1, so a consumer of either format hands the validators one list ([clinical-modeling.md § REQ-112 *Value-typed mandatory presence*](clinical-modeling.md#value-typed-mandatory-presence)). A pointer **MUST NOT** carry a value from the document: its segments are attribute names, positions and `Hash` keys. The pointer value **MUST** also give, without writing its text, the pointer of the value that holds the member and its own last reference token, unescaped, so a consumer can read the report as one tree and meet each shared parent once. The report option of § REQ-170 keeps its own path grammar; the two options are independent and may be combined.
+#### Report
 
-**Sent without a value.** A document can send a member and give it no value. In canonical XML that is a child element that carries `xsi:nil` set, or a primitive element with no text, or a string element with whitespace only, as the table above reads them. By default, an optional member so sent decodes as absent, and a mandatory one to its zero value ([§ REQ-056](#req-056)), so the value cannot say that the document sent it, and the missing-member report above says nothing of an optional member. The canonical-XML codec **MUST** offer a second decode option that passes every member the document sends without a value to a function the caller supplies, mandatory and optional alike, once each, while the decode carries on as by default and returns the same value as without the option. The function **MUST** receive the member's JSON Pointer, as under *Identification*, and which form the member took, nil or empty. Each member is reported as its own element closes, in document order, since what the element carries is known then, where a missing member waits for the element that lacks it to close; nothing inside a nilled element is reported, and a decode that fails makes no promise about which members it reported before the failure. A member that carries a value is not reported, as it is not missing, with one exception, a string member `canxml.WithStringText` keeps ([§ REQ-056](#req-056)). An empty struct element, a bare `PARTY_SELF`, a `magnitude` of 0, a TERM_MAPPING `match` of one space and a `Hash` entry, whatever its text unless it is nilled, are values. An element that is no member is not reported: the root, unmatched content (§ REQ-170), a repeat among it, and an element the schema accepts that no member holds, which the decode drops, such as the AOM 1.4 `match_negated`. An empty element a primitive type refuses, `TERM_MAPPING.match`, fails the decode as [§ REQ-056](#req-056) says, as a number or boolean element of whitespace only does, and a decode that fails makes no promise about what it reported. A mandatory member sent without a value is reported by both options, by one pointer; an absent member by the missing-member option alone, since nothing was sent; the missing-member option is unchanged either way, and stays what the validators read ([clinical-modeling.md § REQ-112](clinical-modeling.md#value-typed-mandatory-presence)). Strict refuses nothing for a member sent without a value. Canonical JSON offers no counterpart: a `null` member there is a missing member when mandatory, as the table says, and absent otherwise, and an empty string is a value, so a caller that needs to know which optional members a canonical-JSON document sent reads the document itself ([§ REQ-052](#req-052) *`DV_TEXT.mappings` re-encode collapse*). The three report options, this one, the missing-member one and § REQ-170's, are independent and may be combined.
+Each codec **MUST** offer a decode option that passes every missing member to a function the caller supplies, once each, while the decode carries on as by default and returns the same value as without the option.
+The members of one object are reported as the decoder finishes reading the object, in the order the Reference Model declares the attributes (an ancestor's before the class's own), and the objects in the order they close, so an object's missing members come after those of the objects inside it.
+In canonical JSON the members are checked once the decode has succeeded, so a decode that fails reports nothing; in canonical XML the check runs as the decode streams, and a decode that fails makes no promise about which members it reported before the failure, as § REQ-170 says of its items.
 
-**Scope.** What each codec checks is what § REQ-170 *Scope* gives it. In canonical JSON the members of the RM classes reached from the decode target are checked; a value of a class outside the RM, such as an AOM 1.4 archetype, a BASE `Interval<T>`, a generic payload and the content of a `Hash` of plain values are not, and nothing inside them is reported. In canonical XML every class the generated decoders read is checked, AOM 1.4 included, through the description of the class the generator gives each decoder ([ADR 0033](../adr/0033-missing-members-reported-by-decoders.md)); a `Hash` whose values are `Hash`es is present when the document carries it, and nothing inside it is checked, while each class value a `Hash` holds is checked under its entry's key, and the class value an `Any` member such as `EXPR_LEAF.item` holds is checked as a member's is; the report of members sent without a value has the same scope. A primitive already held in an interface-typed slot, which `encoding/xml` reads itself, counts as a value even when its element is empty, for both reports. REST reads through `transport` and the `openehr/client/*` packages decode with the default and offer no report.
+#### Identification
+
+A missing member is a member of the instance, not an item of the document, so both codecs **MUST** identify it the same way: by its JSON Pointer (RFC 6901) in the canonical-JSON form of the instance, from the root of the value.
+The pointer names each attribute by its name, each item of a multi-valued attribute by its position counted from 0, and each entry of a `Hash` by its key, as `/content/0/data/events/0/data/items/0/value/magnitude`.
+The function receives the pointer, and a report costs, as [§ REQ-170](#req-170--unmatched-content-on-decode) *Report* says.
+For canonical JSON that is the pointer the member would have in the input; for canonical XML it is the pointer the member has in the canonical-JSON form of the same instance, the n-th child element of a multi-valued attribute's name being its item at position n-1, so a consumer of either format hands the validators one list ([clinical-modeling.md § REQ-112 *Value-typed mandatory presence*](clinical-modeling.md#value-typed-mandatory-presence)).
+A pointer **MUST NOT** carry a value from the document: its segments are attribute names, positions and `Hash` keys.
+The pointer value **MUST** also give, without writing its text, the pointer of the value that holds the member and its own last reference token, unescaped, so a consumer can read the report as one tree and meet each shared parent once.
+The report option of § REQ-170 keeps its own path grammar; the two options are independent and may be combined.
+
+#### Sent without a value
+
+A document can send a member and give it no value.
+In canonical XML that is a child element that carries `xsi:nil` set, or a primitive element with no text, or a string element with whitespace only, as the table above reads them.
+By default, an optional member so sent decodes as absent, and a mandatory one to its zero value ([§ REQ-056](#req-056)), so the value cannot say that the document sent it, and the missing-member report above says nothing of an optional member.
+The canonical-XML codec **MUST** offer a second decode option that passes every member the document sends without a value to a function the caller supplies, mandatory and optional alike, once each, while the decode carries on as by default and returns the same value as without the option.
+The function **MUST** receive the member's JSON Pointer, as under *Identification*, and which form the member took, nil or empty.
+Each member is reported as its own element closes, in document order, since what the element carries is known then, where a missing member waits for the element that lacks it to close; nothing inside a nilled element is reported, and a decode that fails makes no promise about which members it reported before the failure.
+A member that carries a value is not reported, as it is not missing, with one exception, a string member `canxml.WithStringText` keeps ([§ REQ-056](#req-056)).
+An empty struct element, a bare `PARTY_SELF`, a `magnitude` of 0, a TERM_MAPPING `match` of one space and a `Hash` entry, whatever its text unless it is nilled, are values.
+An element that is no member is not reported: the root, unmatched content (§ REQ-170), a repeat among it, and an element the schema accepts that no member holds, which the decode drops, such as the AOM 1.4 `match_negated`.
+An empty element a primitive type refuses, `TERM_MAPPING.match`, fails the decode as [§ REQ-056](#req-056) says, as a number or boolean element of whitespace only does, and a decode that fails makes no promise about what it reported.
+A mandatory member sent without a value is reported by both options, by one pointer; an absent member by the missing-member option alone, since nothing was sent; the missing-member option is unchanged either way, and stays what the validators read ([clinical-modeling.md § REQ-112](clinical-modeling.md#value-typed-mandatory-presence)).
+Strict refuses nothing for a member sent without a value.
+Canonical JSON offers no counterpart: a `null` member there is a missing member when mandatory, as the table says, and absent otherwise, and an empty string is a value, so a caller that needs to know which optional members a canonical-JSON document sent reads the document itself ([§ REQ-052](#req-052) *`DV_TEXT.mappings` re-encode collapse*).
+The three report options, this one, the missing-member one and § REQ-170's, are independent and may be combined.
+
+#### Scope
+
+What each codec checks is what § REQ-170 *Scope* gives it.
+In canonical JSON the members of the RM classes reached from the decode target are checked; a value of a class outside the RM, such as an AOM 1.4 archetype, a BASE `Interval<T>`, a generic payload and the content of a `Hash` of plain values are not, and nothing inside them is reported.
+In canonical XML every class the generated decoders read is checked, AOM 1.4 included, through the description of the class the generator gives each decoder ([ADR 0033](../adr/0033-missing-members-reported-by-decoders.md)); a `Hash` whose values are `Hash`es is present when the document carries it, and nothing inside it is checked, while each class value a `Hash` holds is checked under its entry's key, and the class value an `Any` member such as `EXPR_LEAF.item` holds is checked as a member's is; the report of members sent without a value has the same scope.
+A primitive already held in an interface-typed slot, which `encoding/xml` reads itself, counts as a value even when its element is empty, for both reports.
+REST reads through `transport` and the `openehr/client/*` packages decode with the default and offer no report.
 
 **Acceptance:**
 
 - A canonical-JSON COMPOSITION whose `DV_QUANTITY` leaves out `magnitude`, whose `DV_COUNT` leaves out `magnitude`, whose `DV_BOOLEAN` leaves out `value`, whose `DV_PROPORTION` leaves out `denominator`, whose `DV_ORDINAL` leaves out `symbol` and whose ENTRY leaves out `language`, each at its own depth, and an EHR_STATUS that leaves out `subject`, decode by default with no error; the report option receives each member's pointer once, and the decode returns the same value as the default.
-- A member sent as `null` in canonical JSON, and one sent with `xsi:nil="true"` or as an empty primitive element in canonical XML, is reported like an absent one, and nothing inside it is reported. Under `canxml.WithStringText` an empty string element is not reported.
+- A member sent as `null` in canonical JSON, and one sent with `xsi:nil="true"` or as an empty primitive element in canonical XML, is reported like an absent one, and nothing inside it is reported.
+  Under `canxml.WithStringText` an empty string element is not reported.
 - The canonical-XML form of each instance above reports the same pointers as its canonical-JSON form.
 - A present member is not reported: a bare `PARTY_SELF`, an empty `units` in canonical JSON, a `magnitude` of 0, an `items` list written `[]` in canonical JSON, an `archetype_node_id` written as an XML attribute.
 - An absent interval boundary flag, an absent function-valued attribute such as EVENT `offset`, and an absent RESOURCE_DESCRIPTION `parent_resource` are not reported.
@@ -431,7 +793,9 @@ Three kinds of attribute are never missing: one no serialization carries, the se
 
 ### REQ-053
 
-The SDK **MUST** provide codecs in `openehr/serialize` for the openEHR **FLAT** and **STRUCTURED** *Simplified Formats* — the JSON serializations of a composition **data instance** standardised by the openEHR ITS-REST [*Simplified Formats*](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html) specification (STABLE, targeting 1.1.0). The spec names exactly these two variants — *Flat* and *Structured*; the earlier "Simplified Data Template (SDT)" naming (and EHRbase's `simSDT`/`structSDT` labels) is superseded and **MUST NOT** appear in the SDK's public surface. This section pins to that document for the wire grammar; it does not re-define it.
+The SDK **MUST** provide codecs in `openehr/serialize` for the openEHR **FLAT** and **STRUCTURED** *Simplified Formats* — the JSON serializations of a composition **data instance** standardised by the openEHR ITS-REST [*Simplified Formats*](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html) specification (STABLE, targeting 1.1.0).
+The spec names exactly these two variants — *Flat* and *Structured*; the earlier "Simplified Data Template (SDT)" naming (and EHRbase's `simSDT`/`structSDT` labels) is superseded and **MUST NOT** appear in the SDK's public surface.
+This section pins to that document for the wire grammar; it does not re-define it.
 
 Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-specific**, human-readable field identifiers taken from the template's *Web Template* projection (REQ-106) — **not** canonical AQL/AOM paths:
 
@@ -446,14 +810,24 @@ Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-
   A key in that spelling and the key in the Web Template's are two spellings of one field ([§ REQ-170](#req-170--unmatched-content-on-decode)), and an unmatched one is reported as written.
   Encode writes the Web Template's `id` alone.
 - Repeating nodes carry a zero-based instance index `:0` / `:1`.
-- Leaf attributes are pipe suffixes (`|magnitude`, `|unit`, `|code`, `|value`, `|terminology`, …); an `ELEMENT` with one value alternative, or with two that are one coded text and one free text, collapses into its value (no trailing `/value`), and one with any other two or more, or none, keeps a segment of its own, as *ELEMENT value types* below sets out. Exactly **one subtype substitution** is carried in suffix form: a `DV_CODED_TEXT` stored at a `DV_TEXT`-typed leaf (legal RM substitution) **MUST** be emitted and accepted in the `DV_CODED_TEXT` suffix form — `|code` + `|value` + `|terminology` (plus the other modelled `DV_CODED_TEXT` suffixes, e.g. `|formatting`), with **no** bare-key spelling — matching the reference implementation, whose corpus carries the rubric under `|value` (`ehrbase_conformance_data_types_dv_coded_text_as_dv_text`); every other substituted subtype (the value's dynamic type differing from the leaf's declared type) rides `|raw`. The inverse substitution — an uncoded `DV_TEXT` at a `DV_CODED_TEXT` leaf — stays the `|other` open-value-set form.
+- Leaf attributes are pipe suffixes (`|magnitude`, `|unit`, `|code`, `|value`, `|terminology`, …); an `ELEMENT` with one value alternative, or with two that are one coded text and one free text, collapses into its value (no trailing `/value`), and one with any other two or more, or none, keeps a segment of its own, as *ELEMENT value types* below sets out.
+  Exactly **one subtype substitution** is carried in suffix form: a `DV_CODED_TEXT` stored at a `DV_TEXT`-typed leaf (legal RM substitution) **MUST** be emitted and accepted in the `DV_CODED_TEXT` suffix form — `|code` + `|value` + `|terminology` (plus the other modelled `DV_CODED_TEXT` suffixes, e.g. `|formatting`), with **no** bare-key spelling — matching the reference implementation, whose corpus carries the rubric under `|value` (`ehrbase_conformance_data_types_dv_coded_text_as_dv_text`); every other substituted subtype (the value's dynamic type differing from the leaf's declared type) rides `|raw`.
+  The inverse substitution — an uncoded `DV_TEXT` at a `DV_CODED_TEXT` leaf — stays the `|other` open-value-set form.
 - Structural levels are removed relative to the canonical path: container attributes (`content`, `data`, `events`, `items`, …) are elided, and the `ITEM_STRUCTURE` family, `HISTORY`, and single unnamed `EVENT`s are collapsed.
 - Composition-level metadata is carried under the `ctx/` prefix (mandatory `language`, `territory`; optional `composer`, `time`, `setting`), as *Composition-level metadata* below sets out.
 - Optional RM attributes the template does not constrain use an underscore prefix (`_uid`, `_link`, `_normal_range`, …) — the normative attribute vocabulary and value grammar are [§ REQ-140](#req-140--underscore-prefixed-rm-attributes); the `|raw` suffix embeds a pre-serialized canonical RM fragment, which **MUST** carry `_type`.
 
-**FLAT** is a single-level map of `path → primitive | object`. **STRUCTURED** is the same data as nested JSON keyed by the same segment `id`s, where every data value is wrapped in an **array** (even at cardinality `0..1` / `1..1`) and attribute suffixes appear as `|`-prefixed keys. A leaf's **bare** FLAT value is the array element itself; where the same leaf also carries `|`-suffixes or nested members (a DV_MULTIMEDIA's uri beside its mandatory `|mediatype`, a DV_TEXT beside `|formatting`, any bare leaf carrying a `_`-attribute, § REQ-140), that element **MUST** be an object whose `"|"` member holds the bare value: the `"|"+suffix` convention with the empty suffix the FLAT key itself spells. OPT-free interconversion reads and writes it as that empty suffix in both directions, which is what makes the mapping reversible without a template where `|value` would not be (DV_ORDINAL and DV_CODED_TEXT spell a real `|value`). The member appears only where the alternative is a scalar/object collision: a leaf carrying nothing but a bare value **MUST** stay a bare scalar, so a leaf that cannot collide is spelled identically either way. *Not corpus-pinned:* no vendored STRUCTURED body exercises the shape, so `"|"` is this specification's choice within the format's own conventions — the same standing as the DV_SCALE suffix set (§ REQ-140) — and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears. Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
+**FLAT** is a single-level map of `path → primitive | object`.
+**STRUCTURED** is the same data as nested JSON keyed by the same segment `id`s, where every data value is wrapped in an **array** (even at cardinality `0..1` / `1..1`) and attribute suffixes appear as `|`-prefixed keys.
+A leaf's **bare** FLAT value is the array element itself; where the same leaf also carries `|`-suffixes or nested members (a DV_MULTIMEDIA's uri beside its mandatory `|mediatype`, a DV_TEXT beside `|formatting`, any bare leaf carrying a `_`-attribute, § REQ-140), that element **MUST** be an object whose `"|"` member holds the bare value: the `"|"+suffix` convention with the empty suffix the FLAT key itself spells.
+OPT-free interconversion reads and writes it as that empty suffix in both directions, which is what makes the mapping reversible without a template where `|value` would not be (DV_ORDINAL and DV_CODED_TEXT spell a real `|value`).
+The member appears only where the alternative is a scalar/object collision: a leaf carrying nothing but a bare value **MUST** stay a bare scalar, so a leaf that cannot collide is spelled identically either way.
+*Not corpus-pinned:* no vendored STRUCTURED body exercises the shape, so `"|"` is this specification's choice within the format's own conventions — the same standing as the DV_SCALE suffix set (§ REQ-140) — and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears.
+Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
-**Composition-level metadata.** The reference implementation spells six of the `ctx/` fields as real paths under the template root, carrying the same information ([ADR 0015](../adr/0015-flat-metadata-spelling.md)):
+#### Composition-level metadata
+
+The reference implementation spells six of the `ctx/` fields as real paths under the template root, carrying the same information ([ADR 0015](../adr/0015-flat-metadata-spelling.md)):
 
 | Field | `ctx/` short form | Real path | Implied terminology |
 |---|---|---|---|
@@ -464,66 +838,131 @@ Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-
 | time | `ctx/time` | `<root>/context/start_time` | |
 | setting | `ctx/setting\|code` and `ctx/setting\|value` | `<root>/context/setting\|code` and `\|value` | `openehr` |
 
-Decode **MUST** accept either spelling of a field in the table, reading a real path whose segments carry the index `:0`, the template root's own segment included (`<root>:0/composer:0|name`), as the unindexed spelling and refusing any other index there: each of these attributes is single-valued, and OPT-free STRUCTURED → FLAT conversion writes every segment with an index. Encode **MUST** write only the `ctx/` form, except a composer it writes at its real path (*The composer*, below), refusing a populated setting the `ctx/setting` pair cannot carry rather than omitting it; an all-zero setting writes nothing. Where two keys for one field disagree, the codec **MUST** refuse rather than choose: two spellings with different values, a real-path `|terminology` other than the one the table implies (a matching one is discarded), and a `composer_self: true` beside a name, an identifier or a relationship, which PARTY_SELF does not have. `openehr` is the only terminology a setting can carry, since EVENT_CONTEXT's `Setting_valid` requires its code to belong to the openEHR `setting` group, as `ISO_639-1` is for a language.
-
-*A bare setting.* The *Simplified Formats* spec (§ *setting*) also accepts a setting given by its code or its rubric alone, as in `"ctx/setting": "238"` or `"ctx/setting": "other care"`. Decode **MUST** read a bare `ctx/setting`, and the bare real path `<root>/context/setting`, as the member of the openEHR `setting` group whose code, or else whose rubric, it holds. Beside the pair, it is one more spelling of the field. Decode **MUST** also complete half the pair, in either spelling, from the group: `|code` alone as the member with that code, and `|value` alone as the member with that rubric; a half the group does not complete stays a missing required suffix, refused naming the missing key. Decode **MUST** refuse, naming the key, a value that is neither a code nor a rubric of the group. Encode writes the pair.
-
-*The composer.* The `ctx/` forms carry part of a composer: `ctx/composer_name` a PARTY_IDENTIFIED that has a name and nothing else, `ctx/composer_self` a PARTY_SELF with no `external_ref`. Decode **MUST** read the composer's real path as the carrier of the whole composer, in the party grammar of § REQ-140 ([ADR 0029](../adr/0029-composer-real-path-carrier.md)): `<root>/composer|name`, `|id`, `|id_scheme`, `|id_namespace` and `|type`, the `<root>/composer/_identifier:N` list and, for a PARTY_RELATED, `<root>/composer/relationship`; a `composer_self: true`, in either spelling, beside an `external_ref` reads as a PARTY_SELF carrying that reference. Encode **MUST** write a composer that one `ctx/` form carries whole in that form, and every other composer whole at its real path with no `ctx/` composer key, a PARTY_SELF that carries an `external_ref` as `<root>/composer_self: true` beside the reference's keys, so one body spells its composer one way.
+Decode **MUST** accept either spelling of a field in the table, reading a real path whose segments carry the index `:0`, the template root's own segment included (`<root>:0/composer:0|name`), as the unindexed spelling and refusing any other index there: each of these attributes is single-valued, and OPT-free STRUCTURED → FLAT conversion writes every segment with an index.
+Encode **MUST** write only the `ctx/` form, except a composer it writes at its real path (*The composer*, below), refusing a populated setting the `ctx/setting` pair cannot carry rather than omitting it; an all-zero setting writes nothing.
+Where two keys for one field disagree, the codec **MUST** refuse rather than choose: two spellings with different values, a real-path `|terminology` other than the one the table implies (a matching one is discarded), and a `composer_self: true` beside a name, an identifier or a relationship, which PARTY_SELF does not have.
+`openehr` is the only terminology a setting can carry, since EVENT_CONTEXT's `Setting_valid` requires its code to belong to the openEHR `setting` group, as `ISO_639-1` is for a language.
 
 The `ctx/` short forms the *Simplified Formats* spec sketches for the EVENT_CONTEXT optionals (participations, `health_care_facility`, `end_time`, `location`) are not part of this contract: those attributes ride the underscore grammar under the real `context` segment (§ REQ-140, [ADR 0016](../adr/0016-event-context-optionals-underscore-spelling.md)).
 
-**A value its RM class forbids.** The codecs **MUST** refuse each of these values at the key that carries it, rather than read or write it, since its RM class forbids it:
+##### A bare setting
+
+The *Simplified Formats* spec (§ *setting*) also accepts a setting given by its code or its rubric alone, as in `"ctx/setting": "238"` or `"ctx/setting": "other care"`.
+Decode **MUST** read a bare `ctx/setting`, and the bare real path `<root>/context/setting`, as the member of the openEHR `setting` group whose code, or else whose rubric, it holds.
+Beside the pair, it is one more spelling of the field.
+Decode **MUST** also complete half the pair, in either spelling, from the group: `|code` alone as the member with that code, and `|value` alone as the member with that rubric; a half the group does not complete stays a missing required suffix, refused naming the missing key.
+Decode **MUST** refuse, naming the key, a value that is neither a code nor a rubric of the group.
+Encode writes the pair.
+
+##### The composer
+
+The `ctx/` forms carry part of a composer: `ctx/composer_name` a PARTY_IDENTIFIED that has a name and nothing else, `ctx/composer_self` a PARTY_SELF with no `external_ref`.
+Decode **MUST** read the composer's real path as the carrier of the whole composer, in the party grammar of § REQ-140 ([ADR 0029](../adr/0029-composer-real-path-carrier.md)): `<root>/composer|name`, `|id`, `|id_scheme`, `|id_namespace` and `|type`, the `<root>/composer/_identifier:N` list and, for a PARTY_RELATED, `<root>/composer/relationship`; a `composer_self: true`, in either spelling, beside an `external_ref` reads as a PARTY_SELF carrying that reference.
+Encode **MUST** write a composer that one `ctx/` form carries whole in that form, and every other composer whole at its real path with no `ctx/` composer key, a PARTY_SELF that carries an `external_ref` as `<root>/composer_self: true` beside the reference's keys, so one body spells its composer one way.
+
+#### A value its RM class forbids
+
+The codecs **MUST** refuse each of these values at the key that carries it, rather than read or write it, since its RM class forbids it:
 
 - an empty composer name, on decode in either spelling and on encode (PARTY_IDENTIFIED `Name_valid`);
 - on encode, a composer that is a PARTY_IDENTIFIED with no name, `external_ref` or identifiers (`Basic_validity`; written as nothing, it would read back as PARTY_SELF), or a PARTY_RELATED with no `relationship`, which the RM makes mandatory;
 - an empty in-context ACTIVITY `action_archetype_id`, on decode (`Action_archetype_id_valid`, *Leaf datatypes* below).
 
-Encode **MUST NOT** write an empty `action_archetype_id`: it leaves the key out rather than refusing the composition. The interval keys hold the same line under § REQ-140 *Interval boundary flags*.
+Encode **MUST NOT** write an empty `action_archetype_id`: it leaves the key out rather than refusing the composition.
+The interval keys hold the same line under § REQ-140 *Interval boundary flags*.
 
-**A `null` value reads as absent.** A JSON `null` held by a FLAT key, or by a STRUCTURED member or array element, **MUST** be read as the absence of what holds it, never as the zero of its type, wherever the decoder reads the key (a key that resolves, or one § REQ-170 names as the reference's spelling of data the Web Template does not model): a leaf whose keys are all `null` is an absent leaf, and a `null` required suffix beside a present key of its leaf is a missing required suffix, refused as one ([§ REQ-170](#req-170--unmatched-content-on-decode)). An empty string at the bare value of a `DV_DATE_TIME`, `DV_DATE`, `DV_TIME`, `DV_DURATION`, `DV_URI` or `DV_EHR_URI` leaf, `context/start_time` among them and its `ctx/time` spelling, reads as absent the same way where no other suffix of its leaf, and no `_`-attribute key of that value ([§ REQ-140](#req-140--underscore-prefixed-rm-attributes)), holds a value, because encode writes no key for that value. A form that leaves a field empty writes `null` there, so `|magnitude: null` beside a unit is a quantity without a magnitude, never one of 0. A key the decoder does not read is unmatched content whatever its value, and a `null` at a key § REQ-170 refuses for want of a carrier is absent, not refused, since it carries nothing to drop. [§ REQ-169](#req-169--interval-boundary-flag-defaults) applies the same reading to an interval bound.
+#### A `null` value reads as absent
 
-**A value must fit its attribute.** Decode **MUST** refuse a suffix value, required or optional, that the canonical-JSON decode of its RM attribute would refuse ([§ REQ-052](#req-052), [ADR 0004](../adr/0004-numeric-wire-tolerance.md) tolerance included): a string where the attribute is a number and the string is no decimal, a number or a Boolean where it is a `String`, a number with a non-zero fraction where it is an `Integer` or `Integer64` (§ *Floating-point precision*). The refusal wraps `simplified.ErrUnsupportedDatatype` and names the FLAT key, so it never surfaces as a canonical-JSON error naming a path the caller did not write.
+A JSON `null` held by a FLAT key, or by a STRUCTURED member or array element, **MUST** be read as the absence of what holds it, never as the zero of its type, wherever the decoder reads the key (a key that resolves, or one § REQ-170 names as the reference's spelling of data the Web Template does not model): a leaf whose keys are all `null` is an absent leaf, and a `null` required suffix beside a present key of its leaf is a missing required suffix, refused as one ([§ REQ-170](#req-170--unmatched-content-on-decode)).
+An empty string at the bare value of a `DV_DATE_TIME`, `DV_DATE`, `DV_TIME`, `DV_DURATION`, `DV_URI` or `DV_EHR_URI` leaf, `context/start_time` among them and its `ctx/time` spelling, reads as absent the same way where no other suffix of its leaf, and no `_`-attribute key of that value ([§ REQ-140](#req-140--underscore-prefixed-rm-attributes)), holds a value, because encode writes no key for that value.
+A form that leaves a field empty writes `null` there, so `|magnitude: null` beside a unit is a quantity without a magnitude, never one of 0.
+A key the decoder does not read is unmatched content whatever its value, and a `null` at a key § REQ-170 refuses for want of a carrier is absent, not refused, since it carries nothing to drop.
+[§ REQ-169](#req-169--interval-boundary-flag-defaults) applies the same reading to an interval bound.
+
+#### A value must fit its attribute
+
+Decode **MUST** refuse a suffix value, required or optional, that the canonical-JSON decode of its RM attribute would refuse ([§ REQ-052](#req-052), [ADR 0004](../adr/0004-numeric-wire-tolerance.md) tolerance included): a string where the attribute is a number and the string is no decimal, a number or a Boolean where it is a `String`, a number with a non-zero fraction where it is an `Integer` or `Integer64` (§ *Floating-point precision*).
+The refusal wraps `simplified.ErrUnsupportedDatatype` and names the FLAT key, so it never surfaces as a canonical-JSON error naming a path the caller did not write.
+
+#### Codec obligations
 
 The identifier-generation algorithm is **normative** in the *Simplified Formats* spec (§Node ID Generation Rules); the SDK **MUST** generate segment identifiers by that algorithm, reusing the Web Template projection (REQ-106, [ADR-0014](../adr/0014-webtemplate-reference-implementation-lock.md)) as the single source of ids.
 
 The codecs **MUST**:
 
 - Require the composition's **operational template** (via its Web Template) to resolve identifiers, RM types, level-removal, and `:index` — conversion is template-specific and cannot proceed from the payload alone.
-- **Round-trip** FLAT / STRUCTURED ↔ canonical `COMPOSITION` given the OPT: bidirectional and **semantics-preserving** (all archetype- and template-constrained clinical semantics are retained). The simplified forms are *not self-standing* — they depend on the template — which is distinct from being lossy; reconstructing the OPT itself from a data instance is out of scope.
-- Rebuild `archetype_details` on decode. FLAT and STRUCTURED have no key for `LOCATABLE.archetype_details`, because the Web Template already holds what it records. Decode gives every node the Web Template identifies by an archetype id an `ARCHETYPED` whose `archetype_id` is that id and whose `rm_version` is the RM release the SDK is generated from (`rm.Release`), and adds `template_id`, the Web Template's `templateId`, on the COMPOSITION root only. The Web Template identifies a node by its node id, or, for a structural wrapper it folds away (an archetyped `ITEM_TREE` under an ACTIVITY `description`, for instance), by the predicate its children's paths carry for the wrapper. The placement is the reference implementation's (observed on EHRbase 2.36.0 with openEHR SDK 2.35.0, whose FLAT decoder sets it the same way). The `rm_version` value is not: the reference writes a fixed `1.0.4`, while `rm_version` records the RM release an object was built against, so the SDK writes its own. Encode writes nothing for `archetype_details` ([§ REQ-140](#req-140--underscore-prefixed-rm-attributes) names it among the attributes out of scope). Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
-- Take from the compiled template, when decode is given one (`simplified.WithTemplate`), what the formats do not carry and the template determines. Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
-  - The first such fact is a folded structure's concrete subtype: the formats fold every `ITEM_STRUCTURE` away, and `ITEM_TREE` and `ITEM_LIST` both hold `items`, so the path cannot tell them apart. A decoded `ITEM_STRUCTURE` takes the subtype the compiled template gives the node at its path, where that subtype is an `ITEM_STRUCTURE` declaring the attribute the path goes on through. Where the template gives no single answer (no node there, or alternatives that disagree), and in a decode without the template, the subtype is inferred from the path.
-  - The second is a required structure with no member, for which the formats have no key. Decode rebuilds the structure at a single-valued attribute where all of these hold:
+- **Round-trip** FLAT / STRUCTURED ↔ canonical `COMPOSITION` given the OPT: bidirectional and **semantics-preserving** (all archetype- and template-constrained clinical semantics are retained).
+  The simplified forms are *not self-standing* — they depend on the template — which is distinct from being lossy; reconstructing the OPT itself from a data instance is out of scope.
+- Rebuild `archetype_details` on decode.
+  FLAT and STRUCTURED have no key for `LOCATABLE.archetype_details`, because the Web Template already holds what it records.
+  Decode gives every node the Web Template identifies by an archetype id an `ARCHETYPED` whose `archetype_id` is that id and whose `rm_version` is the RM release the SDK is generated from (`rm.Release`), and adds `template_id`, the Web Template's `templateId`, on the COMPOSITION root only.
+  The Web Template identifies a node by its node id, or, for a structural wrapper it folds away (an archetyped `ITEM_TREE` under an ACTIVITY `description`, for instance), by the predicate its children's paths carry for the wrapper.
+  The placement is the reference implementation's (observed on EHRbase 2.36.0 with openEHR SDK 2.35.0, whose FLAT decoder sets it the same way).
+  The `rm_version` value is not: the reference writes a fixed `1.0.4`, while `rm_version` records the RM release an object was built against, so the SDK writes its own.
+  Encode writes nothing for `archetype_details` ([§ REQ-140](#req-140--underscore-prefixed-rm-attributes) names it among the attributes out of scope).
+  Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
+- Take from the compiled template, when decode is given one (`simplified.WithTemplate`), what the formats do not carry and the template determines.
+  Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
+  - The first such fact is a folded structure's concrete subtype: the formats fold every `ITEM_STRUCTURE` away, and `ITEM_TREE` and `ITEM_LIST` both hold `items`, so the path cannot tell them apart.
+    A decoded `ITEM_STRUCTURE` takes the subtype the compiled template gives the node at its path, where that subtype is an `ITEM_STRUCTURE` declaring the attribute the path goes on through.
+    Where the template gives no single answer (no node there, or alternatives that disagree), and in a decode without the template, the subtype is inferred from the path.
+  - The second is a required structure with no member, for which the formats have no key.
+    Decode rebuilds the structure at a single-valued attribute where all of these hold:
     - a node decode rebuilds lacks the attribute, which the template's existence, or the RM, requires of it;
     - the children the template allows there agree on one concrete `ITEM_STRUCTURE` subtype and node id;
     - that structure holds no member the template or the RM requires ([§ REQ-102](clinical-modeling.md#req-102--composition-validation) *An existence lower bound alone asks for no member*).
 
-    It rebuilds the structure as the generator writes it: the template's subtype, node id and name, and no member, its list present and empty where the generator writes it so. It builds no parent node, member or data value, no structure for a slot or an archetype root, and none where the template nodes that share the parent's path disagree on it. Where the template asks the structure for a member, the body lacks data, and no structure is rebuilt.
-  - The third is a coded node name. Where the template constrains a rebuilt node's name as a `DV_CODED_TEXT`, through one child or alternatives that agree, and determines one coded value, decode gives the node that `DV_CODED_TEXT` name as the generator writes it, in place of the `DV_TEXT` name from the archetype terminology. The value is determined where the name's `C_CODE_PHRASE` lists exactly one code, or lists several of which exactly one has a term text equal to the text the template pins on the name. Its terminology is the `C_CODE_PHRASE`'s, and its text is the pinned text, else the code's term text:
+    It rebuilds the structure as the generator writes it: the template's subtype, node id and name, and no member, its list present and empty where the generator writes it so.
+    It builds no parent node, member or data value, no structure for a slot or an archetype root, and none where the template nodes that share the parent's path disagree on it.
+    Where the template asks the structure for a member, the body lacks data, and no structure is rebuilt.
+  - The third is a coded node name.
+    Where the template constrains a rebuilt node's name as a `DV_CODED_TEXT`, through one child or alternatives that agree, and determines one coded value, decode gives the node that `DV_CODED_TEXT` name as the generator writes it, in place of the `DV_TEXT` name from the archetype terminology.
+    The value is determined where the name's `C_CODE_PHRASE` lists exactly one code, or lists several of which exactly one has a term text equal to the text the template pins on the name.
+    Its terminology is the `C_CODE_PHRASE`'s, and its text is the pinned text, else the code's term text:
     - for a `local` code, its archetype term;
     - for an external code, the archetype term it has under `<terminology>::<code>` or its bare code;
     - for an `openehr` code, the openEHR terminology rubric, where every terminology group that holds the code gives the same one.
 
     No node name below the root has a key in the formats, so a coded name the template leaves open (a code from an external reference set, or several codes and no pinned text) comes back as `DV_TEXT`.
-  - The fourth is an ordinal's terminology. The formats carry the code and the ordinal value of a `DV_ORDINAL`, a leaf or a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, but not its symbol's terminology, and decode without the template rebuilds the symbol in `local`, as the reference does. Where the `C_DV_ORDINAL` pairs the template has at that position for that code and value agree on one terminology, decode gives the symbol that terminology. A `|raw` value keeps its own, and a `DV_SCALE` symbol stays in `local`, since the compiled template holds no pairs for it. Encode writes a `local` symbol without its terminology, so one the template codes in another terminology at that code and value, a value the template refuses, comes back in the template's terminology: that round trip changes it.
-  - The fifth is what a coded value leaves out, which the *Simplified Formats* spec lets a client omit where the template defines it. A `DV_CODED_TEXT` leaf, the `|code` substitution at a `DV_TEXT` leaf included, with no `|terminology` takes the terminology its `defining_code` constraint names, where the alternatives at its path agree on one. A `C_CODE_REFERENCE` whose code phrase names no terminology names the one its `terminology:` URI names ([clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection)); the openEHR specifications do not say which terminology such a URI names, so this reading is the SDK's. With no `|value` it takes its code's term text, read as for a coded node name, where that constraint lists the code and the coded text is in its terminology. A `DV_ORDINAL` leaf, and each bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, with no `|ordinal` or no `|value` takes the ordinal value, and the code's term text in the pair's terminology, that the `C_DV_ORDINAL` pairs at its position give its code, where they give it one value. What the body gives is kept as written. A `|terminology` the template does not determine is a missing required suffix ([§ REQ-170](#req-170--unmatched-content-on-decode)), except at an ISM transition, whose current state, transition and careflow step take theirs from the rules below; a `|value` or `|ordinal` it does not determine stays one, except a careflow step's, which the rules below also give. Decode without the template and a `DV_SCALE` complete nothing.
-  - The sixth is the composition's category. A body that spells no `category` takes the code the template's COMPOSITION `category` constraint fixes, a `C_CODE_PHRASE` of the `openehr` terminology listing exactly one code, with that code's openEHR rubric as its text; where the template fixes none, it takes `433|event`. A category the body spells is kept as written.
-  - The seventh is an in-context ACTIVITY's `action_archetype_id`, which the RM requires and a body can leave out. An ACTIVITY the body gives none takes the value the generator writes on the template node it stands for, the one at its path with the names the template pins, read from the first `C_STRING` that node allows on that attribute:
+  - The fourth is an ordinal's terminology.
+    The formats carry the code and the ordinal value of a `DV_ORDINAL`, a leaf or a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, but not its symbol's terminology, and decode without the template rebuilds the symbol in `local`, as the reference does.
+    Where the `C_DV_ORDINAL` pairs the template has at that position for that code and value agree on one terminology, decode gives the symbol that terminology.
+    A `|raw` value keeps its own, and a `DV_SCALE` symbol stays in `local`, since the compiled template holds no pairs for it.
+    Encode writes a `local` symbol without its terminology, so one the template codes in another terminology at that code and value, a value the template refuses, comes back in the template's terminology: that round trip changes it.
+  - The fifth is what a coded value leaves out, which the *Simplified Formats* spec lets a client omit where the template defines it.
+    A `DV_CODED_TEXT` leaf, the `|code` substitution at a `DV_TEXT` leaf included, with no `|terminology` takes the terminology its `defining_code` constraint names, where the alternatives at its path agree on one.
+    A `C_CODE_REFERENCE` whose code phrase names no terminology names the one its `terminology:` URI names ([clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection)); the openEHR specifications do not say which terminology such a URI names, so this reading is the SDK's.
+    With no `|value` it takes its code's term text, read as for a coded node name, where that constraint lists the code and the coded text is in its terminology.
+    A `DV_ORDINAL` leaf, and each bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, with no `|ordinal` or no `|value` takes the ordinal value, and the code's term text in the pair's terminology, that the `C_DV_ORDINAL` pairs at its position give its code, where they give it one value.
+    What the body gives is kept as written.
+    A `|terminology` the template does not determine is a missing required suffix ([§ REQ-170](#req-170--unmatched-content-on-decode)), except at an ISM transition, whose current state, transition and careflow step take theirs from the rules below; a `|value` or `|ordinal` it does not determine stays one, except a careflow step's, which the rules below also give.
+    Decode without the template and a `DV_SCALE` complete nothing.
+  - The sixth is the composition's category.
+    A body that spells no `category` takes the code the template's COMPOSITION `category` constraint fixes, a `C_CODE_PHRASE` of the `openehr` terminology listing exactly one code, with that code's openEHR rubric as its text; where the template fixes none, it takes `433|event`.
+    A category the body spells is kept as written.
+  - The seventh is an in-context ACTIVITY's `action_archetype_id`, which the RM requires and a body can leave out.
+    An ACTIVITY the body gives none takes the value the generator writes on the template node it stands for, the one at its path with the names the template pins, read from the first `C_STRING` that node allows on that attribute:
     - the RM default `/.*/`, where that `C_STRING` lists no string and admits it, as one with neither a list nor a pattern does, or the template allows none there;
     - otherwise a value the `C_STRING` accepts, a list member or a match of its pattern;
     - none, where the `C_STRING` accepts no value the generator builds.
 
-    An ACTIVITY that pins no name thus takes its own node's value beside a sibling of its node id that pins one. An id the body gives is kept as written.
-  - A body whose start time is absent in every spelling (an empty or `null` value is absent) takes `t` from `simplified.WithDefaultTime(t)`, in UTC and to the second, as if its `ctx/time` held it (context `start_time` and setting, ACTION time, HISTORY origin), except that on a `431|persistent` composition it builds no `EVENT_CONTEXT`. The zero `t` leaves the option off.
+    An ACTIVITY that pins no name thus takes its own node's value beside a sibling of its node id that pins one.
+    An id the body gives is kept as written.
+  - A body whose start time is absent in every spelling (an empty or `null` value is absent) takes `t` from `simplified.WithDefaultTime(t)`, in UTC and to the second, as if its `ctx/time` held it (context `start_time` and setting, ACTION time, HISTORY origin), except that on a `431|persistent` composition it builds no `EVENT_CONTEXT`.
+    The zero `t` leaves the option off.
   - A HISTORY whose `history_origin` the body leaves out (*Attributes with no Web Template node*, below) takes the earliest time its own events carry, compared as instants, else the start time, given or defaulted; an EVENT the body gives no time takes its HISTORY's origin.
 - Read a Web Template node's `rmType` as the BMM type name it spells, in both directions: white space around the name and around its generic parameters carries no meaning (` DV_INTERVAL< DV_QUANTITY >` is `DV_INTERVAL<DV_QUANTITY>`, not structure), and a name that is not a well-formed BMM type name is classified as written.
-- Decode an ACTION's ISM transition spelled under one of the Web Template's archetyped `ism_transition[atNNNN]` nodes, one per careflow step, and write none there: encode writes every transition at the in-context node (next item). At such a node decode:
+- Decode an ACTION's ISM transition spelled under one of the Web Template's archetyped `ism_transition[atNNNN]` nodes, one per careflow step, and write none there: encode writes every transition at the in-context node (next item).
+  At such a node decode:
   - gives the rebuilt ISM_TRANSITION the careflow step its node id names when the body carries none, the node id as a `local` code and the node's Web Template name as its value: the careflow step a path predicate on that node id matches ([reference-model.md § REQ-121](reference-model.md#req-121--locatable-path-read-access));
   - reads a careflow step that names no terminology (no `terminology_id`, a null one, or a blank value) as `local`, the only terminology an archetype's at-code belongs to;
   - refuses one coded otherwise: a code other than the node id, a terminology other than `local`, or a `terminology_id` of any other shape.
 - Map an ACTION's `time` onto its in-context `time` leaf, `<action>/time`, as the *Simplified Formats* spec (§ *ACTION*) and the reference spell it.
-- Map an ACTION's ISM transition onto the in-context `ism_transition` node the Web Template gives every ACTION ([REQ-106](clinical-modeling.md#req-106--webtemplate-json-export)), as the *Simplified Formats* spec (§ *ISM_TRANSITION*) and the reference spell it. Its keys are `<action>/ism_transition/current_state`, `transition` and, where the node merges archetyped ones, `careflow_step`, each as `|code`, `|value` and `|terminology`, and the reasons as `_reason:N`, each in the DV_TEXT leaf grammar. Decode:
-  - reads a `current_state` or `transition` that names no terminology (no `|terminology`, or a null one) as `openehr`, the only terminology RM `Current_state_valid` and `Transition_valid` admit, as a setting's terminology is implied by `Setting_valid`. It does so at this node and at an archetyped one alike, which has a `transition` leaf only where its archetype constrains one: [§ REQ-170](#req-170--unmatched-content-on-decode) refuses the key elsewhere;
+- Map an ACTION's ISM transition onto the in-context `ism_transition` node the Web Template gives every ACTION ([REQ-106](clinical-modeling.md#req-106--webtemplate-json-export)), as the *Simplified Formats* spec (§ *ISM_TRANSITION*) and the reference spell it.
+  Its keys are `<action>/ism_transition/current_state`, `transition` and, where the node merges archetyped ones, `careflow_step`, each as `|code`, `|value` and `|terminology`, and the reasons as `_reason:N`, each in the DV_TEXT leaf grammar.
+  Decode:
+  - reads a `current_state` or `transition` that names no terminology (no `|terminology`, or a null one) as `openehr`, the only terminology RM `Current_state_valid` and `Transition_valid` admit, as a setting's terminology is implied by `Setting_valid`.
+    It does so at this node and at an archetyped one alike, which has a `transition` leaf only where its archetype constrains one: [§ REQ-170](#req-170--unmatched-content-on-decode) refuses the key elsewhere;
   - at a node that merges archetyped ones, reads a careflow step that names no terminology (no `|terminology`, a null one, or a blank one) as `local`, and gives one with no `|value` the label the node's `careflow_step` input lists for its code, where it is coded in `local`;
   - at that node, refuses no careflow step for its code, since no transition moves between nodes on encode, and leaves it to validation;
   - at that node, gives a transition the body spells no careflow step for the one step whose `currentStates` hold its current state's code, as a `local` code with the step's label, and none where no step, or more than one, holds it;
@@ -534,11 +973,18 @@ The codecs **MUST**:
 - Treat a key the Web Template does not resolve, an unknown suffix and an unknown `ctx/` field as unmatched content, except the keys *Attributes with no Web Template node* (below) reads and the refusals [§ REQ-170](#req-170--unmatched-content-on-decode) lists.
 - Report a missing or mismatched Web Template / OPT as a typed error when conversion cannot proceed without it.
 
-The codecs **MUST** use the canonical media types `application/openehr.wt.flat+json` (FLAT) and `application/openehr.wt.structured+json` (STRUCTURED) and never emit the deprecated `.schema`-suffixed variants, which they **SHOULD** accept on input for interoperability, since EHRbase still serves them though the specification retired them. Classification is per media-type token — one `Content-Type` value or one `Accept` media range, matched case-insensitively with well-formed parameters ignored, `q` included; a comma-separated `Accept` list is the caller's to split. A value whose type part or parameters do not parse — a comma-separated list among them — or that names neither format — including the WebTemplate resource type `application/openehr.wt+json`, a template projection rather than a composition format — **MUST** be refused with a typed error (`simplified.ErrUnknownMediaType`), never defaulted to a format. (`simplified.ParseMediaType` and `Format.MediaType` implement this; the codecs themselves take bytes, so negotiation happens one call before them. Recorded in the package [deviations register](../../openehr/serialize/simplified/deviations.md).)
+#### Media types
+
+The codecs **MUST** use the canonical media types `application/openehr.wt.flat+json` (FLAT) and `application/openehr.wt.structured+json` (STRUCTURED) and never emit the deprecated `.schema`-suffixed variants, which they **SHOULD** accept on input for interoperability, since EHRbase still serves them though the specification retired them.
+Classification is per media-type token — one `Content-Type` value or one `Accept` media range, matched case-insensitively with well-formed parameters ignored, `q` included; a comma-separated `Accept` list is the caller's to split.
+A value whose type part or parameters do not parse — a comma-separated list among them — or that names neither format — including the WebTemplate resource type `application/openehr.wt+json`, a template projection rather than a composition format — **MUST** be refused with a typed error (`simplified.ErrUnknownMediaType`), never defaulted to a format.
+(`simplified.ParseMediaType` and `Format.MediaType` implement this; the codecs themselves take bytes, so negotiation happens one call before them. Recorded in the package [deviations register](../../openehr/serialize/simplified/deviations.md).)
 
 #### Leaf datatypes
 
-The *Simplified Formats* spec pins the suffix convention but does not spell every leaf datatype's suffix set. Four are stated here because the reference implementation's spelling ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md), pinned by the PROBE-086 corpus) is the only source for them. Each applies at a **Web Template leaf** — reachable with no `_`-segment in the path — and, unchanged, at every nested **value** position § REQ-140's grammar reaches one (`_thumbnail`, `original_content`, an interval bound; the DV_PARSABLE row names the one exception); the codec **MUST** support each in both directions:
+The *Simplified Formats* spec pins the suffix convention but does not spell every leaf datatype's suffix set.
+Four are stated here because the reference implementation's spelling ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md), pinned by the PROBE-086 corpus) is the only source for them.
+Each applies at a **Web Template leaf** — reachable with no `_`-segment in the path — and, unchanged, at every nested **value** position § REQ-140's grammar reaches one (`_thumbnail`, `original_content`, an interval bound; the DV_PARSABLE row names the one exception); the codec **MUST** support each in both directions:
 
 | Leaf datatype | Suffix set |
 |---|---|
@@ -547,7 +993,12 @@ The *Simplified Formats* spec pins the suffix convention but does not spell ever
 | STRING | bare value only: a JSON string carrying the RM `String` as written, with no suffix. The Web Template gives one RM `String` attribute a leaf of its own, the in-context ACTIVITY `action_archetype_id`, which is RM-mandatory; the reference writes it at the leaf's bare key (`…/current_activity/action_archetype_id: "/openEHR-EHR-CLUSTER.conformance_action.v0/"` in the PROBE-086 corpus). Decode refuses an empty one, and encode leaves it out (*A value its RM class forbids*, above) |
 | DV_INTERVAL&lt;T&gt; | not a suffix set at all: the § REQ-140 **interval grammar** (`_normal_range`'s row and the *Interval boundary flags* rule govern it in both positions), anchored on the bound datatype the Web Template names inside the angle brackets (`DV_INTERVAL<DV_QUANTITY>`, …), the only place the anchor can come from. `/lower` and `/upper` are not Web Template children, so the leaf's own keys reach no node and the codec resolves them against the leaf itself. A value of another type rides `\|raw` at the leaf, as at every other leaf, and decode reads a `\|raw` there as the whole value, refusing it beside the interval's own keys |
 
-*Input shorthands.* The *Simplified Formats* spec lets a client leave out two suffixes. Decode **MUST** read a `DV_IDENTIFIER`'s bare value as its `|id` ("For the input |id might be left out"), and a `DV_TEXT`'s `|value`, where no `|code` selects a `DV_CODED_TEXT`, as its bare value, wherever the datatype is read. Two spellings of one value that disagree are refused (§ REQ-170). Encode writes `|id` and the bare value.
+##### Input shorthands
+
+The *Simplified Formats* spec lets a client leave out two suffixes.
+Decode **MUST** read a `DV_IDENTIFIER`'s bare value as its `|id` ("For the input |id might be left out"), and a `DV_TEXT`'s `|value`, where no `|code` selects a `DV_CODED_TEXT`, as its bare value, wherever the datatype is read.
+Two spellings of one value that disagree are refused (§ REQ-170).
+Encode writes `|id` and the bare value.
 
 #### ELEMENT value types
 
@@ -555,16 +1006,24 @@ Where an `ELEMENT` has two or more value alternatives other than that coded-text
 The codecs **MUST** spell such an ELEMENT, in FLAT and in STRUCTURED, as follows:
 
 - Its value is spelled under the child of the value's type, in that datatype's grammar, its value decorations (§ REQ-140: `_normal_range`, `_other_reference_ranges:N`, `_mapping:N`) included: `<element>/quantity_value|magnitude`, `<element>/interval_of_date_time_value/lower`, `<element>/quantity_value/_normal_range/lower|magnitude`.
-- Its own underscore attributes (`_uid`, `_link:N`, `_feeder_audit`, `_null_flavour`, `_null_reason`) are spelled at the ELEMENT, as `<element>/_null_flavour|code`. Under a child they are unmatched content ([§ REQ-170](#req-170--unmatched-content-on-decode)).
-- Decode reads a key at the ELEMENT itself, bare, suffixed, a sub-path, `|raw` or a value decoration, as the same key under its first child; the ELEMENT's own underscore attributes stay the ELEMENT's. Earlier releases spelled such an ELEMENT as a leaf of its first type (`<element>|magnitude`).
-- Decode refuses with `ErrUnknownPath` keys that reach two children of one ELEMENT, or the ELEMENT itself and a child, since the ELEMENT holds one value (the single-valued attribute rule above). A key the decode does not read, or one holding `null`, reaches no child.
-- Encode writes the value under the first child whose type is the value's own. Else it writes a `DV_CODED_TEXT` under the first `DV_TEXT` child, in the coded-text suffixes of the substitution above, and an interval whose bounds name no type, such as one open at both ends, under the first interval child. Else it writes the value as `|raw` under the first child.
+- Its own underscore attributes (`_uid`, `_link:N`, `_feeder_audit`, `_null_flavour`, `_null_reason`) are spelled at the ELEMENT, as `<element>/_null_flavour|code`.
+  Under a child they are unmatched content ([§ REQ-170](#req-170--unmatched-content-on-decode)).
+- Decode reads a key at the ELEMENT itself, bare, suffixed, a sub-path, `|raw` or a value decoration, as the same key under its first child; the ELEMENT's own underscore attributes stay the ELEMENT's.
+  Earlier releases spelled such an ELEMENT as a leaf of its first type (`<element>|magnitude`).
+- Decode refuses with `ErrUnknownPath` keys that reach two children of one ELEMENT, or the ELEMENT itself and a child, since the ELEMENT holds one value (the single-valued attribute rule above).
+  A key the decode does not read, or one holding `null`, reaches no child.
+- Encode writes the value under the first child whose type is the value's own.
+  Else it writes a `DV_CODED_TEXT` under the first `DV_TEXT` child, in the coded-text suffixes of the substitution above, and an interval whose bounds name no type, such as one open at both ends, under the first interval child.
+  Else it writes the value as `|raw` under the first child.
 
-A `<type>_value` id the Web Template does not give the ELEMENT resolves nothing, so its keys are unmatched content: an interval child is read as `interval_of_<type>_value` alone. The `|raw` under the first child is this SDK's: the reference writes no key for a value whose type matches no child. Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
+A `<type>_value` id the Web Template does not give the ELEMENT resolves nothing, so its keys are unmatched content: an interval child is read as `interval_of_<type>_value` alone.
+The `|raw` under the first child is this SDK's: the reference writes no key for a value whose type matches no child.
+Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
 #### Attributes with no Web Template node
 
-The *Simplified Formats* spec (§ OBSERVATION, § INTERVAL_EVENT) spells four RM attributes that the Web Template gives no node of their own, in this SDK and in the reference implementation. The codecs **MUST** read and write each, in FLAT and in STRUCTURED:
+The *Simplified Formats* spec (§ OBSERVATION, § INTERVAL_EVENT) spells four RM attributes that the Web Template gives no node of their own, in this SDK and in the reference implementation.
+The codecs **MUST** read and write each, in FLAT and in STRUCTURED:
 
 | Key | RM attribute | Value |
 |---|---|---|
@@ -573,7 +1032,9 @@ The *Simplified Formats* spec (§ OBSERVATION, § INTERVAL_EVENT) spells four RM
 | `<event>/width`, at an EVENT node | INTERVAL_EVENT `width` | a DV_DURATION leaf |
 | `<observation>/history_origin` | `origin` of the OBSERVATION's `data` HISTORY | a DV_DATE_TIME leaf |
 
-An INTERVAL_EVENT node has `math_function` and `width` leaves of its own. Decode **MUST** rebuild an event at an EVENT node as an INTERVAL_EVENT where the body gives it any of the three INTERVAL_EVENT keys, and as a POINT_EVENT otherwise. Each key is single-valued, so an index past `:0` on it is past its bound (§ REQ-170).
+An INTERVAL_EVENT node has `math_function` and `width` leaves of its own.
+Decode **MUST** rebuild an event at an EVENT node as an INTERVAL_EVENT where the body gives it any of the three INTERVAL_EVENT keys, and as a POINT_EVENT otherwise.
+Each key is single-valued, so an index past `:0` on it is past its bound (§ REQ-170).
 
 Encode **MUST** write:
 
@@ -581,13 +1042,16 @@ Encode **MUST** write:
 - `math_function` and `width` for an INTERVAL_EVENT at an EVENT node;
 - `history_origin`, unless the origin sets `value` alone and that value is, as written, the earliest time its events carry, the origin decode gives a HISTORY with no `history_origin`; an origin that sets any other attribute, such as `magnitude_status`, is written.
 
-Every other spelling of the four, such as `<event>/sample_count` or `<observation>|history_origin`, is unmatched content (§ REQ-170). Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
+Every other spelling of the four, such as `<event>/sample_count` or `<observation>|history_origin`, is unmatched content (§ REQ-170).
+Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
 ### REQ-140 — Underscore-prefixed RM attributes
 
-The FLAT / STRUCTURED codecs (REQ-053) **MUST** carry the *Simplified Formats* **underscore-prefixed RM attribute** grammar — the spec's *RM Attributes prefix* rule: an optional RM attribute the template does not constrain is addressed by prefixing its RM attribute name with `_` at the node it belongs to. The spec names the mechanism and the attribute set; the concrete suffix vocabulary below is the reference implementation's ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)), pinned by the PROBE-086 corpus.
+The FLAT / STRUCTURED codecs (REQ-053) **MUST** carry the *Simplified Formats* **underscore-prefixed RM attribute** grammar — the spec's *RM Attributes prefix* rule: an optional RM attribute the template does not constrain is addressed by prefixing its RM attribute name with `_` at the node it belongs to.
+The spec names the mechanism and the attribute set; the concrete suffix vocabulary below is the reference implementation's ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)), pinned by the PROBE-086 corpus.
 
-The grammar is **recursive and typed by the owning RM class**, not a flat key list: a `_`-attribute's value decomposes by its own RM type, and `_`-attributes nest (`…/_feeder_audit/originating_system_audit/provider/_identifier:0|id`, `…/dv_multimedia/_thumbnail|size`). The codec **MUST** support, in **both** directions — encode emitting every populated in-scope attribute from the RM instance, decode rebuilding canonical RM:
+The grammar is **recursive and typed by the owning RM class**, not a flat key list: a `_`-attribute's value decomposes by its own RM type, and `_`-attributes nest (`…/_feeder_audit/originating_system_audit/provider/_identifier:0|id`, `…/dv_multimedia/_thumbnail|size`).
+The codec **MUST** support, in **both** directions — encode emitting every populated in-scope attribute from the RM instance, decode rebuilding canonical RM:
 
 | Owner | Attributes | Value grammar |
 |---|---|---|
@@ -619,42 +1083,90 @@ The grammar is **recursive and typed by the owning RM class**, not a flat key li
 | | `originating_system_audit` (RM-mandatory), `feeder_system_audit` | FEEDER_AUDIT_DETAILS — `\|system_id` (RM-mandatory), `\|version_id`, `\|time` (bare DV_DATE_TIME), all three own suffixes; `/location` and `/provider` as PARTY_IDENTIFIED, `/subject` as PARTY_PROXY; `other_details` (ITEM_STRUCTURE) **deferred** as a typed refusal |
 | | `original_content` **or** `original_content_multimedia` | DV_PARSABLE or DV_MULTIMEDIA per [§ REQ-053 *Leaf datatypes*](#leaf-datatypes) — the DV_ENCAPSULATED choice disambiguated **by key name** (reference spelling); both spellings present is a typed error |
 
-DV_PARSABLE, DV_MULTIMEDIA and `DV_INTERVAL<T>` are **not** `_`-attributes — each is a leaf datatype reachable with no `_`-segment at all — so their suffix sets are specified with the other leaf grammars in [§ REQ-053 *Leaf datatypes*](#leaf-datatypes). The value positions above (`original_content`, `_thumbnail`, an interval bound) apply those leaf rules verbatim, per the `|raw`-carrier rule below.
+DV_PARSABLE, DV_MULTIMEDIA and `DV_INTERVAL<T>` are **not** `_`-attributes — each is a leaf datatype reachable with no `_`-segment at all — so their suffix sets are specified with the other leaf grammars in [§ REQ-053 *Leaf datatypes*](#leaf-datatypes).
+The value positions above (`original_content`, `_thumbnail`, an interval bound) apply those leaf rules verbatim, per the `|raw`-carrier rule below.
 
-Behavioural rules:
+#### Round trip
 
-- The round trip preserves the semantics of everything the grammar matches, in both directions, as [§ REQ-053](#req-053) requires of the codecs. An unrecognised `_`-segment and an unrecognised suffix inside a family are unmatched content ([§ REQ-170](#req-170--unmatched-content-on-decode)): ignored by default, reported under the report option, and refused with `ErrUnknownPath` under strict.
-- Encode **MUST NOT** silently lose an in-scope attribute: a populated attribute is emitted in this grammar; what the grammar cannot carry either rides `|raw` (where a `|raw` carrier exists) or is a typed error, so a decorated value whose extras the grammar expresses (a `normal_range`, `mappings`, …) rides suffixes and `_`-attribute keys, not a whole `|raw` fragment. Three attribute classes are deliberately **out of scope**, and they are the only three. The first is the `_uid` / `_link:N` / `_feeder_audit` of a **folded structural wrapper** — an `ITEM_TREE`, `ITEM_LIST`, `ITEM_TABLE`, `ITEM_SINGLE`, `HISTORY` or lifted `max: 1` `EVENT`, none of which the Web Template models as a node: FLAT has no key for one, so encode drops those attributes with no error and decode can never read them back. This boundary cannot be closed codec-side at all — it needs a FLAT spelling for a folded wrapper, a reference-side change ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)). Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md) § folded structural wrappers. The second is `archetype_details` on any LOCATABLE: no FLAT key carries it, because decode rebuilds it from the Web Template ([§ REQ-053](#req-053)). Encode writes nothing for it, so a round trip rebuilds it from the Web Template: an `archetype_id` that differs from its node's `archetype_node_id` (no RM invariant ties the two) takes the node id, any other `rm_version` becomes `rm.Release`, the COMPOSITION's `template_id` becomes the Web Template's, and a `template_id` below the root is dropped. The third is the `careflow_step` of a transition on an ACTION whose `ism_transition` node merges no archetyped one ([REQ-106](clinical-modeling.md#req-106--webtemplate-json-export): its template models none, or only ones constraining no attribute of the transition). That node holds its `current_state` and `transition` and carries its `reason` ([§ REQ-053](#req-053)), but has no `careflow_step` leaf, as the reference's has none: the template names no careflow step. So encode drops such a careflow step with no error, and decode refuses the reference's key for it. Refusing on encode instead would make such an ACTION that carries a careflow step unencodable. Closing it needs a node the reference does not build ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)). Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
-- STRUCTURED carries the same vocabulary as nested members (`_`-keys as object members, arrays for `:N` lists), and OPT-free FLAT ↔ STRUCTURED interconversion keeps it, as [§ REQ-053](#req-053) requires of the codecs.
-- **DV_SCALE** takes the `DV_ORDINAL` suffix set — `|code` + `|value` + `|ordinal`, with `|ordinal` carrying DV_SCALE's **Real** `value`. The two classes differ only in that value's type, so decode **MUST** read, and encode write, the same three keys at a `DV_SCALE` leaf as at a `DV_ORDINAL` one. *Not corpus-pinned:* no vendored body and no reference sample spells a `DV_SCALE`, so this is this codec's choice within the format's conventions — the same standing as the STRUCTURED `"|"` member — and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears. Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
-- **Interval boundary flags.** The Simplified Formats specification gives each of the four DV_INTERVAL Booleans a default, `false` for `|*_unbounded` and `true` for `|*_included`, and writes it "only in output if" it differs ([ITS-REST Simplified Formats](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html), *RM mapping*, `DV_INTERVAL`). The reference writes them the same way, and encode **MUST** too: `|lower_unbounded` / `|upper_unbounded` only as `true`, and `|lower_included` / `|upper_included` only as `false`, so an open side always carries an explicit `|*_included: false` and an open end is spelled by its `|*_unbounded: true` flag alone. Decode reads an absent key by [§ REQ-169](#req-169--interval-boundary-flag-defaults), so a decoded interval always carries all four. Encode **MUST** refuse, rather than emit, an interval whose flags and bounds BASE forbids together: a side both unbounded and included, a side not marked unbounded that has no bound to spell (BASE reads a side's bound whenever that side is not open, `has`, `Limits_consistent`), and a bound standing beside its own `|*_unbounded: true`. Decode **MUST** refuse that last pair too, since BASE defines `*_unbounded` as marking that boundary open (-infinity or +infinity) and an open side carries no bound. Encode therefore never writes a missing bound as a zero-valued one and never drops a bound silently. Decode reads an included open side as written (§ REQ-169), reads an end that spells neither a bound nor that flag as open, and refuses an end marked `|*_unbounded: false` with no bound where the bound is held by value (§ REQ-169 *A closed side with no bound*); a closed side with no bound, which decode reads as written where the bound is held by pointer or as an interface, does not re-encode, as an included open side does not.
+The round trip preserves the semantics of everything the grammar matches, in both directions, as [§ REQ-053](#req-053) requires of the codecs.
+An unrecognised `_`-segment and an unrecognised suffix inside a family are unmatched content ([§ REQ-170](#req-170--unmatched-content-on-decode)): ignored by default, reported under the report option, and refused with `ErrUnknownPath` under strict.
 
-  What counts as a missing bound differs with the instantiation. An **interface**-typed bound (`DV_INTERVAL<DV_ORDERED>`) is missing when it is Void, so any value standing beside the open flag contradicts it, one whose fields are all zero included. A **concrete**-typed bound cannot be Void, so its zero counts as missing exactly where that zero would leave a string-valued RM-mandatory suffix empty (a DV_QUANTITY `|unit`, a DV_ORDINAL or DV_SCALE `|code`, a temporal's value) or is a DV_PROPORTION with denominator 0, which RM `Valid_denominator` forbids, and a side not marked unbounded whose bound is missing in that sense is refused; any other zero, such as a `DV_COUNT` bound of 0, is a real bound and is emitted. For a concrete bound, a zero the producer meant (a `DV_COUNT` lower bound of 0) cannot be told from one it never set, so beside the open flag that pair is emitted as the unbounded end rather than refused: refusing it would refuse every half-open concrete range. Two spellings are normalised on re-encode, since each denotes the same RM value as its canonical form: a redundant `|*_included: true` on a bounded side is dropped, and an absent `|*_included` on an open side is written as an explicit `false`. These rules bind the interval keys. A value that rides `|raw` carries its canonical fragment as canonical JSON writes it, flags included, so an interval inside a `|raw` fragment is decoded as written and, while the value still rides `|raw`, encoded unchecked; the RM check for it belongs to the validation floor ([§ REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)), whose result names the rules it does not evaluate in `Coverage.Unevaluated` ([§ REQ-171](clinical-modeling.md#req-171--validation-engine)).
-- **`|mode` carries no code.** PARTICIPATION.mode is a DV_CODED_TEXT whose `defining_code` is RM-mandatory, but the reference writes only the openEHR Terminology **`participation mode` rubric** (`"face-to-face communication"`, `"not specified"`). The codec **MUST** therefore rebuild the code from that closed, specification-versioned group (a small vendored code↔rubric table, the only vocabulary this codec carries, recorded in the package [deviations register](../../openehr/serialize/simplified/deviations.md)), refusing a rubric outside the group rather than fabricating a code, and, on encode, a mode whose code, terminology or value that rebuild would not reproduce.
-- **PARTY_SELF at an RM-optional PARTY_PROXY position carries `|_type`.** PARTY_SELF is spelled by the absence of every party key wherever that absence is unambiguous — a PARTICIPATION performer and an ENTRY `subject`, both RM-mandatory, so no-keys can only mean PARTY_SELF. At an RM-**optional** PARTY_PROXY the absence already means *absent*, so the reference writes the discriminator explicitly: the codec **MUST** accept and emit `|_type: "PARTY_SELF"` at FEEDER_AUDIT_DETAILS' `subject` and at ENTRY's `_provider`, and refuse any other `|_type` value or a `|_type` standing beside party keys that contradict it: the suffix carries one subtype and reaches no other position.
-- **The DV_MULTIMEDIA coded attributes travel as a bare code.** `|mediatype` carries `media_type.code_string` alone, and `|compression_algorithm` and `|integrity_check_algorithm` carry a bare code too, so each one's terminology is implied: decode **MUST** read `|mediatype` as a code of the openEHR `media types` code set (`IANA_media-types`, the identifier the RM names and in which REQ-107 writes its `text/plain` default), and the two algorithm suffixes as codes of the openEHR code set the RM names for the attribute, by the external identifier the pinned openEHR terminology gives it ([reference-model.md § REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034)), `openehr_compression_algorithms` and `openehr_integrity_check_algorithms`. A value of any of the three coded in another terminology, or carrying a `preferred_term`, **MUST** ride `|raw` whole rather than be silently re-terminologised, as `|normal_status` does one attribute up. An absent terminology contradicts nothing the implication asserts and survives the suffix form.
-- **The party `external_ref` `type`.** The reference writes no `|type` at a party and hardcodes `PARTY`, which is lossy for the `PERSON` and `ORGANISATION` references real compositions carry. The codec **MUST** read an absent `|type` as `PARTY` and write `|type` only when the value is not `PARTY`, so a reference-authored body round-trips byte-exactly and never gains the key. That suffix is the reference's own spelling of the same RM attribute in the OBJECT_REF families, applied at one further position; an empty `type` is a typed error, not a defaulted one.
-- **The grammar stops where the reference stops, and the `|raw` carrier takes the rest.** A nested value the grammar reaches through a *datatype* position — an interval bound, a REFERENCE_RANGE `/meaning`, a `_charset`, a `_thumbnail`, an `original_content`, a `_wf_definition` — is read and written by that datatype's own leaf rules, except that a `_wf_definition` writes its value as `|value` (its row above). One whose extras the suffix set cannot carry therefore rides `|raw` **at its own key** rather than being refused: a thumbnail carrying its own charset is `_thumbnail|raw`, an `original_content` carrying one is `original_content|raw`. The families that reach a value through a *non-datatype* position instead (a party, a PARTICIPATION, a LINK, a FEEDER_AUDIT_DETAILS scalar) have no such carrier, and there every shape the suffixes cannot express **MUST** be a typed error.
-- Deliberate exclusions **MUST** be refused in both directions with a typed error naming the key, never decoded and dropped: PARTICIPATION `time`; FEEDER_AUDIT_DETAILS `other_details`; `_instruction_details` (ACTION), which the spec names and the pinned corpus does not exercise, **deferred** as a typed refusal.
+#### Attributes out of scope
 
-## ITS-REST envelopes
+Encode **MUST NOT** silently lose an in-scope attribute: a populated attribute is emitted in this grammar; what the grammar cannot carry either rides `|raw` (where a `|raw` carrier exists) or is a typed error, so a decorated value whose extras the grammar expresses (a `normal_range`, `mappings`, …) rides suffixes and `_`-attribute keys, not a whole `|raw` fragment.
+Three attribute classes are deliberately **out of scope**, and they are the only three.
+The first is the `_uid` / `_link:N` / `_feeder_audit` of a **folded structural wrapper** — an `ITEM_TREE`, `ITEM_LIST`, `ITEM_TABLE`, `ITEM_SINGLE`, `HISTORY` or lifted `max: 1` `EVENT`, none of which the Web Template models as a node: FLAT has no key for one, so encode drops those attributes with no error and decode can never read them back.
+This boundary cannot be closed codec-side at all — it needs a FLAT spelling for a folded wrapper, a reference-side change ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
+Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md) § folded structural wrappers.
+The second is `archetype_details` on any LOCATABLE: no FLAT key carries it, because decode rebuilds it from the Web Template ([§ REQ-053](#req-053)).
+Encode writes nothing for it, so a round trip rebuilds it from the Web Template: an `archetype_id` that differs from its node's `archetype_node_id` (no RM invariant ties the two) takes the node id, any other `rm_version` becomes `rm.Release`, the COMPOSITION's `template_id` becomes the Web Template's, and a `template_id` below the root is dropped.
+The third is the `careflow_step` of a transition on an ACTION whose `ism_transition` node merges no archetyped one ([REQ-106](clinical-modeling.md#req-106--webtemplate-json-export): its template models none, or only ones constraining no attribute of the transition).
+That node holds its `current_state` and `transition` and carries its `reason` ([§ REQ-053](#req-053)), but has no `careflow_step` leaf, as the reference's has none: the template names no careflow step.
+So encode drops such a careflow step with no error, and decode refuses the reference's key for it.
+Refusing on encode instead would make such an ACTION that carries a careflow step unencodable.
+Closing it needs a node the reference does not build ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
+Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
-The openEHR REST 1.1.0 specification defines envelope shapes for typical responses (collections, errors, version metadata). The SDK **MUST**:
+#### STRUCTURED
 
-- Decode well-formed envelopes into typed Go structs.
-- Surface envelope-level metadata (e.g. paging hints, conformance hints) on the typed response, not as a parallel `map[string]any`.
+STRUCTURED carries the same vocabulary as nested members (`_`-keys as object members, arrays for `:N` lists), and OPT-free FLAT ↔ STRUCTURED interconversion keeps it, as [§ REQ-053](#req-053) requires of the codecs.
 
-The exact envelope shapes are openEHR REST 1.1.0; this spec does not re-define them, it pins to them. A 2xx envelope that does not decode fails as [transport.md § REQ-151](transport.md#req-151--typed-2xx-decode-failure) says, and a non-2xx error envelope is decoded best-effort ([§ REQ-093](transport.md#req-093--openehr-error-envelope-mapping)).
+#### DV_SCALE
 
-### Request vs response shape asymmetry
+**DV_SCALE** takes the `DV_ORDINAL` suffix set — `|code` + `|value` + `|ordinal`, with `|ordinal` carrying DV_SCALE's **Real** `value`.
+The two classes differ only in that value's type, so decode **MUST** read, and encode write, the same three keys at a `DV_SCALE` leaf as at a `DV_ORDINAL` one.
+*Not corpus-pinned:* no vendored body and no reference sample spells a `DV_SCALE`, so this is this codec's choice within the format's conventions — the same standing as the STRUCTURED `"|"` member — and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears.
+Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
-Two endpoints carry **distinct request and response shapes** that are easy to conflate because the RM ships only the persisted (response) form:
+#### Interval boundary flags
 
-- **`POST /ehr/{ehr_id}/composition`** and **`PUT /ehr/{ehr_id}/composition/{vo_uid}`** ([PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition)). Request body: a bare `COMPOSITION` payload. Response body under `Prefer: return=representation`: a bare `COMPOSITION` per ITS-REST `201_COMPOSITION` / `200_COMPOSITION_updated`, **not** the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope. The persisted envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). Same shape applies to `directory.Save` / `Update`.
-- **`POST /ehr/{ehr_id}/contribution`** ([PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)). Request body: ITS-REST `Contribution_create` — `{audit, versions: [ORIGINAL_VERSION<T> with inline data: T]}` for `T ∈ {COMPOSITION, EHR_STATUS, FOLDER, EHR_ACCESS}`, except that a deletion built without a payload carries no `data` ([§ REQ-130](#req-130--contribution-builder) *Deletion*). Response body: persisted `CONTRIBUTION` whose `versions[]` is `[]OBJECT_REF` (the references the server assigned). A submission body shaped like the persisted `CONTRIBUTION` is rejected by spec-conformant CDRs because its `OBJECT_REF`s point at versions that do not yet exist.
-  - **Commit-audit DTO asymmetry (SPECITS-95 / [ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)).** The request-side commit audit (the batch `audit` and each version's `commit_audit`) is the `UPDATE_AUDIT` DTO, not the persisted `AUDIT_DETAILS`: it has no server-assigned `time_committed` ([§ REQ-130](#req-130--contribution-builder) *Audit*), treats `system_id` as optional, and types `change_type` (and `UpdateVersion.lifecycle_state`) as `DV_CODED_TEXT`, never the withdrawn flat `TERMINOLOGY_CODE`. Upstream asks a client to send `_type:"UPDATE_AUDIT"` and a server to accept `AUDIT_DETAILS` or an omitted `_type`. The SDK emits `AUDIT_DETAILS` by default (`contribution.UpdateAudit`) and offers `AuditType` to send `UPDATE_AUDIT` to a server that accepts only that form. *Informative:* EHRbase 2.37.1 validates the batch `audit` and each `commit_audit` as the RM `AUDIT_DETAILS`: it refuses one, typed `AUDIT_DETAILS` or untyped, whose `system_id` is absent or empty, and accepts any non-empty value, recording its own system id instead. It also refuses `UPDATE_AUDIT`, which names the REST commit DTO and no RM class, so a client sets `WithSystemID` and keeps the default type.
+The Simplified Formats specification gives each of the four DV_INTERVAL Booleans a default, `false` for `|*_unbounded` and `true` for `|*_included`, and writes it "only in output if" it differs ([ITS-REST Simplified Formats](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html), *RM mapping*, `DV_INTERVAL`).
+The reference writes them the same way, and encode **MUST** too: `|lower_unbounded` / `|upper_unbounded` only as `true`, and `|lower_included` / `|upper_included` only as `false`, so an open side always carries an explicit `|*_included: false` and an open end is spelled by its `|*_unbounded: true` flag alone.
+Decode reads an absent key by [§ REQ-169](#req-169--interval-boundary-flag-defaults), so a decoded interval always carries all four.
+Encode **MUST** refuse, rather than emit, an interval whose flags and bounds BASE forbids together: a side both unbounded and included, a side not marked unbounded that has no bound to spell (BASE reads a side's bound whenever that side is not open, `has`, `Limits_consistent`), and a bound standing beside its own `|*_unbounded: true`.
+Decode **MUST** refuse that last pair too, since BASE defines `*_unbounded` as marking that boundary open (-infinity or +infinity) and an open side carries no bound.
+Encode therefore never writes a missing bound as a zero-valued one and never drops a bound silently.
+Decode reads an included open side as written (§ REQ-169), reads an end that spells neither a bound nor that flag as open, and refuses an end marked `|*_unbounded: false` with no bound where the bound is held by value (§ REQ-169 *A closed side with no bound*); a closed side with no bound, which decode reads as written where the bound is held by pointer or as an interface, does not re-encode, as an included open side does not.
 
-Which shape each submission path sends, and which server-assigned fields a request body omits, is [§ REQ-130](#req-130--contribution-builder)'s.
+What counts as a missing bound differs with the instantiation.
+An **interface**-typed bound (`DV_INTERVAL<DV_ORDERED>`) is missing when it is Void, so any value standing beside the open flag contradicts it, one whose fields are all zero included.
+A **concrete**-typed bound cannot be Void, so its zero counts as missing exactly where that zero would leave a string-valued RM-mandatory suffix empty (a DV_QUANTITY `|unit`, a DV_ORDINAL or DV_SCALE `|code`, a temporal's value) or is a DV_PROPORTION with denominator 0, which RM `Valid_denominator` forbids, and a side not marked unbounded whose bound is missing in that sense is refused; any other zero, such as a `DV_COUNT` bound of 0, is a real bound and is emitted.
+For a concrete bound, a zero the producer meant (a `DV_COUNT` lower bound of 0) cannot be told from one it never set, so beside the open flag that pair is emitted as the unbounded end rather than refused: refusing it would refuse every half-open concrete range.
+Two spellings are normalised on re-encode, since each denotes the same RM value as its canonical form: a redundant `|*_included: true` on a bounded side is dropped, and an absent `|*_included` on an open side is written as an explicit `false`.
+These rules bind the interval keys.
+A value that rides `|raw` carries its canonical fragment as canonical JSON writes it, flags included, so an interval inside a `|raw` fragment is decoded as written and, while the value still rides `|raw`, encoded unchecked; the RM check for it belongs to the validation floor ([§ REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)), whose result names the rules it does not evaluate in `Coverage.Unevaluated` ([§ REQ-171](clinical-modeling.md#req-171--validation-engine)).
+
+#### `|mode` carries no code
+
+PARTICIPATION.mode is a DV_CODED_TEXT whose `defining_code` is RM-mandatory, but the reference writes only the openEHR Terminology **`participation mode` rubric** (`"face-to-face communication"`, `"not specified"`).
+The codec **MUST** therefore rebuild the code from that closed, specification-versioned group (a small vendored code↔rubric table, the only vocabulary this codec carries, recorded in the package [deviations register](../../openehr/serialize/simplified/deviations.md)), refusing a rubric outside the group rather than fabricating a code, and, on encode, a mode whose code, terminology or value that rebuild would not reproduce.
+
+#### PARTY_SELF at an RM-optional PARTY_PROXY position carries `|_type`
+
+PARTY_SELF is spelled by the absence of every party key wherever that absence is unambiguous — a PARTICIPATION performer and an ENTRY `subject`, both RM-mandatory, so no-keys can only mean PARTY_SELF.
+At an RM-**optional** PARTY_PROXY the absence already means *absent*, so the reference writes the discriminator explicitly: the codec **MUST** accept and emit `|_type: "PARTY_SELF"` at FEEDER_AUDIT_DETAILS' `subject` and at ENTRY's `_provider`, and refuse any other `|_type` value or a `|_type` standing beside party keys that contradict it: the suffix carries one subtype and reaches no other position.
+
+#### The DV_MULTIMEDIA coded attributes travel as a bare code
+
+`|mediatype` carries `media_type.code_string` alone, and `|compression_algorithm` and `|integrity_check_algorithm` carry a bare code too, so each one's terminology is implied: decode **MUST** read `|mediatype` as a code of the openEHR `media types` code set (`IANA_media-types`, the identifier the RM names and in which REQ-107 writes its `text/plain` default), and the two algorithm suffixes as codes of the openEHR code set the RM names for the attribute, by the external identifier the pinned openEHR terminology gives it ([reference-model.md § REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034)), `openehr_compression_algorithms` and `openehr_integrity_check_algorithms`.
+A value of any of the three coded in another terminology, or carrying a `preferred_term`, **MUST** ride `|raw` whole rather than be silently re-terminologised, as `|normal_status` does one attribute up.
+An absent terminology contradicts nothing the implication asserts and survives the suffix form.
+
+#### The party `external_ref` `type`
+
+The reference writes no `|type` at a party and hardcodes `PARTY`, which is lossy for the `PERSON` and `ORGANISATION` references real compositions carry.
+The codec **MUST** read an absent `|type` as `PARTY` and write `|type` only when the value is not `PARTY`, so a reference-authored body round-trips byte-exactly and never gains the key.
+That suffix is the reference's own spelling of the same RM attribute in the OBJECT_REF families, applied at one further position; an empty `type` is a typed error, not a defaulted one.
+
+#### The grammar stops where the reference stops, and the `|raw` carrier takes the rest
+
+A nested value the grammar reaches through a *datatype* position — an interval bound, a REFERENCE_RANGE `/meaning`, a `_charset`, a `_thumbnail`, an `original_content`, a `_wf_definition` — is read and written by that datatype's own leaf rules, except that a `_wf_definition` writes its value as `|value` (its row above).
+One whose extras the suffix set cannot carry therefore rides `|raw` **at its own key** rather than being refused: a thumbnail carrying its own charset is `_thumbnail|raw`, an `original_content` carrying one is `original_content|raw`.
+The families that reach a value through a *non-datatype* position instead (a party, a PARTICIPATION, a LINK, a FEEDER_AUDIT_DETAILS scalar) have no such carrier, and there every shape the suffixes cannot express **MUST** be a typed error.
+
+#### Deliberate exclusions
+
+Deliberate exclusions **MUST** be refused in both directions with a typed error naming the key, never decoded and dropped: PARTICIPATION `time`; FEEDER_AUDIT_DETAILS `other_details`; `_instruction_details` (ACTION), which the spec names and the pinned corpus does not exercise, **deferred** as a typed refusal.
 
 ## AQL
 
@@ -662,68 +1174,123 @@ Which shape each submission path sends, and which server-assigned fields a reque
 
 `openehr/aql` ships two builder styles:
 
-- **Struct-builder.** Build an `aql.Query` value by composing typed structs.
-- **Verb-functions.** Compose a query via top-level functions (`aql.Select(...)`, `aql.From(...)`, `aql.Where(...)`).
+- **Struct-builder.**
+  Build an `aql.Query` value by composing typed structs.
+- **Verb-functions.**
+  Compose a query via top-level functions (`aql.Select(...)`, `aql.From(...)`, `aql.Where(...)`).
 
-Both styles **MUST** produce the **same AQL string on the wire** for the same logical query. Concrete rules:
+Both styles **MUST** produce the **same AQL string on the wire** for the same logical query.
+Concrete rules:
 
-- The serialised AQL string is the wire contract. Two queries that produce the same string are equivalent; two that produce different strings are different queries, even if logically equivalent.
+- The serialised AQL string is the wire contract.
+  Two queries that produce the same string are equivalent; two that produce different strings are different queries, even if logically equivalent.
 - Whitespace, casing, and aliasing are subject to canonicalisation in the wire-output path — the SDK **MUST** produce a stable, canonicalised string so wire-output goldens are deterministic.
 - Both styles are tested against the same wire-output golden fixtures; a builder change that produces different output is a breaking change.
 
-**Canonicalisation (wire output).** Built queries emit a single stable form so the goldens are deterministic. Changing any rule below rewrites every golden and is a **semver-major** change to `openehr/aql`:
+#### Canonicalisation (wire output)
 
-1. **Keywords** uppercase — `SELECT`, `FROM`, `WHERE`, `CONTAINS`, `AND`, `OR`, `ORDER BY`, `ASC`, `DESC`. (`OFFSET` / `LIMIT` are not emitted in the string — see rule 7.)
+Built queries emit a single stable form so the goldens are deterministic.
+Changing any rule below rewrites every golden and is a **semver-major** change to `openehr/aql`:
+
+1. **Keywords** uppercase — `SELECT`, `FROM`, `WHERE`, `CONTAINS`, `AND`, `OR`, `ORDER BY`, `ASC`, `DESC`.
+   (`OFFSET` / `LIMIT` are not emitted in the string — see rule 7.)
 2. **Whitespace** — exactly one space between tokens; no leading or trailing space on the emitted string.
 3. **Paths and archetype ids** — emitted verbatim; no case folding.
-4. **Parameters** — caller values appear only as `$name` placeholders in the string, never interpolated as literals (the injection guard, below); placeholder keys carry no leading `$`. A bind whose name is empty after that strip **MUST** fail at `Build()` with an error wrapping `aql.ErrInvalidQuery` — no placeholder can match an empty name, so the value would ship only as a dead key.
+4. **Parameters** — caller values appear only as `$name` placeholders in the string, never interpolated as literals (the injection guard, below); placeholder keys carry no leading `$`.
+   A bind whose name is empty after that strip **MUST** fail at `Build()` with an error wrapping `aql.ErrInvalidQuery` — no placeholder can match an empty name, so the value would ship only as a dead key.
 5. **SELECT list** — comma-separated, one space after each comma, no trailing comma.
-6. **FROM / CONTAINS** — every class carries an alias (`EHR e`, `OBSERVATION o`); archetype predicates attach in square brackets (`OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2]`); consecutive `CONTAINS` express nested containment. The builders emit EHR scoping as a `WHERE <alias>/ehr_id/value = $param` condition so it composes with other conditions in one clause; the standing-predicate form (`EHR e[ehr_id/value=$param]`) is equally valid AQL but is not what the builders emit **at the FROM root** — since [aql.md § REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) a `CONTAINS` operand does carry a standing predicate, through a carrier of its own; the root's choice above is the one that stands.
-7. **Clause order** — the AQL string emits `SELECT … FROM … WHERE … ORDER BY`; the builder is the sole author of `Query.Q` for built queries. Paging (OFFSET / LIMIT) is carried in the request envelope (`Query.Offset` / `Query.Fetch`), not the string, so paging has a single channel.
+6. **FROM / CONTAINS** — every class carries an alias (`EHR e`, `OBSERVATION o`); archetype predicates attach in square brackets (`OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2]`); consecutive `CONTAINS` express nested containment.
+   The builders emit EHR scoping as a `WHERE <alias>/ehr_id/value = $param` condition so it composes with other conditions in one clause; the standing-predicate form (`EHR e[ehr_id/value=$param]`) is equally valid AQL but is not what the builders emit **at the FROM root** — since [aql.md § REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) a `CONTAINS` operand does carry a standing predicate, through a carrier of its own; the root's choice above is the one that stands.
+7. **Clause order** — the AQL string emits `SELECT … FROM … WHERE … ORDER BY`; the builder is the sole author of `Query.Q` for built queries.
+   Paging (OFFSET / LIMIT) is carried in the request envelope (`Query.Offset` / `Query.Fetch`), not the string, so paging has a single channel.
 
-The canonical forms for negated containment (`NOT CONTAINS`), sibling containment junctions (`AND` / `OR`, parenthesised only where precedence requires) and the opt-in in-text `LIMIT` / `OFFSET` (which relaxes rules 1 and 7 only for a caller who asks for it; the envelope stays the default, and combining the two channels is a build-time error), and the write-side constructs (the version predicate, the class standing predicate, and the typed projection: `DISTINCT`, `AS`, aggregates), are specified by [aql.md § REQ-163](aql.md#req-163--aql-write-side-expressivity-parity). They add to the rules above and rewrite none of them, nor any golden.
+The canonical forms for negated containment (`NOT CONTAINS`), sibling containment junctions (`AND` / `OR`, parenthesised only where precedence requires) and the opt-in in-text `LIMIT` / `OFFSET` (which relaxes rules 1 and 7 only for a caller who asks for it; the envelope stays the default, and combining the two channels is a build-time error), and the write-side constructs (the version predicate, the class standing predicate, and the typed projection: `DISTINCT`, `AS`, aggregates), are specified by [aql.md § REQ-163](aql.md#req-163--aql-write-side-expressivity-parity).
+They add to the rules above and rewrite none of them, nor any golden.
 
-The rules above are stated over clause structure and reach no further than the **shapes** a clause is built from. The canonical spelling of each value inside them (string escaping, a real's fractional part, the `MATCHES {uri}` operand alphabet) is specified by [aql.md § REQ-119 § Canonical value spellings](aql.md#req-119--re-parseable-canonical-aql-emission) and asserted by PROBE-090.
+The rules above are stated over clause structure and reach no further than the **shapes** a clause is built from.
+The canonical spelling of each value inside them (string escaping, a real's fractional part, the `MATCHES {uri}` operand alphabet) is specified by [aql.md § REQ-119 § Canonical value spellings](aql.md#req-119--re-parseable-canonical-aql-emission) and asserted by PROBE-090.
 
 PROBE-020 checks built queries against the reference golden.
 
-### AQL executor
+#### AQL executor
 
-`openehr/client/query` is the AQL executor. It:
+`openehr/client/query` is the AQL executor.
+It:
 
 - Accepts a built `aql.Query` (or a raw AQL string for advanced use).
-- **MUST** send it to the route the operation names: `GET|POST /query/aql` for ad-hoc execution, `GET|POST /query/{qualified_query_name}` for a stored query, and `GET|POST /query/{qualified_query_name}/{version}` when pinned to a version — and **MUST NOT** synthesise a `/query/aql/{…}` route. The `aql` path segment belongs to the ad-hoc route alone: the vendored OAS declares exactly those three paths and no `/query/aql/{…}` route.
-- **MUST** decode the response envelope's `meta`, `columns`, and `rows`. Row values decode to `any`, and the call site casts.
-- Surfaces AQL-level errors as typed errors distinct from a generic `WireError`. The taxonomy is fixed by the HTTP status and the openEHR error envelope; each arm below states which of the two carries its signal:
-  - **400** (bad AQL) and **408** (query timeout) **MUST** surface as `*query.AQLError`. One class covers bad AQL in every form: a syntax error, a semantically impossible containment, and a malformed path expression alike are `400`.
-  - An envelope denoting path resolution — never one carried by a `501`, see below — **MUST** additionally satisfy `errors.Is(err, aql.ErrPathResolution)` when the signal is in the envelope's PHI-free **code**: a sub-kind of bad AQL. The classifier also reads anchored message clauses, but only where the deployment surfaces raw error bodies — the message is suppressed by default because it may carry PHI — so an envelope signalling path resolution in the message alone classifies only under that opt-in (PROBE-021).
-  - **501** **MUST** surface as `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)`: a capability gap, **not** a client error — the query is valid AQL and this deployment does not implement the feature, so the caller retries elsewhere or degrades rather than correcting the query. Here the status alone classifies, with or without an envelope and **never** from message text, and a `501` **MUST NOT** also be classified as path resolution.
+- **MUST** send it to the route the operation names: `GET|POST /query/aql` for ad-hoc execution, `GET|POST /query/{qualified_query_name}` for a stored query, and `GET|POST /query/{qualified_query_name}/{version}` when pinned to a version — and **MUST NOT** synthesise a `/query/aql/{…}` route.
+  The `aql` path segment belongs to the ad-hoc route alone: the vendored OAS declares exactly those three paths and no `/query/aql/{…}` route.
+- **MUST** decode the response envelope's `meta`, `columns`, and `rows`.
+  Row values decode to `any`, and the call site casts.
+- Surfaces AQL-level errors as typed errors distinct from a generic `WireError`.
+  The taxonomy is fixed by the HTTP status and the openEHR error envelope; each arm below states which of the two carries its signal:
+  - **400** (bad AQL) and **408** (query timeout) **MUST** surface as `*query.AQLError`.
+    One class covers bad AQL in every form: a syntax error, a semantically impossible containment, and a malformed path expression alike are `400`.
+  - An envelope denoting path resolution — never one carried by a `501`, see below — **MUST** additionally satisfy `errors.Is(err, aql.ErrPathResolution)` when the signal is in the envelope's PHI-free **code**: a sub-kind of bad AQL.
+    The classifier also reads anchored message clauses, but only where the deployment surfaces raw error bodies — the message is suppressed by default because it may carry PHI — so an envelope signalling path resolution in the message alone classifies only under that opt-in (PROBE-021).
+  - **501** **MUST** surface as `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)`: a capability gap, **not** a client error — the query is valid AQL and this deployment does not implement the feature, so the caller retries elsewhere or degrades rather than correcting the query.
+    Here the status alone classifies, with or without an envelope and **never** from message text, and a `501` **MUST NOT** also be classified as path resolution.
 
-**AQL injection.** `ExecuteString` (raw AQL escape hatch) **MUST** be documented as unsafe for interpolating caller-supplied values into the query text — bind parameters via the typed `params` map (named placeholders the CDR binds server-side). String-built AQL from untrusted input is injectable.
+##### AQL injection
 
-**EHR scoping (verb-aware).** When execution is scoped to a single EHR, the SDK **MUST** apply the scope by the verb-appropriate mechanism the ITS-REST OAS declares. The rule is the **verb**, not the route: **every GET** query operation — ad-hoc (`/query/aql`), stored (`/query/{qualified_query_name}`), and stored-versioned (`/query/{qualified_query_name}/{version}`) — declares the `ehr_id` **query parameter**, and the SDK carries the scope there. **No POST** operation declares it, and neither request body schema (`AdhocQueryExecute` for ad-hoc, `Query` for stored) carries an `ehr_id` field, so the **`openehr-ehr-id` request header** is the only channel for both POST forms. The SDK **MUST NOT** scope POST via the query parameter: a strict-spec server that honours only the header would otherwise run the query population-wide.
+`ExecuteString` (raw AQL escape hatch) **MUST** be documented as unsafe for interpolating caller-supplied values into the query text — bind parameters via the typed `params` map (named placeholders the CDR binds server-side).
+String-built AQL from untrusted input is injectable.
+
+##### EHR scoping (verb-aware)
+
+When execution is scoped to a single EHR, the SDK **MUST** apply the scope by the verb-appropriate mechanism the ITS-REST OAS declares.
+The rule is the **verb**, not the route: **every GET** query operation — ad-hoc (`/query/aql`), stored (`/query/{qualified_query_name}`), and stored-versioned (`/query/{qualified_query_name}/{version}`) — declares the `ehr_id` **query parameter**, and the SDK carries the scope there.
+**No POST** operation declares it, and neither request body schema (`AdhocQueryExecute` for ad-hoc, `Query` for stored) carries an `ehr_id` field, so the **`openehr-ehr-id` request header** is the only channel for both POST forms.
+The SDK **MUST NOT** scope POST via the query parameter: a strict-spec server that honours only the header would otherwise run the query population-wide.
 
 ### Stored AQL
 
 ### REQ-057
 
-The platform supports **stored AQL queries** — queries registered ahead of time and executed by ID. The SDK **MUST** support both ends:
+The platform supports **stored AQL queries** — queries registered ahead of time and executed by ID.
+The SDK **MUST** support both ends:
 
-- **`openehr/client/definition/`** — register, list, get, delete stored queries. Operations map to the openEHR REST Definition API.
+- **`openehr/client/definition/`** — register, list, get, delete stored queries.
+  Operations map to the openEHR REST Definition API.
 - **`openehr/client/query/`** — execute a stored query by ID (`GET|POST /query/{qualified_query_name}`) in addition to the ad-hoc execution path.
 
-A stored query is identified by a qualified name (typically reverse-DNS, e.g. `org.example.queries.recent-observations`); the SDK **MUST** pass it through verbatim after surrounding-whitespace trim (the one reserved name below aside). That trim is Path-parameter normalisation below — it is not a rewrite of the name. Stored queries are expected to be faster than ad-hoc AQL on the same backend (materialised read models, known output schemas), but the SDK **MUST NOT** pre-validate the qualified name's *syntax* — that's the backend's responsibility.
+A stored query is identified by a qualified name (typically reverse-DNS, e.g. `org.example.queries.recent-observations`); the SDK **MUST** pass it through verbatim after surrounding-whitespace trim (the one reserved name below aside).
+That trim is Path-parameter normalisation below — it is not a rewrite of the name.
+Stored queries are expected to be faster than ad-hoc AQL on the same backend (materialised read models, known output schemas), but the SDK **MUST NOT** pre-validate the qualified name's *syntax* — that's the backend's responsibility.
 
-**Reserved name `aql`.** That no-pre-validation stance is scoped to name *syntax*, which stays the backend's call — but `aql` is not a syntax question: the upstream contract reserves it outright. The `Qualified_query_name` description in the vendored OAS (`resources/its-rest/query-validation.openapi.yaml`, authoritative per REQ-050) reserves `aql`, case-insensitively, as a query name ("as that is a reserved name"); the rule binds the query-name part of `[{namespace}::]{query-name}`. The SDK enforces it where it would otherwise help create the forbidden artifact, and stays tolerant where tolerance keeps data reachable:
+#### Reserved name `aql`
 
-- **Store (Definition API).** `PutStoredQuery` / `PutStoredQueryVersion` **MUST** fail client-side, before any request is issued, on a qualified name whose query-name part is `aql` case-insensitively (`aql`, `AQL`, `ehr::aql`, …), with an error satisfying `errors.Is(err, transport.ErrInvalidConfig)` whose message names the reserved-name rule. The read, list and delete operations **MUST** pass such a name through — trimmed as *Path-parameter normalisation* below requires, but never refused — a deployment that stored one anyway stays reachable for retrieval and cleanup, and the definition routes carry no collision of their own.
-- **Execution.** One collision is the SDK's own: it builds the stored execution path by concatenating `/query/` with the name, so the name `aql` addresses `/query/aql` — the ad-hoc route — and the caller would otherwise learn of it only through the server's "missing `q`" `400`. A qualified name that is exactly `aql` after trimming surrounding whitespace **MUST** therefore fail client-side before any request is issued, with an error satisfying `errors.Is(err, query.ErrInvalidConfig)` — the execution package's own sentinel, distinct from the store side's `transport.ErrInvalidConfig` — and a message naming the collision. The comparison here stays byte-exact, matching the byte-level path routing that causes it: `AQL` or `ehr::aql` on the execution path **MUST NOT** raise a client-side error — the server remains the authority on whether a name the upstream rule forbids *storing* can be *executed*, and its error surfaces unchanged.
+That no-pre-validation stance is scoped to name *syntax*, which stays the backend's call — but `aql` is not a syntax question: the upstream contract reserves it outright.
+The `Qualified_query_name` description in the vendored OAS (`resources/its-rest/query-validation.openapi.yaml`, authoritative per REQ-050) reserves `aql`, case-insensitively, as a query name ("as that is a reserved name"); the rule binds the query-name part of `[{namespace}::]{query-name}`.
+The SDK enforces it where it would otherwise help create the forbidden artifact, and stays tolerant where tolerance keeps data reachable:
 
-**Path-parameter normalisation.** The stored-query `qualified_query_name` and `version` path parameters **MUST** be trimmed of surrounding whitespace before they are placed on the wire — on the execution side (`query.RunStored`, `query.RunStoredVersion`) and on the Definition side (`definition.PutStoredQuery`, `PutStoredQueryVersion`, `GetStoredQuery`, `DeleteStoredQuery`, and `ListStoredQueries`' name pattern). The **trimmed** value is what both the emptiness check and the path use, so the check and the wire can never disagree about whether a segment is present. An **explicit** `version` that is empty after trimming **MUST** be refused client-side, before any request is issued: with an error satisfying `errors.Is(err, query.ErrInvalidConfig)` on the execution side and `errors.Is(err, transport.ErrInvalidConfig)` on the Definition side. Only `query.RunStored` addresses the latest version, and it does so by omitting the `/{version}` segment — the versioned and unversioned routes execute different query logic, so an empty explicit version **MUST NOT** fall back to the latest.
+- **Store (Definition API).**
+  `PutStoredQuery` / `PutStoredQueryVersion` **MUST** fail client-side, before any request is issued, on a qualified name whose query-name part is `aql` case-insensitively (`aql`, `AQL`, `ehr::aql`, …), with an error satisfying `errors.Is(err, transport.ErrInvalidConfig)` whose message names the reserved-name rule.
+  The read, list and delete operations **MUST** pass such a name through — trimmed as *Path-parameter normalisation* below requires, but never refused — a deployment that stored one anyway stays reachable for retrieval and cleanup, and the definition routes carry no collision of their own.
+- **Execution.**
+  One collision is the SDK's own: it builds the stored execution path by concatenating `/query/` with the name, so the name `aql` addresses `/query/aql` — the ad-hoc route — and the caller would otherwise learn of it only through the server's "missing `q`" `400`.
+  A qualified name that is exactly `aql` after trimming surrounding whitespace **MUST** therefore fail client-side before any request is issued, with an error satisfying `errors.Is(err, query.ErrInvalidConfig)` — the execution package's own sentinel, distinct from the store side's `transport.ErrInvalidConfig` — and a message naming the collision.
+  The comparison here stays byte-exact, matching the byte-level path routing that causes it: `AQL` or `ehr::aql` on the execution path **MUST NOT** raise a client-side error — the server remains the authority on whether a name the upstream rule forbids *storing* can be *executed*, and its error surfaces unchanged.
 
-**Paging.** Stored-query execution (`query.RunStored`, `query.RunStoredVersion`) **MUST** send exactly the `offset` and `fetch` the caller set (`query.WithOffset`, `query.WithFetch`), an explicit `0` included, as query parameters on GET and as request-body members on POST, and nothing for a field the caller did not set: the pin gives `fetch` no default and `fetch: 0` asks for zero rows, so a server applies its own default to an absent field. A request that sets one of the two fields and not the other is sent as set, not refused client-side; whether a server accepts `offset` without `fetch` is the server's rule (EHRbase answers `422`). The POST body **MUST** carry `query_parameters`, as an empty object when the caller passes none. Leaving `offset` and `fetch` out of the POST body departs from the pin's `Query` schema, a departure [§ REQ-050](#the-openapi-files-are-authoritative) keys and [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md) decides.
+#### Path-parameter normalisation
 
-**Store-response version recovery.** The Definition store operation (`PUT /definition/query/{qualified_query_name}[/{version}]`) returns the server-assigned `{name, version}` in a **`Location` response header** with an empty body — the canonical `200_StoredQuery_stored` OAS shape, and what a `text/plain` store returns. The SDK **MUST** recover the assigned identifier in order: (1) parse the `Location` header (canonical); (2) decode a JSON body if present (lenient — some deployments return one); (3) fall back to the caller's input `{name, version}` (graceful degradation). A malformed `Location` **MUST NOT** fail the call — it falls through to (2)/(3).
+The stored-query `qualified_query_name` and `version` path parameters **MUST** be trimmed of surrounding whitespace before they are placed on the wire — on the execution side (`query.RunStored`, `query.RunStoredVersion`) and on the Definition side (`definition.PutStoredQuery`, `PutStoredQueryVersion`, `GetStoredQuery`, `DeleteStoredQuery`, and `ListStoredQueries`' name pattern).
+The **trimmed** value is what both the emptiness check and the path use, so the check and the wire can never disagree about whether a segment is present.
+An **explicit** `version` that is empty after trimming **MUST** be refused client-side, before any request is issued: with an error satisfying `errors.Is(err, query.ErrInvalidConfig)` on the execution side and `errors.Is(err, transport.ErrInvalidConfig)` on the Definition side.
+Only `query.RunStored` addresses the latest version, and it does so by omitting the `/{version}` segment — the versioned and unversioned routes execute different query logic, so an empty explicit version **MUST NOT** fall back to the latest.
+
+#### Paging
+
+Stored-query execution (`query.RunStored`, `query.RunStoredVersion`) **MUST** send exactly the `offset` and `fetch` the caller set (`query.WithOffset`, `query.WithFetch`), an explicit `0` included, as query parameters on GET and as request-body members on POST, and nothing for a field the caller did not set: the pin gives `fetch` no default and `fetch: 0` asks for zero rows, so a server applies its own default to an absent field.
+A request that sets one of the two fields and not the other is sent as set, not refused client-side; whether a server accepts `offset` without `fetch` is the server's rule (EHRbase answers `422`).
+The POST body **MUST** carry `query_parameters`, as an empty object when the caller passes none.
+Leaving `offset` and `fetch` out of the POST body departs from the pin's `Query` schema, a departure [§ REQ-050](#the-openapi-files-are-authoritative) keys and [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md) decides.
+
+#### Store-response version recovery
+
+The Definition store operation (`PUT /definition/query/{qualified_query_name}[/{version}]`) returns the server-assigned `{name, version}` in a **`Location` response header** with an empty body — the canonical `200_StoredQuery_stored` OAS shape, and what a `text/plain` store returns.
+The SDK **MUST** recover the assigned identifier in order: (1) parse the `Location` header (canonical); (2) decode a JSON body if present (lenient — some deployments return one); (3) fall back to the caller's input `{name, version}` (graceful degradation).
+A malformed `Location` **MUST NOT** fail the call — it falls through to (2)/(3).
 
 ## Optimistic concurrency
 
@@ -731,44 +1298,49 @@ A stored query is identified by a qualified name (typically reverse-DNS, e.g. `o
 
 openEHR versioned resources (Composition, EHR_STATUS, Directory, Contribution, and the demographic PARTY resources) are versioned by `version_uid` with `If-Match` / `ETag` optimistic concurrency on the wire.
 
-The statuses map to sentinels by [REQ-093](transport.md#req-093--openehr-error-envelope-mapping): a stale `If-Match` on a PUT (the preceding version is no longer the latest) is `412`, `transport.ErrPreconditionFailed`; deleting a Composition or a demographic PARTY version that is not the latest is `409`, `transport.ErrVersionConflict`; and a missing `If-Match` is `400`. These sentinels come only from the server's status; the SDK does not make them up client-side. Beyond that mapping:
+The statuses map to sentinels by [REQ-093](transport.md#req-093--openehr-error-envelope-mapping): a stale `If-Match` on a PUT (the preceding version is no longer the latest) is `412`, `transport.ErrPreconditionFailed`; deleting a Composition or a demographic PARTY version that is not the latest is `409`, `transport.ErrVersionConflict`; and a missing `If-Match` is `400`.
+These sentinels come only from the server's status; the SDK does not make them up client-side.
+Beyond that mapping:
 
 - The latest `version_uid` a `412` carries in its `ETag`, and the one a `409` from the Composition or demographic delete carries there (`409_COMPOSITION_with_uid_based_id`, `409_PERSON_with_uid_based_id` in the vendored pin), **MUST** stay reachable beside the error through the returned `VersionMetadata`.
 - The Composition delete and the demographic delete take no `If-Match`: the `version_uid` in the path is the preceding version, so the SDK **MUST NOT** require or send one for either.
-- A PUT against a versioned resource **MUST** send its `If-Match` quoted, as `If-Match: "<preceding_version_uid>"`, the canonical form per the openEHR REST envelope. The Directory delete also takes an `If-Match`, sent the same way. The SDK **MUST** refuse an empty `If-Match` on either with `transport.ErrInvalidConfig` before it issues any request.
+- A PUT against a versioned resource **MUST** send its `If-Match` quoted, as `If-Match: "<preceding_version_uid>"`, the canonical form per the openEHR REST envelope.
+  The Directory delete also takes an `If-Match`, sent the same way.
+  The SDK **MUST** refuse an empty `If-Match` on either with `transport.ErrInvalidConfig` before it issues any request.
 
-ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a response and expose it on the typed return value. The value the caller sends on the next PUT is the `VersionUID` from the version-identifier rule below, which is that `ETag` only when the rule selects it.
+ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a response and expose it on the typed return value.
+The value the caller sends on the next PUT is the `VersionUID` from the version-identifier rule below, which is that `ETag` only when the rule selects it.
 
-**Version identifier on a response.** For a versioned resource the SDK **MUST** take the reported version identifier (`VersionUID`) from the first `ETag` value that is a well-formed `object_version_id`, and **MUST** fall back to the last path segment of `Location` otherwise. The vendored overview allows a server to add further opaque `ETag` headers, so a later header can be the well-formed value. In the vendored EHR API, `ETag_VERSION` names the VERSION identifier, and `ETag_COMPOSITION` and `ETag_FOLDER` name an identifier (for example a `version_uid`). `Location` is used on resource creation and redirects (overview § HTTP headers). A server may also leave the version out of `Location`: EHRbase 2.36.0 names only the versioned object there on a composition create. The EHR root is the exception: when the response carries a `Location`, its `VersionUID` **MUST** be the `ehr_id` from that `Location`, and when an EHR root response carries none, its `VersionUID` **MUST** be empty. An EHR's `ETag` names the `ehr_id` (`ETag_EHR`).
+#### Version identifier on a response
+
+For a versioned resource the SDK **MUST** take the reported version identifier (`VersionUID`) from the first `ETag` value that is a well-formed `object_version_id`, and **MUST** fall back to the last path segment of `Location` otherwise.
+The vendored overview allows a server to add further opaque `ETag` headers, so a later header can be the well-formed value.
+In the vendored EHR API, `ETag_VERSION` names the VERSION identifier, and `ETag_COMPOSITION` and `ETag_FOLDER` name an identifier (for example a `version_uid`).
+`Location` is used on resource creation and redirects (overview § HTTP headers).
+A server may also leave the version out of `Location`: EHRbase 2.36.0 names only the versioned object there on a composition create.
+The EHR root is the exception: when the response carries a `Location`, its `VersionUID` **MUST** be the `ehr_id` from that `Location`, and when an EHR root response carries none, its `VersionUID` **MUST** be empty.
+An EHR's `ETag` names the `ehr_id` (`ETag_EHR`).
 
 ## REST leaf operations
 
-When a leaf gains an operation or an option, its package's `Repository` interface **MUST** grow with it. That is no break for a caller of the package functions, but it breaks an implementer of the interface at compile time.
-
-### REQ-143 — Template list filters
-
-`ListTemplates` **MUST** accept the ITS-REST list filters of `definition_template_adl1.4_list` in the vendored OpenAPI pin (the ADL 2 list operation references the same five parameter components, so the option set carries over unchanged when ADL 2 support lands):
-
-| Query parameter | Option | Notes |
-|---|---|---|
-| `template_id` | `WithTemplateID` | Wildcard pattern as specified upstream |
-| `concept` | `WithConcept` | Wildcard pattern as specified upstream |
-| `version` | `WithVersion` | When omitted, the server returns only the latest version |
-| `offset` | `WithOffset` | 0-based |
-| `fetch` | `WithFetch` | |
-
-`ListTemplates` **MUST** omit the query key of an unset option and send an explicit `0` for `offset` or `fetch`, the rule [§ REQ-057](#req-057) *Paging* states for stored-query execution. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` before any request is issued. The `format` argument selects the list path; v1 supports `FormatADL14`, the only registered `TemplateFormat` value.
+When a leaf gains an operation or an option, its package's `Repository` interface **MUST** grow with it.
+That is no break for a caller of the package functions, but it breaks an implementer of the interface at compile time.
 
 ### REQ-177 — Template representations
 
-`GET /definition/template/adl1.4/{template_id}` (`definition_template_adl1.4_get` in the vendored pin) serves one template in two representations, chosen by `Accept`: the operational template as `application/xml` and the Web Template as `application/openehr.wt+json`. The Definition leaf **MUST** offer each through its own call on that route, so the call a caller makes, never an option, decides which representation comes back:
+`GET /definition/template/adl1.4/{template_id}` (`definition_template_adl1.4_get` in the vendored pin) serves one template in two representations, chosen by `Accept`: the operational template as `application/xml` and the Web Template as `application/openehr.wt+json`.
+The Definition leaf **MUST** offer each through its own call on that route, so the call a caller makes, never an option, decides which representation comes back:
 
 | Call | `Accept` sent | Body returned |
 |---|---|---|
 | `GetOperationalTemplate` | `application/xml` | the operational template |
 | `GetWebTemplate` | `application/openehr.wt+json` | the Web Template |
 
-Both **MUST** return a 2xx body byte for byte, undecoded, with the response metadata. A `TemplateFormat` other than `FormatADL14` **MUST** fail with `ErrInvalidConfig` before any request is issued. An empty template id is refused with `ErrInvalidConfig` before any request is issued, and a malformed one by [REQ-150](transport.md#req-150--path-parameter-segment-validation). On a non-2xx answer, the `406` of a server that does not offer the representation included, both **MUST** return the typed wire error of [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) with the response metadata beside it. `GetTemplate` stays as a deprecated alias of `GetOperationalTemplate`.
+Both **MUST** return a 2xx body byte for byte, undecoded, with the response metadata.
+A `TemplateFormat` other than `FormatADL14` **MUST** fail with `ErrInvalidConfig` before any request is issued.
+An empty template id is refused with `ErrInvalidConfig` before any request is issued, and a malformed one by [REQ-150](transport.md#req-150--path-parameter-segment-validation).
+On a non-2xx answer, the `406` of a server that does not offer the representation included, both **MUST** return the typed wire error of [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) with the response metadata beside it.
+`GetTemplate` stays as a deprecated alias of `GetOperationalTemplate`.
 
 **Acceptance.**
 
@@ -782,11 +1354,51 @@ Out of scope: decoding the Web Template into a `webtemplate.WebTemplate`; the `a
 
 - **Probes:** [PROBE-112](conformance.md#probe-112--template-representations-reach-the-wire).
 
+#### List filters
+
+`ListTemplates` **MUST** accept the ITS-REST list filters of `definition_template_adl1.4_list` in the vendored OpenAPI pin (the ADL 2 list operation references the same five parameter components, so the option set carries over unchanged when ADL 2 support lands):
+
+| Query parameter | Option | Notes |
+|---|---|---|
+| `template_id` | `WithTemplateID` | Wildcard pattern as specified upstream |
+| `concept` | `WithConcept` | Wildcard pattern as specified upstream |
+| `version` | `WithVersion` | When omitted, the server returns only the latest version |
+| `offset` | `WithOffset` | 0-based |
+| `fetch` | `WithFetch` | |
+
+`ListTemplates` **MUST** omit the query key of an unset option and send an explicit `0` for `offset` or `fetch`, the rule [§ REQ-057](#req-057) *Paging* states for stored-query execution.
+A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` before any request is issued.
+The `format` argument selects the list path; v1 supports `FormatADL14`, the only registered `TemplateFormat` value.
+
+#### Empty list bodies
+
+`ListTemplates` and `ListStoredQueries` **MUST** return a **non-nil** zero-length slice and a nil error when a 2xx response body is empty, as [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) defines it, decided by `transport.IsNoRepresentationBody` ahead of decode, which is what keeps a `null` list body from unmarshalling to a nil slice.
+This is the empty-*body* arm: a JSON `[]` already decodes to a non-nil empty slice through `encoding/json`.
+A nil slice boxed in a non-nil interface marshals as JSON `null` rather than `[]`, so a caller who re-serialises the result would publish `null` for "no templates" — the read-side twin of the typed-nil trap [REQ-094](transport.md#req-094--prefer-response-shape-negotiation) documents on the write path.
+
+#### Template upload negotiation and response
+
+`UploadTemplate` **MUST** send `Accept: application/json, application/xml`.
+The ITS-REST `201_Template_adl1_4_upload` response offers three representations — a JSON `TemplateIdentifier`, an XML `OperationalTemplate`, and `application/openehr.wt+json` — and its body is empty when the deployment applies the `return=minimal` default (this call sends no `Prefer` header).
+Requesting both is a client-contract interoperability choice, not a pin departure: the `Accept_Template` OpenAPI value is a single-token media range, and a comma-separated `Accept` list is ordinary HTTP the pin does not constrain (REQ-050).
+The decoded `*TemplateMetadata` **MUST** be taken from a JSON **object** body when one is present, and otherwise — an empty, `null`, or XML body — from the trailing segment of the `Location` header; a leading UTF-8 BOM is stripped before that classification, and a non-object JSON body is a typed decode error.
+A response that carries neither a JSON `template_id` nor a `Location` header cannot name the template and **MUST** surface as a typed error (`transport.ErrInvalidShape`), never a metadata record with an empty id.
+A deployment that serves the ADL 1.4 template surface only as XML answers `406 Not Acceptable` to an `application/json`-only `Accept`; that is a deployment characteristic (EHRbase 2.35.1 is one), not an ITS-REST violation, and requesting both representations is what keeps the SDK interoperable with it.
+
+### REQ-143 — Template list filters
+
+Folded into [§ REQ-177](#req-177--template-representations) *List filters*.
+
 ### REQ-144 — Definition metadata decoding
 
-The Definition leaf's two catalog descriptors each carry a timestamp: `TemplateMetadata.created_timestamp` (the template list) and `StoredQueryMetadata.saved` (the stored-query list). Both decode into a Go `time.Time`, for which `encoding/json` accepts only RFC 3339 as `time.Parse` reads it. Deployments emit more than that, and one unreadable timestamp costs the consumer the whole list rather than one entry. The timestamp decode rules below are decided by [ADR 0019](../adr/0019-definition-timestamp-tolerance.md); the tolerance is asymmetric — liberal on decode, single-valued on encode — as [ADR 0004](../adr/0004-numeric-wire-tolerance.md) established for BMM numerics.
+The Definition leaf's two catalog descriptors each carry a timestamp: `TemplateMetadata.created_timestamp` (the template list) and `StoredQueryMetadata.saved` (the stored-query list).
+Both decode into a Go `time.Time`, for which `encoding/json` accepts only RFC 3339 as `time.Parse` reads it.
+Deployments emit more than that, and one unreadable timestamp costs the consumer the whole list rather than one entry.
+The timestamp decode rules below are decided by [ADR 0019](../adr/0019-definition-timestamp-tolerance.md); the tolerance is asymmetric — liberal on decode, single-valued on encode — as [ADR 0004](../adr/0004-numeric-wire-tolerance.md) established for BMM numerics.
 
-**Accepted layouts.** Decode of `created_timestamp` and `saved` **MUST** accept a value spelled in any member of this **closed** set:
+#### Accepted layouts
+
+Decode of `created_timestamp` and `saved` **MUST** accept a value spelled in any member of this **closed** set:
 
 | Layout | Shape |
 |---|---|
@@ -795,62 +1407,139 @@ The Definition leaf's two catalog descriptors each carry a timestamp: `TemplateM
 | `2006-01-02T15:04` | Zone-less, minute precision, ISO 8601 extended |
 | `2006-01-02 15:04:05` | Zone-less, **space**-separated — **deployment interop**: not ISO 8601 extended (no `T`) and not a REST-legal or pin-example form, accepted solely because deployments emit it |
 
-The set is closed: *Unreadable values* below refuses a non-empty value outside it, and *Absent and empty values* governs the absent, `null` and empty-string arm. The SDK reaches the tolerance through no general-purpose or format-guessing parser, since an open set has no reviewable boundary and would absorb the next malformed input instead of reporting it. Adding or removing a layout is an amendment to this §, and removing one breaks every consumer whose server emits it.
+The set is closed: *Unreadable values* below refuses a non-empty value outside it, and *Absent and empty values* governs the absent, `null` and empty-string arm.
+The SDK reaches the tolerance through no general-purpose or format-guessing parser, since an open set has no reviewable boundary and would absorb the next malformed input instead of reporting it.
+Adding or removing a layout is an amendment to this §, and removing one breaks every consumer whose server emits it.
 
-**Fractional seconds.** Decode **MUST** tolerate a fractional-second component on every layout in the set that carries a seconds element. No separate layout entries are required: Go's `time.Parse` absorbs a fractional-second field immediately following a seconds element even when the layout omits it, and accepts either decimal sign — a `.` or the ISO 8601 `,` — so `2022-03-30T07:18:13,591` decodes exactly as `2022-03-30T07:18:13.591` does. That latitude belongs to the seconds-bearing layouts and adds no member to the set. The minute-precision layout `2006-01-02T15:04` carries no seconds element and therefore accepts neither seconds nor fractions — an input carrying them matches one of the seconds-bearing layouts instead.
+#### Fractional seconds
 
-**Stdlib latitude.** Two further properties of the standard library the set is built on are recorded here rather than left to be discovered, and neither adds a rule the SDK invents. *Offset component ranges are not validated:* `time.Parse` normalises an out-of-range zone offset instead of refusing it — `+24:00`, `+00:60` and `-24:00` each parse, landing on the adjacent day or hour — so the closed set constrains layout **shapes**, not component ranges, and the SDK adds no hand-rolled range validation (the same posture as fractional absorption above). *The zero instant is indistinguishable from absence:* a wire value of `0001-01-01T00:00:00Z` decodes to Go's zero `time.Time`, which is exactly what an absent key, a `null`, and an empty string yield below, and both fields carry `omitzero`, so it re-marshals as absent. A consumer needing to tell "the server sent the zero instant" from "the server sent nothing" cannot do so from these fields.
+Decode **MUST** tolerate a fractional-second component on every layout in the set that carries a seconds element.
+No separate layout entries are required: Go's `time.Parse` absorbs a fractional-second field immediately following a seconds element even when the layout omits it, and accepts either decimal sign — a `.` or the ISO 8601 `,` — so `2022-03-30T07:18:13,591` decodes exactly as `2022-03-30T07:18:13.591` does.
+That latitude belongs to the seconds-bearing layouts and adds no member to the set.
+The minute-precision layout `2006-01-02T15:04` carries no seconds element and therefore accepts neither seconds nor fractions — an input carrying them matches one of the seconds-bearing layouts instead.
 
-**Pin ground truth.** The two fields are not pinned alike, and the difference decides how far tolerance is a reading of the pin and where it becomes a departure. `created_timestamp` is `required` but declared a bare `type: string` with **no `format`** ([`definition-validation.openapi.yaml:509`, `:521-522`](../../resources/its-rest/definition-validation.openapi.yaml)), so an RFC 3339-only decoder over-constrains a field the pin never constrained and tolerance closes that gap. `saved` is `required` with `type: string` + `format: date-time` (`:3872`, `:3882-3884`), so its tolerance genuinely exceeds the pin and is the keyed [REQ-050](#the-openapi-files-are-authoritative) exception ADR 0019 grants.
+#### Stdlib latitude
 
-**Zone handling.** A value carrying no zone indicator **MUST** decode as **UTC**, never in another zone, the client host's local zone included, which would decode one response to different instants on different machines. The pinned REST overview says a timezone is supplied only when needed and the local timezone is assumed otherwise ([`overview-validation.openapi.yaml:675`](../../resources/its-rest/overview-validation.openapi.yaml)); the zone assumed there is the *deployment's*, which the SDK can neither know nor discover for a remote server, so UTC is the deterministic choice and the departure is recorded in ADR 0019. The consequence is a stated round-trip asymmetry: a zone-less wire value re-marshals with a `Z` suffix the wire never carried. The emitted form is a correct RFC 3339 rendering of the decoded instant, not a transcription of the server's spelling; a consumer needing the original spelling does not get it from these fields.
+Two further properties of the standard library the set is built on are recorded here rather than left to be discovered, and neither adds a rule the SDK invents.
+*Offset component ranges are not validated:* `time.Parse` normalises an out-of-range zone offset instead of refusing it — `+24:00`, `+00:60` and `-24:00` each parse, landing on the adjacent day or hour — so the closed set constrains layout **shapes**, not component ranges, and the SDK adds no hand-rolled range validation (the same posture as fractional absorption above).
+*The zero instant is indistinguishable from absence:* a wire value of `0001-01-01T00:00:00Z` decodes to Go's zero `time.Time`, which is exactly what an absent key, a `null`, and an empty string yield below, and both fields carry `omitzero`, so it re-marshals as absent.
+A consumer needing to tell "the server sent the zero instant" from "the server sent nothing" cannot do so from these fields.
 
-**Absent and empty values.** A JSON `null`, an absent key, or an empty string **MUST** yield the zero `time.Time` with no error, even though the pin marks both fields `required`: a descriptor whose timestamp the server did not populate is still usable, and the caller distinguishes the case with `IsZero`.
+#### Pin ground truth
 
-**Unreadable values.** A **non-empty** value matching no accepted layout **MUST** fail the containing item's decode, and therefore the list call, with an error naming the field, never yield the zero time: a silent zero would present an instant the server never sent as though it had. On the transport stack that failure surfaces as the typed `*transport.DecodeError` of [REQ-151](transport.md#req-151--typed-2xx-decode-failure), whose own top-level string is deliberately value-free: the field-naming parse error is its **wrapped cause**, reachable through `Unwrap`, and the echo permitted below rides that cause, never the top-level string. Catalog timestamps are design-time metadata, not clinical content, so the offending value **MAY** appear in the error; the value-free discipline [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) sets for `WireError` boundary diagnostics is unaffected — these are decode-side parse failures, not error-envelope surfaces.
+The two fields are not pinned alike, and the difference decides how far tolerance is a reading of the pin and where it becomes a departure.
+`created_timestamp` is `required` but declared a bare `type: string` with **no `format`** ([`definition-validation.openapi.yaml:509`, `:521-522`](../../resources/its-rest/definition-validation.openapi.yaml)), so an RFC 3339-only decoder over-constrains a field the pin never constrained and tolerance closes that gap.
+`saved` is `required` with `type: string` + `format: date-time` (`:3872`, `:3882-3884`), so its tolerance genuinely exceeds the pin and is the keyed [REQ-050](#the-openapi-files-are-authoritative) exception ADR 0019 grants.
 
-**Timestamp encode.** Both fields **MUST** be emitted as RFC 3339; the tolerance is decode-only. (This concerns the two timestamp fields only; the `Extras` encode rules below are separate.)
+#### Zone handling
 
-**Unknown response keys.** The two Definition descriptors, and by [§ REQ-050](#req-050) the System descriptor `ServiceCapabilities`, carry an `Extras` map. Decode **MUST** route every response key outside the documented field set into it rather than dropping it, and encode re-emit those keys with their values unchanged, up to the insignificant whitespace `encoding/json` compacts and the `<`, `>`, `&` it escapes as `\u003c`, `\u003e`, `\u0026` inside a preserved value. The escaped spelling decodes to the identical value, so the carve-out is about the bytes, not the content. An `Extras` key whose name collides with a documented field name **MUST** be ignored on encode, even where that field's own JSON contract emits no key for it: the documented field is authoritative, and otherwise a caller-set collision would survive into output the descriptor's own decode rejects. Collision **MUST** be decided by **exact**, case-sensitive comparison against the documented JSON names. A wire key differing from a documented name only by case is therefore not a collision: `encoding/json` matches field names case-insensitively on decode, so such a key populates the documented field **and** is preserved in `Extras`, and encode emits both. Decode cannot create an exact-name collision, since a documented name is routed to its field and never into `Extras`, so that case is caller-constructed. Round-trip identity of the key set is **not** promised in either direction: documented fields are emitted per their own JSON contract (a field whose contract omits it when empty or zero emits no key at all), and key order is not part of the contract.
+A value carrying no zone indicator **MUST** decode as **UTC**, never in another zone, the client host's local zone included, which would decode one response to different instants on different machines.
+The pinned REST overview says a timezone is supplied only when needed and the local timezone is assumed otherwise ([`overview-validation.openapi.yaml:675`](../../resources/its-rest/overview-validation.openapi.yaml)); the zone assumed there is the *deployment's*, which the SDK can neither know nor discover for a remote server, so UTC is the deterministic choice and the departure is recorded in ADR 0019.
+The consequence is a stated round-trip asymmetry: a zone-less wire value re-marshals with a `Z` suffix the wire never carried.
+The emitted form is a correct RFC 3339 rendering of the decoded instant, not a transcription of the server's spelling; a consumer needing the original spelling does not get it from these fields.
 
-**Empty list bodies.** `ListTemplates` and `ListStoredQueries` **MUST** return a **non-nil** zero-length slice and a nil error when a 2xx response body is empty, as [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) defines it, decided by `transport.IsNoRepresentationBody` ahead of decode, which is what keeps a `null` list body from unmarshalling to a nil slice. This is the empty-*body* arm: a JSON `[]` already decodes to a non-nil empty slice through `encoding/json`. A nil slice boxed in a non-nil interface marshals as JSON `null` rather than `[]`, so a caller who re-serialises the result would publish `null` for "no templates" — the read-side twin of the typed-nil trap [REQ-094](transport.md#req-094--prefer-response-shape-negotiation) documents on the write path.
+#### Absent and empty values
 
-**Template upload negotiation and response.** `UploadTemplate` **MUST** send `Accept: application/json, application/xml`. The ITS-REST `201_Template_adl1_4_upload` response offers three representations — a JSON `TemplateIdentifier`, an XML `OperationalTemplate`, and `application/openehr.wt+json` — and its body is empty when the deployment applies the `return=minimal` default (this call sends no `Prefer` header). Requesting both is a client-contract interoperability choice, not a pin departure: the `Accept_Template` OpenAPI value is a single-token media range, and a comma-separated `Accept` list is ordinary HTTP the pin does not constrain (REQ-050). The decoded `*TemplateMetadata` **MUST** be taken from a JSON **object** body when one is present, and otherwise — an empty, `null`, or XML body — from the trailing segment of the `Location` header; a leading UTF-8 BOM is stripped before that classification, and a non-object JSON body is a typed decode error. A response that carries neither a JSON `template_id` nor a `Location` header cannot name the template and **MUST** surface as a typed error (`transport.ErrInvalidShape`), never a metadata record with an empty id. A deployment that serves the ADL 1.4 template surface only as XML answers `406 Not Acceptable` to an `application/json`-only `Accept`; that is a deployment characteristic (EHRbase 2.35.1 is one), not an ITS-REST violation, and requesting both representations is what keeps the SDK interoperable with it.
+A JSON `null`, an absent key, or an empty string **MUST** yield the zero `time.Time` with no error, even though the pin marks both fields `required`: a descriptor whose timestamp the server did not populate is still usable, and the caller distinguishes the case with `IsZero`.
 
-**Out of scope.** RM `DV_DATE_TIME` wire formats (REQ-052 / REQ-123) are untouched, and this § grants no SDK-wide zone-less tolerance for `time.Time`: the timestamp rules above reach exactly these two Definition-area catalog fields.
+#### Unreadable values
+
+A **non-empty** value matching no accepted layout **MUST** fail the containing item's decode, and therefore the list call, with an error naming the field, never yield the zero time: a silent zero would present an instant the server never sent as though it had.
+On the transport stack that failure surfaces as the typed `*transport.DecodeError` of [REQ-151](transport.md#req-151--typed-2xx-decode-failure), whose own top-level string is deliberately value-free: the field-naming parse error is its **wrapped cause**, reachable through `Unwrap`, and the echo permitted below rides that cause, never the top-level string.
+Catalog timestamps are design-time metadata, not clinical content, so the offending value **MAY** appear in the error; the value-free discipline [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) sets for `WireError` boundary diagnostics is unaffected — these are decode-side parse failures, not error-envelope surfaces.
+
+#### Timestamp encode
+
+Both fields **MUST** be emitted as RFC 3339; the tolerance is decode-only.
+(This concerns the two timestamp fields only; the `Extras` encode rules below are separate.)
+
+#### Unknown response keys
+
+The two Definition descriptors, and by [§ REQ-050](#req-050) the System descriptor `ServiceCapabilities`, carry an `Extras` map.
+Decode **MUST** route every response key outside the documented field set into it rather than dropping it, and encode re-emit those keys with their values unchanged, up to the insignificant whitespace `encoding/json` compacts and the `<`, `>`, `&` it escapes as `\u003c`, `\u003e`, `\u0026` inside a preserved value.
+The escaped spelling decodes to the identical value, so the carve-out is about the bytes, not the content.
+An `Extras` key whose name collides with a documented field name **MUST** be ignored on encode, even where that field's own JSON contract emits no key for it: the documented field is authoritative, and otherwise a caller-set collision would survive into output the descriptor's own decode rejects.
+Collision **MUST** be decided by **exact**, case-sensitive comparison against the documented JSON names.
+A wire key differing from a documented name only by case is therefore not a collision: `encoding/json` matches field names case-insensitively on decode, so such a key populates the documented field **and** is preserved in `Extras`, and encode emits both.
+Decode cannot create an exact-name collision, since a documented name is routed to its field and never into `Extras`, so that case is caller-constructed.
+Round-trip identity of the key set is **not** promised in either direction: documented fields are emitted per their own JSON contract (a field whose contract omits it when empty or zero emits no key at all), and key order is not part of the contract.
+
+#### Out of scope
+
+RM
+
+`DV_DATE_TIME` wire formats (REQ-052 / REQ-123) are untouched, and this § grants no SDK-wide zone-less tolerance for `time.Time`: the timestamp rules above reach exactly these two Definition-area catalog fields.
 
 ### REQ-173 — Composition representation formats
 
-ITS-REST lets a composition be written and read in four representations, which the pin lists as the `Content-Type` and `Accept` values of the composition operations (`ContentType_LOCATABLE`, `Accept_LOCATABLE`): canonical JSON, canonical XML, FLAT and STRUCTURED. The composition leaf **MUST** offer all four on `Save`, `Update` and `Get` through typed per-call options, serialising and decoding with the codecs of [§ REQ-052](#req-052), [§ REQ-056](#req-056) and [§ REQ-053](#req-053), so a caller never builds the request by hand to change format.
+ITS-REST lets a composition be written and read in four representations, which the pin lists as the `Content-Type` and `Accept` values of the composition operations (`ContentType_LOCATABLE`, `Accept_LOCATABLE`): canonical JSON, canonical XML, FLAT and STRUCTURED.
+The composition leaf **MUST** offer all four on `Save`, `Update` and `Get` through typed per-call options, serialising and decoding with the codecs of [§ REQ-052](#req-052), [§ REQ-056](#req-056) and [§ REQ-053](#req-053), so a caller never builds the request by hand to change format.
 
-**Formats.** The leaf names the four with `composition.Format`, whose zero value is canonical JSON, the default. The media types it sends are `application/json`, `application/xml`, and the canonical simplified types [§ REQ-053](#req-053) names, never a deprecated `.schema`-suffixed one. A `Format` outside the four **MUST** fail with `ErrInvalidConfig` before any request is issued.
+#### Formats
 
-**Writes.** `WithFormat(format, webTemplate, decodeOptions...)` on `Save` and `Update` **MUST** serialise the composition in that format and send the format's media type as `Content-Type`, except where *The format query parameters* below replace it. FLAT and STRUCTURED serialise against the Web Template given, which **MUST** be non-nil for them; canonical JSON and XML do not consult it. A composition the codec cannot serialise **MUST** fail before any request, as a `*composition.EncodeError` that names the format and wraps the codec's error, so a caller tells it apart from a request that went out and failed and from an `ErrInvalidConfig` refusal. Everything else a write sends and returns **MUST** be what it is for canonical JSON: `If-Match`, `Prefer`, the audit, lifecycle and item-tag headers, and the version metadata.
+The leaf names the four with `composition.Format`, whose zero value is canonical JSON, the default.
+The media types it sends are `application/json`, `application/xml`, and the canonical simplified types [§ REQ-053](#req-053) names, never a deprecated `.schema`-suffixed one.
+A `Format` outside the four **MUST** fail with `ErrInvalidConfig` before any request is issued.
 
-- **Template id.** The pin's overview requires the `openehr-template-id` header whenever a composition is committed in a simplified format. A FLAT or STRUCTURED write **MUST** therefore send it, holding the id `WithTemplateID` names, or the Web Template's `templateId` when that option is absent or empty. When both are non-empty and differ, or both are empty, the write **MUST** fail with `ErrInvalidConfig` before any request.
-- **The response.** Under `Prefer: return=representation` the write **MUST** send the format's media type as `Accept`, except where *The format query parameters* replace it, and decode the body in that format into the returned composition, under [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure): a body that does not decode is a committed write with an unusable representation, never a failed write. Under any other `Prefer` the write **MUST** send `Accept: application/json`, since the `Identifier` body the pin gives `201_COMPOSITION` is JSON and the identifier arm reads it as JSON.
+#### Writes
 
-**Reads.** `Get` takes trailing options. With no option, `Get` **MUST** send `Accept: application/json` and decode the body as canonical JSON.
+`WithFormat(format, webTemplate, decodeOptions...)` on `Save` and `Update` **MUST** serialise the composition in that format and send the format's media type as `Content-Type`, except where *The format query parameters* below replace it.
+FLAT and STRUCTURED serialise against the Web Template given, which **MUST** be non-nil for them; canonical JSON and XML do not consult it.
+A composition the codec cannot serialise **MUST** fail before any request, as a `*composition.EncodeError` that names the format and wraps the codec's error, so a caller tells it apart from a request that went out and failed and from an `ErrInvalidConfig` refusal.
+Everything else a write sends and returns **MUST** be what it is for canonical JSON: `If-Match`, `Prefer`, the audit, lifecycle and item-tag headers, and the version metadata.
 
-- `WithGetFormat(format, webTemplate, decodeOptions...)` **MUST** send the format's media type as `Accept`, except where *The format query parameters* replace it, and a `200` body **MUST** be decoded into the returned composition in that format: canonical XML with no Web Template, FLAT and STRUCTURED against the Web Template when it is non-nil. With a nil Web Template a simplified body **MUST NOT** be decoded: the call returns a nil composition, the version metadata and a nil error.
-- `WithRawBody(dst)` **MUST** copy the response's `Content-Type` value and its body bytes into `dst` on a `200`, before any decode, so a body that does not decode is still in hand; on any other outcome `dst` is left as it was. A nil `dst` **MUST** fail with `ErrInvalidConfig` before any request.
-- The decoder **MUST** be chosen by the format the caller asked for, never by the response's `Content-Type`. A body that does not decode **MUST** surface as the typed decode failure of [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) with the version metadata beside it, and an empty body and a `204` keep their outcomes (`ErrInvalidShape`, `ErrDeletedAtTime`) in every format.
+- **Template id.**
+  The pin's overview requires the `openehr-template-id` header whenever a composition is committed in a simplified format.
+  A FLAT or STRUCTURED write **MUST** therefore send it, holding the id `WithTemplateID` names, or the Web Template's `templateId` when that option is absent or empty.
+  When both are non-empty and differ, or both are empty, the write **MUST** fail with `ErrInvalidConfig` before any request.
+- **The response.**
+  Under `Prefer: return=representation` the write **MUST** send the format's media type as `Accept`, except where *The format query parameters* replace it, and decode the body in that format into the returned composition, under [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure): a body that does not decode is a committed write with an unusable representation, never a failed write.
+  Under any other `Prefer` the write **MUST** send `Accept: application/json`, since the `Identifier` body the pin gives `201_COMPOSITION` is JSON and the identifier arm reads it as JSON.
 
-**Simplified decode options.** The decode options `WithFormat` and `WithGetFormat` take are the simplified codec's own (`simplified.WithTemplate`, `WithStrict`, `WithUnmatched`). The leaf **MUST** pass them unchanged to every FLAT or STRUCTURED decode the option governs, the read's body and the write's representation, and **MUST** pass none when the caller gives none; canonical JSON and XML do not consult them. *Informative:* without `simplified.WithTemplate` the simplified decoder leaves out the `name` of the nodes below the root and the RM defaults it would otherwise complete ([§ REQ-053](#req-053)), so a caller who needs a complete composition passes the compiled template.
+#### Reads
 
-**The format query parameters.** Some deployments select a simplified format with query parameters rather than with the media types: `format=FLAT` or `format=STRUCTURED` beside `application/json`, and the template id as `templateId` on a write. `WithFormatQuery()` on `Save` and `Update`, and `WithGetFormatQuery()` on `Get`, **MUST** send that form for FLAT and STRUCTURED, in place of the media types the *Writes* and *Reads* rules send: `Content-Type: application/json` on a write, `Accept: application/json` whatever the `Prefer`, the `format` parameter, and on a write the `templateId` parameter holding the id the *Template id* rule resolves, which the write still sends as the `openehr-template-id` header. The body is serialised and decoded in the format asked for, as above. On canonical JSON and XML the two options **MUST NOT** add a parameter. The form is outside the pin, so both options are off by default, and their documentation **SHOULD** name it a deployment extension, so a caller does not take it for openEHR REST; [§ REQ-050](#the-openapi-files-are-authoritative) keys it as an exception ([ADR 0030](../adr/0030-composition-format-query-parameters.md)).
+`Get` takes trailing options.
+With no option, `Get` **MUST** send `Accept: application/json` and decode the body as canonical JSON.
+
+- `WithGetFormat(format, webTemplate, decodeOptions...)` **MUST** send the format's media type as `Accept`, except where *The format query parameters* replace it, and a `200` body **MUST** be decoded into the returned composition in that format: canonical XML with no Web Template, FLAT and STRUCTURED against the Web Template when it is non-nil.
+  With a nil Web Template a simplified body **MUST NOT** be decoded: the call returns a nil composition, the version metadata and a nil error.
+- `WithRawBody(dst)` **MUST** copy the response's `Content-Type` value and its body bytes into `dst` on a `200`, before any decode, so a body that does not decode is still in hand; on any other outcome `dst` is left as it was.
+  A nil `dst` **MUST** fail with `ErrInvalidConfig` before any request.
+- The decoder **MUST** be chosen by the format the caller asked for, never by the response's `Content-Type`.
+  A body that does not decode **MUST** surface as the typed decode failure of [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) with the version metadata beside it, and an empty body and a `204` keep their outcomes (`ErrInvalidShape`, `ErrDeletedAtTime`) in every format.
+
+#### Simplified decode options
+
+The decode options `WithFormat` and `WithGetFormat` take are the simplified codec's own (`simplified.WithTemplate`, `WithStrict`, `WithUnmatched`).
+The leaf **MUST** pass them unchanged to every FLAT or STRUCTURED decode the option governs, the read's body and the write's representation, and **MUST** pass none when the caller gives none; canonical JSON and XML do not consult them.
+*Informative:* without `simplified.WithTemplate` the simplified decoder leaves out the `name` of the nodes below the root and the RM defaults it would otherwise complete ([§ REQ-053](#req-053)), so a caller who needs a complete composition passes the compiled template.
+
+#### The format query parameters
+
+Some deployments select a simplified format with query parameters rather than with the media types: `format=FLAT` or `format=STRUCTURED` beside `application/json`, and the template id as `templateId` on a write.
+`WithFormatQuery()` on `Save` and `Update`, and `WithGetFormatQuery()` on `Get`, **MUST** send that form for FLAT and STRUCTURED, in place of the media types the *Writes* and *Reads* rules send: `Content-Type: application/json` on a write, `Accept: application/json` whatever the `Prefer`, the `format` parameter, and on a write the `templateId` parameter holding the id the *Template id* rule resolves, which the write still sends as the `openehr-template-id` header.
+The body is serialised and decoded in the format asked for, as above.
+On canonical JSON and XML the two options **MUST NOT** add a parameter.
+The form is outside the pin, so both options are off by default, and their documentation **SHOULD** name it a deployment extension, so a caller does not take it for openEHR REST; [§ REQ-050](#the-openapi-files-are-authoritative) keys it as an exception ([ADR 0030](../adr/0030-composition-format-query-parameters.md)).
 
 **Acceptance.**
 
 - A `Save` with `WithFormat(FormatXML, nil)` under `PreferRepresentation` sends `Content-Type: application/xml`, `Accept: application/xml` and a body canonical XML decodes back to the composition given, and returns the composition decoded from an XML `201` body.
-- A `Save` with `WithFormat(FormatFlat, wt)` sends `Content-Type: application/openehr.wt.flat+json`, the bytes `simplified.MarshalFlat` writes for the composition and `wt`, and an `openehr-template-id` equal to `wt`'s template id; STRUCTURED does the same with its own codec and media type. Under `PreferMinimal` both send `Accept: application/json`, and the version uid comes from the `ETag` as for canonical JSON.
+- A `Save` with `WithFormat(FormatFlat, wt)` sends `Content-Type: application/openehr.wt.flat+json`, the bytes `simplified.MarshalFlat` writes for the composition and `wt`, and an `openehr-template-id` equal to `wt`'s template id; STRUCTURED does the same with its own codec and media type.
+  Under `PreferMinimal` both send `Accept: application/json`, and the version uid comes from the `ETag` as for canonical JSON.
 - An `Update` with a FLAT format sends its `If-Match`, audit and lifecycle headers unchanged, and under `PreferRepresentation` returns the composition decoded against `wt` from a FLAT `200` body.
 - A FLAT or STRUCTURED write of a composition its codec refuses, such as an EVENT_CONTEXT setting with a value and no code, and a canonical-JSON write of one canonical JSON refuses, such as a NaN magnitude, fail with a `*composition.EncodeError` that names the format and matches the codec's error, not `ErrInvalidConfig`, and issue no request.
 - Each of these fails with `ErrInvalidConfig` and issues no request: a FLAT or STRUCTURED write with a nil Web Template; a FLAT or STRUCTURED write whose `WithTemplateID` and Web Template id are both non-empty and differ, or both empty; a `Format` outside the four, on a write or a read; `WithRawBody(nil)`.
-- A `Get` with no option sends `Accept: application/json` and decodes canonical JSON. With `WithGetFormat(FormatXML, nil)` it sends `Accept: application/xml` and decodes the XML body. With `WithGetFormat(FormatFlat, nil)` and `WithRawBody` it returns a nil composition and a nil error, and the raw value holds the response's `Content-Type` and body. With a Web Template it returns the decoded composition.
-- A FLAT `Get`, and a FLAT `Save` under `PreferRepresentation`, given `simplified.WithTemplate(compiled)` return a composition whose nodes below the root carry their names, and given no decode option return one whose nodes below the root carry none. `simplified.WithStrict()` makes a body with unmatched content fail the read's decode.
+- A `Get` with no option sends `Accept: application/json` and decodes canonical JSON.
+  With `WithGetFormat(FormatXML, nil)` it sends `Accept: application/xml` and decodes the XML body.
+  With `WithGetFormat(FormatFlat, nil)` and `WithRawBody` it returns a nil composition and a nil error, and the raw value holds the response's `Content-Type` and body.
+  With a Web Template it returns the decoded composition.
+- A FLAT `Get`, and a FLAT `Save` under `PreferRepresentation`, given `simplified.WithTemplate(compiled)` return a composition whose nodes below the root carry their names, and given no decode option return one whose nodes below the root carry none.
+  `simplified.WithStrict()` makes a body with unmatched content fail the read's decode.
 - A FLAT body that does not decode against the Web Template returns the typed decode failure with the version metadata, and `WithRawBody` still holds the bytes.
-- A FLAT `Save` with `WithFormatQuery` sends `Content-Type: application/json`, `Accept: application/json`, `format=FLAT` and `templateId=<id>` beside the `openehr-template-id` header. A STRUCTURED `Get` with `WithGetFormatQuery` and a `version_at_time` sends `Accept: application/json`, `format=STRUCTURED` and `version_at_time`, and decodes the body as STRUCTURED. A canonical JSON or XML call with either option carries no `format` parameter.
+- A FLAT `Save` with `WithFormatQuery` sends `Content-Type: application/json`, `Accept: application/json`, `format=FLAT` and `templateId=<id>` beside the `openehr-template-id` header.
+  A STRUCTURED `Get` with `WithGetFormatQuery` and a `version_at_time` sends `Accept: application/json`, `format=STRUCTURED` and `version_at_time`, and decodes the body as STRUCTURED.
+  A canonical JSON or XML call with either option carries no `format` parameter.
 - No request the leaf sends carries a `.schema`-suffixed media type.
 
 Out of scope: the raw body of a write's response, the other EHR leaves and the contribution envelope's inner payloads ([§ REQ-174](#req-174--versioned-object-reads) keeps the contribution read in canonical JSON), and sending the deprecated `.schema`-suffixed media types.
@@ -859,7 +1548,8 @@ Out of scope: the raw body of a write's response, the other EHR leaves and the c
 
 ### REQ-174 — Versioned-object reads
 
-The composition and EHR_STATUS leaves **MUST** expose the reads the vendored EHR API defines on their versioned objects, so a caller reads a record's history without building the requests by hand. Each family has four operations (`versioned_composition_*` and `versioned_ehr_status_*` in `ehr-validation.openapi.yaml`):
+The composition and EHR_STATUS leaves **MUST** expose the reads the vendored EHR API defines on their versioned objects, so a caller reads a record's history without building the requests by hand.
+Each family has four operations (`versioned_composition_*` and `versioned_ehr_status_*` in `ehr-validation.openapi.yaml`):
 
 | Read | Composition | EHR_STATUS |
 |---|---|---|
@@ -868,21 +1558,46 @@ The composition and EHR_STATUS leaves **MUST** expose the reads the vendored EHR
 | The latest version, or the version at a time | `…/versioned_composition/{versioned_object_uid}/version`, with an optional `version_at_time` | `…/versioned_ehr_status/version`, with an optional `version_at_time` |
 | One version by its id | `…/versioned_composition/{versioned_object_uid}/version/{version_uid}` | `…/versioned_ehr_status/version/{version_uid}` |
 
-An EHR has one EHR_STATUS, so its versioned object is addressed by the `ehr_id` alone. The demographic leaf offers the same reads for `VERSIONED_PARTY`; of this §'s rules only *The `version_at_time` value* and the empty-body sentence of *Responses* bind it, the latter because the demographic pin answers each of the four `versioned_party_*` reads `200` with a body or `404`, a version absent at the requested time included (`404_not_found_or_no_version_at_time` in `demographic-validation.openapi.yaml`).
-
-**Responses.** The versioned-object read **MUST** return the `VERSIONED_COMPOSITION` or `VERSIONED_EHR_STATUS`, and the revision-history read the `REVISION_HISTORY`, each decoded as its RM type. A version read **MUST** decode the `ORIGINAL_VERSION` envelope and return at least its `uid`, `preceding_version_uid`, `lifecycle_state`, `commit_audit` and `contribution`, and its `data` decoded as a `COMPOSITION` or an `EHR_STATUS`; a version that carries no `data`, the RM's logical deletion, returns no payload and no error, a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative) decided by [ADR 0032](../adr/0032-version-reads-accept-logical-deletion.md). The pin's version schemas (`UVersionOfComposition`, `UVersionOfEhrStatus`) also admit an `IMPORTED_VERSION`. v1 reads only `ORIGINAL_VERSION`: a body whose `_type` names anything else **MUST** fail as the typed decode failure of [REQ-151](transport.md#req-151--typed-2xx-decode-failure), never decode to an empty version. Refusing the `IMPORTED_VERSION` the pin admits is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative), decided by [ADR 0031](../adr/0031-version-reads-refuse-imported-version.md). An empty or `null` 2xx body on any of these reads **MUST** fail with `ErrInvalidShape`, since the pin defines no successful response without a body for any of them.
-
-**The contribution read.** The contribution leaf **MUST** also expose the read ITS-REST `contribution_get` defines, `GET /ehr/{ehr_id}/contribution/{contribution_uid}`, returning the persisted `CONTRIBUTION` decoded as the SDK's contribution type.
-
-**Version metadata.** Each read returns a `*VersionMetadata` filled from the response headers by [§ REQ-054](#req-054)'s version-identifier rule. The pin defines an `ETag` only on the version-at-time responses (`ETag_VERSION_of_COMPOSITION`, `ETag_VERSION`), and only `Content-Type` on the contribution read's `200_CONTRIBUTION` (`ETag` and `Location` belong to `201_CONTRIBUTION`), so the SDK **MUST NOT** require populated metadata on any other read.
-
-**Latest and at a time.** The latest-version read and the version-at-time read are separate calls on one path. The latest-version read **MUST NOT** send `version_at_time`. The version-at-time read **MUST** refuse a zero `time.Time` with `ErrInvalidConfig` before any request is issued: the zero time is Go's "not set", not an instant a caller means, and the latest-version read is the call for "now".
+An EHR has one EHR_STATUS, so its versioned object is addressed by the `ehr_id` alone.
+The demographic leaf offers the same reads for `VERSIONED_PARTY`; of this §'s rules only *The `version_at_time` value* and the empty-body sentence of *Responses* bind it, the latter because the demographic pin answers each of the four `versioned_party_*` reads `200` with a body or `404`, a version absent at the requested time included (`404_not_found_or_no_version_at_time` in `demographic-validation.openapi.yaml`).
 
 An empty path parameter is refused with `ErrInvalidConfig` before any request is issued, a malformed one by [REQ-150](transport.md#req-150--path-parameter-segment-validation), and a `404` is mapped as on every leaf, by [REQ-093](transport.md#req-093--openehr-error-envelope-mapping).
 
-**Representation.** v1 of these reads, the contribution read included, **MUST** request canonical JSON (`Accept: application/json`, the pin's `Accept_canonical`). Canonical XML and the simplified formats are out of scope here; the composition leaf's formats are [§ REQ-173](#req-173--composition-representation-formats)'s.
+#### Responses
 
-**The `version_at_time` value.** Every `version_at_time` the SDK sends, on any leaf, **MUST** be the instant in UTC, written in the RFC 3339 profile of ISO 8601 extended format with its fraction of a second: the fractional digits the `time.Time` carries, trailing zeros dropped, and no fraction for a whole second (Go's `time.RFC3339Nano` layout). That covers the composition read by a `Ref` that carries a time, the EHR_STATUS and directory reads at a time, the version-at-time reads of this §, and the `VERSIONED_PARTY` version-at-time read. The SDK **MUST NOT** truncate or round the fraction: two versions committed within one second are told apart only by it. RFC 3339 writes the years 0000 to 9999 only, so a time whose UTC year falls outside them has no such form, and every read that would send it **MUST** refuse it with `ErrInvalidConfig` before any request is issued. The pins declare the parameter as "A given time in the extended ISO 8601 format", with the example `2015-01-20T19:30:22.765+01:00` (`ehr-validation.openapi.yaml`, `demographic-validation.openapi.yaml`).
+The versioned-object read **MUST** return the `VERSIONED_COMPOSITION` or `VERSIONED_EHR_STATUS`, and the revision-history read the `REVISION_HISTORY`, each decoded as its RM type.
+A version read **MUST** decode the `ORIGINAL_VERSION` envelope and return at least its `uid`, `preceding_version_uid`, `lifecycle_state`, `commit_audit` and `contribution`, and its `data` decoded as a `COMPOSITION` or an `EHR_STATUS`; a version that carries no `data`, the RM's logical deletion, returns no payload and no error, a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative) decided by [ADR 0032](../adr/0032-version-reads-accept-logical-deletion.md).
+The pin's version schemas (`UVersionOfComposition`, `UVersionOfEhrStatus`) also admit an `IMPORTED_VERSION`. v1 reads only `ORIGINAL_VERSION`: a body whose `_type` names anything else **MUST** fail as the typed decode failure of [REQ-151](transport.md#req-151--typed-2xx-decode-failure), never decode to an empty version.
+Refusing the `IMPORTED_VERSION` the pin admits is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative), decided by [ADR 0031](../adr/0031-version-reads-refuse-imported-version.md).
+An empty or `null` 2xx body on any of these reads **MUST** fail with `ErrInvalidShape`, since the pin defines no successful response without a body for any of them.
+
+#### The contribution read
+
+The contribution leaf **MUST** also expose the read ITS-REST `contribution_get` defines, `GET /ehr/{ehr_id}/contribution/{contribution_uid}`, returning the persisted `CONTRIBUTION` decoded as the SDK's contribution type.
+
+#### Version metadata
+
+Each read returns a `*VersionMetadata` filled from the response headers by [§ REQ-054](#req-054)'s version-identifier rule.
+The pin defines an `ETag` only on the version-at-time responses (`ETag_VERSION_of_COMPOSITION`, `ETag_VERSION`), and only `Content-Type` on the contribution read's `200_CONTRIBUTION` (`ETag` and `Location` belong to `201_CONTRIBUTION`), so the SDK **MUST NOT** require populated metadata on any other read.
+
+#### Latest and at a time
+
+The latest-version read and the version-at-time read are separate calls on one path.
+The latest-version read **MUST NOT** send `version_at_time`.
+The version-at-time read **MUST** refuse a zero `time.Time` with `ErrInvalidConfig` before any request is issued: the zero time is Go's "not set", not an instant a caller means, and the latest-version read is the call for "now".
+
+#### Representation
+
+v1 of these reads, the contribution read included, **MUST** request canonical JSON (`Accept: application/json`, the pin's `Accept_canonical`).
+Canonical XML and the simplified formats are out of scope here; the composition leaf's formats are [§ REQ-173](#req-173--composition-representation-formats)'s.
+
+#### The `version_at_time` value
+
+Every `version_at_time` the SDK sends, on any leaf, **MUST** be the instant in UTC, written in the RFC 3339 profile of ISO 8601 extended format with its fraction of a second: the fractional digits the `time.Time` carries, trailing zeros dropped, and no fraction for a whole second (Go's `time.RFC3339Nano` layout).
+That covers the composition read by a `Ref` that carries a time, the EHR_STATUS and directory reads at a time, the version-at-time reads of this §, and the `VERSIONED_PARTY` version-at-time read.
+The SDK **MUST NOT** truncate or round the fraction: two versions committed within one second are told apart only by it.
+RFC 3339 writes the years 0000 to 9999 only, so a time whose UTC year falls outside them has no such form, and every read that would send it **MUST** refuse it with `ErrInvalidConfig` before any request is issued.
+The pins declare the parameter as "A given time in the extended ISO 8601 format", with the example `2015-01-20T19:30:22.765+01:00` (`ehr-validation.openapi.yaml`, `demographic-validation.openapi.yaml`).
 
 ### REQ-099 — ITS-REST Admin client surface
 
@@ -890,11 +1605,13 @@ An empty path parameter is refused with `ErrInvalidConfig` before any request is
 
 - `DeleteEHR(ctx, c, ehrID) error` — admin-mode delete on `DELETE /admin/ehr/{ehr_id}` (404 surfaces as `transport.ErrNotFound`).
 - `DeleteAllEHRs(ctx, c, ...) error` — wholesale reset on `DELETE /admin/ehr/all` (the literal `/all` segment of the pinned Admin API's `/admin/ehr/all{?ehr_id*}`), with the optional repeatable `ehr_id` subset query parameter; deployments **MAY** disable it (failures surface as the typed wire error).
-- `PurgeTemplates(ctx, c) error` — clear the template registry. This is **not** part of the ITS-REST Admin contract (which defines only `/admin/ehr/{ehr_id}` and `/admin/ehr/all`); it is an EHRbase-specific extension (`DELETE admin/template/all`, `deleteAllTemplates`), and its godoc says so rather than presenting it as ITS-REST-conformant.
+- `PurgeTemplates(ctx, c) error` — clear the template registry.
+  This is **not** part of the ITS-REST Admin contract (which defines only `/admin/ehr/{ehr_id}` and `/admin/ehr/all`); it is an EHRbase-specific extension (`DELETE admin/template/all`, `deleteAllTemplates`), and its godoc says so rather than presenting it as ITS-REST-conformant.
 
 The Admin API is upstream `x-status: DEVELOPMENT`; this client therefore ships as **Draft** and **MAY** change between minor versions.
 
-The package mirrors the `Repository` pattern of `openehr/client/ehr/*`, so it composes with the same dependency-injection seams ([idiom.md § API conventions](idiom.md#api-conventions)). The Cadasto admin extras (`cadasto/admin/`) are a different surface: they target distinct endpoint families, and the `cadasto/` cut line ([§ Boundary rules](module-layout.md#boundary-rules)) keeps the two apart.
+The package mirrors the `Repository` pattern of `openehr/client/ehr/*`, so it composes with the same dependency-injection seams ([idiom.md § API conventions](idiom.md#api-conventions)).
+The Cadasto admin extras (`cadasto/admin/`) are a different surface: they target distinct endpoint families, and the `cadasto/` cut line ([§ Boundary rules](module-layout.md#boundary-rules)) keeps the two apart.
 
 Out of scope at v1: bulk operations, async-job admin endpoints, ITS-REST capability negotiation (lives in `openehr/client/system`).
 
@@ -904,11 +1621,17 @@ Out of scope at v1: bulk operations, async-job admin endpoints, ITS-REST capabil
 
 ### REQ-130 — Contribution builder
 
-The contribution leaf **MUST** expose a builder that assembles a `Contribution_create` body, a `contribution.Submission`, from caller payloads without hand-wiring version wrappers, change-type codes, or write-side audit fields. It is named as SDK-provided by [scope.md § Synthetic data seeder](scope.md#synthetic-data-seeder). The builder introduces no wire shape of its own: what it emits is a `Submission` ([PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)), with the one exception § *Deletion* names.
+The contribution leaf **MUST** expose a builder that assembles a `Contribution_create` body, a `contribution.Submission`, from caller payloads without hand-wiring version wrappers, change-type codes, or write-side audit fields.
+It is named as SDK-provided by [scope.md § Synthetic data seeder](scope.md#synthetic-data-seeder).
+The builder introduces no wire shape of its own: what it emits is a `Submission` ([PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)), with the one exception § *Deletion* names.
 
-**Submission shapes.** The SDK **MUST NOT** send the persisted shape on either submission path: a contribution sends a `contribution.Submission`, distinct from `rm.Contribution`, and a composition or directory write sends the bare RM type ([§ Request vs response shape asymmetry](#request-vs-response-shape-asymmetry)).
+#### Submission shapes
 
-**Change types.** A version's `commit_audit.change_type` **MUST** carry the openEHR *audit change type* coded value for the operation the caller requested, `DV_CODED_TEXT`-shaped (nested `defining_code`, never the withdrawn flat `TERMINOLOGY_CODE`) with `terminology_id.value = "openehr"`:
+The SDK **MUST NOT** send the persisted shape on either submission path: a contribution sends a `contribution.Submission`, distinct from `rm.Contribution`, and a composition or directory write sends the bare RM type ([§ Request vs response shape asymmetry](#request-vs-response-shape-asymmetry)).
+
+#### Change types
+
+A version's `commit_audit.change_type` **MUST** carry the openEHR *audit change type* coded value for the operation the caller requested, `DV_CODED_TEXT`-shaped (nested `defining_code`, never the withdrawn flat `TERMINOLOGY_CODE`) with `terminology_id.value = "openehr"`:
 
 | Operation | `value` | `code_string` |
 |---|---|---|
@@ -917,35 +1640,78 @@ The contribution leaf **MUST** expose a builder that assembles a `Contribution_c
 | Modification | `modification` | `251` |
 | Deletion | `deleted` | `523` |
 
-The codes and rubrics are the pinned openEHR terminology's ([§ REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034)); this table maps the builder's four operations onto them — `523` is the deletion code; `253` is *unknown*, not *deleted*. The batch-level `audit.change_type` **MAY** be any member of the *audit change type* group: the builder **MUST** refuse a code outside the group and **MUST** render a member with the group's rubric. This bar holds at build time on whichever path set the change type — `WithChangeType`, or a wholesale `WithAudit` that supplies the entire audit envelope — so no entry point ships an `AUDIT_DETAILS.Change_type_valid`-violating audit; a caller who needs an off-spec audit hand-wires a `Submission`. The batch-level `audit.change_type` describes the contribution as a whole and **MUST** be caller-supplied: the builder **MUST NOT** derive it from the versions it holds. The vendored corpus ([`testkit/corpus/submissions/`](../../testkit/corpus/README.md)) settles that — a batch audit there records `creation` over an all-`modification` version list, and `modification` over an all-`creation` one, so no derivation rule is faithful to it.
+The codes and rubrics are the pinned openEHR terminology's ([§ REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034)); this table maps the builder's four operations onto them — `523` is the deletion code; `253` is *unknown*, not *deleted*.
+The batch-level `audit.change_type` **MAY** be any member of the *audit change type* group: the builder **MUST** refuse a code outside the group and **MUST** render a member with the group's rubric.
+This bar holds at build time on whichever path set the change type — `WithChangeType`, or a wholesale `WithAudit` that supplies the entire audit envelope — so no entry point ships an `AUDIT_DETAILS.Change_type_valid`-violating audit; a caller who needs an off-spec audit hand-wires a `Submission`.
+The batch-level `audit.change_type` describes the contribution as a whole and **MUST** be caller-supplied: the builder **MUST NOT** derive it from the versions it holds.
+The vendored corpus ([`testkit/corpus/submissions/`](../../testkit/corpus/README.md)) settles that — a batch audit there records `creation` over an all-`modification` version list, and `modification` over an all-`creation` one, so no derivation rule is faithful to it.
 
-**Preceding version.** An amendment, modification, or deletion **MUST** carry `preceding_version_uid`; a creation **MUST NOT** — the version it would follow does not exist yet. The builder **MUST** refuse a preceding-version-bearing operation whose uid is empty rather than emitting a version the server cannot resolve.
+#### Preceding version
 
-**Lifecycle state.** Each built version **MUST** carry its `lifecycle_state` in the **version body**, and a builder-assembled batch **MUST NOT** convey that state as the `openehr-version` request header — not as a substitute for the body value and not alongside it, since one header value cannot describe several versions. Informative rationale: `lifecycle_state` is a required member of the pin's `UpdateVersion` DTO, and the header ([REQ-059](#req-059)) is per-*request*, so it cannot express a distinct state for each version of a batch that commits several. The emitted state **MUST** be a `DV_CODED_TEXT` from the openEHR *version lifecycle state* group — any member of the group ([§ REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034)); the SDK names `complete` (`532`), `incomplete` (`553`), `deleted` (`523`), `inactive` (`800`) and `abandoned` (`801`) — defaulting to `complete` and overridable per version. The one exception is a deletion, whose default is `deleted` (`523`) as § *Deletion* below says; for a creation, amendment or modification the default **MUST NOT** be derived from the change type. Informative: the vendored corpus records 12 versions with change type `523` (counting the two nested in a CONTRIBUTION payload), six with a `deleted` lifecycle state and six with `complete`, so it shows no single lifecycle state for a deletion.
+An amendment, modification, or deletion **MUST** carry `preceding_version_uid`; a creation **MUST NOT** — the version it would follow does not exist yet.
+The builder **MUST** refuse a preceding-version-bearing operation whose uid is empty rather than emitting a version the server cannot resolve.
 
-**Deletion.** The builder **MUST** build a deletion given no payload, and **MUST** then emit it as a version with no `data` member at all, not `"data":null`. Given a payload, it **MUST** emit that payload inline under `data`. A deletion's `commit_audit.change_type` is `deleted` (`523`), and its `lifecycle_state` **MUST** default to `deleted` (`523`) with or without a payload; a per-version override replaces it. A creation, amendment or modification given no payload **MUST** be refused at `Build`. `Submission.Validate` **MUST** accept a version with no `data`, and the marshalled version **MUST** decode into an `rm.OriginalVersion` whose `data` is nil. A deletion built without a payload is the one version that carries no payload inline: it is the exception to the inline-`data` shape of [PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create), and the departure from the pinned schema that [REQ-050](#the-openapi-files-are-authoritative) keys to [ADR 0024](../adr/0024-contribution-deletion-without-data.md). *Informative:* the Reference Model defines a logical deletion as a new `ORIGINAL_VERSION` whose `data` is Void, with change type and lifecycle state `deleted` (RM Common, *Contributions* and *Logical Deletion*). It declares `ORIGINAL_VERSION.data` optional, as does the vendored BMM, while the pin's `UpdateVersion` lists `data` as required ([SPECPR-489](https://openehr.atlassian.net/browse/SPECPR-489) asks the pin's authors to make it optional), so a deletion built without a payload is outside the pinned schema. A caller whose server enforces the schema passes the payload.
+#### Lifecycle state
 
-**Audit.** The batch `audit` and every version's `commit_audit` are the write-side commit-audit DTO, which **MUST NOT** carry the server-assigned `time_committed` (§ [Request vs response shape asymmetry](#request-vs-response-shape-asymmetry)). The pin marks `change_type` and `committer` **required** on both. The builder **MUST** refuse at build time when either is missing, rather than emitting an audit the pin rejects, and **MUST** apply the batch committer, system id, and audit `_type` to every version whose own audit does not override them — one declaration, not one per version.
+Each built version **MUST** carry its `lifecycle_state` in the **version body**, and a builder-assembled batch **MUST NOT** convey that state as the `openehr-version` request header — not as a substitute for the body value and not alongside it, since one header value cannot describe several versions.
+Informative rationale: `lifecycle_state` is a required member of the pin's `UpdateVersion` DTO, and the header ([REQ-059](#req-059)) is per-*request*, so it cannot express a distinct state for each version of a batch that commits several.
+The emitted state **MUST** be a `DV_CODED_TEXT` from the openEHR *version lifecycle state* group — any member of the group ([§ REQ-034](reference-model.md#openehr-terminology-vocabulary-req-034)); the SDK names `complete` (`532`), `incomplete` (`553`), `deleted` (`523`), `inactive` (`800`) and `abandoned` (`801`) — defaulting to `complete` and overridable per version.
+The one exception is a deletion, whose default is `deleted` (`523`) as § *Deletion* below says; for a creation, amendment or modification the default **MUST NOT** be derived from the change type.
+Informative: the vendored corpus records 12 versions with change type `523` (counting the two nested in a CONTRIBUTION payload), six with a `deleted` lifecycle state and six with `complete`, so it shows no single lifecycle state for a deletion.
 
-**Server-assigned fields.** The pin's `UpdateVersion` declares neither `contribution` nor `uid`; the server assigns both at commit. A write-side version body **MUST** omit each of them when the caller supplied neither, rather than emitting `"contribution":null` or an empty `uid` object — a field the request schema does not declare, sent with no value, is a body a strict server may refuse and no record in the vendored corpus carries. A caller-supplied `uid`, by contrast, **MUST** be emitted verbatim — the omission rule reaches only the value the caller never set.
+#### Deletion
 
-**Builder contract.**
+The builder **MUST** build a deletion given no payload, and **MUST** then emit it as a version with no `data` member at all, not `"data":null`.
+Given a payload, it **MUST** emit that payload inline under `data`.
+A deletion's `commit_audit.change_type` is `deleted` (`523`), and its `lifecycle_state` **MUST** default to `deleted` (`523`) with or without a payload; a per-version override replaces it.
+A creation, amendment or modification given no payload **MUST** be refused at `Build`.
+`Submission.Validate` **MUST** accept a version with no `data`, and the marshalled version **MUST** decode into an `rm.OriginalVersion` whose `data` is nil.
+A deletion built without a payload is the one version that carries no payload inline: it is the exception to the inline-`data` shape of [PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create), and the departure from the pinned schema that [REQ-050](#the-openapi-files-are-authoritative) keys to [ADR 0024](../adr/0024-contribution-deletion-without-data.md).
+*Informative:* the Reference Model defines a logical deletion as a new `ORIGINAL_VERSION` whose `data` is Void, with change type and lifecycle state `deleted` (RM Common, *Contributions* and *Logical Deletion*).
+It declares `ORIGINAL_VERSION.data` optional, as does the vendored BMM, while the pin's `UpdateVersion` lists `data` as required ([SPECPR-489](https://openehr.atlassian.net/browse/SPECPR-489) asks the pin's authors to make it optional), so a deletion built without a payload is outside the pinned schema.
+A caller whose server enforces the schema passes the payload.
 
-- `Build` **MUST** return a `*Submission` that passes `Validate`, or a typed error and no submission — never a partially populated one. It does not panic on any caller input ([REQ-025](idiom.md#errors-req-025)).
+#### Audit
+
+The batch `audit` and every version's `commit_audit` are the write-side commit-audit DTO, which **MUST NOT** carry the server-assigned `time_committed` (§ [Request vs response shape asymmetry](#request-vs-response-shape-asymmetry)).
+The pin marks `change_type` and `committer` **required** on both.
+The builder **MUST** refuse at build time when either is missing, rather than emitting an audit the pin rejects, and **MUST** apply the batch committer, system id, and audit `_type` to every version whose own audit does not override them — one declaration, not one per version.
+
+#### Server-assigned fields
+
+The pin's `UpdateVersion` declares neither `contribution` nor `uid`; the server assigns both at commit.
+A write-side version body **MUST** omit each of them when the caller supplied neither, rather than emitting `"contribution":null` or an empty `uid` object — a field the request schema does not declare, sent with no value, is a body a strict server may refuse and no record in the vendored corpus carries.
+A caller-supplied `uid`, by contrast, **MUST** be emitted verbatim — the omission rule reaches only the value the caller never set.
+
+#### Builder contract
+
+- `Build` **MUST** return a `*Submission` that passes `Validate`, or a typed error and no submission — never a partially populated one.
+  It does not panic on any caller input ([REQ-025](idiom.md#errors-req-025)).
 - `Build` **MUST** be idempotent, and the submission it returns **MUST** be independent of the builder: mutating the builder afterwards **MUST NOT** change an already-built submission.
 - An accumulation error (an unsupported operation, a missing preceding uid) **MUST** be reported at `Build`, not swallowed and not panicked at the call that made it — a fluent chain has nowhere to return an error.
 - The builder **MUST** accept only the four versionable types the submission shape admits: `COMPOSITION`, `EHR_STATUS`, `FOLDER` and `EHR_ACCESS`.
 - A builder holding no versions **MUST** fail at `Build`: the pin requires a non-empty `versions` array.
 
-**Decoding a submission.** A caller who receives a contribution as one document, authored elsewhere, commits it as the batch it describes. `contribution.UnmarshalSubmission(data, opts...)` **MUST** decode a canonical-JSON `Contribution_create` body into a `*Submission`, the dual of `Submission.MarshalJSON`:
+#### Decoding a submission
+
+A caller who receives a contribution as one document, authored elsewhere, commits it as the batch it describes.
+`contribution.UnmarshalSubmission(data, opts...)` **MUST** decode a canonical-JSON `Contribution_create` body into a `*Submission`, the dual of `Submission.MarshalJSON`:
 
 - The batch `audit` and each version's `commit_audit` **MUST** decode as the write-side commit audit from a `_type` of `AUDIT_DETAILS` or `UPDATE_AUDIT`, or from an omitted `_type`, the three forms the pin asks a server to accept, and keep the audit type they were read with, so an omitted one encodes back as the default.
-- Each `versions[]` element **MUST** decode as the `ORIGINAL_VERSION` or `IMPORTED_VERSION` wrapper its `_type` names, its payload type chosen by the `_type` of its `data` (of `item.data` for an `IMPORTED_VERSION`) among the four of § *Builder contract*; an element with no `_type` **MAY** be read as an `ORIGINAL_VERSION`. An element with no `data`, the deletion § *Deletion* builds, decodes with no payload.
-- The decoded submission **MUST** pass `Validate`, or the decode fails with its error. For a body in which `canjson.WithMissing` finds no missing member, its `MarshalJSON` encoding **MUST** be wire-equivalent ([conformance.md § Terms](conformance.md#terms)) to the body's expected form ([§ REQ-052](#req-052)), with the payload of an `IMPORTED_VERSION`'s `item` as the body writes it, less what a `Submission` has no place for: the `time_committed` of the batch `audit` and of each `commit_audit` (an imported item's own audit keeps its), their empty or null `system_id` and a `versions[]` element's `uid` whose `value` is empty, which the write-side shape leaves out, and a top-level member beside `audit` and `versions`. A body that lacks a mandatory member the decoded submission still accepts re-encodes as § REQ-052 *An absent mandatory member* says, not as the body wrote it.
-- A body the decoder cannot place **MUST** fail as a `*canjson.DecodeError` ([§ REQ-052](#req-052)) whose path is the JSON Pointer of the offending member: a body that is not a JSON object, an absent or empty `versions`, a version `_type` other than the two, an audit `_type` other than the three (an empty `_type` on either reads as an omitted one), an `IMPORTED_VERSION` whose `item` is absent, null or not an object, and a `data` whose `_type` is absent or empty or names a type outside the four. The absent `item` is the one missing member this decoder refuses, an exception to [§ REQ-175](#req-175--missing-members-on-decode): the wrapper holds the item by value and would write one the body never held.
-- The `canjson` decode options `opts` **SHOULD** govern the audits and versions the decoder reads, an `ORIGINAL_VERSION`'s payload included, with pointers from the root of the body ([§ REQ-170](#req-170--unmatched-content-on-decode), [§ REQ-175](#req-175--missing-members-on-decode)). They do not reach the payload of an `IMPORTED_VERSION`'s `item`, which the wrapper holds as the JSON text the body carries. A member the write-side shape leaves out by design is not missing: an audit's `time_committed` (§ *Audit*) and its `system_id`, which the pin's audit leaves optional, and a `versions[]` element's own `uid` and `contribution` (§ *Server-assigned fields*); an imported item's `uid` and `contribution` are its own, and are reported missing.
+- Each `versions[]` element **MUST** decode as the `ORIGINAL_VERSION` or `IMPORTED_VERSION` wrapper its `_type` names, its payload type chosen by the `_type` of its `data` (of `item.data` for an `IMPORTED_VERSION`) among the four of § *Builder contract*; an element with no `_type` **MAY** be read as an `ORIGINAL_VERSION`.
+  An element with no `data`, the deletion § *Deletion* builds, decodes with no payload.
+- The decoded submission **MUST** pass `Validate`, or the decode fails with its error.
+  For a body in which `canjson.WithMissing` finds no missing member, its `MarshalJSON` encoding **MUST** be wire-equivalent ([conformance.md § Terms](conformance.md#terms)) to the body's expected form ([§ REQ-052](#req-052)), with the payload of an `IMPORTED_VERSION`'s `item` as the body writes it, less what a `Submission` has no place for: the `time_committed` of the batch `audit` and of each `commit_audit` (an imported item's own audit keeps its), their empty or null `system_id` and a `versions[]` element's `uid` whose `value` is empty, which the write-side shape leaves out, and a top-level member beside `audit` and `versions`.
+  A body that lacks a mandatory member the decoded submission still accepts re-encodes as § REQ-052 *An absent mandatory member* says, not as the body wrote it.
+- A body the decoder cannot place **MUST** fail as a `*canjson.DecodeError` ([§ REQ-052](#req-052)) whose path is the JSON Pointer of the offending member: a body that is not a JSON object, an absent or empty `versions`, a version `_type` other than the two, an audit `_type` other than the three (an empty `_type` on either reads as an omitted one), an `IMPORTED_VERSION` whose `item` is absent, null or not an object, and a `data` whose `_type` is absent or empty or names a type outside the four.
+  The absent `item` is the one missing member this decoder refuses, an exception to [§ REQ-175](#req-175--missing-members-on-decode): the wrapper holds the item by value and would write one the body never held.
+- The `canjson` decode options `opts` **SHOULD** govern the audits and versions the decoder reads, an `ORIGINAL_VERSION`'s payload included, with pointers from the root of the body ([§ REQ-170](#req-170--unmatched-content-on-decode), [§ REQ-175](#req-175--missing-members-on-decode)).
+  They do not reach the payload of an `IMPORTED_VERSION`'s `item`, which the wrapper holds as the JSON text the body carries.
+  A member the write-side shape leaves out by design is not missing: an audit's `time_committed` (§ *Audit*) and its `system_id`, which the pin's audit leaves optional, and a `versions[]` element's own `uid` and `contribution` (§ *Server-assigned fields*); an imported item's `uid` and `contribution` are its own, and are reported missing.
 
-**Out of scope for v1:** `IMPORTED_VERSION` authoring beyond the landed pass-through wrapper, multi-EHR batching, checkpoint/resume — the seeder's responsibility per [scope.md](scope.md#synthetic-data-seeder) — and decoding a canonical-XML submission.
+#### Out of scope for v1
+
+`IMPORTED_VERSION` authoring beyond the landed pass-through wrapper, multi-EHR batching, checkpoint/resume — the seeder's responsibility per [scope.md](scope.md#synthetic-data-seeder) — and decoding a canonical-XML submission.
 
 ## Transport cross-cutting concerns
 
