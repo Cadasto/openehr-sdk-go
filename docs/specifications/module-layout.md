@@ -176,7 +176,8 @@ Each building block in the table below **MUST** be importable and useful without
 The table is the one home of each block's own import rule beside that closure rule.
 A closure rule holds for the block and every package of this module it imports, directly or indirectly.
 An own-files rule holds for the block's own non-test files, whatever their build tags, except a file marked `//go:build ignore`.
-The template-side blocks and the AQL blocks keep `openehr/serialize/` out of their own files rather than their closure, because the generated marshal code of `openehr/rm` and `openehr/aom/aom14` imports `openehr/serialize/canxml`, so the closure of every block that uses either reaches it; a caller that wants wire bytes imports a codec itself.
+The template-side blocks and the AQL blocks keep `openehr/serialize/` out of their own files rather than their closure, because the generated marshal code of `openehr/rm` and `openehr/aom/aom14` imports `openehr/serialize/canxml`, so the closure of every block that uses either reaches it.
+A caller that wants wire bytes imports a codec itself.
 
 | Building block | Its own import rule |
 |---|---|

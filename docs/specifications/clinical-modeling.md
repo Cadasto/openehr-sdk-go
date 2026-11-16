@@ -191,8 +191,7 @@ Each leaves wide room above real templates, schemas and records while still boun
 
 ### Polymorphic JSON decode (`openehr/rm/typereg/`)
 
-- An RM value that opens deeper than the decode depth limit below the document root **MUST** be refused with `typereg.ErrMaxDepthExceeded` on every canonical-JSON decode route, `Registry.Decode`, `canjson.Unmarshal`, `canjson.Decoder`, and a bare `encoding/json/v2` or v1 `encoding/json` caller of the generated methods.
-  On the two routes that buffer a value, `Registry.Decode` for its document and a polymorphic slot for its value, so is any bracket of that value deeper than the limit.
+- An RM value that opens deeper than the decode depth limit below the document root **MUST** be refused with `typereg.ErrMaxDepthExceeded` on every canonical-JSON decode route, `Registry.Decode`, `canjson.Unmarshal`, `canjson.Decoder`, and a bare `encoding/json/v2` or v1 `encoding/json` caller of the generated methods; on the two routes that buffer a value, `Registry.Decode` for its document and a polymorphic slot for its value, so is any bracket of that value deeper than the limit.
   Nesting below which no RM value opens, inside a declared array, an `any` or map member, or an undeclared member, counts toward the limit only on those two routes; outside a buffered value, `jsontext`'s own limit of about 10 000 levels bounds it.
   See [ADR 0002](../adr/0002-bmm-codegen-decisions.md) and REQ-040.
 

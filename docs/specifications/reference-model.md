@@ -593,7 +593,8 @@ The generator's named-class exclusion list deliberately restates several primiti
 
 An out-of-universe name that no absence entry backs, the empty string included, **MUST** report *undeclared*: *undeclared* is computed from the table's silence, never stored.
 The generated table is produced by the run that generates the universe and never names a universe member.
-It accounts for every name the RM generation target's pinned schemas declare (`class_definitions` and `primitive_types`) that the universe omits, with a reason that is neither *undeclared* nor *none*; a declared name no rule accounts for fails generation rather than being emitted, which keeps a future widening of a package skip from silently reclassifying a real openEHR class as undeclared.
+It accounts for every name the RM generation target's pinned schemas declare (`class_definitions` and `primitive_types`) that the universe omits, with a reason that is neither *undeclared* nor *none*.
+A declared name no rule accounts for fails generation rather than being emitted, which keeps a future widening of a package skip from silently reclassifying a real openEHR class as undeclared.
 
 The reason set is **closed and exhaustive-switchable**.
 Adding a member is an additive change to the public surface: which bump it warrants is [module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)'s question, not this taxonomy's, and what a caller does with a member it does not recognise is the caller's (§ Out of scope below).
