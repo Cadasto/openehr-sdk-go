@@ -156,6 +156,10 @@ Its rule is now [reference-model.md § REQ-120](reference-model.md#req-120--rm-i
 
 The contribution read moved to [wire.md § REQ-174](wire.md#req-174--versioned-object-reads) *The contribution read*.
 
+## REQ-143 — Template list filters
+
+The list filters are a template operation: they moved to [wire.md § REQ-177](wire.md#req-177--template-representations) *[List filters](wire.md#list-filters)*.
+
 ## REQ-162 — Builder containment verification
 
 Its rules moved to [aql.md § REQ-161 § Builder adapter](aql.md#builder-adapter).

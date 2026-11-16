@@ -2221,12 +2221,10 @@ requirements:
     implementation: retired
 
   - id: REQ-143
-    title: Template list filters
-    canonical: docs/specifications/wire.md#req-143--template-list-filters
-    status: draft
-    implementation: landed
-    packages: [openehr/client/definition]
-    probes: [PROBE-093]
+    title: Template list filters (retired)
+    canonical: docs/specifications/retired-requirements.md#req-143--template-list-filters
+    status: deprecated
+    implementation: retired
 
   - id: REQ-144
     title: Definition metadata decoding
@@ -2764,7 +2762,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/definition]
-    probes: [PROBE-067, PROBE-112]
+    probes: [PROBE-067, PROBE-093, PROBE-112]
     tests:
       - openehr/client/definition/body_read_error_test.go
       - openehr/client/definition/path_encoding_test.go

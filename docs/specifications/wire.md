@@ -1361,10 +1361,6 @@ Out of scope: decoding the Web Template into a `webtemplate.WebTemplate`; the `a
 A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` before any request is issued.
 The `format` argument selects the list path; `FormatADL14` is the only registered `TemplateFormat` value.
 
-#### Empty list bodies
-
-`ListTemplates` and `ListStoredQueries` **MUST** return a **non-nil** zero-length slice and a nil error when a 2xx response body is empty, as [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) defines it, so a caller who re-serialises the result writes `[]`, not `null`.
-
 #### Template upload negotiation and response
 
 `UploadTemplate` **MUST** send `Accept: application/json, application/xml`.
@@ -1373,10 +1369,6 @@ Requesting both is a client-contract interoperability choice, not a pin departur
 The decoded `*TemplateMetadata` **MUST** be taken from a JSON **object** body when one is present, and otherwise — an empty, `null`, or XML body — from the trailing segment of the `Location` header; a leading UTF-8 BOM is stripped before that classification, and a non-object JSON body is a typed decode error.
 A response that carries neither a JSON `template_id` nor a `Location` header cannot name the template and **MUST** surface as a typed error (`transport.ErrInvalidShape`), never a metadata record with an empty id.
 Requesting both keeps the SDK working with a server that serves the ADL 1.4 template surface only as XML, which answers `406 Not Acceptable` to an `application/json`-only `Accept` without breaking ITS-REST.
-
-### REQ-143 — Template list filters
-
-Folded into [§ REQ-177](#req-177--template-representations) *List filters*.
 
 ### REQ-144 — Definition metadata decoding
 
@@ -1440,6 +1432,10 @@ Collision **MUST** be decided by **exact**, case-sensitive comparison against th
 A wire key differing from a documented name only by case is therefore not a collision: `encoding/json` matches field names case-insensitively on decode, so such a key populates the documented field **and** is preserved in `Extras`, and encode emits both.
 Decode cannot create an exact-name collision, since a documented name is routed to its field and never into `Extras`, so that case is caller-constructed.
 Round-trip identity of the key set is **not** promised in either direction: documented fields are emitted per their own JSON contract (a field whose contract omits it when empty or zero emits no key at all), and key order is not part of the contract.
+
+#### Empty list bodies
+
+`ListTemplates` and `ListStoredQueries` **MUST** return a **non-nil** zero-length slice and a nil error when a 2xx response body is empty, as [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) defines it, so a caller who re-serialises the result writes `[]`, not `null`.
 
 #### Out of scope
 

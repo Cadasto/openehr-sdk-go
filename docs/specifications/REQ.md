@@ -114,7 +114,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-130 | Contribution builder | [wire.md](wire.md#req-130--contribution-builder) | draft | landed |
 | REQ-140 | Underscore-prefixed RM attributes (simplified formats) | [wire.md](wire.md#req-140--underscore-prefixed-rm-attributes) | draft | landed |
 | REQ-142 | Contribution read (retired) | [retired-requirements.md](retired-requirements.md#req-142--contribution-read) | deprecated | retired |
-| REQ-143 | Template list filters | [wire.md](wire.md#req-143--template-list-filters) | draft | landed |
+| REQ-143 | Template list filters (retired) | [retired-requirements.md](retired-requirements.md#req-143--template-list-filters) | deprecated | retired |
 | REQ-144 | Definition metadata decoding | [wire.md](wire.md#req-144--definition-metadata-decoding) | draft | landed |
 | REQ-150 | Path-parameter segment validation | [transport.md](transport.md#req-150--path-parameter-segment-validation) | draft | landed |
 | REQ-151 | Typed 2xx decode failure | [transport.md](transport.md#req-151--typed-2xx-decode-failure) | draft | landed |
