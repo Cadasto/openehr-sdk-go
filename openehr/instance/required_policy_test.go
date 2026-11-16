@@ -92,11 +92,14 @@ type policyLevel struct {
 // Required holds fewer JSON values than Medium, and Medium no more than
 // Large. Large builds a member of every optional archetype the template
 // names and of every use of one; Medium builds one member of each optional
-// archetype under an attribute, so it builds what Large builds on
-// vital_signs and social, which use no archetype twice under one
-// attribute, and less on Corona_Anamnese, whose content uses
-// SECTION.adhoc.v1 four times; Required builds no optional archetype, only
-// the composition's own and its context. No policy builds a slot fill in
+// archetype under an attribute, and of a later use of one only where it
+// holds other archetypes, so it builds what Large builds on vital_signs and
+// social, which use no archetype twice under one attribute, and every
+// archetype but fewer members on Corona_Anamnese, whose four uses of
+// SECTION.adhoc.v1 each hold other entries while the uses of
+// symptom_sign_screening and exposure_assessment under one section add
+// none; Required builds no optional archetype, only the composition's own
+// and its context. No policy builds a slot fill in
 // vital_signs: the slots sit in the items of an OBSERVATION's protocol or
 // an event's state, which the template leaves optional, so no policy
 // writes them (What a visit writes). Each tree passes the template
@@ -184,13 +187,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 					"openEHR-EHR-OBSERVATION.travel_history.v0":         1,
 					"openEHR-EHR-SECTION.adhoc.v1":                      4,
 				}},
-				instance.Medium: {values: 314, archetypes: map[string]int{
-					report: 1,
-					"openEHR-EHR-OBSERVATION.body_temperature.v2":       1,
-					"openEHR-EHR-OBSERVATION.story.v1":                  1,
-					"openEHR-EHR-OBSERVATION.symptom_sign_screening.v0": 1,
-					"openEHR-EHR-SECTION.adhoc.v1":                      1,
-				}},
+				instance.Medium:   {values: 1441, archetypes: coronaMedium},
 				instance.Required: {values: 53, archetypes: map[string]int{report: 1}},
 			},
 		},
@@ -235,12 +232,39 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 	}
 }
 
+// coronaMedium counts the archetype ids of the composition Medium builds
+// on Corona_Anamnese: every archetype Large builds, one member of each,
+// except four of SECTION.adhoc.v1, one per use, and two of
+// symptom_sign_screening, one in each of the two sections that hold it.
+var coronaMedium = map[string]int{
+	"openEHR-EHR-COMPOSITION.report.v1":                 1,
+	"openEHR-EHR-CLUSTER.address_cc.v0":                 1,
+	"openEHR-EHR-CLUSTER.dwelling.v0":                   1,
+	"openEHR-EHR-CLUSTER.location.v1":                   1,
+	"openEHR-EHR-CLUSTER.occupation_record.v1":          1,
+	"openEHR-EHR-CLUSTER.organisation_cc.v0":            1,
+	"openEHR-EHR-CLUSTER.problem_qualifier.v1":          1,
+	"openEHR-EHR-EVALUATION.health_risk.v1":             1,
+	"openEHR-EHR-EVALUATION.living_arrangement.v0":      1,
+	"openEHR-EHR-EVALUATION.occupation_summary.v1":      1,
+	"openEHR-EHR-EVALUATION.problem_diagnosis.v1":       1,
+	"openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1": 1,
+	"openEHR-EHR-INSTRUCTION.service_request.v1":        1,
+	"openEHR-EHR-OBSERVATION.body_temperature.v2":       1,
+	"openEHR-EHR-OBSERVATION.exposure_assessment.v0":    1,
+	"openEHR-EHR-OBSERVATION.medication_use.v0":         1,
+	"openEHR-EHR-OBSERVATION.story.v1":                  1,
+	"openEHR-EHR-OBSERVATION.symptom_sign_screening.v0": 2,
+	"openEHR-EHR-OBSERVATION.travel_event.v0":           1,
+	"openEHR-EHR-OBSERVATION.travel_history.v0":         1,
+	"openEHR-EHR-SECTION.adhoc.v1":                      4,
+}
+
 // TestREQ107_ZeroPolicyBuildsMedium is the REQ-107 check of Levels and
 // names on Corona_Anamnese, where each policy builds a tree of its own:
 // Options with no Policy builds the medium level, the tree Medium builds
-// in TestREQ107_PoliciesBuildTheirLevels, with 314 JSON values and,
-// besides the composition's own archetype, one member each of the story,
-// the first SECTION.adhoc.v1 and the two archetypes that section holds.
+// in TestREQ107_PoliciesBuildTheirLevels, with 1441 JSON values and the
+// archetypes coronaMedium counts.
 func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
 	c := compileCoronaAnamnese(t)
 	comp := generateComposition(t, c, instance.Options{
@@ -249,20 +273,13 @@ func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
 		Now:       defaultsNow,
 	})
 	tree := decodedJSON(t, comp)
-	if got, want := jsonValueCount(tree), 314; got != want {
+	if got, want := jsonValueCount(tree), 1441; got != want {
 		t.Errorf("Generate(Corona_Anamnese) with no Policy holds %d JSON values, want Medium's %d", got, want)
 	}
 	got := make(map[string]int)
 	archetypeIDCounts(tree, got)
-	want := map[string]int{
-		"openEHR-EHR-COMPOSITION.report.v1":                 1,
-		"openEHR-EHR-OBSERVATION.body_temperature.v2":       1,
-		"openEHR-EHR-OBSERVATION.story.v1":                  1,
-		"openEHR-EHR-OBSERVATION.symptom_sign_screening.v0": 1,
-		"openEHR-EHR-SECTION.adhoc.v1":                      1,
-	}
-	if !maps.Equal(got, want) {
-		t.Errorf("Generate(Corona_Anamnese) with no Policy archetype ids = %v, want Medium's %v", got, want)
+	if !maps.Equal(got, coronaMedium) {
+		t.Errorf("Generate(Corona_Anamnese) with no Policy archetype ids = %v, want Medium's %v", got, coronaMedium)
 	}
 }
 

@@ -31,18 +31,20 @@ type Policy int
 
 const (
 	// Medium builds a member of each optional archetype under an
-	// attribute, but not of each use of one, what the ITS-REST template
-	// example calls detail_level=medium. It visits the required
+	// attribute, and of a further use of one only where that use holds
+	// another archetype, what the ITS-REST template example calls
+	// detail_level=medium. It visits the required
 	// attributes, and those with an allowed OPT child: an attribute the
 	// BMM marks mandatory, one whose existence or cardinality lower bound
 	// is bounded and at least 1, and one with an OPT child whose
 	// occurrences upper bound is not 0. A visited multi-valued attribute
 	// gets its members as under Large, except that an optional child
 	// whose identity a required sibling, or an earlier optional one that
-	// gets a member of its own, carries gets none of its own. A child's
-	// identity is its archetype id when it is an archetype root, and its
-	// node id otherwise. Medium is the zero value, so Options with no
-	// Policy builds it.
+	// gets a member of its own, carries gets none of its own, unless it
+	// holds an archetype, as a root itself or below it, that none of those
+	// siblings holds. A child's identity is its archetype id when it is an
+	// archetype root, and its node id otherwise. Medium is the zero value,
+	// so Options with no Policy builds it.
 	Medium Policy = iota
 	// Required builds only the data points the template makes mandatory
 	// and a composition's context, what the ITS-REST template example

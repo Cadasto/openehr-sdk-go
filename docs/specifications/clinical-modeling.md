@@ -848,7 +848,7 @@ So `Required` leaves out an optional list that only its cardinality asks a membe
 The three follow the levels of the ITS-REST template example's `detail_level` ([`definition-validation.openapi.yaml`](../../resources/its-rest/definition-validation.openapi.yaml)):
 
 - `Required` builds its `required` level, the data points the template makes mandatory and a composition's `context`;
-- `Medium` its `medium` level, with a member of each optional archetype under an attribute, but not of each use of one (*Sibling identity*);
+- `Medium` its `medium` level, with a member of each optional archetype under an attribute, and of a further use of one only where that use holds another archetype (*Sibling identity*);
 - `Large` a member of every optional archetype the template names that needs no undescribed content (§ [Slot fills](#slot-fills)), and of every use of one, named or not, short of the `complete` level (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *The `Complete` level*).
 
 An attribute the BMM marks mandatory that a compiled node does not carry, as under `templatecompile.WithoutImplicitAttributes`, is visited as if the node carried it with no OPT child.
@@ -877,9 +877,13 @@ A visited multi-valued attribute gets, in OPT order, these members of each allow
 It gets no more members in all than its `cardinality.upper` when that is bounded.
 Within that bound the room goes first to the members asked for by the children whose occurrences lower bound is bounded and at least 1, which fit wherever § [Errors](#errors) does not refuse the list: any other child, before or after them, gets only the room they leave, and the members still stand in OPT order.
 So `CLUSTER.items` at cardinality `0..1` over an optional `at0001` and a required `at0002` holds the `at0002` member alone.
-Under `Medium`, an optional child (occurrences lower bound 0) whose identity (*Sibling identity*) a required sibling, before or after it, or an earlier optional sibling that gets a member of its own carries gets no member of its own; the top-up below can still build one.
-An optional sibling that gets no member of its own, such as one that needs undescribed content, carries no identity for this rule.
-Under `Large`, such a child gets its members as any other optional child does, so a `Large` root holds a member of every sibling of one identity that needs no undescribed content, whether the OPT pins a name on it or not, within the cardinality bound above.
+Under `Medium`, an optional child (occurrences lower bound 0) gets no member of its own where both hold, though the top-up below can still build one:
+
+- a sibling that gets a member of its own carries its identity (*Sibling identity*): a required sibling, before or after it, or an earlier optional sibling that gets one;
+- every archetype it holds (*Sibling identity*) is one such a sibling holds.
+
+An optional sibling that gets no member of its own, such as one that needs undescribed content, carries no identity and holds no archetype for this rule.
+Under `Large`, an optional child whose identity a sibling carries gets its members as any other optional child does, so a `Large` root holds a member of every sibling of one identity that needs no undescribed content, whether the OPT pins a name on it or not, within the cardinality bound above.
 The validator binds those members by room and by trial ([§ REQ-102](#req-102--composition-validation) *Structural — binding items*), each to the sibling whose constraints built it wherever that sibling comes first among those with room (§ *Exceptions and known gaps*).
 An optional multi-valued attribute with no allowed OPT child gets no member, so nothing archetype-rooted appears without its `archetype_details`.
 
@@ -887,8 +891,15 @@ An optional multi-valued attribute with no allowed OPT child gets no member, so 
 
 A child's identity is its archetype id when it is an archetype root and its `node_id` otherwise, and a child with neither has no identity and is never skipped.
 A sibling other than a slot carries an identity when it is that sibling's archetype id or `node_id`, as [§ REQ-102](#req-102--composition-validation) *Structural — binding items* binds a LOCATABLE member.
-So under `Medium` an optional child that is not an archetype root gets no member when an archetype root before it has its `node_id`, while optional archetype roots of different archetypes under one attribute each get their members under `Medium` and `Large` alike.
-Only `Large` gives a member to every use of one archetype (*Members of a list*).
+A child holds the archetype it is a root of, and that of each root in its template subtree that `Large` and `Medium` build, which a search reaches:
+
+- through the allowed children of each attribute but those no policy visits (*Attributes no policy visits*);
+- through only the child a single-valued attribute binds its value to (*Single-valued attributes*);
+- through no slot, and no optional child that needs undescribed content (§ [Slot fills](#slot-fills)).
+
+So under `Medium` an optional child that is not an archetype root gets no member when an archetype root before it that gets one has its `node_id`, unless it holds an archetype that no sibling with a member of its own holds.
+Optional archetype roots of different archetypes under one attribute each get their members under `Medium` and `Large` alike.
+A further use of one archetype gets a member under `Medium` only where it holds another archetype, as four uses of one SECTION archetype that each hold other entries each do; only `Large` gives a member to every use (*Members of a list*).
 A name the OPT pins on a child is not part of this identity, although the validator also tells siblings apart by it.
 
 ##### Top-up

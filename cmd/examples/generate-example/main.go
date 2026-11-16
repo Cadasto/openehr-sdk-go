@@ -42,7 +42,7 @@ func main() {
 
 func run() error {
 	optFlag := flag.String("opt", "", "path to an ADL 1.4 operational template (default: the vendored vital_signs.opt)")
-	policyFlag := flag.String("policy", defaultPolicy, "how much to build; case does not matter: 'required' or its alias 'minimal' (the mandatory data and a composition's context), 'medium' (also every attribute the template constrains, with a member of each optional archetype under it), 'large' or its alias 'complete' (also a member of every use of one archetype)")
+	policyFlag := flag.String("policy", defaultPolicy, "how much to build; case does not matter: 'required' or its alias 'minimal' (the mandatory data and a composition's context), 'medium' (also every attribute the template constrains, with a member of each optional archetype under it, and of a further use of one where that use holds another archetype), 'large' or its alias 'complete' (also a member of every use of one archetype)")
 	territoryFlag := flag.String("territory", "NL", "ISO 3166-1 territory code; a COMPOSITION root requires one")
 	composerFlag := flag.String("composer-name", "Example Composer", "name recorded as the composition's composer")
 	flag.Parse()
@@ -116,7 +116,8 @@ const defaultPolicy = "medium"
 // template makes mandatory and a composition's context, the ITS-REST
 // template example's detail_level=required. Medium also builds every
 // attribute the template constrains, with a member of each optional
-// archetype under it, its detail_level=medium. Large, and complete with it
+// archetype under it, and of a further use of one where that use holds
+// another archetype, its detail_level=medium. Large, and complete with it
 // for now, also builds a member of every use of one archetype, short of
 // its detail_level=complete. Under each of them every primitive
 // leaf holds its example value. Any other text is an error that names the

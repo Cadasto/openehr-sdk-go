@@ -15,7 +15,8 @@ import (
 // default, when none is given: every required RM attribute is filled
 // (BMM-mandatory implicits and OPT-declared ones), the optional content
 // the policy builds is added (under instance.Medium, a member of each
-// optional archetype under an attribute; under instance.Large, also one of
+// optional archetype under an attribute, and of a further use of one where
+// that use holds another archetype; under instance.Large, also one of
 // every use of an archetype; under instance.Required, none),
 // and primitive leaves carry ExampleValue defaults, so the resulting tree
 // is valid against `validation.ValidateComposition`.

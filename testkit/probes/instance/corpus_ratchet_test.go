@@ -138,11 +138,13 @@ var mediumHollowBodies = []string{
 // templates EHR_STATUS- and FOLDER-rooted).
 //
 // Medium rows: Medium gives an attribute a member of each optional
-// archetype, but none of a second use of one. So it reaches the
-// TestPerson.v2 identifier clusters, each of another archetype, and has
-// their floor_coded rows, and the clinical_content_validation EVALUATION,
-// whose root validates. Under Medium the hollow-body floor is the
-// mediumHollowBodies list instead of a row.
+// archetype, and of a further use of one only where that use holds
+// another archetype. So it reaches the TestPerson.v2 identifier clusters,
+// each of another archetype, and has their floor_coded rows, the
+// clinical_content_validation EVALUATION and the four SECTION.adhoc.v1
+// roots of Corona_Anamnese, which each hold other entries, whose roots
+// validate. Under Medium the hollow-body floor is the mediumHollowBodies
+// list instead of a row.
 //
 // Required rows: none. Required visits only the attributes the template
 // makes mandatory and gives an optional child no member of its own

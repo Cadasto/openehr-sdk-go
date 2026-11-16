@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"maps"
 	mrand "math/rand/v2"
 	"slices"
 	"testing"
@@ -172,33 +173,49 @@ func TestREQ107_LargeWritesEachRepeatedOptionalArchetype(t *testing.T) {
 	}
 }
 
-// TestREQ107_MediumBuildsEachOptionalArchetypeOnce is the REQ-107 check
-// that, under Medium, every optional archetype root under an attribute gets
-// a member unless an earlier optional sibling uses its archetype:
-// Corona_Anamnese's content holds the optional OBSERVATION.story.v1 and the
-// first of the four optional SECTION.adhoc.v1 roots after it ('Symptome').
-// That section holds the first of its eight optional symptom_sign_screening
-// roots and its optional body_temperature root, in OPT order. The
-// composition validates. It holds under both value fills.
-func TestREQ107_MediumBuildsEachOptionalArchetypeOnce(t *testing.T) {
+// TestREQ107_MediumBuildsEveryArchetypeLargeBuilds is the REQ-107 check
+// that, under Medium, a later use of an archetype gets its member where it
+// holds an archetype that no sibling with a member of its own holds, and
+// none where it adds no archetype. Corona_Anamnese's content uses
+// SECTION.adhoc.v1 four times, each holding other entries, so content holds
+// the story and the four sections, in OPT order, and Medium builds a member
+// of every archetype Large builds. The first section ('Symptome') holds
+// eight uses of symptom_sign_screening that hold the same archetypes, so it
+// holds the first of them alone, with its body_temperature root, where
+// Large builds all eight. The composition validates. It holds under both
+// value fills.
+func TestREQ107_MediumBuildsEveryArchetypeLargeBuilds(t *testing.T) {
 	const adhoc = "openEHR-EHR-SECTION.adhoc.v1"
 	c := compileCoronaAnamnese(t)
-	wantContent := []string{"openEHR-EHR-OBSERVATION.story.v1", adhoc}
+	large := make(map[string]int)
+	archetypeIDCounts(decodedJSON(t, generateComposition(t, c, corpusPolicyOptions(instance.Large))), large)
+	wantIDs := slices.Sorted(maps.Keys(large))
+	wantContent := []string{"openEHR-EHR-OBSERVATION.story.v1", adhoc, adhoc, adhoc, adhoc}
+	wantSections := []string{"Symptome", "Kontakt", "Risikogebiet", "Allgemeine Angaben"}
 	wantItems := []string{"openEHR-EHR-OBSERVATION.symptom_sign_screening.v0", "openEHR-EHR-OBSERVATION.body_temperature.v2"}
 	for _, opts := range corpusOptions(instance.Medium) {
 		t.Run(opts.ValueFill.String(), func(t *testing.T) {
 			comp := generateComposition(t, c, opts)
+			medium := make(map[string]int)
+			archetypeIDCounts(decodedJSON(t, comp), medium)
+			if got := slices.Sorted(maps.Keys(medium)); !slices.Equal(got, wantIDs) {
+				t.Errorf("Generate(Corona_Anamnese, Medium) archetypes = %v, want Large's %v", got, wantIDs)
+			}
 			if got := contentIDs(comp.Content); !slices.Equal(got, wantContent) {
 				t.Fatalf("Generate(Corona_Anamnese, Medium) content = %v, want %v", got, wantContent)
 			}
-			section, ok := comp.Content[1].(*rm.Section)
-			if !ok {
-				t.Fatalf("content item is %T, want *rm.Section", comp.Content[1])
+			var names []string
+			for _, item := range comp.Content[1:] {
+				section, ok := item.(*rm.Section)
+				if !ok {
+					t.Fatalf("content item is %T, want *rm.Section", item)
+				}
+				names = append(names, section.Name.GetValue())
 			}
-			if got, want := section.Name.GetValue(), "Symptome"; got != want {
-				t.Errorf("content section name = %q, want %q", got, want)
+			if !slices.Equal(names, wantSections) {
+				t.Errorf("content section names = %q, want %q", names, wantSections)
 			}
-			if got := contentIDs(section.Items); !slices.Equal(got, wantItems) {
+			if got := contentIDs(comp.Content[1].(*rm.Section).Items); !slices.Equal(got, wantItems) {
 				t.Errorf("section 'Symptome' items = %v, want %v", got, wantItems)
 			}
 			noValidationErrors(t, comp, c)

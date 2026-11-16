@@ -36,7 +36,8 @@ func contentShape[T any](items []T) string {
 // different archetypes, a second use of the first one, and an optional
 // SECTION whose items list two more. Medium builds one member of each
 // archetype, the nested ones included, and none of the second use, whose
-// identity the first carries; Large also builds that second use. Required
+// identity the first carries and which holds no other archetype; Large
+// also builds that second use. Required
 // builds no optional child, and the content is optional. Every root passes
 // the RM floor and the template validator, under every policy, both value
 // fills and both compile modes.
@@ -122,6 +123,103 @@ func TestREQ107_MediumSkippedSiblingCarriesNoIdentity(t *testing.T) {
 					t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
 				}
 			})
+		}
+	}
+}
+
+// TestREQ107_MediumBuildsALaterUseThatAddsAnArchetype is the REQ-107 check
+// of Sibling identity that, under Medium, an optional child whose identity
+// a sibling with a member of its own carries still gets its member where
+// it holds an archetype root that no such sibling holds: a required
+// sibling, before or after it, or an earlier optional one that gets a
+// member. A root that needs undescribed content, which Medium does not
+// build, is not held. A later use that adds no archetype gets none, so
+// Large still builds more. The cases are uses of one SECTION archetype
+// under a composition's content, and CLUSTERs of one node id under a
+// CLUSTER's items. Every root passes the RM floor and the template
+// validator, under every policy, both value fills and both compile modes.
+func TestREQ107_MediumBuildsALaterUseThatAddsAnArchetype(t *testing.T) {
+	const (
+		section = "openEHR-EHR-SECTION.adhoc.v1"
+		obsA    = "openEHR-EHR-OBSERVATION.a.v1"
+		obsB    = "openEHR-EHR-OBSERVATION.b.v1"
+		obsC    = "openEHR-EHR-OBSERVATION.c.v1"
+		obsD    = "openEHR-EHR-OBSERVATION.d.v1"
+		inner   = "openEHR-EHR-CLUSTER.inner.v1"
+	)
+	slottedProtocol := optSingle("protocol", optSlot("ITEM_TREE", "at0002"))
+	use := func(entries ...string) string {
+		return guardChild("C_ARCHETYPE_ROOT", "SECTION", "at0000", guardOccurrences01, section,
+			guardMultiple("items", guardExistence01, entries...))
+	}
+	optional := func(id string, attrs ...string) string {
+		return undescribedObservation(id, guardOccurrences01, attrs...)
+	}
+	cluster := func(items ...string) string {
+		return guardChild("C_COMPLEX_OBJECT", "CLUSTER", "at0001", guardOccurrences01, "", optMultiple("items", items...))
+	}
+	cases := []struct {
+		name  string
+		opt   string
+		shape func(any) string
+		// want is the shape per policy.
+		want map[instance.Policy]string
+	}{
+		{
+			// The second use adds b, the third adds nothing, the fourth
+			// holds only c, which needs undescribed content, and the fifth
+			// holds d, which the required root after it holds.
+			name: "uses of one section archetype",
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence01,
+				use(optional(obsA, describedHistory)),
+				use(optional(obsB, describedHistory)),
+				use(optional(obsA, describedHistory), optional(obsB, describedHistory)),
+				use(optional(obsC, describedHistory, slottedProtocol)),
+				use(optional(obsD, describedHistory)),
+				undescribedObservation(obsD, guardOccurrences11, describedHistory))),
+			shape: archetypeShape,
+			want: map[instance.Policy]string{
+				instance.Large: strings.Join([]string{
+					section + "(" + obsA + ")", section + "(" + obsB + ")", section + "(" + obsA + "," + obsB + ")",
+					section + "()", section + "(" + obsD + ")", obsD,
+				}, ","),
+				instance.Medium:   strings.Join([]string{section + "(" + obsA + ")", section + "(" + obsB + ")", obsD}, ","),
+				instance.Required: obsD,
+			},
+		},
+		{
+			// The second CLUSTER adds the inner root; the third adds none.
+			name: "clusters of one node id",
+			opt: optTemplate("CLUSTER", optMultiple("items",
+				cluster(optNode("ELEMENT", "at0002")),
+				cluster(optArchetypeRoot("CLUSTER", inner, optMultiple("items", optNode("ELEMENT", "at0003")))),
+				cluster(optNode("ELEMENT", "at0004")))),
+			shape: undescribedShape,
+			want: map[instance.Policy]string{
+				instance.Large:    "at0001(at0002),at0001(" + inner + "(at0003)),at0001(at0004)",
+				instance.Medium:   "at0001(at0002),at0001(" + inner + "(at0003))",
+				instance.Required: "at0001(at0002)",
+			},
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range guardOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					if got := tc.shape(out); got != tc.want[opts.Policy] {
+						t.Errorf("Generate built %q, want %q", got, tc.want[opts.Policy])
+					}
+					noFloorErrors(t, out)
+					for _, iss := range templateErrors(out, c) {
+						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+				})
+			}
 		}
 	}
 }

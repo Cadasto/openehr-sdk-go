@@ -162,11 +162,13 @@ type generator struct {
 	// use; "" until then.
 	nowText string
 	// undescribed holds, per template node, whether it needs content the
-	// template does not describe (needsUndescribed), and locatableTypes,
-	// per RM type, whether the value built for it is a LOCATABLE
-	// (buildsLocatable). Both are filled on first use.
+	// template does not describe (needsUndescribed), locatableTypes, per
+	// RM type, whether the value built for it is a LOCATABLE
+	// (buildsLocatable), and held, per template node, the archetypes it
+	// holds (heldArchetypes). All are filled on first use.
 	undescribed    map[*tcimpl.CompiledNode]bool
 	locatableTypes map[string]bool
+	held           map[*tcimpl.CompiledNode][]string
 }
 
 // nextUID returns the next LOCATABLE.uid pointer. Honours
@@ -3244,19 +3246,22 @@ func newHierObjectID() *rm.HierObjectID {
 // Large and Medium, an optional child that needs content the OPT does not
 // describe gets none (optionalUndescribed). Under Medium, neither does a
 // child whose identity a sibling that gets a member of its own carries
-// (identityTaken), so the attribute holds one member of every optional
-// archetype, not one of each use of it. Under Large every other child gets
-// its members, each named or unnamed use of one archetype included, which
-// the validator binds by room and by trial. Required skips no child here:
-// it sizes each child by its occurrences lower bound, which gives an
-// optional child no member. The top-up to the attribute's lower bound can
-// still build a member of a skipped child.
+// (identityTaken), unless it holds an archetype that no such sibling holds
+// (addsArchetype). So the attribute holds a member of every optional
+// archetype, and of a later use of one only where that use holds other
+// archetypes, not one of each use. Under Large every other child gets its
+// members, each named or unnamed use of one archetype included, which the
+// validator binds by room and by trial. Required skips no child here: it
+// sizes each child by its occurrences lower bound, which gives an optional
+// child no member. The top-up to the attribute's lower bound can still
+// build a member of a skipped child.
 func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int, own []bool) bool {
 	switch g.opts.Policy {
 	case Large:
 		return g.optionalUndescribed(children[i])
 	case Medium:
-		return g.optionalUndescribed(children[i]) || identityTaken(children, i, own)
+		return g.optionalUndescribed(children[i]) ||
+			identityTaken(children, i, own) && !g.addsArchetype(children, i, own)
 	case Required:
 		return false
 	}
@@ -3312,6 +3317,68 @@ func siblingOwnsMember(children []*tcimpl.CompiledNode, i, j int, own []bool) bo
 		return !children[j].IsSlot() && childRequired(children[j])
 	}
 	return false
+}
+
+// addsArchetype reports whether children[i] holds an archetype
+// (heldArchetypes) that no sibling that gets a member of its own
+// (siblingOwnsMember, given own) holds. Under Medium such a child gets its
+// member although a sibling carries its identity (identityTaken), so a
+// later use of one archetype is built where it holds archetypes the uses
+// before it do not, and skipped where it adds none.
+func (g *generator) addsArchetype(children []*tcimpl.CompiledNode, i int, own []bool) bool {
+	held := make(map[string]bool)
+	for j, sib := range children {
+		if siblingOwnsMember(children, i, j, own) {
+			for _, id := range g.heldArchetypes(sib) {
+				held[id] = true
+			}
+		}
+	}
+	return slices.ContainsFunc(g.heldArchetypes(children[i]), func(id string) bool { return !held[id] })
+}
+
+// heldArchetypes returns the archetype ids node holds, sorted and without
+// repeats: its own, where it is an archetype root, and those of the
+// archetype roots in its template subtree that the walk under Large and
+// Medium builds. The search goes through the allowed children of each
+// attribute the walk does not skip (walkSkips), only the child a
+// single-valued attribute binds its value to (bindingAlternative), and
+// passes no slot and no optional child that needs undescribed content
+// (optionalUndescribed), which gets no member of its own. A slot holds no
+// archetype. The answer does not depend on the policy, and it is kept per
+// node for the call, so the caller must not change the slice.
+func (g *generator) heldArchetypes(node *tcimpl.CompiledNode) []string {
+	if node.IsSlot() {
+		return nil
+	}
+	if ids, seen := g.held[node]; seen {
+		return ids
+	}
+	var ids []string
+	if id := node.ArchetypeID(); id != "" {
+		ids = append(ids, id)
+	}
+	for _, attr := range tcimpl.NodeAttributes(node) {
+		children := tcimpl.AllowedChildNodes(attr)
+		if len(children) == 0 || walkSkips(node, attr) {
+			continue
+		}
+		if attr.Cardinality() == template.Single {
+			children = []*tcimpl.CompiledNode{bindingAlternative(children, builtRMType(children[0]))}
+		}
+		for _, c := range children {
+			if !c.IsSlot() && !g.optionalUndescribed(c) {
+				ids = append(ids, g.heldArchetypes(c)...)
+			}
+		}
+	}
+	slices.Sort(ids)
+	ids = slices.Compact(ids)
+	if g.held == nil {
+		g.held = make(map[*tcimpl.CompiledNode][]string)
+	}
+	g.held[node] = ids
+	return ids
 }
 
 // childRequired reports whether child counts as required: every child does

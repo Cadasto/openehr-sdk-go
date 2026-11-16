@@ -17,7 +17,8 @@
 // path-assigning API.
 // With no WithPolicy, NewSkeleton builds instance.Medium, the instance
 // package's default: a skeleton with a member of each optional archetype
-// under an attribute, but not of each use of one.
+// under an attribute, and of a further use of one only where that use
+// holds another archetype.
 // `WithPolicy(instance.Required)` gives one with only what the template
 // makes mandatory and a composition's context, and
 // `WithPolicy(instance.Large)` one with a member of every optional
