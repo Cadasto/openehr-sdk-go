@@ -140,8 +140,9 @@ openEHR **QUERY Release-1.1.0 § 4.4.3** governs the clause.
 Its syntax is `SELECT TOP integer [FORWARD|BACKWARD]`; from Release 1.1.0 the modifier is deprecated in favour of `LIMIT` with `ORDER BY`, and the specification announces its removal in a future major release; and `TOP` is not allowed beside a `LIMIT` clause in the same query.
 A deprecated but legal construct is still one the SDK reads: until the removal release a client, a stored query or a conformance corpus may carry `TOP`.
 
-- The `SELECT` clause **MUST** carry the clause as an optional value (`SelectClause.Top`, an `*aql.TopClause`), so "no `TOP`" stays distinguishable from `TOP 0`: a dropped `TOP` turns a bounded query into an unbounded one, and an absent one read as `0` inverts it.
-- The carrier **MUST** model the row count and the direction, with an unspecified zero direction, so a bare `TOP n` round-trips without a direction the source did not write and a `BACKWARD`, which selects the other end of the result set, is never lost.
+- The `SELECT` clause **MUST** carry the clause as an optional value (`SelectClause.Top`, an `*aql.TopClause`) that models the row count and the direction, with an unspecified zero direction.
+  The optional value keeps "no `TOP`" distinguishable from `TOP 0`: a dropped `TOP` turns a bounded query into an unbounded one, and an absent one read as `0` inverts it.
+  The zero direction lets a bare `TOP n` round-trip without a direction the source did not write, and a `BACKWARD`, which selects the other end of the result set, is never lost.
 - `TOP` and the `LIMIT` / `OFFSET` clause **MUST** each report what the source wrote, independently.
   The parser never normalises one into the other and never picks one when a query carries both: that query is spec-invalid (§ 4.4.3), and reporting it as written is what lets the lint name it (`aql_top_with_limit`, [§ REQ-109](#req-109--aql-static-lint)).
   `Emit` renders both as written, since the profile accepts the text and the emitter is not the diagnosis layer.
@@ -185,7 +186,18 @@ The kind set is derived from the vendored grammar and checked against it mechani
 
 #### The structured kinds
 
-The model **MUST** be a sealed sum in `openehr/aql`, in the package's `aql.Value` / `parse.SelectExpr` style, covering these forms: a node id (`[at0001]`, `[id3]`); a node id with a name (`[at0001, 'Systolic']`); an archetype HRID; an archetype HRID with a name; a parameter (`[$param]`); a comparison, carrying `aql.Comparison`, so a WHERE comparison and a predicate comparison share one vocabulary; a regex match (`objectPath MATCHES CONTAINED_REGEX`, whose token also admits an optional `; 'label'` tail the model carries as its own component); and an `AND` / `OR` junction over two structured predicates, with its operator and both operands.
+The model **MUST** be a sealed sum in `openehr/aql` covering these forms:
+
+- a node id (`[at0001]`, `[id3]`);
+- a node id with a name (`[at0001, 'Systolic']`);
+- an archetype HRID;
+- an archetype HRID with a name;
+- a parameter (`[$param]`);
+- a comparison, carrying `aql.Comparison`, so a WHERE comparison and a predicate comparison share one vocabulary;
+- a regex match (`objectPath MATCHES CONTAINED_REGEX`, whose token also admits an optional `; 'label'` tail the model carries as its own component);
+- an `AND` / `OR` junction over two structured predicates, with its operator and both operands.
+
+The sum follows the package's `aql.Value` / `parse.SelectExpr` style.
 
 #### The name slot
 
@@ -305,7 +317,8 @@ The validating write paths are `aql.Builder.Build`, `aql.FormatWhere` and `(*par
 - **One unvalidated formatter.** `aql.FormatValue` returns no error and so cannot refuse; it is the escape hatch for a value the caller has already checked, outside the closure.
   Being unvalidated does not license a panic: it **MUST** render a value with no wire form (a nil or typed-nil pointer, reachable through the public API as the zero `aql.MatchesExpr.Terminology`) as the empty string.
   The SDK **MUST** expose `aql.ValidateValue`, which refuses every value the closure refuses, a value with no wire form included, so a caller, or a write path outside `openehr/aql`, can hold the same line before calling `FormatValue`.
-- **No silent substitution.** Where a caller-supplied operand is emitted verbatim because its grammar token is unquoted (the `MATCHES {uri}` operand and the single-token identifier positions below), the write side **MUST** refuse operand text that would change the query's structure, even when the resulting text is valid AQL.
+- **No silent substitution.** Where a caller-supplied operand is emitted verbatim because its grammar token is unquoted, the write side refuses operand text that would change the query's structure, even when the resulting text is valid AQL.
+  The accept sets that bind it are the `MATCHES {uri}` operand's ([§ Canonical value spellings](#canonical-value-spellings)) and those of [§ Single-token identifier positions](#single-token-identifier-positions).
   The path positions REQ-055 rule 3 emits verbatim by contract are outside this rule: caller data belongs in `aql.Param` ([§ REQ-055](wire.md#req-055--wire-boundary), the injection guard).
 - **Refuse, never re-spell.** A value the grammar cannot carry **MUST** fail with an error wrapping `aql.ErrInvalidQuery`, not be normalised into a spelling that parses, which would change what the query asks.
 - **Verbatim text round-trips as identity.** Text the read side captures and the write side re-emits verbatim (the class and path predicates, `aql.IdentifiedPath.Raw`, `aql.Comparison.Path`) **MUST** come back unchanged, the caller's own spacing, line breaks and comments included.
@@ -327,11 +340,15 @@ The validating write paths are `aql.Builder.Build`, `aql.FormatWhere` and `(*par
 These value-level rules extend the canonical write form, whose home is [wire.md § REQ-055](wire.md#req-055--wire-boundary).
 Each is derived from the vendored grammar profile (`resources/aql/grammar/active/`, ADR [0007](../adr/0007-aql-antlr-grammar-profile.md)), which is the authority ([§ REQ-109](#req-109--aql-static-lint)'s syntax floor); no rule here widens the profile.
 
-- **String literals** **MUST** be emitted with the grammar's `ESCAPE_SEQ` (a backslash before the escaped character), never with the SQL-style doubled quote: the `STRING` token admits only `ESCAPE_SEQ`, `UTF8CHAR`, `OCTAL_ESC`, or a character that is neither a backslash nor the delimiter, so a doubled quote ends the token and opens another.
-  Decoding **MUST** be the exact inverse, over all three escape shapes and both delimiter forms: the `STRING`, `DATE`, `TIME` and `DATETIME` tokens all admit `"…"` beside `'…'`, and a delimiter that survives into the decoded value turns a comparison into one that matches nothing.
-  - The C0 controls that have an `ESCAPE_SEQ` spelling (`\a \b \f \n \r \t \v`) **MUST** be emitted escaped, so canonical AQL stays single-line and printable, and every other character the token admits raw emitted as it is, `"`, `?`, `*` and the controls with no `ESCAPE_SEQ` spelling included.
-  - A byte that begins no valid UTF-8 sequence **MUST** be emitted as `OCTAL_ESC` (`\NNN`), the grammar's only spelling for an arbitrary byte: the lexer decodes its input to runes, so a raw byte would come back as U+FFFD on the second pass.
-  - Decoding **MUST** combine an adjacent UTF-16 surrogate pair into the character it denotes, and read a lone half as U+FFFD: `UTF8CHAR` is exactly four hex digits, so a character outside the BMP has no other spelling.
+- **String literals.** Emission **MUST** use the grammar's `ESCAPE_SEQ` (a backslash before the escaped character), never the SQL-style doubled quote, and spell these characters as follows:
+  - a C0 control that has an `ESCAPE_SEQ` spelling (`\a \b \f \n \r \t \v`): escaped, so canonical AQL stays single-line and printable;
+  - a byte that begins no valid UTF-8 sequence: `OCTAL_ESC` (`\NNN`), the grammar's only spelling for an arbitrary byte, since the lexer decodes its input to runes and a raw byte would come back as U+FFFD on the second pass;
+  - every other character the token admits raw, `"`, `?`, `*` and the controls with no `ESCAPE_SEQ` spelling included: as it is.
+
+  The `STRING` token admits only `ESCAPE_SEQ`, `UTF8CHAR`, `OCTAL_ESC`, or a character that is neither a backslash nor the delimiter, so a doubled quote ends the token and opens another.
+  Decoding **MUST** be the exact inverse, over all three escape shapes and both delimiter forms, and combine an adjacent UTF-16 surrogate pair into the character it denotes, reading a lone half as U+FFFD.
+  The `STRING`, `DATE`, `TIME` and `DATETIME` tokens all admit `"…"` beside `'…'`, and a delimiter that survives into the decoded value turns a comparison into one that matches nothing.
+  `UTF8CHAR` is exactly four hex digits, so a character outside the BMP has no other spelling.
 - **Real literals** **MUST** be emitted in decimal form with a fractional part, so the text re-lexes as `REAL : DIGIT* '.' DIGIT+` and never as `INTEGER : DIGIT+` (`2.0`, never `2`), or be refused where no such spelling exists (an infinity or NaN).
   Scientific notation (`SCI_REAL` / `SCI_INTEGER`) is read and re-emitted in decimal form, a canonicalisation and not a value change.
 - **Integer literals** are bounded by `aql.IntValue`'s `int64`; the residual of [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast) covers only a literal outside that type.
@@ -411,10 +428,23 @@ Tests confront a generated corpus with the parser at both bracket positions and 
 
 ### Emit-side structural parity
 
-`(*parse.Query).Emit` **MUST** refuse, with an error wrapping `aql.ErrInvalidQuery`, a tree the grammar cannot carry as written: a containment junction anywhere but at the end of its chain (the rule `Build()` holds, [§ REQ-163](#req-163--aql-write-side-expressivity-parity)); a class node with no RM type that is not a `VERSION` class expression, or with a child-join of its own; and a class expression carrying both an archetype and a standing predicate, the two mutually exclusive spellings of its one `[...]` position, where emitting whichever a switch reaches first drops the other, a row filter, and the query returns more rows than the AST asked for.
-The same dual-operand rule binds `aql.Comparison` (`Path` and `Left`) and `aql.MatchesExpr` (its three operand forms).
+`(*parse.Query).Emit` **MUST** refuse, with an error wrapping `aql.ErrInvalidQuery`, every tree shape in the table below.
+A shape is refused because the grammar cannot carry it as written, or because it carries a content field `Emit` would not render: a guard that passes a field the emitter then drops hides the loss.
 
-`Emit` **MUST** also refuse a tree carrying a content field it would not render, because a guard that passes a field the emitter then drops hides the loss: a `VERSION` class expression carrying an RM type other than `VERSION`, or an archetype predicate (the alternative has neither slot; `RMType: "VERSION"` beside the flag is accepted, since the extractor sets the two together); a `$param` archetype flag with no parameter; a non-zero FROM root beside a root junction; a blank standing predicate, which would emit `[   ]`; class data on a containment junction node, or a negation on the FROM-root junction or on a junction operand, where `NOT` has no spelling (negation on a chain child, `NOT CONTAINS`, stays legal); and a structured predicate comparison with no verbatim predicate text.
+| Refused tree shape | Reason |
+|---|---|
+| A containment junction anywhere but at the end of its chain | The grammar cannot carry it; `Build()` holds the same rule ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)). |
+| A class node with no RM type that is not a `VERSION` class expression, or with a child-join of its own | The grammar cannot carry it. |
+| A class expression carrying both an archetype and a standing predicate | The grammar cannot carry it: the two are the mutually exclusive spellings of its one `[...]` position, and emitting whichever a switch reaches first drops the other, a row filter, so the query returns more rows than the AST asked for. |
+| A `VERSION` class expression carrying an RM type other than `VERSION`, or an archetype predicate | Unrendered content: the alternative has neither slot. `RMType: "VERSION"` beside the flag is accepted, since the extractor sets the two together. |
+| A `$param` archetype flag with no parameter | Unrendered content. |
+| A non-zero FROM root beside a root junction | Unrendered content. |
+| A blank standing predicate | Unrendered content: it would emit `[   ]`. |
+| Class data on a containment junction node | Unrendered content. |
+| A negation on the FROM-root junction or on a junction operand | Unrendered content: `NOT` has no spelling there. Negation on a chain child, `NOT CONTAINS`, stays legal. |
+| A structured predicate comparison with no verbatim predicate text | Unrendered content. |
+
+The same dual-operand rule as the archetype-and-standing row binds `aql.Comparison` (`Path` and `Left`) and `aql.MatchesExpr` (its three operand forms).
 `ClassExpr.HasPredicate` is exempt: it is a derived flag carrying no content, so no value of it adds or removes emitted text.
 
 Completeness is checked before placement: the read side infers a node's kind from an absent RM type, so an incomplete class node checked the other way round would be reported as a misplaced junction the caller never wrote.
@@ -426,8 +456,8 @@ The extractor never builds a violating tree; these rules bind a consumer that as
 Every rule above decides one position from the text handed to it, and that is not enough: a `CONTAINED_REGEX` body can complete a token inside the bracket text and still reach beyond it (`{/a\/}`), so which token the lexer forms depends on text the predicate does not contain.
 No per-position validator decides that, and refusing `{/a\/}` outright would refuse text `ParseQuery` reads back unchanged in every ordinary query.
 
-`(*parse.Query).Emit`, and `aql.Builder.Build` for the projection list it renders, **MUST** read the emitted text back before returning it and refuse, with an error wrapping `aql.ErrInvalidQuery` (and `aql.ErrSyntax` as well where the parser refuses the text) and a diagnostic that follows § The emission closure property, text that does not re-parse or that re-parses as a different query.
-`Emit` reads the text back with the parser; `Build` reads its `SELECT` clause by the means [§ REQ-163](#req-163--aql-write-side-expressivity-parity) describes.
+`(*parse.Query).Emit` **MUST** read the emitted text back with the parser before returning it, and refuse, with an error wrapping `aql.ErrInvalidQuery` (and `aql.ErrSyntax` as well where the parser refuses the text) and a diagnostic that follows § The emission closure property, text that does not re-parse or that re-parses as a different query.
+`aql.Builder.Build` verifies the projection list it renders against the same definition ([§ REQ-163 § `Build()` verifies the projection it emitted](#build-verifies-the-projection-it-emitted)).
 A different query is one that adds or removes a class expression, a projection, a predicate leaf or a whole clause, or that changes a containment connective, a negation, or the grouping of containment operands across operators.
 A substitution confined to the text of one path position is outside the check, since REQ-055 rule 3 emits a path verbatim by contract.
 
@@ -436,7 +466,6 @@ A substitution confined to the text of one path position is outside the check, s
 It leaves out the read-side carriers a constructed AST does not populate, factors out the encodings the emitted text erases (same-operator junction nesting, one-term junctions, the bracketing of a containment chain, the two carriers of a comparison's path, edge whitespace on path text, a sole unaliased star item against the bare `SELECT *` flag), and keeps the structure the text carries, including each containment junction's operator at its coordinate.
 A shape the skeleton cannot model makes `Emit` refuse rather than compare equal to itself.
 There is no unverified `Emit`.
-`Build()` verifies its projection list only, because the rest of the builder's vocabulary takes no free text: `aql.Containment` holds an RM type, an alias and an archetype id, its brackets render from typed comparisons, and `WHERE` arrives structured.
 
 ### Out of scope
 
@@ -488,7 +517,8 @@ The vocabulary is the shared `aql.TopClause` ([§ REQ-113 § The `TOP` carrier](
 ### The version-predicate carrier
 
 `versionPredicate : LATEST_VERSION | ALL_VERSIONS | standardPredicate`.
-The write side **MUST** carry that position as a **sealed sum** in `openehr/aql`, in the package's existing `aql.Value` / `parse.SelectExpr` style (an unexported marker method), with **exactly three** shapes: the two keywords, and one `standardPredicate` comparison carrying `aql.Comparison` rather than a second, structurally identical vocabulary.
+The write side **MUST** carry that position as a **sealed sum** in `openehr/aql` with **exactly three** shapes: the two keywords, and one `standardPredicate` comparison carrying `aql.Comparison` rather than a second, structurally identical vocabulary.
+The sum follows the package's existing `aql.Value` / `parse.SelectExpr` style, an unexported marker method.
 The production is a fixed three-way choice that does not recurse into its own position, the property [§ REQ-119 § The class predicate positions](#the-class-predicate-positions) relies on to decide the position in one pass; a fourth shape would be a grammar change, not an extension.
 
 The predicate reaches a class expression through a **`VERSION`-fixed constructor** (`aql.Version(alias, pred)`), so the RM type at that position is the SDK's spelling and never a caller string.
@@ -498,7 +528,7 @@ Absence stays legal: a `VERSION` class with no predicate **MUST** stay buildable
 - A version predicate on a class node **not** spelled `VERSION` **MUST** be refused: the grammar reaches `versionPredicate` from the `VERSION` alternative of `classExprOperand` alone.
 - An **archetype** predicate on a `VERSION` node stays refused: the `VERSION` alternative has no archetype slot at all (§ REQ-119 § Single-token identifier positions states the same rule for the read-side carrier).
 
-The combinators return a `Containment` rather than an error, so a misuse **MUST** be carried on the node and surfaced at `Build()` as an error wrapping `aql.ErrInvalidQuery`, the route the containment algebra already uses, never absorbed into a shape that means something else.
+The combinators return a `Containment` rather than an error, so a misuse **MUST** surface at `Build()` as an error wrapping `aql.ErrInvalidQuery`, the route the containment algebra already uses, and never be absorbed into a shape that means something else.
 
 ### The standing-predicate carrier
 
@@ -521,7 +551,8 @@ The rendered bracket text **MUST** be held to `aql.ValidatePathPredicate`, the g
 
 ### One carrier per grammar position
 
-`versionPredicate` admits `standardPredicate`, so a comparison **on a `VERSION` node is legal AQL** and **MUST** be expressible, through the version-predicate carrier's comparison shape (`aql.VersionCompare`) alone: the standing-predicate carrier applied to a `VERSION`-spelled node **MUST** be refused with an error wrapping `aql.ErrInvalidQuery` that names `aql.VersionCompare`, the constructor which does carry it.
+`versionPredicate` admits `standardPredicate`, so a comparison **on a `VERSION` node is legal AQL** and **MUST** be expressible, through the version-predicate carrier's comparison shape (`aql.VersionCompare`) alone.
+The standing-predicate carrier applied to a `VERSION`-spelled node **MUST** be refused with an error wrapping `aql.ErrInvalidQuery`, and the error **SHOULD** name `aql.VersionCompare`, the constructor which does carry it.
 The two accept sets differ in both directions, `versionPredicate` carrying no node predicate and `pathPredicate` no `LATEST_VERSION`, so routing a class-position call to the version position silently would change the caller's accept set with no diagnostic (§ REQ-119 § The class predicate positions); refusing instead is loud and named.
 
 Both spelling tests, this routing refusal and the version carrier's refusal of a node not spelled `VERSION`, **MUST** match the RM type ASCII-case-insensitively, so each accept set is exactly the spellings the lexer reads as the keyword: `VERſION` (U+017F, Unicode-fold-equal to the keyword and unreadable to the lexer) is an ordinary class, and a Unicode fold would either answer a class-position call on it by naming a constructor that fixes the RM type to `VERSION`, or carry a `versionPredicate` bracket onto a node the lexer reads as an ordinary class.
@@ -558,7 +589,8 @@ The typed constructors above are the recommended route and their godoc says so; 
 
 #### `Build()` verifies the projection it emitted
 
-`Build()` reads the emitted `SELECT` clause back as [§ REQ-119 § Emission verified after emission](#emission-verified-after-emission) requires.
+`Build()` **MUST** read the `SELECT` clause it emitted back before returning it, and refuse, with an error wrapping `aql.ErrInvalidQuery` and a diagnostic that follows [§ REQ-119 § The emission closure property](#the-emission-closure-property), a clause that does not re-parse or that re-parses as a different query ([§ REQ-119 § Emission verified after emission](#emission-verified-after-emission)).
+It verifies its projection list only, because the rest of the builder's vocabulary takes no free text: `aql.Containment` holds an RM type, an alias and an archetype id, its brackets render from typed comparisons, and `WHERE` arrives structured.
 For the projection, a different query is a `Col` whose text splits into two or more items, spills out of `SELECT` into another clause, or adds a clause-level flag: the silent mode, valid AQL asking a different question.
 The compared structure **MUST** include the item count, each item's `AS` alias and the clause-level flags (`DISTINCT`, and the deprecated `TOP` with its `FORWARD` / `BACKWARD` direction, which `top : TOP INTEGER direction?` consumes into the clause as `selectClause` consumes `DISTINCT`), compared after factoring out the encodings the emitted text erases: a sole unaliased star item and the bare `SELECT *` flag are one encoding, path text enters its slot with edge whitespace trimmed, and a closed top-level comment run reads as whitespace.
 A `Col` text that leaves a lexical region **open** where the clause ends (a string literal, a comment run, a bracket or a parenthesis) **MUST** be refused, even where it would read back unchanged: what closes the region is the text after the projection, so the same text is a loud error in one query and a silent substitution in the next.
@@ -643,16 +675,18 @@ Recording a decline never widens the profile: admitting an engine extension is a
 
 ### Layer 2 — Shape (AST walk, no CDR)
 
-| Check | Code | Severity | Rule |
+Each code in this table and in the § Layer 3 table **MUST** be raised exactly when its *Fires when* cell holds, at the severity the table gives.
+
+| Check | Code | Severity | Fires when |
 |---|---|---|---|
-| Alias binding | `aql_unknown_alias` | Error | Every identified path's root alias **MUST** bind to a class in FROM / CONTAINS. |
-| Identifiable scope | `aql_from_archetype` | Warning | FROM/CONTAINS **SHOULD** name ≥1 archetype HRID, `$param` archetype predicate, `VERSION` operand, or `EHR` root; otherwise the query scans broadly. |
-| Bound parameters | `aql_unbound_param` | Error | When linting an `aql.Query`, every `$name` referenced **MUST** have a key in `Query.Parameters`. |
-| Unused parameters | `aql_unused_param` | Warning | A `Query.Parameters` key never referenced is advisory. |
-| Deprecated `TOP` | `aql_deprecated_top` | Warning | A `SELECT TOP` clause **SHOULD** be replaced by `LIMIT` with `ORDER BY`: the modifier is deprecated from QUERY Release-1.1.0 and slated for removal ([§ REQ-113 § The `TOP` carrier](#the-top-carrier)). Fires once per query carrying a `TOP`. |
-| `TOP` with `LIMIT` | `aql_top_with_limit` | Error | A query **MUST NOT** use `TOP` and the `LIMIT` clause together (QUERY Release-1.1.0 § 4.4.3). Fires in addition to `aql_deprecated_top`. |
-| `TOP` with envelope `fetch` | `aql_top_with_fetch` | Error | A query carrying `TOP` **MUST NOT** also carry the request envelope's row limit: the openEHR Query API's common parameters state that `fetch` cannot be combined with AQL-top. Reachable only when the caller supplies `Options.Query`, and keyed on its `Fetch` alone: an `Offset` **MUST NOT** raise it, the exclusion naming the row limit only. Fires in addition to `aql_deprecated_top`. `Build()` also refuses an envelope `Offset` beside a `TOP` ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)), because it declines to author two row bounds; the lint reads a query it did not author, so it reports only the exclusion the Query API states. |
-| Bare / mixed `SELECT *` | `aql_select_star` | Warning | A projection carrying a `*` item **SHOULD** raise this code, and `COUNT(*)` **MUST NOT**: it uses the [SDK-AQL-002](../../resources/aql/grammar/DIVERGENCES.md#sdk-aql-002--select-) relaxation, and official QUERY 1.1.0's only use of `*` is `COUNT(*)`. |
+| Alias binding | `aql_unknown_alias` | Error | An identified path's root alias binds to no class in FROM / CONTAINS. |
+| Identifiable scope | `aql_from_archetype` | Warning | FROM/CONTAINS names no archetype HRID, no `$param` archetype predicate, no `VERSION` operand and no `EHR` root, so the query scans broadly. |
+| Bound parameters | `aql_unbound_param` | Error | When linting an `aql.Query`, a `$name` the query references has no key in `Query.Parameters`. |
+| Unused parameters | `aql_unused_param` | Warning | A `Query.Parameters` key is never referenced; the code is advisory. |
+| Deprecated `TOP` | `aql_deprecated_top` | Warning | The query carries a `SELECT TOP` clause; it fires once per query. The remedy is `LIMIT` with `ORDER BY`: the modifier is deprecated from QUERY Release-1.1.0 and slated for removal ([§ REQ-113 § The `TOP` carrier](#the-top-carrier)). |
+| `TOP` with `LIMIT` | `aql_top_with_limit` | Error | The query uses `TOP` and the `LIMIT` clause together, which QUERY Release-1.1.0 § 4.4.3 forbids. Fires in addition to `aql_deprecated_top`. |
+| `TOP` with envelope `fetch` | `aql_top_with_fetch` | Error | The query carries `TOP` and the request envelope carries a row limit: the openEHR Query API's common parameters state that `fetch` cannot be combined with AQL-top. Reachable only when the caller supplies `Options.Query`, and keyed on its `Fetch` alone: an `Offset` does not fire it, the exclusion naming the row limit only. Fires in addition to `aql_deprecated_top`. `Build()` also refuses an envelope `Offset` beside a `TOP` ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)), because it declines to author two row bounds; the lint reads a query it did not author, so it reports only the exclusion the Query API states. |
+| Bare / mixed `SELECT *` | `aql_select_star` | Warning | A projection carries a `*` item; `COUNT(*)` does not fire it. A `*` item uses the [SDK-AQL-002](../../resources/aql/grammar/DIVERGENCES.md#sdk-aql-002--select-) relaxation, and official QUERY 1.1.0's only use of `*` is `COUNT(*)`. |
 
 The three `TOP` codes **MUST** key on the `TOP` clause's presence in the source, not on a decoded count: a count too large to represent leaves no bound to read ([§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s residual), and the query carrying it still draws them.
 The other half of each pair is read from its own channel: the in-text `LIMIT` clause for `aql_top_with_limit`, the request envelope's `Fetch` for `aql_top_with_fetch`.
@@ -670,12 +704,14 @@ Two grammar-admitted, server-executable shapes resolve without `aql_unknown_alia
 
 ### Layer 3 — Path & template (only when a compiled OPT is supplied)
 
-| Check | Code | Severity | Rule |
-|---|---|---|---|
-| Archetype membership | `aql_archetype_not_in_template` | Error | Each literal archetype HRID in FROM/CONTAINS **MUST** be present in the compiled OPT (`Compiled.AllByArchetypeID`). |
-| Path in template | `aql_path_not_in_template` | Warning | Each identified path **SHOULD** resolve under its alias's archetype subtree. |
+The rule of § Layer 2 binds this table too: each code is raised exactly when its cell holds.
 
-A `$param` archetype predicate (`[$name]`, `parse.ClassExpr.ParamArchetype`) is not a literal HRID, so it **MUST NOT** raise `aql_archetype_not_in_template`, and it anchors no `aql_path_not_in_template` resolution: there is no literal subtree to walk, and the CDR resolves the bound scope at execution ([PROBE-021](conformance.md#probe-021--aql-parse-error-mapping)).
+| Check | Code | Severity | Fires when |
+|---|---|---|---|
+| Archetype membership | `aql_archetype_not_in_template` | Error | A literal archetype HRID in FROM/CONTAINS is absent from the compiled OPT (`Compiled.AllByArchetypeID`); a `$param` archetype predicate is not a literal HRID and does not fire it. |
+| Path in template | `aql_path_not_in_template` | Warning | An identified path does not resolve under its alias's archetype subtree, as the walk below decides. |
+
+A `$param` archetype predicate (`[$name]`, `parse.ClassExpr.ParamArchetype`) anchors no `aql_path_not_in_template` resolution either: there is no literal subtree to walk, and the CDR resolves the bound scope at execution ([PROBE-021](conformance.md#probe-021--aql-parse-error-mapping)).
 
 `aql_path_not_in_template` resolution walks the archetype-scoped compiled subtree (predicate-aware first-child descent) and warns only on high-confidence structural divergence: a path segment naming an attribute that does not exist on a node that has modelled attributes.
 It stays silent on unmodelled RM-leaf attributes (e.g. `/value/magnitude`) and on descent below the modelled tree, because the CDR, not the OPT index, is the path authority (PROBE-021).
@@ -690,8 +726,7 @@ A path through a non-mandatory RM attribute the OPT did not constrain can still 
 - `validation.ValidateAQL(q aql.Query, c *templatecompile.Compiled) validation.Result` is the seam: it parses `q.Q`, runs the layers, and maps `lint.Issue` → `validation.Issue` (code and severity carried verbatim) so callers already using `ValidateComposition` get one uniform `Result`.
 - `validation.ValidateAQLWithTypeRelation(q, c, rel *contain.TypeRelation) validation.Result` is the same seam with the containment relation supplied by the caller, and `ValidateAQL(q, c)` is its nil call.
   [§ REQ-161 § Relation supply](#relation-supply) states the obligation to offer it and the bound on what a supplied relation changes.
-- A published lint code is never re-pointed at another rule: consumers filter and gate on `Code`, so a code keeps its meaning for as long as it exists.
-  `aql_contains_redundant_step` in particular **MUST NOT** be re-pointed at another rule.
+- A published lint code **MUST NOT** be re-pointed at another rule: consumers filter and gate on `Code`, so a code keeps its meaning for as long as it exists.
 
 ### Value-free lint diagnostics
 
@@ -745,8 +780,9 @@ Its consumer is `aql_contains_redundant_step` ([§ REQ-161 § `aql_contains_redu
 
 #### Admissible is route-existence, not a claim of RM truth
 
-A verdict is derived from the pinned BMM's by-value graph plus the overlay edges; on the RM-faithful subgraph an Admissible verdict *is* genuine RM nesting, but where the default relation is deliberately loose (the family-agnostic `VERSION` hub, § Overlay edges) it **MAY** report Admissible for a pair that cannot actually nest.
-That looseness is a documented missed defect, never a false Error (§ REQ-161 § Flagging policy); consumers needing RM-exact verdicts use a stricter profile once one ships (§ Out of scope).
+A verdict is derived from the pinned BMM's by-value graph plus the overlay edges.
+On the RM-faithful subgraph an Admissible verdict *is* genuine RM nesting; where the default relation is deliberately loose, at the family-agnostic `VERSION` hub, an Admissible verdict can cover a pair that cannot actually nest ([§ Overlay edges](#overlay-edges-default-relation)).
+Consumers needing RM-exact verdicts use a stricter profile once one ships (§ Out of scope).
 
 | Verdict | Meaning |
 |---|---|
@@ -857,7 +893,7 @@ The version tier of every pin-shipped `VERSIONED_*` container, `VERSIONED_PARTY`
 
 ## REQ-161 — AQL semantic and portability lint
 
-REQ-109's Layer 2 **MUST** carry three additive check groups, each specified below:
+REQ-109's Layer 2 carries three additive check groups, each specified below:
 
 - **semantic checks**, backed by the REQ-160 relation: RM-impossible shapes a CDR will typically accept and answer with zero rows;
 - **portability checks**, for behaviours the QUERY specification leaves open, each citing the open specification question or community source where one exists;
@@ -898,8 +934,9 @@ The semantic and portability catalogue, one entry per code:
 #### `aql_unknown_rm_class`
 
 - **Check:** Unknown RM class; **severity:** Warning.
-- **Fires:** A class token whose REQ-160 verdict is **UnknownClass**, **or** a literal archetype predicate whose HRID type segment is not a class the relation knows (`ArchetypeMatches` → **UnknownClass**, REQ-160 § Archetype/class conformance), **MUST** raise this code, once per class-expression occurrence — Warning, because unknown is not wrong (future RM, demographic deployments, dialects).
-- **Why:** This is the code that fires when `aql_archetype_class_mismatch` is suppressed for an unknown type segment, so an unknown name is never silent.
+- **Fires:** A class token whose REQ-160 verdict is **UnknownClass**, **or** a literal archetype predicate whose HRID type segment is not a class the relation knows (`ArchetypeMatches` → **UnknownClass**, REQ-160 § Archetype/class conformance), **MUST** raise this code, once per class-expression occurrence.
+- **Why:** Warning, because unknown is not wrong (future RM, demographic deployments, dialects).
+  This is the code that fires when `aql_archetype_class_mismatch` is suppressed for an unknown type segment, so an unknown name is never silent.
 
 #### `aql_containment_by_reference`
 
@@ -910,7 +947,8 @@ The semantic and portability catalogue, one entry per code:
 #### `aql_version_no_predicate`
 
 - **Check:** `VERSION` without predicate; **severity:** Warning.
-- **Fires:** A `VERSION` class expression carrying no version predicate **MUST** raise this code: the default is unspecified ([SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)), so portable queries **SHOULD** state `[LATEST_VERSION]` / `[ALL_VERSIONS]` explicitly.
+- **Fires:** A `VERSION` class expression carrying no version predicate **MUST** raise this code.
+- **Why:** The default is unspecified ([SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)), so a portable query states `[LATEST_VERSION]` or `[ALL_VERSIONS]` explicitly.
 
 #### `aql_versioned_object_unreferenced`
 
@@ -923,10 +961,15 @@ The semantic and portability catalogue, one entry per code:
 #### `aql_fanout_row_grain`
 
 - **Check:** Engine-defined row grain; **severity:** Warning.
-- **Fires:** **MUST** fire exactly when an `AND` containment junction that no inherited negation covers has two or more **projected** aliases among its class-expression **leaves**: the class expressions reached by flattening nested `AND` junctions, descending into neither an `OR` junction nor a negated node.
-  An alias is **projected** when it roots at least one SELECT column, **or** when the projection carries a `*` item in any form (bare `SELECT *`, mixed `SELECT *, col`): a star projects **every** alias bound in FROM/CONTAINS, because the engine returns a column per alias, and a star roots no identified path, so a SELECT-column-only reading would exempt the shape where the question is most live.
-  Negation is inherited downward and alternation is not: a `NOT CONTAINS` at any depth above an `AND` junction, including through an intervening un-negated `OR`, covers it, because a `NOT CONTAINS` collapses to a boolean filter on the parent row and multiplies nothing inside its excluded subtree, while an un-negated `AND` nested under an un-negated `OR` is covered by nothing and fires.
-- **Silent:** So the code stays silent on an `AND` junction with one projected alias, on an `OR` junction with two (under named columns and under `SELECT *` alike, since alternation selects rows and does not multiply them), on `NOT CONTAINS (A AND B)`, and on `NOT CONTAINS (B OR (D AND E))`.
+- **Fires:** The code **MUST** fire exactly when an `AND` containment junction that no inherited negation covers has two or more **projected** aliases among its class-expression **leaves**: the class expressions reached by flattening nested `AND` junctions, descending into neither an `OR` junction nor a negated node.
+  An alias is **projected** when it roots at least one SELECT column, **or** when the projection carries a `*` item in any form (bare `SELECT *`, mixed `SELECT *, col`).
+  A star projects **every** alias bound in FROM/CONTAINS, because the engine returns a column per alias, and a star roots no identified path, so a SELECT-column-only reading would exempt the shape where the question is most live.
+  Negation is inherited downward and alternation is not: a `NOT CONTAINS` at any depth above an `AND` junction, including through an intervening un-negated `OR`, covers it, while an un-negated `AND` nested under an un-negated `OR` is covered by nothing and fires.
+- **Silent:** The code stays silent on:
+  - an `AND` junction with one projected alias;
+  - an `OR` junction with two, under named columns and under `SELECT *` alike, since alternation selects rows and does not multiply them;
+  - `NOT CONTAINS (A AND B)` and `NOT CONTAINS (B OR (D AND E))`.
+- **Why:** A `NOT CONTAINS` collapses to a boolean filter on the parent row and multiplies nothing inside its excluded subtree.
   Possibility is sign-blind and row multiplicity is not, which is why `aql_impossible_containment` checks a `NOT CONTAINS` pair and this code does not.
 - **Detail:** `Detail` states that row multiplicity for this shape is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9).
   It covers the **junction** source of engine-defined row multiplicity (§ No double-reporting).
@@ -942,8 +985,12 @@ The path-shape catalogue, one entry per code:
 #### `aql_path_repeating_unpredicated`
 
 - **Check:** Unconstrained repeating segment; **severity:** Warning.
-- **Fires:** An identified path segment **MUST** raise this code exactly when it types to a **multi-valued** RM attribute (`rminfo` `IsContainer`) and carries **no predicate** of any kind (a node id, a name and a standing comparison all count: presence suffices and content is **not** judged, § The conservative segment walk), once per offending segment, with `Span` on that segment, in **every** identified path the document records (`SELECT`, `WHERE` and `ORDER BY` alike, `parse.Document.Paths`): a `WHERE` filter or an `ORDER BY` key over an unconstrained repeating segment leaves the same which-occurrence question to the engine as a projected path.
-- **Why:** Whether `[at0006]` is the *right* node id is a template question owned by Layer 3's `aql_path_not_in_template`.
+- **Fires:** An identified path segment **MUST** raise this code exactly when it types to a **multi-valued** RM attribute (`rminfo` `IsContainer`) and carries **no predicate** of any kind, as follows:
+  - a node id, a name and a standing comparison all count as a predicate: presence suffices and content is **not** judged (§ The conservative segment walk);
+  - the code fires once per offending segment, with `Span` on that segment;
+  - it fires in **every** identified path the document records (`SELECT`, `WHERE` and `ORDER BY` alike, `parse.Document.Paths`).
+- **Why:** A `WHERE` filter or an `ORDER BY` key over an unconstrained repeating segment leaves the same which-occurrence question to the engine as a projected path.
+  Whether `[at0006]` is the *right* node id is a template question owned by Layer 3's `aql_path_not_in_template`.
 
 #### `aql_paging_no_order_by`
 
@@ -957,23 +1004,40 @@ The path-shape catalogue, one entry per code:
 #### `aql_select_no_alias`
 
 - **Check:** Unaliased projection; **severity:** Warning.
-- **Fires:** A `SELECT` item **MUST** raise this code exactly when it is not a `*` item and carries no `AS` alias, once per item, with `Span` on the item where the item has a position of its own (a bare path) and the **zero `Span`** otherwise (a function-call or literal item, which `Detail`'s item ordinal locates instead), REQ-109's answer for an issue not attributable to a position ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)).
+- **Fires:** A `SELECT` item **MUST** raise this code exactly when it is not a `*` item and carries no `AS` alias, once per item, with:
+  - `Span` on the item where the item has a position of its own (a bare path);
+  - the **zero `Span`** otherwise (a function-call or literal item, which `Detail`'s item ordinal locates instead), REQ-109's answer for an issue not attributable to a position ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)).
 - **Silent:** A `*` item is exempt ([§ No double-reporting](#no-double-reporting)); a **bare alias** item (`SELECT o`) is **not** exempt, because it names no column either.
 - **Why:** A stored-query contract and every column-addressed result reader depend on stable column names, and an unaliased column's name is engine-defined.
 
 #### `aql_fanout_path_grain`
 
 - **Check:** Path row grain; **severity:** Warning.
-- **Fires:** A query **MUST** raise this code exactly when two projected identified paths rooted on the **same** alias diverge after their longest common prefix, **each** passing at least one unpredicated multi-valued segment at or after the divergence: the Cartesian-product shape, whose row multiplicity is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9), which `Detail` states as its sibling's does.
+- **Fires:** A query **MUST** raise this code exactly when two projected identified paths rooted on the **same** alias diverge after their longest common prefix, **each** passing at least one unpredicated multi-valued segment at or after the divergence, the Cartesian-product shape.
+  Its row multiplicity is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9), which `Detail` states as its sibling's does.
   It fires **once per alias**, not once per pair: the first offending pair in document order fixes the `Span` (the later path of that pair) and is named in `Detail`, so a wide projection yields one advisory rather than a quadratic report.
-- **Silent:** So it stays silent on two paths whose multi-valued segments are all in their **common prefix** (one repeating scope, no product), on a pair in which **either** path predicates every multi-valued segment at or after the divergence, on paths rooted on **different** aliases (the junction question, `aql_fanout_row_grain`), and on a bare `SELECT *`, which projects no identified path (the star's row-grain question belongs to the junction code).
+- **Silent:** It stays silent on:
+  - two paths whose multi-valued segments are all in their **common prefix** (one repeating scope, no product);
+  - a pair in which **either** path predicates every multi-valued segment at or after the divergence;
+  - paths rooted on **different** aliases (the junction question, `aql_fanout_row_grain`);
+  - a bare `SELECT *`, which projects no identified path (the star's row-grain question belongs to the junction code).
 
 #### `aql_contains_redundant_step`
 
 - **Check:** Redundant containment step; **severity:** Warning.
-- **Fires:** A `CONTAINS` operand **MUST** raise this code exactly when **all** of the following hold: it is **not** the FROM root; it is **not** a leaf of the containment tree; it carries **no class-position predicate** of any kind, archetype, standing or version (`parse.ClassExpr.HasPredicate` false); its alias roots **no** identified path outside FROM/CONTAINS; it sits inside no containment **junction** and under no **negation**; its class does not conform to `VERSIONED_OBJECT` (§ No double-reporting); and its class is **unavoidable** under the REQ-160 relation, every containment route from its parent operand's class to its child operand's class passing through it.
-  Removing such a step provably changes no result: `EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o` with `c` unreferenced, where every EHR→OBSERVATION route passes `COMPOSITION`.
-- **Why:** The rule is narrower than the guidance sentence it comes from ("containment is minimal"), and the narrowing is its substance: an **avoidable** intermediate narrows the result (removing `SECTION s` from `… CONTAINS SECTION s CONTAINS OBSERVATION o` admits observations outside sections), an unreferenced **leaf** is an existence filter, and inside a junction or under a negation removing the step changes the junction's arity or the excluded set, which the relation alone cannot prove inert.
+- **Fires:** A `CONTAINS` operand **MUST** raise this code exactly when **all** of the following hold:
+  - it is **not** the FROM root;
+  - it is **not** a leaf of the containment tree;
+  - it carries **no class-position predicate** of any kind, archetype, standing or version (`parse.ClassExpr.HasPredicate` false);
+  - its alias roots **no** identified path outside FROM/CONTAINS;
+  - it sits inside no containment **junction** and under no **negation**;
+  - its class does not conform to `VERSIONED_OBJECT` (§ No double-reporting);
+  - its class is **unavoidable** under the REQ-160 relation, every containment route from its parent operand's class to its child operand's class passing through it.
+- **Why:** Removing such a step provably changes no result: `EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o` with `c` unreferenced, where every EHR→OBSERVATION route passes `COMPOSITION`.
+  The rule is narrower than the guidance sentence it comes from ("containment is minimal"), and the narrowing is its substance:
+  - an **avoidable** intermediate narrows the result (removing `SECTION s` from `… CONTAINS SECTION s CONTAINS OBSERVATION o` admits observations outside sections);
+  - an unreferenced **leaf** is an existence filter;
+  - inside a junction or under a negation, removing the step changes the junction's arity or the excluded set, which the relation alone cannot prove inert.
 
 ### The conservative segment walk
 
@@ -995,14 +1059,13 @@ Widening the reach means carrying the RM's generic constraints as cited data in 
 
 The checks are **conservative**: a false **Error** is worse than a missed defect, so the semantic checks flag only what the pinned BMM and overlays prove.
 An **Error** code (`aql_impossible_containment`, `aql_contains_not_containable`, `aql_archetype_class_mismatch`) **MUST** fire only on a verdict the relation proves, so where the relation is deliberately loose (the family-agnostic `VERSION` hub, REQ-160 § Overlay edges) the layer raises no Error the relation does not support.
-An unknown name is **not** an error: it **MUST** surface as the `aql_unknown_rm_class` **Warning**, never as silence and never as an Error.
+An unknown name is **not** an error: it surfaces as the [`aql_unknown_rm_class`](#aql_unknown_rm_class) **Warning**, never as silence and never as an Error.
 Every path-shape code is a **Warning**, and where a fact is not provable from the query text plus the pin, a path-shape check **MUST** stay silent rather than guess (§ The conservative segment walk).
 
 ### Relation supply
 
-`lint.Options` **MUST** carry a nilable relation field, typed `*contain.TypeRelation` (the relation is over RM **type names**, and the type says so); nil uses the REQ-160 default relation.
+`lint.Options` **MUST** carry a nilable relation field, typed `*contain.TypeRelation` (the relation is over RM **type names**, and the type says so).
 A caller with dialect overlay edges (REQ-160 § Extensibility) lints without false findings.
-Because adding a field breaks positional struct literals ([idiom.md § Public-API stability](idiom.md#public-api-stability)), callers **SHOULD** construct `lint.Options` field by name.
 
 Every entry point that runs the semantic group **MUST** offer this supply, or the escape hatch reaches only the callers who bypass the seams: the read side through `lint.Options`, the write side through `(*aql.Builder).VerifyContainment` (§ Builder adapter), and the validation seam through `validation.ValidateAQLWithTypeRelation` (REQ-109 § Issue model and entry points), whose no-relation form `ValidateAQL(q, c)` **MUST** be exactly the nil call.
 A relation is supplied, never gated: nil **MUST** select the REQ-160 default at every one of them, and never switches a group off.
