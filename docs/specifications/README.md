@@ -146,7 +146,7 @@ Identifiers are stable once published ([REQ.md § Numbering policy](REQ.md#numbe
   Specs carry no paths into the code, no test names, no PR numbers and no phase labels.
   Probe entries and Acceptance lists carry no keywords: they state what a test checks.
   A lower-case-modal warning from the gate (`make sdd-check` shows it) is fixed by rephrasing ("is", "does", "never", "only"), not by capitalising the modal.
-- **Layout for reading in parts.** In a specification that uses it, starting with [clinical-modeling.md](clinical-modeling.md), each sentence of prose stands on its own line, which renders as one paragraph, so a search hit or a `file:line` names one sentence; and a named rule inside a section is a heading, so it has an anchor and `make spec-context REQ=NNN RULE=<name>` prints it alone (`OUTLINE=1` lists a requirement's rules).
+- **Layout for reading in parts.** In every specification here, each sentence of prose stands on its own line, which renders as one paragraph, so a search hit or a `file:line` names one sentence; and a named rule inside a section is a heading, so it has an anchor and `make spec-context REQ=NNN RULE=<name>` prints it alone (`OUTLINE=1` lists a requirement's rules).
   An edit keeps that layout, and a sentence over about 60 words that it touches is split ([AGENTS.md § Spec-driven workflow](../../AGENTS.md#spec-driven-workflow-agents)).
 - The specifications source-of-truth is **this tree**.
   Cadasto architecture sources may inform it, but a divergence between this tree and any external source is resolved by editing this tree, not by handwaving "see external".

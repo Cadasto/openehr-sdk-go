@@ -51,7 +51,12 @@ client, err := transport.New(catalog,
 ```
 
 The SDK allocates no `*http.Client` of its own.
-Three shallow copies of the injected client are the exceptions, each changing only its redirect policy, and each **MUST** leave the injected client unmodified: the copy that [auth.md § Credential-bearing requests](auth.md#credential-bearing-requests) prescribes for token, refresh and revocation requests; the copy the discovery resolver fetches with, to refuse a redirect to a URL that is not https ([auth.md § REQ-073](auth.md#req-073--discovery-trust-posture)); and the copy the transport sends a request carrying a credential header (`Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`) with, to refuse a redirect from https to a URL that is not https ([transport.md § REQ-092](transport.md#req-092--tls-posture)).
+Three shallow copies of the injected client are the exceptions, each changing only its redirect policy, and each **MUST** leave the injected client unmodified:
+
+- the copy that [auth.md § Credential-bearing requests](auth.md#credential-bearing-requests) prescribes for token, refresh and revocation requests;
+- the copy the discovery resolver fetches with, to refuse a redirect to a URL that is not https ([auth.md § REQ-073](auth.md#req-073--discovery-trust-posture));
+- the copy the transport sends a request carrying a credential header (`Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`) with, to refuse a redirect from https to a URL that is not https ([transport.md § REQ-092](transport.md#req-092--tls-posture)).
+
 Each copy keeps the injected client's `Transport`, `Jar` and `Timeout`.
 
 Rationale:
