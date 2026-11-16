@@ -1613,8 +1613,9 @@ The exported tree is **not** a 1:1 mirror of the compiled OPT; it follows the re
 The transform **MUST**:
 
 - keep `COMPOSITION`, the ENTRY types (`OBSERVATION` / `EVALUATION` / `INSTRUCTION` / `ACTION` / `ADMIN_ENTRY`), `EVENT_CONTEXT`, and `CLUSTER` as nodes;
-- keep the event types (`EVENT` / `POINT_EVENT` / `INTERVAL_EVENT`) as nodes **except** an abstract `EVENT` constrained to at most one occurrence, which is **lifted**.
-  The reference emits no node for such a degenerate wrapper, while retaining its `events[…]` path segment on descendants and its synthesized `time` leaf (a repeating `EVENT`, and any concrete `POINT_EVENT` / `INTERVAL_EVENT` even at `max=1`, stays a node);
+- keep the event types (`EVENT` / `POINT_EVENT` / `INTERVAL_EVENT`) as nodes **except** an event of any of these types that is its `HISTORY`'s only event and is constrained to at most one occurrence, which is **lifted**.
+  The reference emits no node for such an event, while retaining its `events[…]` path segment on descendants and its synthesized leaves (`time`, and an `INTERVAL_EVENT`'s `math_function` and `width`).
+  An event at `max=1` beside another event stays a node, whatever its type, and so does a repeating event;
 - give each `ELEMENT` the leaf or node its value alternatives call for, as the table below says;
 - **drop** the pure structural wrappers (`HISTORY` and the `ITEM_STRUCTURE` family — `ITEM_TREE` / `ITEM_LIST` / `ITEM_SINGLE` / `ITEM_TABLE`) as nodes while **folding their node predicates into the `aqlPath`** of the descendants they enclose;
 - emit RM-attribute values that carry data directly (e.g. `EVENT_CONTEXT.start_time` / `setting`, `EVENT.time`, `ACTION.time`, the ENTRY `language` / `encoding` / `subject`, `INTERVAL_EVENT.math_function` / `width`) as leaves whose `id` is the attribute name.

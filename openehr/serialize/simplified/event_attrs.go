@@ -5,9 +5,11 @@ package simplified
 // and § INTERVAL_EVENT, issue 424): an INTERVAL_EVENT's `sample_count`, a
 // suffix on its event node; an abstract EVENT's `math_function` and `width`,
 // leaves under its node, which an INTERVAL_EVENT node already has; and an
-// OBSERVATION's `history_origin`, a leaf under its node. An abstract EVENT the
-// Web Template folds into its OBSERVATION has no node, so its three are
-// spelled at the OBSERVATION's (issue 456); where it folds in more than one,
+// OBSERVATION's `history_origin`, a leaf under its node. An event the Web
+// Template folds into its OBSERVATION, its HISTORY's only event at max 1 of
+// any type (issue 452), has no node, so its three are spelled at the
+// OBSERVATION's (issue 456), where a folded INTERVAL_EVENT has its
+// `math_function` and `width` as children; where it folds in more than one,
 // those keys name none of them. The reference implementation gives none of
 // them a Web Template node either, so the codec reads and writes them itself,
 // and the Web Template stays the reference's.
@@ -41,9 +43,8 @@ var sampleCountFit = valueFit{attr: "INTERVAL_EVENT.sample_count", bmmType: "Int
 //   - under an OBSERVATION node, `history_origin`, the DV_DATE_TIME at
 //     `data/origin`, where the node's events name the HISTORY's node id
 //     ([historyNodeID]);
-//   - under an OBSERVATION node that folds in an abstract EVENT
-//     ([foldedEvent]), that event's `math_function` and `width`, as under the
-//     event's node.
+//   - under an OBSERVATION node that folds in an event ([foldedEvent]), that
+//     event's `math_function` and `width`, as under an abstract EVENT's node.
 //
 // The leaf is built per call, and its path extends the parent's, so it
 // resolves through [reusedSiblings] as the parent does.
@@ -69,7 +70,7 @@ func codecLeaf(parent *webtemplate.Node, id string) *webtemplate.Node {
 }
 
 // intervalAttrLeaf returns the leaf of the INTERVAL_EVENT attribute id of the
-// abstract EVENT at eventPath, `math_function` or `width`, or nil for any
+// abstract EVENT or folded event at eventPath, `math_function` or `width`, or nil for any
 // other id.
 func intervalAttrLeaf(eventPath, id string) *webtemplate.Node {
 	switch id {
@@ -81,9 +82,9 @@ func intervalAttrLeaf(eventPath, id string) *webtemplate.Node {
 	return nil
 }
 
-// intervalEventOf returns the path of the abstract EVENT whose INTERVAL_EVENT
-// attribute leaf is, a [codecLeaf] under parent: the attribute makes the event
-// an INTERVAL_EVENT. It reports false for any other leaf.
+// intervalEventOf returns the path of the abstract or folded event whose
+// INTERVAL_EVENT attribute leaf is, a [codecLeaf] under parent: the attribute
+// makes the event an INTERVAL_EVENT. It reports false for any other leaf.
 func intervalEventOf(parent, leaf *webtemplate.Node) (string, bool) {
 	switch nodeRMType(parent) {
 	case "EVENT", "OBSERVATION":
@@ -94,7 +95,7 @@ func intervalEventOf(parent, leaf *webtemplate.Node) (string, bool) {
 	return "", false
 }
 
-// foldedEvent returns the abstract EVENT an OBSERVATION node folds in, where
+// foldedEvent returns the event an OBSERVATION node folds in, where
 // it folds in exactly one ([foldedEventPaths]). The node returned stands for
 // the event and holds its path. It reports false where obs folds in no event,
 // or more than one, whose keys at the OBSERVATION name none of them.
@@ -111,25 +112,56 @@ func foldedEventNode(path string) *webtemplate.Node {
 	return &webtemplate.Node{RMType: "EVENT", Max: 1, AQLPath: path}
 }
 
-// foldedEventPaths returns the paths of the abstract EVENTs an OBSERVATION
-// node folds in, in the order of their `time` leaves. The Web Template gives
-// an abstract EVENT that occurs at most once no node: it lifts the event's
-// children into the OBSERVATION's node, its `time` leaf among them, each at
-// its path through the event ([webtemplate.Build]), so each path is read off
-// a `time` leaf.
+// foldedEventPaths returns the paths of the events an OBSERVATION node folds
+// in, in the order of their `time` leaves. The Web Template gives an event
+// that is its HISTORY's only event and occurs at most once no node, whatever
+// its type (issue 452): it lifts the event's children into the OBSERVATION's
+// node, its `time` leaf among them, each at its path through the event
+// ([webtemplate.Build]), so each path is read off a `time` leaf.
 func foldedEventPaths(obs *webtemplate.Node) []string {
 	depth := len(parseAQL(obs.AQLPath))
 	var paths []string
 	for _, ch := range obs.Children {
-		segs := parseAQL(ch.AQLPath)
-		if len(segs) != depth+3 || segs[depth].attr != "data" || segs[depth+1].attr != "events" || segs[depth+2].attr != "time" {
+		event, folded := foldedEventOf(depth, ch)
+		if !folded || ch.AQLPath != event+"/time" {
 			continue
 		}
-		if event := ch.AQLPath[:segs[depth+1].end]; !slices.Contains(paths, event) {
+		if !slices.Contains(paths, event) {
 			paths = append(paths, event)
 		}
 	}
 	return paths
+}
+
+// foldedEventOf returns the path of the folded event that ch, a child of an
+// OBSERVATION node whose path has depth segments, sits below: the child's
+// path runs through the OBSERVATION's `data` and an `events[…]` segment with
+// more below it. It reports false for any other child, an event node of its
+// own among them.
+func foldedEventOf(depth int, ch *webtemplate.Node) (string, bool) {
+	segs := parseAQL(ch.AQLPath)
+	if len(segs) < depth+3 || segs[depth].attr != "data" || segs[depth+1].attr != "events" {
+		return "", false
+	}
+	return ch.AQLPath[:segs[depth+1].end], true
+}
+
+// markFoldedIntervalEvent records in predType, under its bare path, that the
+// event an OBSERVATION node folds in is an INTERVAL_EVENT, where child, one of
+// the node's children, sits below that event and the event is one. The Web
+// Template lifts a folded INTERVAL_EVENT's in-context `width` leaf into the
+// OBSERVATION with its other children, and no other event has one, so the
+// event takes the type its template gives whatever key reaches it. Any other
+// folded event decodes as the POINT_EVENT [concreteType] gives, unless a key
+// spells one of its interval attributes ([codecLeaf]).
+func markFoldedIntervalEvent(obs, child *webtemplate.Node, predType map[string]string) {
+	if nodeRMType(obs) != "OBSERVATION" || !strings.Contains(strings.TrimPrefix(child.AQLPath, obs.AQLPath), "/events[") {
+		return
+	}
+	event, folded := foldedEventOf(len(parseAQL(obs.AQLPath)), child)
+	if folded && slices.ContainsFunc(obs.Children, func(ch *webtemplate.Node) bool { return ch.AQLPath == event+"/"+widthSeg }) {
+		predType[bareAQLPath(event)] = "INTERVAL_EVENT"
+	}
 }
 
 // historyNodeID returns the node id of the HISTORY an OBSERVATION node's
@@ -154,7 +186,7 @@ func historyNodeID(obs *webtemplate.Node) (string, bool) {
 
 // sampleCountEvent returns the event whose `|sample_count` a Web Template node
 // takes as a suffix: an event node's own, abstract or an INTERVAL_EVENT, and
-// an OBSERVATION node's that folds in an abstract EVENT ([foldedEvent]). It
+// an OBSERVATION node's that folds in an event ([foldedEvent]). It
 // reports false for any other node.
 func sampleCountEvent(node *webtemplate.Node) (*webtemplate.Node, bool) {
 	switch nodeRMType(node) {
@@ -185,8 +217,8 @@ func placeSampleCount(compJSON map[string]any, eventPath, eventNames string, pre
 
 // emitCodecAttrs writes the attributes [codecLeaf] and `|sample_count` name, of
 // v, the instance at node, under flatPath: an INTERVAL_EVENT's sample_count
-// where it is set, an abstract EVENT's math_function and width where the
-// instance is an INTERVAL_EVENT, at its node or at the OBSERVATION node that
+// where it is set, an abstract or folded event's math_function and width where
+// the instance is an INTERVAL_EVENT, at its node or at the OBSERVATION node that
 // folds it in ([foldedEvent]), and an OBSERVATION's history origin
 // ([emitHistoryOrigin]). root and rootAql are the resolution root v's children
 // resolve against.
@@ -227,19 +259,25 @@ func emitSampleCount(out map[string]any, flatPath string, ev rm.IntervalEvent[rm
 
 // emitIntervalAttrs writes ev, an INTERVAL_EVENT at the abstract EVENT node or
 // the OBSERVATION node that folds it in, as node's [codecLeaf] spellings and
-// `|sample_count` under flatPath. Where a child of node has the id of one of
-// those leaves, the key is the child's, and decode reads it as the child, so
-// the attribute, which an INTERVAL_EVENT always holds, has no key: it is
-// refused, wrapping [ErrUnsupportedDatatype], rather than written where it
-// would be read as the child or dropped.
+// `|sample_count` under flatPath. Where a child of node is the attribute's own
+// leaf, at its path, as a folded INTERVAL_EVENT's in-context leaves are, the
+// node walk writes it, and so does not this. Where another child of node has
+// the id of one of those leaves, the key is the child's, and decode reads it
+// as the child, so the attribute, which an INTERVAL_EVENT always holds, has no
+// key: it is refused, wrapping [ErrUnsupportedDatatype], rather than written
+// where it would be read as the child or dropped.
 func emitIntervalAttrs(out map[string]any, node *webtemplate.Node, flatPath string, ev rm.IntervalEvent[rm.ItemStructure], root rm.Locatable, rootAql string, sib *reusedSiblings) error {
 	emitSampleCount(out, flatPath, ev)
 	for _, id := range []string{mathFunctionSeg, widthSeg} {
+		leaf := codecLeaf(node, id)
+		if slices.ContainsFunc(node.Children, func(ch *webtemplate.Node) bool { return ch.AQLPath == leaf.AQLPath }) {
+			continue
+		}
 		if childByID(node, id) != nil {
 			return fmt.Errorf("%w: %q is the key of a child of its node, so the INTERVAL_EVENT's %s has no key there",
 				ErrUnsupportedDatatype, flatPath+"/"+id, id)
 		}
-		if err := emitNode(out, codecLeaf(node, id), flatPath, root, rootAql, sib); err != nil {
+		if err := emitNode(out, leaf, flatPath, root, rootAql, sib); err != nil {
 			return err
 		}
 	}

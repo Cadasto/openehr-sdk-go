@@ -24,9 +24,9 @@ import (
 
 // namedEventsTemplate builds the template in testdata whose OBSERVATION holds
 // two EVENTs of one node id, at most one each, told apart only by the names
-// they pin, 'First event' and 'Second event'. The Web Template lifts both
-// events, so their leaves sit side by side under the OBSERVATION: text and
-// time for the first, text_1, count and time_1 for the second.
+// they pin, 'First event' and 'Second event'. Neither is its HISTORY's only
+// event, so the Web Template keeps both as nodes, first_event with text and
+// time, and second_event with text, count and time (issue 452).
 func namedEventsTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
 	opt, err := readOPTFile("testdata/named_sibling_events.opt")
@@ -38,6 +38,8 @@ func namedEventsTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompi
 
 const (
 	namedEventsObs    = "sdk_named_sibling_events/sdk_named_events"
+	namedFirstEvent   = namedEventsObs + "/first_event"
+	namedSecondEvent  = namedEventsObs + "/second_event"
 	namedEventsEvents = "/content[openEHR-EHR-OBSERVATION.sdk_named_events.v1]/data[at0001]/events"
 )
 
@@ -100,8 +102,8 @@ func TestREQ053ReusedSiblingEventsRoundTrip(t *testing.T) {
 
 	keys := flatKeys(t, comp, wt)
 	for key, want := range map[string]string{
-		namedEventsObs + "/text":   "first text",
-		namedEventsObs + "/text_1": "second text",
+		namedFirstEvent + "/text":  "first text",
+		namedSecondEvent + "/text": "second text",
 	} {
 		if got := keys[key]; got != want {
 			t.Errorf("MarshalFlat %q = %v, want %q", key, got, want)
@@ -111,10 +113,10 @@ func TestREQ053ReusedSiblingEventsRoundTrip(t *testing.T) {
 	if !ok {
 		t.Fatal("the second event's count is not a *rm.DVCount")
 	}
-	if got, ok := keys[namedEventsObs+"/count"].(float64); !ok || rm.Integer64(got) != count.Magnitude {
-		t.Errorf("MarshalFlat %q = %v, want %d", namedEventsObs+"/count", keys[namedEventsObs+"/count"], count.Magnitude)
+	if got, ok := keys[namedSecondEvent+"/count"].(float64); !ok || rm.Integer64(got) != count.Magnitude {
+		t.Errorf("MarshalFlat %q = %v, want %d", namedSecondEvent+"/count", keys[namedSecondEvent+"/count"], count.Magnitude)
 	}
-	for _, key := range []string{namedEventsObs + "/time", namedEventsObs + "/time_1"} {
+	for _, key := range []string{namedFirstEvent + "/time", namedSecondEvent + "/time"} {
 		if _, ok := keys[key]; !ok {
 			t.Errorf("MarshalFlat wrote no %q", key)
 		}
@@ -157,20 +159,32 @@ func TestREQ053ReusedSiblingEventsRoundTrip(t *testing.T) {
 // TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent — REQ-053, REQ-111: a
 // FLAT key under one named sibling lands in the event carrying that sibling's
 // name, created with it when absent, even where a key of the other sibling
-// sorts first; the events then stand in template order. The second event's
-// time is spelled time2, the earlier spelling of time_1.
+// sorts first; the events then stand in template order. The second event is
+// renamed 'A second event' here, so that its keys sort before the first's.
 func TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent(t *testing.T) {
-	wt, compiled := namedEventsTemplate(t)
-	// count (second event) sorts before text (first event).
+	raw, err := os.ReadFile("testdata/named_sibling_events.opt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const second, renamed = "<list>Second event</list>", "<list>A second event</list>"
+	if n := strings.Count(string(raw), second); n != 1 {
+		t.Fatalf("the template pins 'Second event' %d times, want once — fixture changed?", n)
+	}
+	opt, err := fixtures.ReadOperationalTemplate([]byte(strings.Replace(string(raw), second, renamed, 1)))
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	wt, compiled := compileTemplate(t, "sdk_named_sibling_events.v1", opt)
+	// a_second_event/count (second event) sorts before first_event/text.
 	body := mustJSON(t, map[string]any{
 		"ctx/language":                                  "en",
 		"ctx/territory":                                 "NL",
 		"ctx/composer_name":                             "Composer",
 		"ctx/time":                                      "2026-10-26T09:00:00Z",
-		namedEventsObs + "/count":                       7,
-		namedEventsObs + "/text":                        "first text",
-		namedEventsObs + "/time":                        "2026-10-26T09:00:00Z",
-		namedEventsObs + "/time2":                       "2026-10-26T10:00:00Z",
+		namedEventsObs + "/a_second_event/count":        7,
+		namedEventsObs + "/a_second_event/time":         "2026-10-26T10:00:00Z",
+		namedFirstEvent + "/text":                       "first text",
+		namedFirstEvent + "/time":                       "2026-10-26T09:00:00Z",
 		"sdk_named_sibling_events/category|code":        "433",
 		"sdk_named_sibling_events/category|value":       "event",
 		"sdk_named_sibling_events/category|terminology": "openehr",
@@ -187,14 +201,14 @@ func TestREQ053ReusedSiblingEventsDecodeIntoTheirOwnEvent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("UnmarshalFlat: %v", err)
 			}
-			if got, want := eventNames(t, back), []string{"First event", "Second event"}; !slices.Equal(got, want) {
+			if got, want := eventNames(t, back), []string{"First event", "A second event"}; !slices.Equal(got, want) {
 				t.Fatalf("decoded events = %q, want %q", got, want)
 			}
 			if dv, ok := namedEventItem(t, back, "First event", "at0004").(*rm.DVText); !ok || dv.Value != "first text" {
 				t.Errorf("first event's text = %v, want %q", namedEventItem(t, back, "First event", "at0004"), "first text")
 			}
-			if c, ok := namedEventItem(t, back, "Second event", "at0005").(*rm.DVCount); !ok || c.Magnitude != 7 {
-				t.Errorf("second event's count = %v, want 7", namedEventItem(t, back, "Second event", "at0005"))
+			if c, ok := namedEventItem(t, back, "A second event", "at0005").(*rm.DVCount); !ok || c.Magnitude != 7 {
+				t.Errorf("second event's count = %v, want 7", namedEventItem(t, back, "A second event", "at0005"))
 			}
 			if len(mode.opts) == 2 {
 				for _, is := range validation.ValidateComposition(back, compiled).Issues {
@@ -397,14 +411,14 @@ func TestREQ053ReusedSiblingOrdinalTerminology(t *testing.T) {
 		"ctx/territory":                                 "NL",
 		"ctx/composer_name":                             "Composer",
 		"ctx/time":                                      "2026-10-26T09:00:00Z",
-		namedEventsObs + "/text|code":                   "X1",
-		namedEventsObs + "/text|value":                  "Mild",
-		namedEventsObs + "/text|ordinal":                1,
-		namedEventsObs + "/time":                        "2026-10-26T09:00:00Z",
-		namedEventsObs + "/text_1|code":                 "X1",
-		namedEventsObs + "/text_1|value":                "Mild",
-		namedEventsObs + "/text_1|ordinal":              1,
-		namedEventsObs + "/time_1":                      "2026-10-26T10:00:00Z",
+		namedFirstEvent + "/text|code":                  "X1",
+		namedFirstEvent + "/text|value":                 "Mild",
+		namedFirstEvent + "/text|ordinal":               1,
+		namedFirstEvent + "/time":                       "2026-10-26T09:00:00Z",
+		namedSecondEvent + "/text|code":                 "X1",
+		namedSecondEvent + "/text|value":                "Mild",
+		namedSecondEvent + "/text|ordinal":              1,
+		namedSecondEvent + "/time":                      "2026-10-26T10:00:00Z",
 		"sdk_named_sibling_events/category|code":        "433",
 		"sdk_named_sibling_events/category|value":       "event",
 		"sdk_named_sibling_events/category|terminology": "openehr",

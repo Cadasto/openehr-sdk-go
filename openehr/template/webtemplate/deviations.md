@@ -234,15 +234,19 @@ in this builder's spelling (§ Duplicate sibling ids).
   reference's own IPS test Web Template spelling, where its code writes
   `interval<dv_date_time>_value`. The reference's FLAT reader does not read that key.
 
-- **Single-occurrence `EVENT` containers are lifted, not emitted** — matches the
-  reference. An abstract `EVENT` constrained to at most one occurrence contributes
-  no node of its own; its `events[…]` path segment and its in-context `time` leaf
-  are retained and its children are lifted to the parent. A repeating `EVENT`, and
-  any concrete `POINT_EVENT` / `INTERVAL_EVENT`, is kept as a node even at `max=1`.
-  Both halves of the discriminator are needed: corona drops 14 EVENT nodes (all
-  `max=1`) and keeps 2 (`max=-1`); `constrain_test` keeps 3 EVENT at `max=-1` **and**
-  an INTERVAL_EVENT `a24_hour_average` at `max=1`; and the upstream FLAT corpus keys
-  `any_event` (repeating) in 424 places, which this builder still emits.
+- **A sole event that occurs at most once is lifted, not emitted** — matches the
+  reference (openEHR_SDK `Filter.skip`). An event of any type (`EVENT`, `POINT_EVENT`,
+  `INTERVAL_EVENT`) that is its HISTORY's only event and is constrained to at most one
+  occurrence contributes no node of its own; its `events[…]` path segment and its
+  in-context leaves (`time`, and an `INTERVAL_EVENT`'s `math_function` and `width`) are
+  retained and its children are lifted to the parent. An event at `max=1` beside another
+  event is kept as a node, whatever its type, and so is a repeating event. The goldens
+  agree: corona lifts 14 sole EVENTs (all `max=1`) and keeps 2 (`max=-1`);
+  `constrain_test` keeps an INTERVAL_EVENT `a24_hour_average` at `max=1` beside three
+  repeating EVENTs; and the upstream FLAT corpus keys `any_event` (repeating) in 424
+  places. Until issue 452 the builder, reading the rule off those goldens, lifted an
+  abstract `EVENT` alone: it kept a sole `POINT_EVENT` at `max=1`, such as the laboratory
+  test report's `any_event`, as a node, and lifted an abstract `EVENT` beside other events.
 
 - **GECCO golden marks in-context RM-attribute leaves `min=1`** — 14 nodes
   (`/language`, `/territory`, `/composer`, `/context/setting`, `/context/start_time`

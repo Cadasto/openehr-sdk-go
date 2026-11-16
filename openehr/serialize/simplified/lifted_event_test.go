@@ -2,9 +2,11 @@ package simplified_test
 
 // REQ-053, issue 452 — an event the Web Template lifts, any subtype at max 1
 // that is its HISTORY's only event (REQ-106), spells no segment of its own:
-// its leaves are keyed under its OBSERVATION. Decode rebuilds the event with
-// the RM type the template gives it, its time and, for an INTERVAL_EVENT, its
-// width and math_function; encode writes them back under the same keys.
+// its leaves are keyed under its OBSERVATION, and an INTERVAL_EVENT's
+// sample_count is a suffix on the OBSERVATION's node, as for a folded abstract
+// EVENT (issue 456). Decode rebuilds the event with the RM type the template
+// gives it, its time and, for an INTERVAL_EVENT, its width, math_function and
+// sample_count; encode writes them back under the same keys.
 
 import (
 	"bytes"
@@ -65,13 +67,15 @@ func labBody(extra map[string]any) map[string]any {
 	return body
 }
 
-// labIntervalKeys are the keys of a lifted INTERVAL_EVENT's width and
-// math_function.
+// labIntervalKeys are the keys of a lifted INTERVAL_EVENT's width,
+// math_function and sample_count.
 func labIntervalKeys() map[string]any {
 	return map[string]any{
-		labObs + "/width":               "PT1H",
-		labObs + "/math_function|code":  "146",
-		labObs + "/math_function|value": "mean",
+		labObs + "/width":                     "PT1H",
+		labObs + "/math_function|code":        "146",
+		labObs + "/math_function|value":       "mean",
+		labObs + "/math_function|terminology": "openehr",
+		labObs + "|sample_count":              4.0, // a JSON number reads back as float64
 	}
 }
 
@@ -119,9 +123,10 @@ func TestREQ053LiftedEventKeysDecode(t *testing.T) {
 
 // TestREQ053LiftedEventRoundTrips — REQ-053, issue 452. Encode writes a lifted
 // POINT_EVENT's and a lifted INTERVAL_EVENT's leaves under the OBSERVATION,
-// with no segment for the event, and a strict decode of the FLAT and the
+// with no segment for the event, the INTERVAL_EVENT's width and math_function
+// once, at their Web Template leaves, and a strict decode of the FLAT and the
 // STRUCTURED it writes, with and without the template, gives back the event's
-// RM type, time, width and math_function.
+// RM type, time, width, math_function and sample_count.
 func TestREQ053LiftedEventRoundTrips(t *testing.T) {
 	for _, tc := range []struct {
 		eventType string
@@ -161,7 +166,7 @@ func TestREQ053LiftedEventRoundTrips(t *testing.T) {
 
 // assertLabEvent checks that ev, decoded in the way named how, is an event of
 // eventType with the time labBody gives it and, as an INTERVAL_EVENT, the
-// width and math_function labIntervalKeys give it.
+// width, math_function and sample_count labIntervalKeys give it.
 func assertLabEvent(t *testing.T, how, eventType string, ev rm.Event) {
 	t.Helper()
 	if got := eventTimeOf(t, ev); got != "2026-11-16T09:30:00Z" {
@@ -183,6 +188,9 @@ func assertLabEvent(t *testing.T, how, eventType string, ev rm.Event) {
 	}
 	if mf := iv.MathFunction; mf.Value != "mean" || mf.DefiningCode.CodeString != "146" {
 		t.Errorf("%s: math_function = %+v, want 146|mean", how, mf)
+	}
+	if iv.SampleCount == nil || *iv.SampleCount != 4 {
+		t.Errorf("%s: sample_count = %v, want 4", how, iv.SampleCount)
 	}
 }
 

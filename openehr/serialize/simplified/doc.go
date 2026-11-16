@@ -85,14 +85,19 @@
 // earliest time the events carry. Any other spelling of the four, such as
 // "<event>/sample_count", is unmatched content.
 //
-// An abstract EVENT that occurs at most once has no Web Template node: the
-// Web Template folds it into its OBSERVATION, whose node holds the event's
-// "time" leaf. Its three interval keys are then spelled at the OBSERVATION,
-// as "<observation>/width", "<observation>/math_function" and
-// "<observation>|sample_count", and read and written there as at an EVENT
-// node. An OBSERVATION that folds in two or more such events gives those keys
-// to none of them: decode reads them as unmatched content, and encode refuses
-// an INTERVAL_EVENT among the events that holds any of the three with
+// An event that is its history's only event and occurs at most once, of any
+// event type, has no Web Template node: the Web Template folds it into its
+// OBSERVATION, whose node holds the event's "time" leaf and its data. Its
+// three interval keys are then spelled at the OBSERVATION, as
+// "<observation>/width", "<observation>/math_function" and
+// "<observation>|sample_count". A folded INTERVAL_EVENT has the first two as
+// leaves of the OBSERVATION's node, and decode rebuilds it as an
+// INTERVAL_EVENT whatever keys the body gives. Any other folded event is read
+// as at an abstract EVENT node: the Web Template does not tell a folded
+// POINT_EVENT from a folded EVENT, so any of the three keys makes it an
+// INTERVAL_EVENT. An OBSERVATION that folds in two or more events gives those
+// keys to none of them: decode reads them as unmatched content, and encode
+// refuses an INTERVAL_EVENT among the events that holds any of the three with
 // [ErrUnsupportedDatatype].
 //
 // # An ELEMENT with several value types

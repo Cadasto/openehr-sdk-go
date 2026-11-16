@@ -1689,6 +1689,7 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 			// than corrupt; see deviations.md § Conformance.
 			return nil, nil, nil, fmt.Errorf("%w: FLAT id %q reaches one of several reused siblings sharing the path %q — not yet decodable (see deviations.md)", ErrUnknownPath, seg.id, sib.nodePath(next))
 		}
+		markFoldedIntervalEvent(node, next, predType)
 		if next.NodeID != "" {
 			bare := bareAQLPath(next.AQLPath)
 			predType[bare] = nodeRMType(next)

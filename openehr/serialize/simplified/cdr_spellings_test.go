@@ -508,9 +508,12 @@ func TestREQ053IntervalAttributeKeyTakenByAChildIsRefused(t *testing.T) {
 }
 
 // twoFoldedEventsTemplate is clinical_notes.v0 with a second abstract EVENT,
-// at0003, that can occur once beside story_history's at0002: the Web Template
-// folds both into the OBSERVATION, whose node then holds a `time` leaf for
-// each.
+// at0003, that can occur once beside story_history's at0002, and a Web
+// Template that folds both into the OBSERVATION, whose node then holds a
+// `time` leaf for each. Build keeps two such events as nodes, as the
+// reference does (issue 452), so the events are folded here by hand
+// ([foldEventNodes]): the codec still meets such a Web Template where one
+// built otherwise is handed to it.
 func twoFoldedEventsTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
 	raw, err := os.ReadFile(fixtures.TemplateOpt("clinical_notes.v0"))
@@ -542,6 +545,9 @@ func twoFoldedEventsTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatec
 	var times []string
 	var walk func(n *webtemplate.Node)
 	walk = func(n *webtemplate.Node) {
+		if n.ID == "story_history" {
+			foldEventNodes(n)
+		}
 		for _, ch := range n.Children {
 			if n.ID == "story_history" && strings.HasPrefix(ch.ID, "time") {
 				times = append(times, ch.ID)
@@ -554,6 +560,30 @@ func twoFoldedEventsTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatec
 		t.Fatalf("story_history's node holds the time leaves %q, want two", times)
 	}
 	return wt, compiled
+}
+
+// foldEventNodes replaces each EVENT node among obs's children by the event's
+// own children, the Web Template shape of an event folded into its
+// OBSERVATION. A child whose id an earlier child holds takes the next free
+// `_N` suffix, as Build spells duplicate siblings.
+func foldEventNodes(obs *webtemplate.Node) {
+	var children []*webtemplate.Node
+	for _, ch := range obs.Children {
+		if ch.RMType == "EVENT" {
+			children = append(children, ch.Children...)
+			continue
+		}
+		children = append(children, ch)
+	}
+	taken := make(map[string]bool, len(children))
+	for _, ch := range children {
+		id := ch.ID
+		for n := 1; taken[id]; n++ {
+			id = ch.ID + "_" + strconv.Itoa(n)
+		}
+		ch.ID, taken[id] = id, true
+	}
+	obs.Children = children
 }
 
 // TestREQ053TwoFoldedEventsIntervalAttributesAreRefused — REQ-053. Where an
