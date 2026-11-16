@@ -821,7 +821,7 @@ requirements:
     title: openEHR custom headers
     canonical: docs/specifications/wire.md#req-059
     status: draft
-    implementation: partial
+    implementation: landed
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
     probes: [PROBE-062]
     tests:
@@ -844,6 +844,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [auth, auth/basic, auth/clientcreds, auth/jwtbearer, auth/smart, smart, smart/discovery, internal/noredirect, transport]
+    probes: [PROBE-064]
     tests:
       - auth/basic/print_test.go
       - auth/clientcreds/print_test.go
@@ -1062,7 +1063,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart/discovery]
-    probes: [PROBE-002, PROBE-040]
+    probes: [PROBE-002, PROBE-063]
     tests:
       - smart/discovery/auth_endpoints_test.go
       - smart/discovery/diagnostics_test.go
@@ -1085,7 +1086,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart/discovery]
-    probes: [PROBE-041]
+    probes: [PROBE-040, PROBE-041]
     tests:
       - smart/discovery/cache_hit_test.go
       - smart/discovery/cache_write_bound_test.go
@@ -1103,7 +1104,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart/discovery]
-    probes: [PROBE-002, PROBE-003, PROBE-040, PROBE-041]
+    probes: [PROBE-002, PROBE-003, PROBE-041]
     tests:
       - smart/discovery/auth_members_test.go
       - smart/discovery/cache_hit_test.go
@@ -1152,7 +1153,7 @@ requirements:
     title: Probe runnability
     canonical: docs/specifications/conformance.md#req-082--runnability
     status: draft
-    implementation: partial
+    implementation: landed
     packages: [testkit, testkit/probe, cmd/probe-record, cmd/cdrcheck, sandbox, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/demographic, testkit/probes/transport, testkit/probes/discovery, testkit/probes/template, testkit/probes/query, testkit/probes/rest, testkit/probes]
     tests:
       - cmd/cdrcheck/main_test.go
@@ -1191,7 +1192,7 @@ requirements:
     title: Cadasto platform API conformance
     canonical: docs/specifications/conformance.md#req-083--cadasto-platform-api-conformance
     status: draft
-    implementation: partial
+    implementation: landed
     packages: [cadasto, cadasto/admin]
     tests:
       - cadasto/admin/probes_test.go
@@ -1203,7 +1204,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport]
-    probes: [PROBE-051]
+    probes: [PROBE-050, PROBE-051]
     tests:
       - openehr/client/route_guard_test.go
       - transport/client_test.go
@@ -1245,7 +1246,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/query]
-    probes: [PROBE-010, PROBE-011]
+    probes: [PROBE-010, PROBE-011, PROBE-068]
     tests:
       - cadasto/admin/probes_test.go
       - cmd/probe-record/main_test.go
@@ -1902,7 +1903,7 @@ requirements:
     title: Template-less Reference Model validation floor
     canonical: docs/specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor
     status: draft
-    implementation: partial
+    implementation: landed
     packages:
       - openehr/validation
       - openehr/rm/rminfo
@@ -2439,6 +2440,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport]
+    probes: [PROBE-007]
     tests:
       - transport/body_read_error_test.go
       - transport/challenge_test.go
@@ -2766,7 +2768,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/definition]
-    probes: [PROBE-112]
+    probes: [PROBE-067, PROBE-112]
     tests:
       - openehr/client/definition/body_read_error_test.go
       - openehr/client/definition/path_encoding_test.go

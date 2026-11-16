@@ -60,7 +60,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-056 | Canonical XML | [wire.md](wire.md#req-056) | draft | landed |
 | REQ-057 | Stored AQL queries | [wire.md](wire.md#req-057) | draft | landed |
 | REQ-058 | Datamap V2 | [module-layout.md](module-layout.md#req-058--datamap-v2) | draft | planned |
-| REQ-059 | openEHR custom headers | [wire.md](wire.md#req-059) | draft | partial |
+| REQ-059 | openEHR custom headers | [wire.md](wire.md#req-059) | draft | landed |
 | REQ-060 | TokenSource interface | [auth.md](auth.md#req-060) | draft | landed |
 | REQ-061 | SMART-on-openEHR PKCE | [auth.md](auth.md#req-061--pkce-flow) | draft | landed |
 | REQ-062 | JWKS rotation | [auth.md](auth.md#req-062--jwks-rotation) | draft | landed |
@@ -77,8 +77,8 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-073 | Discovery trust posture | [auth.md](auth.md#req-073--discovery-trust-posture) | draft | landed |
 | REQ-080 | openEHR wire conformance (retired) | [retired-requirements.md](retired-requirements.md#req-080--openehr-wire-conformance) | deprecated | retired |
 | REQ-081 | Wire-level parity (retired) | [retired-requirements.md](retired-requirements.md#req-081--wire-level-parity) | deprecated | retired |
-| REQ-082 | Probe runnability | [conformance.md](conformance.md#req-082--runnability) | draft | partial |
-| REQ-083 | Cadasto platform API conformance | [conformance.md](conformance.md#req-083--cadasto-platform-api-conformance) | draft | partial |
+| REQ-082 | Probe runnability | [conformance.md](conformance.md#req-082--runnability) | draft | landed |
+| REQ-083 | Cadasto platform API conformance | [conformance.md](conformance.md#req-083--cadasto-platform-api-conformance) | draft | landed |
 | REQ-090 | OpenTelemetry hooks | [transport.md](transport.md#req-090--opentelemetry-hooks) | draft | landed |
 | REQ-091 | Retry policy | [transport.md](transport.md#req-091--retry-policy) | draft | landed |
 | REQ-092 | TLS posture | [transport.md](transport.md#req-092--tls-posture) | draft | landed |
@@ -101,7 +101,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-109 | AQL static lint | [aql.md](aql.md#req-109--aql-static-lint) | draft | landed |
 | REQ-110 | Template-driven validation beyond COMPOSITION (retired) | [retired-requirements.md](retired-requirements.md#req-110--template-driven-validation-beyond-composition) | deprecated | retired |
 | REQ-111 | Public compiled-template bridge | [clinical-modeling.md](clinical-modeling.md#req-111--public-compiled-template-bridge) | draft | landed |
-| REQ-112 | Template-less Reference Model validation floor | [clinical-modeling.md](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) | draft | partial |
+| REQ-112 | Template-less Reference Model validation floor | [clinical-modeling.md](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) | draft | landed |
 | REQ-113 | Execution-oriented parsed AQL AST | [aql.md](aql.md#req-113--execution-oriented-parsed-aql-ast) | draft | landed |
 | REQ-116 | Template-level node naming and name-predicated paths (retired) | [retired-requirements.md](retired-requirements.md#req-116--template-level-node-naming-and-name-predicated-paths) | deprecated | retired |
 | REQ-117 | AQL expression-catalogue completion (retired) | [retired-requirements.md](retired-requirements.md#req-117--aql-expression-catalogue-completion) | deprecated | retired |
