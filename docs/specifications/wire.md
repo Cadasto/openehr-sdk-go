@@ -908,9 +908,10 @@ The codecs **MUST**:
 
     No node name below the root has a key in the formats, so a coded name the template leaves open (a code from an external reference set, or several codes and no pinned text) comes back as `DV_TEXT`.
   - The fourth is an ordinal's terminology.
-    The formats carry the code and the ordinal value of a `DV_ORDINAL`, a leaf or a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, but not its symbol's terminology, and decode without the template rebuilds the symbol in `local`, as the reference does.
-    Where the `C_DV_ORDINAL` pairs the template has at that position for that code and value agree on one terminology, decode gives the symbol that terminology.
-    A `|raw` value keeps its own, and a `DV_SCALE` symbol stays in `local`, since the compiled template holds no pairs for it.
+    The formats carry the code and the ordinal value of a `DV_ORDINAL`, a leaf or a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, and its symbol's terminology only as an optional `|terminology`, which decode reads as written.
+    Without one, decode without the template rebuilds the symbol in `local`, as the reference does.
+    Where the `C_DV_ORDINAL` pairs the template has at that position for that code and value agree on one terminology, decode gives a symbol without `|terminology` that terminology, and **MUST** refuse a `|terminology` that names another, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+    A `|raw` value keeps its own, and a `DV_SCALE` symbol takes its `|terminology`, else `local`, since the compiled template holds no pairs for it.
     Encode writes a `local` symbol without its terminology, so one the template codes in another terminology at that code and value, a value the template refuses, comes back in the template's terminology: that round trip changes it.
   - The fifth is what a coded value leaves out, which the *Simplified Formats* spec lets a client omit where the template defines it.
     A `DV_CODED_TEXT` leaf, the `|code` substitution at a `DV_TEXT` leaf included, with no `|terminology` takes the terminology its `defining_code` constraint names, where the alternatives at its path agree on one.
@@ -977,6 +978,10 @@ Each applies at a **Web Template leaf** — reachable with no `_`-segment in the
 | STRING | bare value only: a JSON string carrying the RM `String` as written, with no suffix. The Web Template gives one RM `String` attribute a leaf of its own, the in-context ACTIVITY `action_archetype_id`, which is RM-mandatory; the reference writes it at the leaf's bare key (`…/current_activity/action_archetype_id: "/openEHR-EHR-CLUSTER.conformance_action.v0/"` in the PROBE-086 corpus). Decode refuses an empty one, and encode leaves it out (*A value its RM class forbids*, above) |
 | DV_INTERVAL&lt;T&gt; | not a suffix set at all: the § REQ-140 **interval grammar** (`_normal_range`'s row and the *Interval boundary flags* rule govern it in both positions), anchored on the bound datatype the Web Template names inside the angle brackets (`DV_INTERVAL<DV_QUANTITY>`, …), the only place the anchor can come from. `/lower` and `/upper` are not Web Template children, so the leaf's own keys reach no node and the codec resolves them against the leaf itself. A value of another type rides `\|raw` at the leaf, as at every other leaf, and decode reads a `\|raw` there as the whole value, refusing it beside the interval's own keys |
 
+The *Simplified Formats* spec lists a `DV_PROPORTION`'s bare value as its magnitude, "calculated on output", and the reference writes it beside `|numerator` and `|denominator`.
+Decode **MUST** read it as a bare value, and **MUST** refuse one that differs from numerator/denominator by more than one part in a billion of that quotient, or that stands beside a zero denominator, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+The RM holds no magnitude, so without both a numerator and a denominator the bare value is the proportion missing them, and encode writes none.
+
 ##### Input shorthands
 
 The *Simplified Formats* spec lets a client leave out two suffixes.
@@ -1011,19 +1016,20 @@ The codecs **MUST** read and write each, in FLAT and in STRUCTURED:
 
 | Key | RM attribute | Value |
 |---|---|---|
-| `<event>\|sample_count`, at an EVENT or INTERVAL_EVENT node | INTERVAL_EVENT `sample_count` | an RM `Integer`, refused where it does not fit, as a suffix value is (above) |
-| `<event>/math_function`, at an EVENT node | INTERVAL_EVENT `math_function` | a DV_CODED_TEXT leaf |
-| `<event>/width`, at an EVENT node | INTERVAL_EVENT `width` | a DV_DURATION leaf |
+| `<event>\|sample_count`, at an EVENT or INTERVAL_EVENT node or a folded EVENT | INTERVAL_EVENT `sample_count` | an RM `Integer`, refused where it does not fit, as a suffix value is (above) |
+| `<event>/math_function`, at an EVENT node or a folded EVENT | INTERVAL_EVENT `math_function` | a DV_CODED_TEXT leaf |
+| `<event>/width`, at an EVENT node or a folded EVENT | INTERVAL_EVENT `width` | a DV_DURATION leaf |
 | `<observation>/history_origin` | `origin` of the OBSERVATION's `data` HISTORY | a DV_DATE_TIME leaf |
 
 An INTERVAL_EVENT node has `math_function` and `width` leaves of its own.
-Decode **MUST** rebuild an event at an EVENT node as an INTERVAL_EVENT where the body gives it any of the three INTERVAL_EVENT keys, and as a POINT_EVENT otherwise.
+A folded EVENT is the abstract EVENT the Web Template lifts into its OBSERVATION's node, one that occurs at most once ([clinical-modeling.md § *Output shape*](clinical-modeling.md#output-shape)); its `<event>` is the OBSERVATION's path, as the reference writes it.
+Decode **MUST** rebuild an event at an EVENT node or a folded EVENT as an INTERVAL_EVENT where the body gives it any of the three INTERVAL_EVENT keys, and as a POINT_EVENT otherwise.
 Each key is single-valued, so an index past `:0` on it is past its bound (§ REQ-170).
 
 Encode **MUST** write:
 
 - `|sample_count` where the INTERVAL_EVENT holds one;
-- `math_function` and `width` for an INTERVAL_EVENT at an EVENT node;
+- `math_function` and `width` for an INTERVAL_EVENT at an EVENT node or a folded EVENT;
 - `history_origin`, unless the origin sets `value` alone and that value is, as written, the earliest time its events carry, the origin decode gives a HISTORY with no `history_origin`; an origin that sets any other attribute, such as `magnitude_status`, is written.
 
 Every other spelling of the four, such as `<event>/sample_count` or `<observation>|history_origin`, is unmatched content (§ REQ-170).
