@@ -3740,7 +3740,8 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 // finishValue fills the RM-mandatory fields of rmValue, whose OPT node is
 // opt, that the OPT walk left empty, but for its coded attributes, which
 // finishNode settles next (settleCoded), and a DV_MULTIMEDIA's content,
-// which it settles after them (settleMultimedia).
+// which it settles after them (settleMultimedia). Under RandomFill it also
+// draws a DV_DURATION's value that the OPT leaves unconstrained.
 func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	switch v := rmValue.(type) {
 	case *rm.DVIdentifier:
@@ -3763,6 +3764,19 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 			roundProportion(opt, v)
 		}
 		settleProportion(opt, v)
+	case *rm.DVDuration:
+		// REQ-107 Primitive-leaf value fill: a value the OPT leaves
+		// unconstrained, naming none or a C_PRIMITIVE_OBJECT with no item,
+		// holds the sentinel populatePrimitiveDefault wrote; RandomFill
+		// draws it as under an empty C_DURATION. The draw is made here,
+		// after the walk, so a template without such a duration keeps its
+		// seeded draws. A bound of an interval is drawn before the
+		// interval's walk puts its two bounds in order.
+		if g.opts.ValueFill == RandomFill && primitiveOf(bindingChild(opt, "value")) == nil {
+			if s, ok := g.valueSampler.duration(constraints.CDuration{}).(string); ok {
+				v.Value = s
+			}
+		}
 	case *rm.DVCodedText:
 		// Any coded text the OPT builds as a node of its own: an ELEMENT's
 		// value or null flavour, a locatable's name, an INTERVAL_EVENT's

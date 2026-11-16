@@ -336,10 +336,14 @@ func checkRangesSimple(t *testing.T, v rm.DataValue) {
 // normal_range, a normal_status and an other_reference_ranges member, and
 // whose DV_ORDERED attributes must render as want (orderedString).
 func orderedCase(name, value, want string) dvCase {
-	return dvCase{
-		name:  name,
-		value: value,
-		check: func(t *testing.T, out any) {
+	return orderedCaseFills(name, value, want, want)
+}
+
+// orderedCaseFills is orderedCase for a value whose DV_ORDERED attributes
+// render as want under ExampleFill and as wantRandom under RandomFill.
+func orderedCaseFills(name, value, want, wantRandom string) dvCase {
+	check := func(want string) func(t *testing.T, out any) {
+		return func(t *testing.T, out any) {
 			t.Helper()
 			el, ok := out.(*rm.Element)
 			if !ok {
@@ -349,8 +353,9 @@ func orderedCase(name, value, want string) dvCase {
 				t.Errorf("%s:\n got %s\nwant %s", name, got, want)
 			}
 			checkRangesSimple(t, el.Value)
-		},
+		}
 	}
+	return dvCase{name: name, value: value, check: check(want), random: check(wantRandom)}
 }
 
 // TestREQ107_OrderedValueAttributesAreWritten is the REQ-107 Leaf values
@@ -364,9 +369,11 @@ func orderedCase(name, value, want string) dvCase {
 // pointer. A side the OPT names no bound for stays open, with no bound. A
 // REFERENCE_RANGE takes the meaning its C_STRING pins, and its range is
 // held over DV_ORDERED, with bounds that are simple, so REFERENCE_RANGE
-// Range_is_simple holds. It holds under every policy, both value fills,
-// and with and without the implicit attributes, and the root passes both
-// validators.
+// Range_is_simple holds. A bound the OPT names with no constraint on its
+// value holds its type's sentinel, but a DV_DURATION, which RandomFill
+// draws, here from the fixed source of optionsFor. It holds under every
+// policy, both value fills, and with and without the implicit attributes,
+// and the root passes both validators.
 func TestREQ107_OrderedValueAttributesAreWritten(t *testing.T) {
 	const status = "normal_status openehr_normal_statuses::N; "
 	ordered := func(class, lower, upper, refLower, refUpper string) []string {
@@ -405,9 +412,10 @@ func TestREQ107_OrderedValueAttributesAreWritten(t *testing.T) {
 			optNode("DV_DATE_TIME", "", ordered("DV_DATE_TIME", optNode("DV_DATE_TIME", ""), optNode("DV_DATE_TIME", ""), optNode("DV_DATE_TIME", ""), "")...),
 			status+"normal_range [*DV_DATE_TIME 2021-03-04T05:06:07Z .. *DV_DATE_TIME 2021-03-04T05:06:07Z]; "+
 				"other_reference_ranges [critical: [*DV_DATE_TIME 2021-03-04T05:06:07Z .. open)]"),
-		orderedCase("DV_DURATION",
+		orderedCaseFills("DV_DURATION",
 			optNode("DV_DURATION", "", ordered("DV_DURATION", "", optNode("DV_DURATION", ""), optNode("DV_DURATION", ""), optNode("DV_DURATION", ""))...),
-			status+"normal_range (open .. *DV_DURATION P0D]; other_reference_ranges [critical: [*DV_DURATION P0D .. *DV_DURATION P0D]]"),
+			status+"normal_range (open .. *DV_DURATION P0D]; other_reference_ranges [critical: [*DV_DURATION P0D .. *DV_DURATION P0D]]",
+			status+"normal_range (open .. *DV_DURATION PT10H]; other_reference_ranges [critical: [*DV_DURATION P6D .. *DV_DURATION P3Y]]"),
 	})
 }
 

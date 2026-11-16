@@ -278,12 +278,17 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 // the defaults the generator writes on values it builds from the BMM
 // alone, and on values the OPT names but leaves unconstrained. Each case
 // asserts the field the default writes and checks the generated value
-// against the RM floor, under every policy and both value fills.
+// against the RM floor, under every policy and both value fills. Only the
+// DV_DURATION case differs between the fills: RandomFill draws the value
+// the OPT leaves unconstrained.
 func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 	cases := []struct {
 		name  string
 		opt   string
 		check func(t *testing.T, out any)
+		// random, where set, is the check under RandomFill in place of
+		// check.
+		random func(t *testing.T, out any)
 	}{
 		{
 			// An OBSERVATION the OPT pins by archetype and leaves
@@ -371,11 +376,18 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 			},
 		},
 		{
+			// The OPT leaves the value unconstrained, so RandomFill draws
+			// it.
 			name: "DV_DURATION value is a valid duration",
 			opt:  optTemplate("DV_DURATION"),
 			check: func(t *testing.T, out any) {
 				if got, want := out.(*rm.DVDuration).Value, "P0D"; got != want {
 					t.Errorf("DV_DURATION.value = %q, want %q", got, want)
+				}
+			},
+			random: func(t *testing.T, out any) {
+				if got := out.(*rm.DVDuration).Value; !randomDuration(got, everyDesignator, 1, 12) {
+					t.Errorf("DV_DURATION.value = %q, want a count from 1 to 12 of one of %v", got, everyDesignator)
 				}
 			},
 		},
@@ -431,7 +443,11 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 						if err != nil {
 							t.Fatalf("Generate: %v", err)
 						}
-						tc.check(t, out)
+						check := tc.check
+						if fill == instance.RandomFill && tc.random != nil {
+							check = tc.random
+						}
+						check(t, out)
 						for _, iss := range validation.ValidateRM(out).Issues {
 							if iss.Severity == validation.Error {
 								t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)

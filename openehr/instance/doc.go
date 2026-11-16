@@ -170,7 +170,9 @@
 // not zero, a count of one designator its constraint accepts, such as P3Y
 // or PT7H, from 1 to 12 where the constraint has no range and spread across
 // the range where it has one, in a designator the range is written in where
-// the constraint accepts it. Where the template leaves a text
+// the constraint accepts it. A duration whose value the template leaves
+// unconstrained is drawn under [RandomFill] too, from 1 to 12 of any
+// designator, and is P0D under [ExampleFill]. Where the template leaves a text
 // open, with no constraint of its own or a string constraint with neither
 // a list nor a pattern, both fills write a value that means something: a
 // plain DV_TEXT that is an ELEMENT's value takes the name of that ELEMENT,

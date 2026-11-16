@@ -57,6 +57,8 @@ type dvCase struct {
 	name  string
 	value string // the ELEMENT's value node
 	check func(t *testing.T, out any)
+	// random, where set, is the check under RandomFill in place of check.
+	random func(t *testing.T, out any)
 	// policies are the policies the case runs under; every policy when
 	// empty.
 	policies []instance.Policy
@@ -86,7 +88,11 @@ func runDataValueCases(t *testing.T, cases []dvCase) {
 					if err != nil {
 						t.Fatalf("Generate: %v, want a root", err)
 					}
-					tc.check(t, out)
+					check := tc.check
+					if opts.ValueFill == instance.RandomFill && tc.random != nil {
+						check = tc.random
+					}
+					check(t, out)
 					if tc.unchecked {
 						return
 					}
@@ -354,9 +360,21 @@ func TestREQ107_EncapsulatedAttributesAreWritten(t *testing.T) {
 // magnitude_status; a DV_DURATION's accuracy, accuracy_is_percent and
 // magnitude_status; and a DV_DATE's magnitude_status, beside the DV_DURATION
 // the OPT puts under its accuracy. Each constraint lists one value, so both
-// value fills write it. It holds under every policy and with and without
-// the implicit attributes, and the root passes both validators.
+// value fills write it. That DV_DURATION leaves its value unconstrained, so
+// it is the sentinel P0D under ExampleFill and drawn under RandomFill. It
+// holds under every policy and with and without the implicit attributes,
+// and the root passes both validators.
 func TestREQ107_QuantifiedAttributesAreWritten(t *testing.T) {
+	dateWithAccuracy := func(want string, ok func(string) bool) func(t *testing.T, out any) {
+		return func(t *testing.T, out any) {
+			t.Helper()
+			d := dvValue[*rm.DVDate](t, out)
+			checkHeldString(t, "DV_DATE.magnitude_status", d.MagnitudeStatus, "~")
+			if d.Accuracy == nil || !ok(d.Accuracy.Value) {
+				t.Errorf("DV_DATE.accuracy = %+v, want a DV_DURATION of %s", d.Accuracy, want)
+			}
+		}
+	}
 	checkAccuracy := func(t *testing.T, what string, accuracy *rm.Real, isPercent *bool, want rm.Real) {
 		t.Helper()
 		if accuracy == nil || *accuracy != want {
@@ -468,14 +486,10 @@ func TestREQ107_QuantifiedAttributesAreWritten(t *testing.T) {
 			value: optNode("DV_DATE", "",
 				optSingle("magnitude_status", guardString("~")),
 				optSingle("accuracy", optNode("DV_DURATION", ""))),
-			check: func(t *testing.T, out any) {
-				t.Helper()
-				d := dvValue[*rm.DVDate](t, out)
-				checkHeldString(t, "DV_DATE.magnitude_status", d.MagnitudeStatus, "~")
-				if d.Accuracy == nil || d.Accuracy.Value != "P0D" {
-					t.Errorf("DV_DATE.accuracy = %+v, want a DV_DURATION of the sentinel P0D", d.Accuracy)
-				}
-			},
+			check: dateWithAccuracy("the sentinel P0D", func(v string) bool { return v == "P0D" }),
+			random: dateWithAccuracy("a count from 1 to 12 of one designator", func(v string) bool {
+				return randomDuration(v, everyDesignator, 1, 12)
+			}),
 		},
 	})
 }

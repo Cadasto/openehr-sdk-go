@@ -468,11 +468,15 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			asGenerated: true,
 		},
 		{
-			name: "DV_DURATION range [P0D..P0D], H, left as generated",
+			// The value and the bounds leave their value unconstrained:
+			// the sentinel P0D under ExampleFill, drawn under RandomFill.
+			name: "DV_DURATION with unconstrained bounds, H, left as generated",
 			value: optNode("DV_DURATION", "",
 				normalRangeOver("DV_DURATION", optNode("DV_DURATION", ""), optNode("DV_DURATION", "")), normalStatus("H")),
 			want: "DV_DURATION P0D; normal_status openehr_normal_statuses::H; " +
 				"normal_range [*DV_DURATION P0D .. *DV_DURATION P0D]" + noRefs,
+			wantRandom: "DV_DURATION P1D; normal_status openehr_normal_statuses::H; " +
+				"normal_range [*DV_DURATION PT10M .. *DV_DURATION PT10H]" + noRefs,
 			asGenerated: true,
 		},
 	}

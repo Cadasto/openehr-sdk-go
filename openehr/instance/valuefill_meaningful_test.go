@@ -2,6 +2,7 @@ package instance_test
 
 import (
 	"fmt"
+	mrand "math/rand/v2"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -397,6 +398,69 @@ func TestREQ107_DurationIsNotZeroUnderRandomFill(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ107_UnconstrainedDurationIsNotZeroUnderRandomFill is the REQ-107
+// Primitive-leaf value fill check on a DV_DURATION whose value the template
+// leaves unconstrained, by naming no value or by a C_PRIMITIVE_OBJECT with
+// no item: under RandomFill the value is drawn as under a C_DURATION that
+// is empty, a count from 1 to 12 of one designator; under ExampleFill it
+// is the sentinel P0D. The RM floor passes, and the template validator
+// too where the template names no value: it refuses a string under a
+// C_PRIMITIVE_OBJECT with no item, which AOM 1.4 does not allow. Two such
+// durations that bound an interval are drawn and then put in order.
+func TestREQ107_UnconstrainedDurationIsNotZeroUnderRandomFill(t *testing.T) {
+	check := func(t *testing.T, opts instance.Options, out any) {
+		t.Helper()
+		got := rootElementValue[*rm.DVDuration](t, out).Value
+		switch {
+		case opts.ValueFill == instance.RandomFill && !randomDuration(got, everyDesignator, 1, 12):
+			t.Errorf("DV_DURATION.value = %q, want a count from 1 to 12 of one of %v", got, everyDesignator)
+		case opts.ValueFill != instance.RandomFill && got != "P0D":
+			t.Errorf("DV_DURATION.value = %q, want the sentinel P0D", got)
+		}
+	}
+	t.Run("value left silent", func(t *testing.T) {
+		eachSetting(t, optTemplate("ELEMENT", optSingle("value", optNode("DV_DURATION", ""))), check)
+	})
+	t.Run("C_PRIMITIVE_OBJECT with no item", func(t *testing.T) {
+		anyDuration := `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>DURATION</rm_type_name><node_id></node_id></children>`
+		c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", optNode("DV_DURATION", "", optSingle("value", anyDuration)))), true)
+		for _, opts := range defaultsOptions() {
+			t.Run(fmt.Sprintf("%v/%v", opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				check(t, opts, out)
+				noFloorErrors(t, out)
+			})
+		}
+	})
+	// Each bound is drawn before the interval's walk puts the two in order,
+	// so no seed leaves them inverted, which the RM floor refuses.
+	t.Run("bounds of an interval", func(t *testing.T) {
+		c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", optNode("DV_INTERVAL&lt;DV_DURATION&gt;", "",
+			optSingle("lower", optNode("DV_DURATION", "")), optSingle("upper", optNode("DV_DURATION", ""))))), true)
+		for seed := range uint64(20) {
+			opts := instance.Options{ValueFill: instance.RandomFill, ValueSource: mrand.NewPCG(seed, 2), Now: defaultsNow}
+			out, err := instance.Generate(t.Context(), c, opts)
+			if err != nil {
+				t.Fatalf("Generate with seed %d: %v", seed, err)
+			}
+			iv := rootElementValue[*rm.DVInterval[rm.DVDuration]](t, out)
+			for _, got := range []string{iv.Lower.Value, iv.Upper.Value} {
+				if !randomDuration(got, everyDesignator, 1, 12) {
+					t.Errorf("seed %d: bound %q, want a count from 1 to 12 of one of %v", seed, got, everyDesignator)
+				}
+			}
+			checkValid(t, out, c)
+		}
+	})
+}
+
+// everyDesignator lists every designator of a duration, each written as it
+// follows P, for randomDuration.
+var everyDesignator = []string{"Y", "M", "W", "D", "TH", "TM", "TS"}
 
 // randomDuration reports whether s is a count from lowest to highest of one
 // of the designators letters, each written as it follows P.
