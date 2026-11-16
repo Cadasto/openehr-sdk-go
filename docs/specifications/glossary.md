@@ -67,7 +67,8 @@ A small key-value annotation surface attached to versioned resources, introduced
 The set of openEHR-specific HTTP headers defined by ITS-REST 1.1.0: `openehr-version`, `openehr-audit-details`, `openehr-template-id`, `openehr-uri`, `openehr-item-tag`. The SDK exposes them as typed per-call options, never as raw strings (REQ-059).
 
 **`openehr-audit-details`**
-A request-side header carrying the commit-time audit envelope (committer, time, change-type, optional `description`) on versioned writes. The SDK builds it from a typed `*rm.AuditDetails` and serialises it via the canonical-JSON codec.
+A request-side header carrying the commit-time audit envelope (committer, change type, system id, optional `description`) on versioned writes.
+The SDK builds it from a typed `*rm.AuditDetails` and writes it in the openEHR dotted-attribute grammar, not as JSON ([wire.md § REQ-059](wire.md#req-059)).
 
 **`Prefer: return=…`**
 Standard HTTP header used by openEHR REST 1.1.0 to negotiate the response body on write paths: `minimal`, `identifier`, or `representation`. The SDK exposes a typed `transport.Prefer` enum and a per-call option `WithPrefer(Prefer)`. Defaults: `minimal` for writes, none for reads (REQ-094).
@@ -92,7 +93,9 @@ The endpoint and document publishing the authorization server's signing keys. Th
 The set of contextual values delivered alongside a SMART access token — `patient`, `encounter`, `user`, plus any `launch-*` parameters defined by the deployment. Exposed by `smart/` as typed values.
 
 **TokenSource**
-The SDK's generic auth abstraction (`auth.TokenSource`). Returns a bearer token and an expiry. Implemented by `auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, and any future provider.
+The SDK's generic auth abstraction (`auth.TokenSource`).
+Returns an `auth.Token`: a credential, its `Authorization` scheme and its expiry.
+Implemented by `auth/smart`, `auth/clientcreds`, `auth/jwtbearer` and `auth/basic`.
 
 **Client Credentials**
 OAuth2 grant for service-to-service callers. No interactive user; client authenticates with its own credentials. Implemented in `auth/clientcreds`.
@@ -115,7 +118,9 @@ The SMART-on-openEHR configuration document advertised by the deployment — typ
 ## SDK internals
 
 **Conformance probe**
-An executable assertion that the SDK exercises against the sandbox transport, a replayed recording, or a live deployment (REQ-082), to verify wire-level conformance to openEHR REST + SMART-on-openEHR. Each probe has a stable `PROBE-NNN` ID (see [conformance.md](conformance.md)). The shared result type and runner live in [`testkit/probe`](../../testkit/probe/).
+An executable assertion that the SDK exercises against the sandbox transport, a replayed recording, or a live deployment (REQ-082), to verify wire-level conformance to openEHR REST + SMART-on-openEHR, or that checks an in-repo property and reaches no server.
+Each probe has a stable `PROBE-NNN` ID (see [conformance.md](conformance.md)).
+The shared result type and runner live in [`testkit/probe`](../../testkit/probe/).
 
 **Building-block use case**
 A consumer that imports one of the building blocks [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence) lists, such as `openehr/rm`, `openehr/serialize` or `openehr/validation`, without constructing an authenticated client.

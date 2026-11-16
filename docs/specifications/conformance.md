@@ -22,7 +22,7 @@ Each probe has a stable `PROBE-NNN` ID, one catalogue entry here, and a pass/fai
 
 ### REQ-082 — Runnability
 
-A backend-facing probe runs in up to three modes: **Sandbox**, against the in-memory `sandbox/` transport; **Cassette**, against a replayed recording; and **Live**, against a reference openEHR deployment. An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output and reaches no server in any mode. Each catalogue entry's **Modes** line says which applies: 37 of the 83 catalog entries are in-repo by construction. Today 12 entries declare all three modes; a mode missing from a backend-facing entry is open work in this requirement, not a defect in the probe ([roadmap.md](../roadmap.md)).
+A backend-facing probe runs in up to three modes: **Sandbox**, against the in-memory `sandbox/` transport; **Cassette**, against a replayed recording; and **Live**, against a reference openEHR deployment. An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output and reaches no server in any mode. Each catalogue entry's **Modes** line says which applies: 37 of the 83 catalog entries are in-repo by construction. Today 8 entries declare all three modes; a mode missing from a backend-facing entry is open work in this requirement, not a defect in the probe ([roadmap.md](../roadmap.md)).
 
 How the runner selects a mode, what a probe reports and each mode's working rules are in [development-process.md § Conformance probes](../development-process.md#conformance-probes). This section holds what an SDK consumer, or the operator of a deployment a probe writes to, relies on.
 
@@ -113,17 +113,18 @@ Each entry says what its probe checks and which requirement it satisfies; the re
 - **Title:** SMART configuration document declares `code` response type and `S256` PKCE method.
 - **Preconditions:** A SMART-on-openEHR deployment is reachable.
 - **Wire assertion:** GET `<base URL>/.well-known/smart-configuration` (or equivalent) returns 200 with a JSON body containing `"response_types_supported"` including `"code"` and `"code_challenge_methods_supported"` including `"S256"`.
-- **Modes:** Sandbox, Cassette, Live.
+- **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — resolves the canonical SMART configuration fixture through `discovery.Resolver` and checks `code` and `S256` on the resolved `AuthEndpoints`.
 - **Satisfies:** REQ-061.
 
 #### PROBE-002 — Discovery advertises `org.openehr.rest`
 
-- **Title:** Service catalog includes the openEHR REST service with a parseable base URL and a declared spec version.
+- **Title:** Service catalog includes the openEHR REST service with a parseable base URL.
 - **Preconditions:** SMART discovery resolved.
-- **Wire assertion:** The discovery document's service catalog holds a `services` member keyed `"org.openehr.rest"` with a parseable `baseUrl` and a `spec_version` member.
-- **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — checks that `catalog.OpenEHRRest()` resolves an entry with an absolute `baseUrl` and a declared `spec_version`.
+- **Wire assertion:** The discovery document's service catalog holds a `services` member keyed `"org.openehr.rest"` with a parseable `baseUrl`.
+  An entry without a `spec_version` member passes, as [auth.md § REQ-072](auth.md#req-072) allows.
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — checks that `catalog.OpenEHRRest()` resolves an entry with an absolute `baseUrl`.
 - **Satisfies:** REQ-070, REQ-072.
 
 #### PROBE-003 — Spec-version mismatch fails fast
@@ -131,7 +132,7 @@ Each entry says what its probe checks and which requirement it satisfies; the re
 - **Title:** A discovery document advertising an incompatible spec version is rejected at resolution, not at first request.
 - **Preconditions:** SDK is configured to require `1.1.0`; deployment advertises `1.0.3`.
 - **Wire assertion:** Construction-time discovery returns a `DiscoveryError` with reason `spec_version_mismatch`. No request to the openEHR REST endpoint is made.
-- **Modes:** Sandbox, Cassette (constructed-mismatch cassette).
+- **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — serves a fixture whose `org.openehr.rest` declares `1.0.3` and checks that the resolver fails fast with `DiscoveryError(spec_version_mismatch)` and returns no catalog.
 - **Satisfies:** REQ-072.
 
@@ -141,7 +142,7 @@ Each entry says what its probe checks and which requirement it satisfies; the re
 - **Preconditions:** Deployment registers the SDK as a SMART app with PKCE required.
 - **Wire assertion:** Authorization request carries `code_challenge`, `code_challenge_method=S256` and exactly one `aud` naming the configured audience (REQ-061); token exchange carries `code_verifier`; token response is 200 with an `access_token`.
 - **PKCE parity:** the SDK's verifier also satisfies RFC 7636 and `x/oauth2`: ≥ 32 bytes of decoded entropy, `base64.RawURLEncoding` (URL-safe, unpadded), and `code_challenge == base64url(SHA256(verifier))` with method `S256`, cross-checked against `golang.org/x/oauth2.S256ChallengeFromVerifier`.
-- **Modes:** Sandbox, Cassette, Live.
+- **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — drives a full `auth/smart` authorization-code and PKCE launch against a test token endpoint and checks the wire round trip and the PKCE parity properties.
 - **Satisfies:** REQ-061, REQ-068.
 
@@ -150,7 +151,7 @@ Each entry says what its probe checks and which requirement it satisfies; the re
 - **Title:** A configured scope string survives token exchange verbatim and lands in the JWT scope claim or the response `scope` field. The SDK passes scopes through whatever their syntax ([REQ-165](auth.md#req-165--openehr-scope-syntax)), so the probe's scope is not an openEHR resource scope.
 - **Preconditions:** Scope `patient/COMPOSITION.read` is requested.
 - **Wire assertion:** Authorization request `scope` parameter contains `patient/COMPOSITION.read`; token response `scope` field contains it (or the JWT `scope` claim does).
-- **Modes:** Sandbox, Cassette, Live.
+- **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — checks that the configured scope appears on the authorization request and survives into the token response's `scope` field as the SDK parses it.
 - **Satisfies:** REQ-061, REQ-068.
 
@@ -159,7 +160,7 @@ Each entry says what its probe checks and which requirement it satisfies; the re
 - **Title:** When the token carries `principal_uid` and `principal_type` claims (per REQ-064), the SDK surfaces them on `LaunchContext.Principal` without coercion.
 - **Preconditions:** A token with `principal_uid = "u-123"`, `principal_type = "AGENT"`.
 - **Wire assertion:** SDK exposes `LaunchContext.Principal = {UID: "u-123", Type: PrincipalTypeAgent}`. Missing claims surface as nil/zero, not as guessed defaults.
-- **Modes:** Sandbox, Cassette.
+- **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — mints a signed id_token, validates it through `smart.LaunchContextFromTokenResponse`, and checks that the principal claims surface verbatim while a token without them yields a nil `Principal`.
 - **Satisfies:** REQ-064.
 
@@ -177,7 +178,7 @@ Each entry says what its probe checks and which requirement it satisfies; the re
 - **Title:** A signing-key rotation on the authorization server triggers exactly one JWKS refresh in the SDK; subsequent requests succeed without consumer intervention.
 - **Preconditions:** A cached JWKS does not contain the `kid` of the issued token (simulating rotation), and is at least `JWKS.MinRefreshInterval` old; the probe sets that interval to zero, so the miss right after the seed counts as one.
 - **Wire assertion:** SDK fetches JWKS once, validates the token, and proceeds. No double-refresh, no double-validation failure surfaced.
-- **Modes:** Sandbox, Cassette.
+- **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — signs an id_token with a rotated key whose `kid` the seeded JWKS cache lacks, and checks that `smart.ValidateIDToken` recovers through exactly one refresh (the seed plus one fetch on the miss) and validates the token.
 - **Satisfies:** REQ-062.
 
@@ -186,9 +187,9 @@ Each entry says what its probe checks and which requirement it satisfies; the re
 - **Title:** An expired access token with a valid refresh token is refreshed silently before the next request.
 - **Preconditions:** Cached token has `expires_at < now`; refresh token is valid.
 - **Wire assertion:** Token endpoint receives `grant_type=refresh_token`; the next outgoing request carries the new access token.
-- **Modes:** Sandbox, Cassette.
-- **Status:** Implemented (Sandbox) — both halves: the transport's safety net (a 401 on the wire, then `Reauth`, then one retry with the refreshed bearer, REQ-063), and the proactive half, in which an expired access token beside a valid refresh token makes the token endpoint receive exactly one `grant_type=refresh_token` request and `Source.Token` return the freshly issued bearer. Cassette and Live ratification are open.
-- **Satisfies:** REQ-063
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — both halves: the transport's safety net (a 401 on the wire, then `Reauth`, then one retry with the refreshed bearer, [transport.md § REQ-166 *Re-authentication retry*](transport.md#re-authentication-retry)), and the proactive half, in which an expired access token beside a valid refresh token makes the token endpoint receive exactly one `grant_type=refresh_token` request and `Source.Token` return the freshly issued bearer. Cassette and Live ratification are open.
+- **Satisfies:** REQ-063, REQ-166
 
 #### PROBE-106 — Sign-out revokes at the advertised revocation endpoint
 
@@ -625,8 +626,9 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Title:** Given an OPT and a FLAT payload, converting FLAT → canonical and back to FLAT produces the original FLAT payload (modulo documented OPT-driven normalisation).
 - **Preconditions:** A reference OPT + FLAT pair.
 - **Wire assertion:** Round-trip equality after OPT-driven normalisation.
-- **Modes:** In-repo (round-trip property over an OPT and FLAT pair; no backend).
-- **Status:** Draft.
+- **Modes:** In-repo (never run).
+- **Status:** Deprecated — never implemented: [PROBE-086](#probe-086--upstream-flat-serialisation-parity) decodes upstream FLAT and re-encodes it, so it checks this round trip at least as strictly. The identifier is retained and not reused.
+- **Satisfies:** none.
 
 ### Service discovery
 
@@ -635,16 +637,16 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Title:** Two SDK constructions within the TTL window of a cached catalog do not produce a second discovery fetch.
 - **Preconditions:** Catalog with declared TTL > 0; two constructions in quick succession.
 - **Wire assertion:** Exactly one discovery fetch occurs.
-- **Modes:** Sandbox, Cassette.
+- **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox).
-- **Satisfies:** REQ-070, REQ-072
+- **Satisfies:** REQ-071
 
 #### PROBE-041 — Catalog refresh on 401
 
 - **Title:** A `401` from a previously-working endpoint triggers exactly one discovery refresh and one retry; failure to recover surfaces a typed error.
 - **Preconditions:** Cached catalog; backend rotates and returns `401` on the cached token.
 - **Wire assertion:** SDK refreshes JWKS/catalog once, retries once. On second `401`, returns `transport.ErrUnauthorized`.
-- **Modes:** Sandbox, Cassette.
+- **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — the discovery-layer half: the resolver's `Refresh` against a 401 upstream issues exactly one fetch and returns a typed `*discovery.DiscoveryError(fetch_failed)`. The transport's 401 reauth hook is opt-in (`transport.WithReauthOn401` with an `auth.ReautherFunc`, as PROBE-007 uses it); refreshing the discovery catalog on a 401 in an application (REQ-071) is the open half.
 - **Satisfies:** REQ-071 (discovery half), REQ-072
 
@@ -687,7 +689,8 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** Catalog whose `org.openehr.rest` service has `baseUrl` `https://override.example/openehr/v1`.
 - **Wire assertion:** A request made via the leaf client targets `https://override.example/openehr/v1/...`, not the SDK default.
 - **Modes:** Sandbox.
-- **Status:** Draft.
+- **Status:** Deferred — the `transport` unit tests cover a request URL built from the catalog's `org.openehr.rest` base.
+- **Satisfies:** REQ-070.
 
 #### PROBE-064 — Per-request `auth.TokenSource` overrides client default
 
@@ -695,7 +698,8 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** Client constructed with `TokenSource` A; request issued with `ctx` carrying `TokenSource` B.
 - **Wire assertion:** Outgoing `Authorization` header carries the bearer from B; subsequent requests without the ctx-override fall back to A.
 - **Modes:** Sandbox.
-- **Status:** Draft.
+- **Status:** Deferred — the `transport` unit tests cover the override and the fallback.
+- **Satisfies:** REQ-060.
 
 #### PROBE-065 — `Prefer: return=minimal` on POST returns identifier only
 
@@ -719,18 +723,19 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 
 - **Title:** `POST /definition/template/adl1.4` with an OPT body succeeds; a subsequent `GET` returns the same OPT bytes.
 - **Preconditions:** Backend supports ADL1.4 template upload at the standard path.
-- **Wire assertion:** `POST` with an OPT body and `Content-Type: application/xml` returns `201` with a `Location` header; a subsequent `GET` returns the same OPT bytes (modulo backend-side reformatting documented per deployment). The SDK's `Accept` negotiation and 201-response-body handling are the client contract in [wire.md § REQ-144](wire.md#req-144--definition-metadata-decoding) — *Template upload negotiation and response* — not asserted here.
+- **Wire assertion:** `POST` with an OPT body and `Content-Type: application/xml` returns `201` with a `Location` header; a subsequent `GET` returns the same OPT bytes (modulo backend-side reformatting documented per deployment). The SDK's `Accept` negotiation and 201-response-body handling are the client contract in [wire.md § REQ-177 *Template upload negotiation and response*](wire.md#template-upload-negotiation-and-response), not asserted here.
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox).
-- **Satisfies:** REQ-144.
+- **Satisfies:** REQ-177.
 
 #### PROBE-068 — Error envelope decodes into `WireError.OpenEHR`
 
 - **Title:** A `400 Bad Request` carrying a `{message, code}` JSON body surfaces as a `transport.WireError` whose `OpenEHR` detail is populated and which matches a typed error via `errors.As`.
 - **Preconditions:** Cassette of a real 400 error envelope.
-- **Wire assertion:** `errors.As(err, &wire)` succeeds; `wire.OpenEHR.Message`, `wire.OpenEHR.Code` are set from the envelope; `wire.RawBody` preserves the raw bytes.
+- **Wire assertion:** `errors.As(err, &wire)` succeeds and `wire.OpenEHR.Code` is set from the envelope; with `transport.WithRawErrorBodies(true)`, `wire.OpenEHR.Message` is set from the envelope and `wire.RawBody` preserves the raw bytes.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft. Scenario recordings of real refusals by EHRbase 2.36.0 and FerroEHR 5.0.0 (`error-envelopes.har`, `ferroehr/error-envelopes.har`) are replayed by their own test, outside the runner, so they are not yet this probe's Cassette mode: the `400` envelope's `message` decodes and `RawBody` keeps the bytes, but neither envelope carries a `code`, so the `OpenEHR.Code` half is not witnessed.
+- **Status:** Deferred — the `transport` error-envelope unit tests cover the decode.
+- **Satisfies:** REQ-093.
 
 #### PROBE-069 — `Idempotency-Key` header round-trip
 
@@ -747,7 +752,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** Backend exposes the ITS-REST `/admin/*` surface; admin deletion is enabled for the tenant.
 - **Wire assertion:** `admin.DeleteEHR` succeeds; `errors.Is(ehr.Get(...), transport.ErrNotFound)` is true after the delete.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — the happy-path delete and the missing-EHR variants are covered by the `openehr/client/admin` unit tests; a standalone probe is deferred.
+- **Status:** Deferred — the `openehr/client/admin` unit tests cover the delete and the missing-EHR variants.
 - **Satisfies:** REQ-099
 
 #### PROBE-071 — Composition POST/PUT response body is bare COMPOSITION
@@ -833,7 +838,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Effect:** read-only (`GET` list, no state change).
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox).
-- **Satisfies:** REQ-143.
+- **Satisfies:** REQ-177.
 
 #### PROBE-101 — 2xx decode failure is surfaced, not swallowed
 
@@ -943,7 +948,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** An OTel `TracerProvider` given to `transport.WithTracerProvider`.
 - **Wire assertion:** Captured span has the expected attribute set; URL does not contain the bearer token.
 - **Modes:** Sandbox.
-- **Status:** Draft.
+- **Status:** Deferred — the `transport` span unit tests cover the sanitised URL; none yet asserts `openehr.spec_version`.
 - **Satisfies:** REQ-090
 
 #### PROBE-051 — No-OTel is a silent no-op
@@ -952,5 +957,5 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** A client built without `transport.WithTracerProvider`, and no global provider set.
 - **Wire assertion:** Request succeeds; no global state mutation.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — covered by the `transport` unit tests.
+- **Status:** Deferred — the `transport` unit tests cover it.
 - **Satisfies:** REQ-090
