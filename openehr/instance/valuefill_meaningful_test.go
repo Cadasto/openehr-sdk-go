@@ -358,3 +358,50 @@ func TestREQ107_IdentifierHasAnIDShapeAndAnIssuer(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ107_DurationIsNotZeroUnderRandomFill is the REQ-107 Primitive-leaf
+// value fill check on a DV_DURATION whose value a C_DURATION constrains:
+// under RandomFill the value is a duration that is not zero and fits the
+// pattern, a count of one designator it names; under ExampleFill it is the
+// constraint's example, P0D for an open C_DURATION. The RM floor and the
+// template validator pass.
+func TestREQ107_DurationIsNotZeroUnderRandomFill(t *testing.T) {
+	cases := []struct {
+		name    string
+		body    string
+		example string
+		letters []string
+	}{
+		{name: "open C_DURATION", body: "", example: "P0D", letters: []string{"Y", "M", "W", "D", "TH", "TM", "TS"}},
+		{name: "hours and minutes", body: "<pattern>PTHM</pattern>", example: "PT0H", letters: []string{"TH", "TM"}},
+		{name: "years, months and days", body: "<pattern>PYMD</pattern>", example: "P0D", letters: []string{"Y", "M", "D"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opt := optTemplate("ELEMENT", optSingle("value", optNode("DV_DURATION", "",
+				optSingle("value", optPrimitive("DURATION", "C_DURATION", tc.body)))))
+			eachSetting(t, opt, func(t *testing.T, opts instance.Options, out any) {
+				got := rootElementValue[*rm.DVDuration](t, out).Value
+				switch {
+				case opts.ValueFill == instance.RandomFill && !randomDuration(got, tc.letters):
+					t.Errorf("DV_DURATION.value = %q, want a count from 1 to 12 of one of %v", got, tc.letters)
+				case opts.ValueFill != instance.RandomFill && got != tc.example:
+					t.Errorf("DV_DURATION.value = %q, want the example %q", got, tc.example)
+				}
+			})
+		})
+	}
+}
+
+// randomDuration reports whether s is a count from 1 to 12 of one of the
+// designators letters, each written as it follows P.
+func randomDuration(s string, letters []string) bool {
+	for _, l := range letters {
+		for n := 1; n <= 12; n++ {
+			if s == fmt.Sprintf("P%s%d%s", l[:len(l)-1], n, l[len(l)-1:]) {
+				return true
+			}
+		}
+	}
+	return false
+}

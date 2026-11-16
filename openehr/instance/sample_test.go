@@ -344,6 +344,78 @@ func TestSamplerNonPositiveLimit(t *testing.T) {
 	}
 }
 
+// TestSampleValue_REQ107_DurationIsNotZero covers the REQ-107 RandomFill
+// draw of a C_DURATION: a duration that is not zero, a count from 1 to 12
+// of one designator the pattern names, drawn, which validates and varies,
+// inside a range too; else the count 1 of the first designator, in written
+// order, the constraint accepts; and else the constraint's example, which a
+// range that admits no whole count of any designator but zero gives.
+func TestSampleValue_REQ107_DurationIsNotZero(t *testing.T) {
+	t.Parallel()
+	closed := func(lower, upper string) constraints.TemporalRange {
+		return constraints.TemporalRange{Lower: lower, Upper: upper, LowerInclusive: true, UpperInclusive: true}
+	}
+	tests := []struct {
+		name string
+		c    constraints.CDuration
+		// letters are the designators, as written after P, a draw may
+		// carry.
+		letters []string
+		// fixed is the one value every draw takes, or "" for draws that
+		// vary.
+		fixed string
+	}{
+		{name: "open", c: constraints.CDuration{}, letters: []string{"Y", "M", "W", "D", "TH", "TM", "TS"}},
+		{name: "years", c: constraints.CDuration{Pattern: "PY"}, letters: []string{"Y"}},
+		{name: "minutes", c: constraints.CDuration{Pattern: "PTM"}, letters: []string{"TM"}},
+		{name: "date designators", c: constraints.CDuration{Pattern: "PYMWD"}, letters: []string{"Y", "M", "W", "D"}},
+		{name: "years from 0 to 150", c: constraints.CDuration{Pattern: "PY", Range: closed("P0Y", "P150Y")}, letters: []string{"Y"}},
+		{name: "hours and minutes from 1 to 2 hours", c: constraints.CDuration{Pattern: "PTHM", Range: closed("PT1H", "PT2H")}, letters: []string{"TH"}},
+		{name: "years from 18, past every drawn count", c: constraints.CDuration{Pattern: "PY", Range: closed("P18Y", "P120Y")}, fixed: "P18Y"},
+		{name: "half a second at most", c: constraints.CDuration{Range: closed("PT0S", "PT0.5S")}, fixed: "P0D"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			vals := draws(tc.c, newSampler(mrand.NewPCG(31, 32)), 16)
+			for _, v := range vals {
+				s, ok := v.(string)
+				if !ok {
+					t.Fatalf("draw is %T, want string", v)
+				}
+				if got := tc.c.Validate(s); len(got) != 0 {
+					t.Errorf("draw %q fails its own Validate: %v", s, got)
+				}
+				if tc.fixed != "" {
+					if s != tc.fixed {
+						t.Errorf("draw %q, want %q", s, tc.fixed)
+					}
+					continue
+				}
+				if !durationOf(s, tc.letters) {
+					t.Errorf("draw %q, want a count from 1 to 12 of one of %v", s, tc.letters)
+				}
+			}
+			if n := distinct(vals); tc.fixed == "" && n < 2 {
+				t.Errorf("16 draws gave %d distinct values, want them to vary", n)
+			}
+		})
+	}
+}
+
+// durationOf reports whether s is a count from 1 to 12 of one of the
+// designators letters, each written as it follows P.
+func durationOf(s string, letters []string) bool {
+	for _, l := range letters {
+		for n := 1; n <= 12; n++ {
+			if s == fmt.Sprintf("P%s%d%s", l[:len(l)-1], n, l[len(l)-1:]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // TestSampleValue_REQ103_TemporalPatterns covers REQ-107 with the temporal
 // patterns and ranges of REQ-103: a date, time or date-time draw is written
 // to the constraint's pattern, so it validates and still varies, rather than
@@ -396,7 +468,6 @@ func TestSampleValue_REQ103_TemporalPatterns(t *testing.T) {
 		constraints.CDate{Range: constraints.TemporalRange{Lower: "2004-05-20", Upper: "2004-06-02", LowerInclusive: true, UpperInclusive: true}},
 		constraints.CTime{Pattern: "hh:mm:XX", Range: constraints.TemporalRange{Lower: "09:30:00", LowerInclusive: true, UpperUnbounded: true}},
 		constraints.CDateTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "2004-01-01T00:00:00"}},
-		constraints.CDuration{Pattern: "PY", Range: constraints.TemporalRange{Lower: "P0Y", Upper: "P150Y", LowerInclusive: true, UpperInclusive: true}},
 		constraints.CTime{TimezoneValidity: constraints.ValidityMandatory, Range: constraints.TemporalRange{Lower: "13:30:00+02:00", Upper: "13:45:00+02:00", LowerInclusive: true, UpperInclusive: true}},
 	}
 	for _, c := range ranged {

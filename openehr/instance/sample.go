@@ -66,8 +66,9 @@ func (s sampler) between(lo, hi float64) float64 {
 //
 // It falls back to pc.ExampleValue() — silently, and identically on every
 // call — whenever the constraint carries nothing enumerable to sample
-// (unconstrained primitive, pattern-only CString, CDuration, a CDate,
-// CTime or CDateTime with a Range) or a drawn candidate fails pc.Validate.
+// (unconstrained primitive, pattern-only CString, a CDate, CTime or
+// CDateTime with a Range, a CDuration that accepts no count of one
+// designator but zero) or a drawn candidate fails pc.Validate.
 // Several *bounded* shapes therefore also degrade to the fixed example
 // with no signal: an empty list∩range intersection, a single-value range,
 // a collapsed exclusive-integer window, and the exclusive-lower real edge
@@ -173,8 +174,41 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 		return firstAccepted(pc, c.Range.IsBounded(), s.randomTime())
 	case constraints.CDateTime:
 		return firstAccepted(pc, c.Range.IsBounded(), s.randomDateTime())
+	case constraints.CDuration:
+		return s.duration(c)
 	}
-	// CDuration and any unknown constraint: ExampleValue sentinel.
+	// Any unknown constraint: ExampleValue sentinel.
+	return nil
+}
+
+// durationDesignators are the designators a drawn duration is written in,
+// in written order: a count goes between the prefix and the letter.
+var durationDesignators = [...]struct{ prefix, letter string }{
+	{"P", "Y"}, {"P", "M"}, {"P", "W"}, {"P", "D"}, {"PT", "H"}, {"PT", "M"}, {"PT", "S"},
+}
+
+// durationWindow is the largest count a drawn duration has of its one
+// designator.
+const durationWindow = 12
+
+// duration draws a duration that is not zero for c: a count from 1 to
+// durationWindow, drawn, of the first designator c accepts it in, from one
+// drawn at random on in written order and round again, so a range and the
+// pattern keep it; else the count 1 of the first designator c accepts, in
+// written order; else nil, so sampleValue falls back to c's example.
+func (s sampler) duration(c constraints.CDuration) any {
+	n, start := 1+s.intN(durationWindow), s.intN(len(durationDesignators))
+	for i := range len(durationDesignators) {
+		d := durationDesignators[(start+i)%len(durationDesignators)]
+		if v := fmt.Sprintf("%s%d%s", d.prefix, n, d.letter); len(c.Validate(v)) == 0 {
+			return v
+		}
+	}
+	for _, d := range durationDesignators {
+		if v := d.prefix + "1" + d.letter; len(c.Validate(v)) == 0 {
+			return v
+		}
+	}
 	return nil
 }
 

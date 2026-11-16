@@ -166,7 +166,9 @@
 // where the precision admits 0 alone and at most two otherwise, and lies
 // inside its range away from 0 and from the range's bounds, or from 1 to
 // 100 where the range is open; a proportion's drawn numerator and
-// denominator are rounded the same way. Where the template leaves a text
+// denominator are rounded the same way; and a duration's drawn value is
+// not zero, a count from 1 to 12 of one designator its constraint accepts,
+// such as P3Y or PT7H. Where the template leaves a text
 // open, with no constraint of its own or a string constraint with neither
 // a list nor a pattern, both fills write a value that means something: a
 // plain DV_TEXT that is an ELEMENT's value takes the name of that ELEMENT,
