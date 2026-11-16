@@ -251,7 +251,10 @@ func baseOf(key string) string {
 // It is not coming back. An empty-but-armed matcher is a fail-open: a
 // regression in exactly the area the probe was built to watch would land in a
 // tolerated bucket instead of [Report.Missing], and the probe would still pass.
-// A decoded key that does not re-encode is a failure. If a future drop needs
+// A decoded key that does not re-encode is a failure. A DV_PROPORTION's bare
+// value is no waiver of that: the RM derives it, so it is compared with the
+// numerator and denominator the re-encode wrote ([settleDerived]), and one
+// that disagrees fails. If a future drop needs
 // tolerating, the case for it belongs in SKIPPED.md and in a decision to widen
 // the refusal surface — which the codec generates itself by failing loudly —
 // not in a table here that only the tests would notice going stale.

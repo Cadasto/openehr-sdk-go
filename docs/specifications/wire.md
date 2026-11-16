@@ -819,7 +819,7 @@ The reference implementation spells six of the `ctx/` fields as real paths under
 | territory | `ctx/territory` | `<root>/territory\|code` | `ISO_3166-1` |
 | composer name | `ctx/composer_name` | `<root>/composer\|name` | |
 | composer self | `ctx/composer_self` | `<root>/composer_self` | |
-| time | `ctx/time` | `<root>/context/start_time` | |
+| time | `ctx/time` | `<root>/context/start_time`, or its `\|value`, as any DV_DATE_TIME's bare value | |
 | setting | `ctx/setting\|code` and `ctx/setting\|value` | `<root>/context/setting\|code` and `\|value` | `openehr` |
 
 Decode **MUST** accept either spelling of a field in the table, reading a real path whose segments carry the index `:0`, the template root's own segment included (`<root>:0/composer:0|name`), as the unindexed spelling and refusing any other index there: each of these attributes is single-valued, and OPT-free STRUCTURED → FLAT conversion writes every segment with an index.

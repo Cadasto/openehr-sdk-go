@@ -576,6 +576,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
   Why each spelling is held out, and why the match is suffix-aware, is in [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md) § How the exclusion list is produced.
 
   Within the modelled subset the re-encode reproduces the upstream path set with equal leaf values: a dropped, invented or altered key is a failure, and there is no tolerated-drop list.
+  The one key decode reads and encode does not write, a DV_PROPORTION's bare value ([wire.md § REQ-053](wire.md#req-053) *Leaf datatypes*), is compared with the `|numerator` divided by the `|denominator` the re-encode wrote, to the codec's tolerance, so a value that disagrees is a failure too.
   The excluded set is derived from what the codec itself reports as unmatched content and from its own decode refusals, never kept by hand, and each refusal removes only what it names.
   The harness package's own tests pin the excluded and compared counts per fixture, so the unmodelled surface can shrink deliberately but never grow unnoticed.
   A fixture that compares **nothing** fails: exact agreement over an empty compared set is vacuous.
