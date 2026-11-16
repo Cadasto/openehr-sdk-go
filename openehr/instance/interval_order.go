@@ -601,8 +601,9 @@ func setOrderedQuantity(slot *rm.DVOrdered, k quantityKey) {
 
 // dateScale, timeScale and dateTimeScale order DV_DATE, DV_TIME and
 // DV_DATE_TIME bounds (temporalCompare says how), and durationScale
-// DV_DURATION bounds (compareDurations). A C_DATE, C_TIME, C_DATE_TIME or
-// C_DURATION has no numeric end, so only a swap repairs an inversion.
+// DV_DURATION bounds (compareDurations). They read no end from a C_DATE,
+// C_TIME, C_DATE_TIME or C_DURATION, not even from its range, so only a
+// swap repairs an inversion.
 var (
 	dateScale     = temporalScale(temporalCompare(dateOrderRead))
 	timeScale     = temporalScale(temporalCompare(timeOrderRead))
