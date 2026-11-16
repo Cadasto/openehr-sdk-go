@@ -11,7 +11,7 @@ import (
 
 // runIDs names the EHRs one run creates. Every id begins with the run's own
 // identifier, so an EHR the run leaves on a CDR is attributable to it and
-// removable by hand (development-process.md § The CDR cross-check tool,
+// removable by hand (probe-harness.md § The CDR cross-check tool,
 // Self-scoping).
 //
 // An id is a version 8 UUID (RFC 9562 section 5.8, a layout the application

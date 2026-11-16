@@ -89,7 +89,7 @@ func recordedPath(raw string) string {
 // EHRbase and a replay against any catalog URL agree. The full Cassette key
 // also names the headers and body fields a probe's assertion depends on; that
 // is deferred until a recording whose exchanges differ only on those fields
-// lands (no current recording does). See development-process.md § Cassette
+// lands (no current recording does). See probe-harness.md § Cassette
 // mode; docs/roadmap.md tracks the deferral.
 func replayKey(method, path string) string {
 	return strings.ToUpper(method) + " " + stripRESTPrefix(path)

@@ -63,5 +63,4 @@ The superpowers skills own the build, verify and branch loop (brainstorming, pla
 
 ## Conformance probes
 
-<a id="writing-a-probe"></a>
 How probes are written, run and kept, the CDR cross-check tool and the vendored fixtures are in [probe-harness.md](probe-harness.md).

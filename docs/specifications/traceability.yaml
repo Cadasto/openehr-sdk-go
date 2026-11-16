@@ -1111,6 +1111,7 @@ requirements:
       - smart/discovery/resolver_test.go
       - smart/discovery/service_entry_test.go
       - smart/discovery/url_shape_test.go
+      - testkit/probes/auth/probe_002_openehr_rest_service.go
       - testkit/probes/auth/probe_003_spec_version_mismatch.go
       - testkit/probes/auth/probes_test.go
       - testkit/probes/discovery/probe_040_catalog_ttl.go
@@ -2082,7 +2083,6 @@ requirements:
       - openehr/aql/parse/value_position_parity_test.go
       - openehr/aql/predicate_test.go
       - openehr/aql/projection_confrontation_test.go
-      - openehr/aql/projection_internal_test.go
       - openehr/aql/projection_test.go
       - openehr/aql/standing_test.go
       - openehr/aql/value_test.go

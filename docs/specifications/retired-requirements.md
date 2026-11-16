@@ -102,7 +102,7 @@ Its rules are now [auth.md § REQ-064](auth.md#req-064--launch-context) *[Platfo
 
 ## REQ-080 — openEHR wire conformance
 
-Its test-writing rules moved to [development-process.md § Writing a probe](../development-process.md#writing-a-probe), and the round-trip comparison it restated is [wire.md § REQ-052](wire.md#req-052)'s.
+Its test-writing rules moved to [probe-harness.md § Writing a probe](../probe-harness.md#writing-a-probe), and the round-trip comparison it restated is [wire.md § REQ-052](wire.md#req-052)'s.
 
 ## REQ-081 — Wire-level parity
 
