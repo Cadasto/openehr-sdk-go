@@ -12,9 +12,8 @@ date: 2026-06-17
 - **Supersedes:** —
 - **Superseded by:** —
 - **Revises:** [ADR 0005](0005-compiled-template-foundation.md) §C2 (the `template.Compile` / `template.Compiled` re-export proposal).
+- **Amended by:** [ADR 0035](0035-compile-step-reads-operational-template-model.md): `Compile` takes the generated `*aom14.OperationalTemplate`, the OPT parser and its tree are gone, and REQ-100 is retired; `openehr/template` keeps its stdlib-only closure under the `openehr/template` row of [REQ-013](../specifications/module-layout.md#req-013--building-block-independence).
 - **Tracks:** the public compiled-template bridge ([PR 44](https://github.com/Cadasto/openehr-sdk-go/pull/44)). Implements [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge); unblocks external callers of REQ-101 / REQ-102 / REQ-107 / REQ-110.
-
-> **Numbering note.** ADR numbers 0008 (SMART discovery `services` shape) and 0009 (SMART/auth dependency policy) are reserved for decisions in flight on a separate branch and are not yet on `main`. This ADR takes 0010 to avoid a number collision on merge.
 
 ## Context
 
@@ -22,8 +21,8 @@ The compiled-template form (`templatecompile.Compiled`) is the argument every te
 
 REQ-101/102/107/110 have since landed and the shape is stable enough to expose. But the §C2 placement turns out to be infeasible:
 
-1. **Import cycle.** `internal/templatecompile` imports `openehr/template` (it consumes a `*template.OperationalTemplate`). A public `Compile` *inside* `openehr/template` would have to import the engine, forming `template → templatecompile → template`.
-2. **REQ-100 stdlib-only contract.** REQ-100 mandates `openehr/template` import nothing from `openehr/rm/…`. Compilation needs `openehr/rm/rminfo` to inject the implicit attributes an OPT omits. Hosting `Compile` in `openehr/template` would drag `rminfo` into a package the spec requires stay stdlib-only.
+1. **Import cycle.** `internal/templatecompile` imports `openehr/template` (it consumed a `*template.OperationalTemplate`, and still uses the package's path and term types). A public `Compile` *inside* `openehr/template` would have to import the engine, forming `template → templatecompile → template`.
+2. **Stdlib-only contract.** REQ-100, retired since, mandated that `openehr/template` import nothing from `openehr/rm/…`; the `openehr/template` row of REQ-013 holds that rule now. Compilation needs `openehr/rm/rminfo` to inject the implicit attributes an OPT omits. Hosting `Compile` in `openehr/template` would drag `rminfo` into a package the spec requires stay stdlib-only.
 
 So the public constructor cannot live in `openehr/template`. The candidate mechanisms were: (a) **alias re-export** from a sibling public package (consumers keep accepting the same type, now publicly constructable); (b) **promote** the whole `internal/templatecompile` package to public; (c) an **opaque wrapper** exposing a hand-picked method set.
 
@@ -46,7 +45,7 @@ This **revises ADR 0005 §C2**: the re-export is `openehr/templatecompile.Compil
 ## Consequences
 
 - **Positive:** External modules drive the full parse → compile → build → validate pipeline through public packages with no `internal/` import — REQ-111 acceptance proof in `openehr/templatecompile/external_test.go` and `cmd/examples/compile-build-validate`.
-- **Positive:** `openehr/template` keeps its REQ-100 stdlib-only contract; no import cycle.
+- **Positive:** `openehr/template` keeps its stdlib-only contract (REQ-013); no import cycle.
 - **Positive:** The introspection tree is fully navigable by downstream code (form generation, path discovery, custom mapping), and `Compiled`'s node-returning methods render real public types in the API docs.
 - **Negative:** Larger semver commitment — `CompiledNode` (~13 methods) and `CompiledAttribute` (~7) are now public contracts on an engine that is still young (reworked under REQ-104/105). Accepted by the owner; multi-language `Term` resolution is pre-flagged as the likely pre-1.0 change. Adding the types was non-breaking; future changes to them are breaking (pre-1.0 still permits them with a changelog note).
 - **Negative:** Two packages share the base name `templatecompile` (public `openehr/templatecompile`, internal `internal/templatecompile`). Files needing the engine-only helpers alias the internal one as `tcimpl`. The risk is cognitive only — type-alias identity means a mix-up cannot produce a type error.

@@ -11,6 +11,7 @@ date: 2026-06-17
 - **Status:** Accepted, 2026-06-17.
 - **Supersedes:** —
 - **Superseded by:** —
+- **Amended:** introspection left the SDK's client scope and `revocation_endpoint` is consumed by [REQ-167](../specifications/auth.md#req-167--token-revocation) (see (a)); with `WithAcceptedSpecVersions` set, an entry that advertises no `spec_version` has its `version` compared (see (b)).
 - **Tracks:** the SMART-on-openEHR auth conformance audit ([PR 45](https://github.com/Cadasto/openehr-sdk-go/pull/45)). Fixes: REQ-070 (wire decoder), REQ-072 (version-gate softening).
 
 ## Context
@@ -63,9 +64,11 @@ struct (`json:"spec_version"`) — some internal deployments may emit it.
 New top-level wire fields (`introspection_endpoint`, `revocation_endpoint`,
 `management_endpoint`) are surfaced onto `AuthEndpoints` (finding F-K, landed —
 see `smart/discovery/resolver.go`, tested in `resolver_test.go`).
-`introspection_endpoint` is consumed by the opt-in RFC 7662 client
-`auth/introspect` (REQ-062); `revocation_endpoint` and `management_endpoint`
-remain surface-only (no client wired yet).
+`introspection_endpoint` and `management_endpoint` are surfaced only:
+introspection (RFC 7662) is a resource-server operation outside the SDK's
+client scope ([auth.md § What is NOT in scope here](../specifications/auth.md#what-is-not-in-scope-here)),
+and the SDK has no management client. `revocation_endpoint` is consumed by
+`(*auth/smart.Source).Revoke` ([REQ-167](../specifications/auth.md#req-167--token-revocation)).
 
 ### (b) Version gate: soften — only enforce when version is advertised or caller is strict
 
@@ -77,6 +80,12 @@ Strict enforcement remains the default when either condition is met: the
 `resolverConfig` tracks `acceptedVersionsLocked bool` which `WithAcceptedSpecVersions`
 sets to `true`. This preserves backward compatibility for callers who rely on
 strict version pinning.
+
+*Amended:* an advertised `spec_version` is always compared. When the caller
+has set `WithAcceptedSpecVersions` and the entry advertises no `spec_version`,
+the entry's `version` member is compared instead, and an entry with neither
+fails; without that option, `version` is never compared, since a Platform
+advertises its own API version there ([auth.md § REQ-072](../specifications/auth.md#req-072)).
 
 ### (c) Legacy array back-compat: dropped
 

@@ -11,6 +11,7 @@ date: 2026-06-19
 - **Status:** Accepted, 2026-06-19.
 - **Supersedes:** —
 - **Superseded by:** —
+- **Amended by:** [ADR 0028](0028-generated-rm-attribute-access.md), which removed `openehr/validation/rmread`: the validators read through generated attribute access, and `rmpath` keeps its own walker.
 - **Strand:** none — direct design decision (brainstormed 2026-06-19); no prior open research strand.
 - **Introduces:** REQ-120, REQ-121, REQ-122, REQ-123. **Applies:** REQ-013, REQ-014, REQ-024, REQ-025.
 
@@ -44,7 +45,7 @@ Two Go realities, discovered while implementing, refine the decision above (reco
 ## Consequences
 
 - The panic stubs are filled incrementally for the in-scope subset; the public RM surface stops panicking for those operations.
-- `rmpath` is a new openEHR-core building block with zero third-party and zero `transport`/`auth` dependencies; its own walker means a small overlap with `rmread`'s typed switch, accepted to avoid inverting the layer dependency or churning landed REQ-110 code — convergence to a shared navigator is a later option if it proves worthwhile.
+- `rmpath` is a new openEHR-core building block with zero third-party and zero `transport`/`auth` dependencies; its own walker overlapped `rmread`'s typed switch, accepted to avoid inverting the layer dependency or churning landed REQ-110 code. [ADR 0028](0028-generated-rm-attribute-access.md) later replaced `rmread` with generated attribute access; `rmpath` keeps its walker.
 - The client version-uid helper is de-duplicated against the canonical RM parser.
 - The one idiom compromise is the spec-mandated `any` return on `item_at_path`/`items_at_path`; consumers needing type safety continue to use the typed `Get*` accessors. This is contained to the path package.
 - Container/commit version operations remain server-side; `VERSIONED_OBJECT`/`VERSION` in-memory management is explicitly not offered.

@@ -28,7 +28,7 @@ We need a deterministic, reviewable procedure so that any maintainer (or AI-driv
 
 ## Decision
 
-A BMM version bump follows the numbered procedure below. CI enforces the deterministic-output invariant via `make codegen-verify`; the weekly drift bot (`.github/workflows/codegen-drift.yml`) catches both accidental hand-edits and generator-template changes that would silently break the next bump.
+A BMM version bump follows the numbered procedure below. CI enforces the deterministic-output invariant via `make codegen-check`; the weekly drift bot (`.github/workflows/codegen-drift.yml`) catches both accidental hand-edits and generator-template changes that would silently break the next bump.
 
 ### Procedure
 
@@ -53,7 +53,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 3. **Verify the regen is reproducible.** Run:
 
    ```sh
-   make codegen-verify
+   make codegen-check
    ```
 
    On a freshly-regenerated tree this exits 0. If it does not, re-run step 2 and investigate — a non-deterministic generator is a bug, not a "bump consequence".
@@ -85,7 +85,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 
     Then pin a round-trip case for the new subtype under [`openehr/serialize/canjson/polymorphic_decode_test.go`](../../openehr/serialize/canjson/polymorphic_decode_test.go) so PROBE-038's substitution guarantee covers it.
 
-11. **Open the PR.** The weekly drift-bot will pass on subsequent runs since `make codegen-verify` is now green; the PR's normal CI runs `make test` which includes `codegen-verify`.
+11. **Open the PR.** The weekly drift-bot will pass on subsequent runs since `make codegen-check` is now green; the PR's normal CI runs `make test` which includes `codegen-check`.
 
 ### Roles
 
@@ -95,7 +95,7 @@ A BMM version bump follows the numbered procedure below. CI enforces the determi
 
 ### Tooling guarantees
 
-- `make codegen-verify` is wired into `make test` (Makefile line numbers may drift). A passing local `make test` is sufficient evidence the regen is reproducible.
+- `make codegen-check` is wired into `make test` (Makefile line numbers may drift). A passing local `make test` is sufficient evidence the regen is reproducible.
 - `cmd/bmmdiff` is an inspection tool — exit 0 always, output to stdout. Suitable for piping into PR descriptions or CHANGELOG drafts.
 - The drift bot's tracking-issue convention is one open issue labelled `bmm-drift`. Subsequent drift runs comment on the open issue rather than spawning duplicates.
 

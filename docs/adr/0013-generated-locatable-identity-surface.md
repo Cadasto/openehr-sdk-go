@@ -11,6 +11,7 @@ date: 2026-07-12
 - **Status:** Accepted, 2026-07-12 — maintainer acceptance after two review rounds (field-accurate types, corrected counts, completed getter quartet, typed-nil predicate); implementation lands in the same PR.
 - **Supersedes:** —
 - **Superseded by:** —
+- **Amended by:** [ADR 0028](0028-generated-rm-attribute-access.md), which removed `openehr/validation/rmread`, its `IsTypedNilPointer` and the `handles_test.go` pin; a test now holds the generated attribute access to every class the registry decodes.
 - **Strand:** cross-references [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance) (RM polymorphism; does **not** resolve it — the codec question stays open).
 - **Introduces:** — (no new `REQ`). **Amends:** REQ-031, REQ-040, REQ-043. **Applies:** REQ-013, REQ-014, REQ-024, REQ-042, REQ-044.
 - **Landed in:** [PR 72](https://github.com/Cadasto/openehr-sdk-go/pull/72) (the modernise-and-simplify pass).
@@ -125,9 +126,7 @@ reduced set.
 - **Generated-code growth:** 31 LOCATABLE types × 8 one-line methods (~248 generated
   methods) plus the two registry functions, versus the ~200 removed hand-written lines —
   total LOC rises moderately; *hand-maintained* LOC drops sharply. The trade is deliberate:
-  machine-owned bulk over human-owned lock-step. (The `handles_test.go` **54**-type pin is
-  the `rmread` closed taxonomy — a superset including non-LOCATABLE types — and stays the
-  regression gate.)
+  machine-owned bulk over human-owned lock-step.
 - **Naming:** the `Get<Field>` prefix trades Effective Go's omit-`Get` guideline for
   collision-freedom, mechanical derivability, and consistency with the existing
   `*Like`-interface accessors — a deliberate, house-precedented choice.
@@ -157,5 +156,5 @@ reduced set.
 Per the plan's Definition of Ready, implementation was blocked until this ADR reached
 **Accepted** (maintainer decision, 2026-07-12). The implementation PR carries the
 `architecture.md` narrative note, the REQ/traceability wiring, and Phase 5's generator +
-consumer-refactor tasks, verified by `make codegen` + `codegen-verify`, the
+consumer-refactor tasks, verified by `make codegen` + `codegen-check`, the
 `handles_test.go` 54-type taxonomy pin, and the full race-enabled test suite.

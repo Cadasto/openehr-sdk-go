@@ -25,7 +25,7 @@ The fork is irreversible on two counts. It changes what the generator emits, whi
 
 ## Decision
 
-The generator emits, for every concrete RM class the registry knows, the attribute access [REQ-171 *Structural access*](../specifications/clinical-modeling.md#req-171--validation-engine) specifies. The validators, and the composition builder where it navigates a path, read an instance through that access and through nothing else, and `openehr/validation/rmread` is retired. A test pins that the set of classes the access covers equals the set the registry decodes, so a BMM bump that adds a class fails `make codegen-verify` until the generator is run.
+The generator emits, for every concrete RM class the registry knows, the attribute access [REQ-171 *Structural access*](../specifications/clinical-modeling.md#req-171--validation-engine) specifies. The validators, and the composition builder where it navigates a path, read an instance through that access and through nothing else, and `openehr/validation/rmread` is retired. A test pins that the set of classes the access covers equals the set the registry decodes, so a BMM bump that adds a class fails `make codegen-check` until the generator is run.
 
 The emitted access lives in a module-internal package, so it adds no API to the `rm` types; exposing it to consumers is a later decision, taken when one asks for it. Where the template reaches, the compiled node may hold what is resolved once per template rather than once per instance: the accessor for each declared attribute and the conformance answer for each alternative. That precomputation is an optimisation the implementing change measures, not part of this decision.
 
