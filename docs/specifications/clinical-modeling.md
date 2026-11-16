@@ -370,13 +370,21 @@ Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a mini
 For bounded constraints (closed lists, bounded ranges, enumerated units, a property's units) that admit a value, `Validate(c.ExampleValue())` **MUST** return an empty `Violation` slice.
 An unbounded primitive, and a temporal constraint for which no candidate is accepted, **SHOULD** give a fixed sentinel of its type (e.g. `"example"`, `int64(0)`; for the temporal types `"2020-01-01"`, `"12:00:00"`, `"2020-01-01T12:00:00Z"` and `"P0D"`), so the example is a well-formed value of its type that stays the same from call to call.
 A constraint that admits no value has no example `Validate` accepts and is outside the first rule: a closed `CString` list whose `Pattern` matches no entry gives its first entry (§ *Validate contract*), and a temporal constraint that no value satisfies gives its sentinel.
-A temporal constraint is bounded by its `Pattern`, its `Range` and, for a time or a date-time, its `TimezoneValidity`: its `ExampleValue` is the first value `Validate` accepts of its sentinel written to the pattern, then each bound of the range, written to the pattern and moved inside the range, as each method's documentation says, and else the sentinel.
+A temporal constraint is bounded by its `Pattern`, its `Range` and, for a time or a date-time, its `TimezoneValidity`.
+Its `ExampleValue` is the first value `Validate` accepts of these, in this order, as each method's documentation says, and else the sentinel:
+
+- its sentinel, written to the pattern;
+- each bound of the range, written to the pattern and moved inside the range;
+- the value halfway between the bounds, with its fraction of a second, where the pattern allows seconds;
+- for a time or a date-time, each bound that carries a zone, written with its clock and its zone an hour across, so that it names the same instant and `Validate` compares it with the bound as an instant.
+
 Two cases are exceptions to the rule for bounded constraints, where the example is the sentinel `Validate` refuses although a valid value exists:
 
 - a pattern that writes a field after the first as a literal number, beside a range, which can move a bound written to it out of the range (`CDate{Pattern: "yyyy-06-dd"}` with the range `<=2004-05-20` gives `"2020-01-01"`, though `"2003-06-01"` is valid).
   The ITS-XML pattern grammars admit no literal number, so only an OPT that breaks that schema, or a constraint built in code, reaches it;
-- a range that only a value with a fraction of a second, or, for a `CTime`, only a time in another zone, satisfies, since no candidate carries a fraction or changes its zone (`CTime` with the range `>23:59:59` gives `"12:00:00"`, though `"23:59:59.5"` is valid).
-  An OPT reaches it through an excluded bound less than a second from the other bound or from the end of the day.
+- a range that only a value its bounds do not order satisfies, a time with a zone where the bounds carry none, or a date-time with no zone where they carry one, since a candidate takes or drops a zone only where the pattern or the `TimezoneValidity` asks it to.
+  `CTime` with the range `<00:00:00` gives `"12:00:00"`, though `"00:00:00Z"` is valid.
+  An OPT reaches it where neither the pattern nor a `timezone_validity` constrains the zone, through an excluded bound that reaches the end of the day, such as `23:59`, or lies at its start, for a time, or through two bounds closer together than the last field the pattern writes.
 
 The factory is the leaf primitive of the REQ-107 template-driven instance generator and stays on the sealed interface so the closed type-switch remains the only entry point for new primitive shapes, with no reflection ([idiom.md § Generics and reflection](idiom.md#generics-and-reflection)).
 See § REQ-107 for the generator contract.

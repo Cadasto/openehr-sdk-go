@@ -1,8 +1,13 @@
 package constraints_test
 
 import (
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
@@ -282,7 +287,9 @@ func TestREQ107_CodePhraseEmptyListPlaceholder(t *testing.T) {
 
 // TestREQ103_TemporalExampleValue pins REQ-103 § Example value emission on
 // the temporal constraints: the example is the first of the sentinel, the
-// range's lower bound and its upper bound, each written to the pattern, that
+// range's lower bound and its upper bound, each written to the pattern, the
+// value halfway between the bounds with its fraction of a second, and, for a
+// time or a date-time, each bound written in a zone an hour across, that
 // Validate accepts, so the sentinel stays wherever it satisfies both. A
 // value written to the pattern keeps its zone, takes Z where a zone is
 // required, and is read in UTC where Z is. Written with its own zone, a bound
@@ -291,8 +298,9 @@ func TestREQ107_CodePhraseEmptyListPlaceholder(t *testing.T) {
 // share; read in UTC, it moves as an instant. Where none is accepted, it is the
 // sentinel, which Validate then refuses: when no value satisfies the pattern
 // and the range, when the pattern or a bound is malformed, and, in the
-// exception the spec names, when a literal field after the first moves each
-// bound out of the range though a valid value exists.
+// exceptions the spec names, when a literal field after the first moves each
+// bound out of the range though a valid value exists, and when only a value
+// the bounds do not order meets the range.
 func TestREQ103_TemporalExampleValue(t *testing.T) {
 	t.Parallel()
 	from := func(lower string, included bool) constraints.TemporalRange {
@@ -309,7 +317,8 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 		c    constraints.PrimitiveConstraint
 		want string
 		// unsatisfiable marks a constraint whose example is the sentinel
-		// Validate refuses: one no value meets, or the literal exception.
+		// Validate refuses: one no value meets, or an exception the spec
+		// names.
 		unsatisfiable bool
 	}{
 		{name: "date, no pattern", c: constraints.CDate{}, want: "2020-01-01"},
@@ -379,6 +388,21 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 		{name: "date, zone mandatory", c: constraints.CDate{TimezoneValidity: constraints.ValidityMandatory}, want: "2020-01-01", unsatisfiable: true},
 		{name: "time, zone suffix and zone disallowed", c: constraints.CTime{Pattern: "hh:mm:ss+hh", TimezoneValidity: constraints.ValidityDisallowed}, want: "12:00:00", unsatisfiable: true},
 		{name: "duration, zero inside the range", c: constraints.CDuration{Range: from("PT0S", true)}, want: "P0D"},
+		// A range only a value with a fraction of a second meets takes the
+		// value halfway, and one only a time across midnight in its zone
+		// meets, the bound written an hour across in its zone.
+		{name: "time, excluded lower a second before the end of the day", c: constraints.CTime{Range: from("23:59:59", false)}, want: "23:59:59.5"},
+		{name: "time, excluded lower with a fraction before the end of the day", c: constraints.CTime{Range: from("23:59:59.5", false)}, want: "23:59:59.75"},
+		{name: "time, minutes, excluded lower in the last minute of its zone's day", c: constraints.CTime{Pattern: "hh:mm:XX±hh:mm", Range: from("23:59Z", false)}, want: "23:00-01:00"},
+		{name: "time, excluded upper at the start of its zone's day", c: constraints.CTime{Pattern: "hh:mm:ss±hh:mm", Range: upTo("00:00:00Z", false)}, want: "00:59:59.5+01:00"},
+		{name: "date-time, excluded bounds a second apart", c: constraints.CDateTime{Range: constraints.TemporalRange{Lower: "2021-05-15T10:00:00Z", Upper: "2021-05-15T10:00:01Z"}}, want: "2021-05-15T10:00:00.5Z"},
+		{name: "date-time, minutes, bounds a second apart, in another zone", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: constraints.TemporalRange{Lower: "2021-05-15T10:00:00+02:00", Upper: "2021-05-15T10:00:01+02:00", LowerInclusive: true}, TimezoneValidity: constraints.ValidityMandatory}, want: "2021-05-15T09:00+01:00"},
+		{name: "duration, excluded bounds half a second apart", c: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", Upper: "PT0.5S"}}, want: "PT0.25S"},
+		{name: "duration, excluded bounds either side of zero", c: constraints.CDuration{Range: constraints.TemporalRange{Lower: "-PT1S", Upper: "PT0S"}}, want: "-PT0.5S"},
+		// The exception the spec names: only a value the bounds do not
+		// order meets the range, 00:00:00Z here, and 2021-05-15T10:00 below.
+		{name: "time, only a zoned time meets a range with no zone", c: constraints.CTime{Range: upTo("00:00:00", false)}, want: "12:00:00", unsatisfiable: true},
+		{name: "date-time, only a date-time with no zone meets a zoned range", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: constraints.TemporalRange{Lower: "2021-05-15T10:00:00Z", Upper: "2021-05-15T10:00:01Z"}}, want: "2020-01-01T12:00:00Z", unsatisfiable: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -398,13 +422,6 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 	}
 }
 
-// TestREQ103_TemporalExampleValueSweep holds REQ-103 § Example value
-// emission over a sweep of bounded date, time and date-time constraints: for
-// each pattern, full or reduced, and each range from or up to a bound,
-// included or excluded, and each range between a lower and an upper bound
-// far enough apart, Validate(ExampleValue()) has no violation. The bounds
-// are written to every precision, with a fraction of a second, and, for a
-// time and a date-time, with a zone the pattern keeps or reads in UTC.
 // TestREQ103_TemporalExampleValueCloseBoundsAcrossZones pins the upper
 // bound's move under REQ-103 § Example value emission when the two excluded
 // bounds sit in different zones less than one unit of the upper bound's last
@@ -451,6 +468,13 @@ func TestREQ103_TemporalExampleValueCloseBoundsAcrossZones(t *testing.T) {
 	}
 }
 
+// TestREQ103_TemporalExampleValueSweep holds REQ-103 § Example value
+// emission over a sweep of bounded date, time and date-time constraints: for
+// each pattern, full or reduced, and each range from or up to a bound,
+// included or excluded, and each range between a lower and an upper bound
+// far enough apart, Validate(ExampleValue()) has no violation. The bounds
+// are written to every precision, with a fraction of a second, and, for a
+// time and a date-time, with a zone the pattern keeps or reads in UTC.
 func TestREQ103_TemporalExampleValueSweep(t *testing.T) {
 	t.Parallel()
 	ranges := func(lows, highs []string) []constraints.TemporalRange {
@@ -535,4 +559,391 @@ func TestREQ103_TemporalExampleValueSweep(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestREQ103_TemporalExampleValueNarrowRanges holds REQ-103 § Example value
+// emission over a generated sweep of narrow ranges: a time range from a
+// bound less than a second, or one unit of its last field, before the end
+// of the day, or up to one at its start, and time, date-time and duration
+// ranges between two bounds less than a second apart. The bounds are
+// excluded or included, and written with no zone, with Z and with +02:00.
+// Each constraint takes every pattern the ADL 1.4 grammar admits, with no
+// zone suffix, a Z suffix and a ±hh:mm one, under each timezone_validity,
+// and a duration every set of designators. Where Validate refuses the
+// example, a search of values around each bound, in several zones and with
+// fractions of a second, finds none Validate accepts, except in the one
+// exception the spec names: every value it finds is one the bounds do not
+// order, a time with a zone where the bounds carry none, or a date-time
+// with none where they carry one. A test that pins one such case is
+// TestREQ103_TemporalExampleValue.
+func TestREQ103_TemporalExampleValueNarrowRanges(t *testing.T) {
+	t.Parallel()
+	exceptions := 0
+	for _, nc := range narrowCases(t) {
+		got := nc.c.ExampleValue()
+		if len(nc.c.Validate(got)) == 0 {
+			continue
+		}
+		var ordered []string
+		valid := false
+		for _, probe := range nc.probes {
+			if len(nc.c.Validate(probe)) != 0 {
+				continue
+			}
+			valid = true
+			if zoned(t, nc.dated, probe) == nc.zoned {
+				ordered = append(ordered, probe)
+			}
+		}
+		switch {
+		case len(ordered) > 0:
+			t.Errorf("%s: example %#v refused, though %q is valid", nc.name, got, ordered[0])
+		case valid:
+			exceptions++
+		}
+	}
+	if exceptions == 0 {
+		t.Error("no case is the exception the spec names, want the sweep to reach it")
+	}
+}
+
+// narrowCase is one constraint of the narrow-range sweep, with the values
+// the search tries where Validate refuses its example. dated marks a
+// date-time, and zoned says its bounds carry a zone; a time's or a
+// date-time's bounds carry one both or neither, and a duration's none.
+type narrowCase struct {
+	name   string
+	c      constraints.PrimitiveConstraint
+	probes []string
+	dated  bool
+	zoned  bool
+}
+
+// zoned reports whether v, a time, or a date-time when dated, or a
+// duration, carries a zone.
+func zoned(t *testing.T, dated bool, v string) bool {
+	t.Helper()
+	if strings.HasPrefix(strings.TrimPrefix(v, "-"), "P") {
+		return false
+	}
+	if dated {
+		_, tm, err := iso8601.ParseDateTime(v)
+		if err != nil {
+			t.Fatalf("value %q: %v", v, err)
+		}
+		return tm.Zone != ""
+	}
+	tm, err := iso8601.ParseTime(v)
+	if err != nil {
+		t.Fatalf("value %q: %v", v, err)
+	}
+	return tm.Zone != ""
+}
+
+// narrowCases generates the constraints of the narrow-range sweep.
+func narrowCases(t *testing.T) []narrowCase {
+	t.Helper()
+	validities := []constraints.ValidityKind{constraints.ValidityOptional, constraints.ValidityMandatory, constraints.ValidityDisallowed}
+	var out []narrowCase
+	for _, r := range narrowClockRanges("", narrowTimeLowers, narrowTimeUppers, narrowTimePairs) {
+		probes, z := clockProbes(t, false, r), boundZoned(t, false, r)
+		for _, p := range clockPatterns("") {
+			for _, tz := range validities {
+				out = append(out, narrowCase{
+					name:   fmt.Sprintf("time %q %s tz %d", p, r, tz),
+					c:      constraints.CTime{Pattern: p, Range: r, TimezoneValidity: tz},
+					probes: probes,
+					zoned:  z,
+				})
+			}
+		}
+	}
+	for _, r := range narrowClockRanges("2021-05-15T", narrowTimeLowers, nil, narrowTimePairs) {
+		probes, z := clockProbes(t, true, r), boundZoned(t, true, r)
+		for _, p := range clockPatterns("yyyy-mm-ddT") {
+			for _, tz := range validities {
+				out = append(out, narrowCase{
+					name:   fmt.Sprintf("date-time %q %s tz %d", p, r, tz),
+					c:      constraints.CDateTime{Pattern: p, Range: r, TimezoneValidity: tz},
+					probes: probes,
+					dated:  true,
+					zoned:  z,
+				})
+			}
+		}
+	}
+	for _, r := range narrowDurationRanges() {
+		probes := durationProbes(t, r)
+		for _, p := range durationPatterns() {
+			out = append(out, narrowCase{
+				name:   fmt.Sprintf("duration %q %s", p, r),
+				c:      constraints.CDuration{Pattern: p, Range: r},
+				probes: probes,
+			})
+		}
+	}
+	return out
+}
+
+var (
+	// narrowTimeLowers are lower bounds less than a second, or one unit of
+	// their last field, before the end of the day.
+	narrowTimeLowers = []string{"23:59:59", "23:59:59.5", "23:59", "23"}
+	// narrowTimeUppers are upper bounds at the start of the day.
+	narrowTimeUppers = []string{"00:00:00", "00:00:00.5", "00:00", "00"}
+	// narrowTimePairs are bounds less than a second apart.
+	narrowTimePairs = [][2]string{{"10:00:00", "10:00:01"}, {"10:00:00.25", "10:00:00.75"}, {"10:59:59", "11:00:00"}}
+	// narrowZones are the zones a bound is written with: none, Z and an
+	// offset.
+	narrowZones = []string{"", "Z", "+02:00"}
+)
+
+// boundZoned reports whether the bounds of r, a time range, or a date-time
+// one when dated, carry a zone, and fails t where one does and the other
+// does not.
+func boundZoned(t *testing.T, dated bool, r constraints.TemporalRange) bool {
+	t.Helper()
+	var got []bool
+	for _, bound := range []string{r.Lower, r.Upper} {
+		if bound != "" {
+			got = append(got, zoned(t, dated, bound))
+		}
+	}
+	if len(got) == 2 && got[0] != got[1] {
+		t.Fatalf("range %s: one bound carries a zone and the other none", r)
+	}
+	return got[0]
+}
+
+// narrowClockRanges returns the narrow ranges of a time, each clock written
+// after datePrefix, the date of a date-time or "" for a time, and with each
+// of narrowZones: from each lower and up to each upper, excluded and
+// included, and between each pair, with either or both bounds excluded.
+// Two pairs whose bounds sit in different zones are added.
+func narrowClockRanges(datePrefix string, lowers, uppers []string, pairs [][2]string) []constraints.TemporalRange {
+	var out []constraints.TemporalRange
+	for _, z := range narrowZones {
+		for _, in := range []bool{false, true} {
+			for _, lo := range lowers {
+				out = append(out, constraints.TemporalRange{Lower: datePrefix + lo + z, LowerInclusive: in, UpperUnbounded: true})
+			}
+			for _, hi := range uppers {
+				out = append(out, constraints.TemporalRange{LowerUnbounded: true, Upper: datePrefix + hi + z, UpperInclusive: in})
+			}
+		}
+		for _, pr := range pairs {
+			for _, flags := range [][2]bool{{false, false}, {true, false}, {false, true}} {
+				out = append(out, constraints.TemporalRange{
+					Lower: datePrefix + pr[0] + z, Upper: datePrefix + pr[1] + z,
+					LowerInclusive: flags[0], UpperInclusive: flags[1],
+				})
+			}
+		}
+	}
+	return append(out,
+		constraints.TemporalRange{Lower: datePrefix + "10:00:00+02:00", Upper: datePrefix + "08:00:01Z"},
+		constraints.TemporalRange{Lower: datePrefix + "10:00:00.25Z", Upper: datePrefix + "12:00:00.75+02:00"},
+	)
+}
+
+// clockPatterns returns every time pattern the ADL 1.4 grammar admits after
+// datePrefix: the minute and the second each in letters, ?? or XX, in an
+// order the grammar allows, with no zone suffix, a Z suffix or a ±hh:mm
+// one, and the empty pattern.
+func clockPatterns(datePrefix string) []string {
+	out := []string{""}
+	for _, tail := range []string{"mm:ss", "mm:??", "mm:XX", "??:??", "??:XX", "XX:XX"} {
+		for _, zone := range []string{"", "Z", "±hh:mm"} {
+			out = append(out, datePrefix+"hh:"+tail+zone)
+		}
+	}
+	return out
+}
+
+// probeZones are the zones the search writes a value in, none first.
+var probeZones = []string{"", "Z", "+01:00", "-01:00", "+02:00", "-02:00", "+03:00", "-03:00", "+14:00", "-12:00"}
+
+// probeSteps are the seconds the search moves a bound's instant by.
+var probeSteps = []float64{0, 0.25, 0.5, 0.75, 1, 60, 3600, -0.25, -0.5, -0.75, -1, -60, -3600}
+
+// clockProbes returns the values the search tries for a time, or a
+// date-time when dated, in the range r: each bound's instant moved by each
+// of probeSteps, written in each of probeZones with the clock that zone
+// gives it, a bound with no zone read as UTC, and with no zone on its own
+// clock; each to the hour, the minute, the second and with its fraction,
+// and a date-time also on the day before and after its date and as its
+// date alone. A time whose clock leaves the day is left out.
+func clockProbes(t *testing.T, dated bool, r constraints.TemporalRange) []string {
+	t.Helper()
+	var out []string
+	for _, bound := range []string{r.Lower, r.Upper} {
+		if bound == "" {
+			continue
+		}
+		day, clock, zone := parseProbeBound(t, dated, bound)
+		offset := 0
+		if zone != "" {
+			var err error
+			if offset, err = iso8601.ParseZone(zone); err != nil {
+				t.Fatalf("bound %q: %v", bound, err)
+			}
+		}
+		for _, step := range probeSteps {
+			for _, z := range probeZones {
+				local := clock + step
+				if z != "" {
+					o, err := iso8601.ParseZone(z)
+					if err != nil {
+						t.Fatalf("zone %q: %v", z, err)
+					}
+					local += float64(o - offset)
+				}
+				shift := int(math.Floor(local / 86400))
+				if !dated && shift != 0 {
+					continue
+				}
+				local -= float64(shift) * 86400
+				for _, c := range clockForms(local) {
+					if !dated {
+						out = append(out, c+z)
+						continue
+					}
+					for _, d := range []int{-1, 0, 1} {
+						date := probeDate(day + shift + d)
+						out = append(out, date+"T"+c+z, date)
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// parseProbeBound reads bound, a time or, when dated, a date-time, into the
+// magnitude of its date (0 for a time), the seconds of its clock and its
+// zone.
+func parseProbeBound(t *testing.T, dated bool, bound string) (day int, clock float64, zone string) {
+	t.Helper()
+	if !dated {
+		tm, err := iso8601.ParseTime(bound)
+		if err != nil {
+			t.Fatalf("bound %q: %v", bound, err)
+		}
+		return 0, tm.Magnitude(), tm.Zone
+	}
+	d, tm, err := iso8601.ParseDateTime(bound)
+	if err != nil {
+		t.Fatalf("bound %q: %v", bound, err)
+	}
+	return d.Magnitude(), tm.Magnitude(), tm.Zone
+}
+
+// clockForms writes secs, the seconds of a clock, to the hour, the minute,
+// the second and with its fraction, each cut short rather than rounded.
+func clockForms(secs float64) []string {
+	whole := int(math.Floor(secs))
+	h, m, s := whole/3600, whole%3600/60, whole%60
+	out := []string{
+		fmt.Sprintf("%02d", h),
+		fmt.Sprintf("%02d:%02d", h, m),
+		fmt.Sprintf("%02d:%02d:%02d", h, m, s),
+	}
+	if frac := secs - float64(whole); frac > 0 {
+		digits := strconv.FormatFloat(frac, 'f', 6, 64)
+		out = append(out, fmt.Sprintf("%02d:%02d:%02d%s", h, m, s, strings.TrimRight(digits[1:], "0")))
+	}
+	return out
+}
+
+// probeDate writes the date whose magnitude is days.
+func probeDate(days int) string {
+	d := iso8601.DateOfMagnitude(days)
+	return fmt.Sprintf("%04d-%02d-%02d", d.Year, d.Month, d.Day)
+}
+
+// narrowDurationRanges are duration ranges between two bounds less than a
+// second apart, or a second apart, with either or both bounds excluded,
+// and a range from or up to half a second.
+func narrowDurationRanges() []constraints.TemporalRange {
+	var out []constraints.TemporalRange
+	for _, pr := range [][2]string{{"PT0S", "PT0.5S"}, {"PT0.25S", "PT0.75S"}, {"PT1S", "PT2S"}, {"P1D", "P1DT1S"}, {"-PT1S", "PT0S"}} {
+		for _, flags := range [][2]bool{{false, false}, {true, false}, {false, true}} {
+			out = append(out, constraints.TemporalRange{Lower: pr[0], Upper: pr[1], LowerInclusive: flags[0], UpperInclusive: flags[1]})
+		}
+	}
+	for _, in := range []bool{false, true} {
+		out = append(out,
+			constraints.TemporalRange{Lower: "PT0.5S", LowerInclusive: in, UpperUnbounded: true},
+			constraints.TemporalRange{LowerUnbounded: true, Upper: "PT0.5S", UpperInclusive: in})
+	}
+	return out
+}
+
+// durationPatterns returns every duration pattern the ADL 1.4 grammar
+// admits: each set of designators that is not empty, in written order, and
+// the empty pattern.
+func durationPatterns() []string {
+	out := []string{""}
+	for set := 1; set < 1<<7; set++ {
+		var b strings.Builder
+		b.WriteByte('P')
+		for i, c := range "YMWD" {
+			if set&(1<<i) != 0 {
+				b.WriteRune(c)
+			}
+		}
+		if set>>4 != 0 {
+			b.WriteByte('T')
+			for i, c := range "HMS" {
+				if set&(1<<(4+i)) != 0 {
+					b.WriteRune(c)
+				}
+			}
+		}
+		out = append(out, b.String())
+	}
+	return out
+}
+
+// durationProbes returns the durations the search tries in the range r:
+// each bound's length, the midpoint of two bounds and those moved by a
+// quarter, a half and a whole second either way, each in seconds with its
+// fraction and in each designator it is a whole count of.
+func durationProbes(t *testing.T, r constraints.TemporalRange) []string {
+	t.Helper()
+	var lengths []float64
+	for _, bound := range []string{r.Lower, r.Upper} {
+		if bound == "" {
+			continue
+		}
+		d, err := iso8601.ParseDuration(bound)
+		if err != nil {
+			t.Fatalf("bound %q: %v", bound, err)
+		}
+		lengths = append(lengths, d.ToSeconds())
+	}
+	if len(lengths) == 2 {
+		lengths = append(lengths, (lengths[0]+lengths[1])/2)
+	}
+	units := []struct {
+		secs float64
+		unit string
+	}{{365.24 * 86400, "Y"}, {30.42 * 86400, "M"}, {7 * 86400, "W"}, {86400, "D"}, {3600, "TH"}, {60, "TM"}, {1, "TS"}}
+	out := []string{"P0D", "PT0S"}
+	for _, length := range lengths {
+		for _, step := range []float64{0, 0.25, 0.5, 1, -0.25, -0.5, -1} {
+			secs := length + step
+			sign := ""
+			if secs < 0 {
+				sign, secs = "-", -secs
+			}
+			out = append(out, sign+"PT"+strconv.FormatFloat(secs, 'f', -1, 64)+"S")
+			for _, u := range units {
+				if n := secs / u.secs; n == math.Trunc(n) {
+					out = append(out, fmt.Sprintf("%sP%s%d%s", sign, strings.TrimSuffix(u.unit, u.unit[len(u.unit)-1:]), int64(n), u.unit[len(u.unit)-1:]))
+				}
+			}
+		}
+	}
+	return out
 }
