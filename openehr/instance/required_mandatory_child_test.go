@@ -160,14 +160,14 @@ func TestREQ107_RequiredVisitsAListForItsMandatoryChild(t *testing.T) {
 // also where that member holds content no template node describes, which
 // keeps an optional attribute out under Large and Medium.
 // With cardinality 1..* and only an optional archetype root, only the
-// cardinality asks for a member, and a cardinality lower bound counts the
-// members of a list that exists: Required leaves the content out, while
-// Large and Medium, under which that bound still makes the content
-// required, write the one member. Where that root holds content no template
-// node describes, the bound does not make the content required for the rule
-// on undescribed content either, so Large and Medium leave it out too. It
-// holds under both value fills, and each tree passes the RM floor and the
-// template validator.
+// cardinality asks for a member, which counts the members of a list that
+// exists, yet every policy writes the one member: Large and Medium, under
+// which that bound makes the content required, and Required, which builds
+// each entry archetype the content names. Where that root holds content no
+// template node describes, the bound does not make the content required for
+// the rule on undescribed content, and Required builds no such entry, so
+// every policy leaves the content out. It holds under both value fills,
+// and each tree passes the RM floor and the template validator.
 func TestREQ107_RequiredContentFollowsItsChildrenNotItsCardinality(t *testing.T) {
 	cases := []struct {
 		name string
@@ -192,11 +192,7 @@ func TestREQ107_RequiredContentFollowsItsChildrenNotItsCardinality(t *testing.T)
 			name: "cardinality 1..* over an optional archetype root",
 			opt: optTemplate("COMPOSITION", optList("content", 0, 1,
 				optRootOccurring("EVALUATION", evaluationID, 0, 1, optSingle("data", optNode("ITEM_TREE", "at0001"))))),
-			want: policyIDs{
-				instance.Large:    {evaluationID},
-				instance.Medium:   {evaluationID},
-				instance.Required: {},
-			},
+			want: sameUnderEveryPolicy(evaluationID),
 		},
 		{
 			// The EVALUATION's data is built from its BMM type, so the
@@ -223,27 +219,22 @@ func TestREQ107_RequiredContentFollowsItsChildrenNotItsCardinality(t *testing.T)
 	}
 }
 
-// TestREQ107_FamilyHistoryRequiredLeavesOutItsOptionalContent is the
-// REQ-107 check of the Visit rule on the vendored family_history.v.1.2.3
-// template. Its content has existence 0..1 and cardinality 1..*, and its one
-// EVALUATION has occurrences 0..1, so only the cardinality asks for a
-// member: Required writes no content. Large and Medium write the
-// EVALUATION, and its data/items, which the template leaves optional by
-// their existence, get the 1..* CLUSTER at0003 the Visit rule makes them
-// required for. Each tree passes the RM floor and the template validator.
-func TestREQ107_FamilyHistoryRequiredLeavesOutItsOptionalContent(t *testing.T) {
+// TestREQ107_FamilyHistoryBuildsItsOptionalEntry is the REQ-107 check of
+// the Visit rule on the vendored family_history.v.1.2.3 template. Its
+// content has existence 0..1 and cardinality 1..*, and its one EVALUATION
+// has occurrences 0..1, so only the cardinality asks for a member. Every
+// policy writes the EVALUATION all the same, Required because it builds
+// each entry archetype the content names, and its data/items, which the
+// template leaves optional by their existence, get the 1..* CLUSTER at0003
+// the Visit rule makes them required for. Each tree passes the RM floor and
+// the template validator.
+func TestREQ107_FamilyHistoryBuildsItsOptionalEntry(t *testing.T) {
 	c := compileCorpusOPT(t, "templates/family_history.v.1.2.3")
 	for _, policy := range everyPolicy {
 		for _, opts := range corpusOptions(policy) {
 			t.Run(fmt.Sprintf("%v/%v", policy, opts.ValueFill), func(t *testing.T) {
 				comp := generateComposition(t, c, opts)
 				checkValid(t, comp, c)
-				if policy == instance.Required {
-					if len(comp.Content) != 0 {
-						t.Errorf("COMPOSITION.content = %v, want none", contentIDs(comp.Content))
-					}
-					return
-				}
 				if len(comp.Content) != 1 {
 					t.Fatalf("COMPOSITION.content = %v, want the one EVALUATION", contentIDs(comp.Content))
 				}

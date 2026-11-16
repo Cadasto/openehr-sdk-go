@@ -98,8 +98,9 @@ type policyLevel struct {
 // archetype but fewer members on Corona_Anamnese, whose four uses of
 // SECTION.adhoc.v1 each hold other entries while the uses of
 // symptom_sign_screening and exposure_assessment under one section add
-// none; Required builds no optional archetype, only the composition's own
-// and its context. No policy builds a slot fill in
+// none; Required builds the entries and SECTIONs Medium builds, each to
+// its mandatory parts, so none of the CLUSTER archetypes these templates
+// leave optional inside them. No policy builds a slot fill in
 // vital_signs: the slots sit in the items of an OBSERVATION's protocol or
 // an event's state, which the template leaves optional, so no policy
 // writes them (What a visit writes). Each tree passes the template
@@ -131,7 +132,13 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 					"openEHR-EHR-OBSERVATION.heart_rate.v1":       1,
 					"openEHR-EHR-OBSERVATION.respiration.v1":      1,
 				}},
-				instance.Required: {values: 53, archetypes: map[string]int{encounter: 1}},
+				instance.Required: {values: 301, archetypes: map[string]int{
+					encounter: 1,
+					"openEHR-EHR-OBSERVATION.blood_pressure.v1":   1,
+					"openEHR-EHR-OBSERVATION.body_temperature.v1": 1,
+					"openEHR-EHR-OBSERVATION.heart_rate.v1":       1,
+					"openEHR-EHR-OBSERVATION.respiration.v1":      1,
+				}},
 			},
 		},
 		{
@@ -157,7 +164,15 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 					"openEHR-EHR-EVALUATION.education_summary.v1":       1,
 					"openEHR-EHR-CLUSTER.contact_persons_context.v1":    1,
 				}},
-				instance.Required: {values: 53, archetypes: map[string]int{encounter: 1}},
+				instance.Required: {values: 322, archetypes: map[string]int{
+					encounter: 1,
+					"openEHR-EHR-OBSERVATION.livingsituation.v1":        1,
+					"openEHR-EHR-OBSERVATION.languageproficiency.v1":    1,
+					"openEHR-EHR-OBSERVATION.participationinsociety.v1": 1,
+					"openEHR-EHR-OBSERVATION.helpfromothers.v1":         1,
+					"openEHR-EHR-EVALUATION.familysituation.v1":         1,
+					"openEHR-EHR-EVALUATION.education_summary.v1":       1,
+				}},
 			},
 		},
 		{
@@ -188,7 +203,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 					"openEHR-EHR-SECTION.adhoc.v1":                      4,
 				}},
 				instance.Medium:   {values: 1441, archetypes: coronaMedium},
-				instance.Required: {values: 53, archetypes: map[string]int{report: 1}},
+				instance.Required: {values: 825, archetypes: coronaRequired},
 			},
 		},
 	}
@@ -260,6 +275,27 @@ var coronaMedium = map[string]int{
 	"openEHR-EHR-SECTION.adhoc.v1":                      4,
 }
 
+// coronaRequired counts the archetype ids of the composition Required
+// builds on Corona_Anamnese: those of coronaMedium but the CLUSTERs, which
+// the template leaves optional inside the entries.
+var coronaRequired = map[string]int{
+	"openEHR-EHR-COMPOSITION.report.v1":                 1,
+	"openEHR-EHR-EVALUATION.health_risk.v1":             1,
+	"openEHR-EHR-EVALUATION.living_arrangement.v0":      1,
+	"openEHR-EHR-EVALUATION.occupation_summary.v1":      1,
+	"openEHR-EHR-EVALUATION.problem_diagnosis.v1":       1,
+	"openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1": 1,
+	"openEHR-EHR-INSTRUCTION.service_request.v1":        1,
+	"openEHR-EHR-OBSERVATION.body_temperature.v2":       1,
+	"openEHR-EHR-OBSERVATION.exposure_assessment.v0":    1,
+	"openEHR-EHR-OBSERVATION.medication_use.v0":         1,
+	"openEHR-EHR-OBSERVATION.story.v1":                  1,
+	"openEHR-EHR-OBSERVATION.symptom_sign_screening.v0": 2,
+	"openEHR-EHR-OBSERVATION.travel_event.v0":           1,
+	"openEHR-EHR-OBSERVATION.travel_history.v0":         1,
+	"openEHR-EHR-SECTION.adhoc.v1":                      4,
+}
+
 // TestREQ107_ZeroPolicyBuildsMedium is the REQ-107 check of Levels and
 // names on Corona_Anamnese, where each policy builds a tree of its own:
 // Options with no Policy builds the medium level, the tree Medium builds
@@ -283,26 +319,51 @@ func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
 	}
 }
 
-// TestREQ107_RequiredHoldsNoOptionalContentArchetype is the REQ-107 check
-// that Required builds no member of an optional archetype the template
-// names: vital_signs and social give COMPOSITION.content an existence of
-// 0..1, and each content OBSERVATION or EVALUATION occurrences of 0..*
-// (four OBSERVATIONs in vital_signs; four OBSERVATIONs and two EVALUATIONs
-// in social), so the only archetype the tree holds is the composition's
-// own, once.
-func TestREQ107_RequiredHoldsNoOptionalContentArchetype(t *testing.T) {
-	for _, name := range []string{"vital_signs", "social"} {
-		t.Run(name, func(t *testing.T) {
-			c := compileFixture(t, name)
+// TestREQ107_RequiredBuildsEachOptionalContentEntry is the REQ-107 check
+// that Required builds one member of each entry archetype the template
+// names under its content, although the content and each entry are
+// optional: vital_signs and social give COMPOSITION.content an existence of
+// 0..1, and each content OBSERVATION or EVALUATION occurrences of 0..*.
+// The content holds each entry once, in template order, and the tree holds
+// no other archetype but the composition's own: social's CLUSTER
+// contact_persons_context, which Medium builds, is optional inside its
+// entry, so it is none of the entry's mandatory parts.
+func TestREQ107_RequiredBuildsEachOptionalContentEntry(t *testing.T) {
+	const encounter = "openEHR-EHR-COMPOSITION.encounter.v1"
+	cases := []struct {
+		name    string
+		content []string
+	}{
+		{name: "vital_signs", content: []string{
+			"openEHR-EHR-OBSERVATION.blood_pressure.v1",
+			"openEHR-EHR-OBSERVATION.body_temperature.v1",
+			"openEHR-EHR-OBSERVATION.heart_rate.v1",
+			"openEHR-EHR-OBSERVATION.respiration.v1",
+		}},
+		{name: "social", content: []string{
+			"openEHR-EHR-OBSERVATION.livingsituation.v1",
+			"openEHR-EHR-OBSERVATION.languageproficiency.v1",
+			"openEHR-EHR-OBSERVATION.participationinsociety.v1",
+			"openEHR-EHR-OBSERVATION.helpfromothers.v1",
+			"openEHR-EHR-EVALUATION.familysituation.v1",
+			"openEHR-EHR-EVALUATION.education_summary.v1",
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileFixture(t, tc.name)
 			comp := generateComposition(t, c, corpusPolicyOptions(instance.Required))
+			if got := contentIDs(comp.Content); !slices.Equal(got, tc.content) {
+				t.Errorf("Generate(%s, Required) content = %v, want %v", tc.name, got, tc.content)
+			}
 			got := make(map[string]int)
 			archetypeIDCounts(decodedJSON(t, comp), got)
-			want := map[string]int{"openEHR-EHR-COMPOSITION.encounter.v1": 1}
-			if !maps.Equal(got, want) {
-				t.Errorf("Generate(%s, Required) archetype ids = %v, want %v", name, got, want)
+			want := map[string]int{encounter: 1}
+			for _, id := range tc.content {
+				want[id] = 1
 			}
-			if len(comp.Content) != 0 {
-				t.Errorf("Generate(%s, Required) content = %v, want none", name, contentIDs(comp.Content))
+			if !maps.Equal(got, want) {
+				t.Errorf("Generate(%s, Required) archetype ids = %v, want %v", tc.name, got, want)
 			}
 		})
 	}

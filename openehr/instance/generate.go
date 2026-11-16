@@ -59,7 +59,8 @@ import (
 // interval holds, make Generate return an error wrapping
 // [ErrConstraintUnsatisfiable] and no root. A list that sits
 // in an optional node the policy builds no member of, as Required builds
-// none of an optional child, is not visited, and the root leaves it out. An
+// none of an optional child other than an entry or a SECTION on the way to
+// one, is not visited, and the root leaves it out. An
 // optional node that holds such an attribute is content the template does
 // not describe, so no policy builds a member of it unless a top-up has no
 // other child to take. Where the template leaves such an attribute
@@ -720,18 +721,21 @@ func attrProhibited(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute
 // lower bound is bounded and at least 1, or it is a list with an allowed
 // child, not a slot, whose occurrences lower bound is bounded and at least
 // 1 (holdsRequiredChild, which leaves out a list the OPT prohibits and one
-// of primitive values), and no other: a cardinality lower bound alone does
-// not make Required visit a list, since it counts the members of a list
-// that exists and does not ask for the list. Under Medium: every attribute that is required in
+// of primitive values), and an attribute with an allowed child that leads
+// to an entry (holdsEntry), which only a COMPOSITION's content and a
+// SECTION's items have, so that Required builds each entry the template
+// names there. A cardinality lower bound alone does not make Required
+// visit a list, since it counts the members of a list that exists and
+// does not ask for the list. Under Medium: every attribute that is required in
 // the wider sense of visitRequired, which a cardinality lower bound of 1
 // or more also meets, OR that has OPT-pinned children the OPT does not
 // prohibit. The "has OPT children" arm captures the case where the OPT
 // explicitly constrains a structurally optional attribute (e.g. COMPOSITION.content
 // with archetype-root pins): under Medium the act of pinning is itself
 // a signal that the resulting tree should carry those children. Required
-// does not take that arm, so it builds only what the template makes
-// mandatory, except on a COMPOSITION's context, which it visits as
-// Medium does: applyCompositionDefaults writes a context under every
+// does not take that arm, so beyond the entries it builds only what the
+// template makes mandatory, except on a COMPOSITION's context, which it
+// visits as Medium does: applyCompositionDefaults writes a context under every
 // policy, so the walk builds it under the OPT's constraints (a pinned
 // setting, a required other_context) rather than leaving it bare. Inside
 // the context Required's own rule applies. Under Large and Medium, an
@@ -753,7 +757,7 @@ func attrProhibited(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute
 func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	isContext := compositionContext(optNode, attr)
 	if g.opts.Policy == Required && !isContext {
-		return isRequired(optNode, attr)
+		return isRequired(optNode, attr) || g.holdsEntry(optNode, attr)
 	}
 	if isRequired(optNode, attr) {
 		return true
@@ -834,7 +838,8 @@ func (g *generator) holdsNoItem(attr *tcimpl.CompiledAttribute) bool {
 // cardinality lower bound is bounded and at least 1. Cardinality lower and
 // existence are separate, so a 1..* list is required when existence does
 // not say so. Required leaves out a list only that cardinality requires,
-// and so do Large and Medium where every member it would get is
+// unless an allowed child of it leads to an entry (holdsEntry), and so do
+// Large and Medium where every member it would get is
 // undescribed or needs undescribed content (shouldVisit). Whether a node
 // needs undescribed content (needsUndescribed) reads this wider sense under
 // every policy.
@@ -843,8 +848,9 @@ func visitRequired(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute)
 }
 
 // compositionContext reports whether attr is the context of a
-// COMPOSITION, the one attribute Required visits as Medium does and the
-// one the rule on undescribed content never keeps the walk out of.
+// COMPOSITION, which Required visits as Medium does whatever it holds, and
+// the one attribute the rule on undescribed content never keeps the walk
+// out of.
 func compositionContext(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	return attr.Name() == "context" && bmmtype.Class(optNode.RMTypeName()) == "COMPOSITION"
 }
@@ -2107,12 +2113,12 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 
 // materialiseMultiple synthesises and appends children under a
 // C_MULTIPLE_ATTRIBUTE. Per-child counts honour each OPT child's
-// occurrences.lower: max(occurrences.lower, 1) under Large and Medium,
-// and occurrences.lower under Required, so an optional child (bounded
-// occurrences with a lower bound of 0) gets none of its own there; a child
-// with no occurrences, or an unbounded lower, counts as required
-// (childRequired) and gets one under every policy. Under Large and Medium a
-// child ownMemberSkipped names gets none of its own either. The overall attribute's
+// occurrences.lower: max(occurrences.lower, 1), except a child
+// ownMemberSkipped names, which gets none of its own: under Required that
+// is an optional child (bounded occurrences with a lower bound of 0) other
+// than one that leads to an entry. A child with no occurrences, or an
+// unbounded lower, counts as required (childRequired) and gets one under
+// every policy. The overall attribute's
 // cardinality.upper (default unbounded) caps the total. Within that cap the
 // members the children that ask the list for members want (askedMembers)
 // get the room first: any other child, before or after them, takes only
@@ -2199,9 +2205,8 @@ func (p memberPlan) members() int { return len(p.own) + len(p.topUp) }
 // planMembers returns the members the walk builds for attr, a visited list
 // of optNode whose allowed children are children, without building any.
 // Each allowed child that is not a slot and that the policy does not skip
-// (ownMemberSkipped) gets max(occurrences.lower, 1) members under Large and
-// Medium, and occurrences.lower under Required, within the cardinality
-// upper bound (memberCap), where the children that ask for members
+// (ownMemberSkipped) gets max(occurrences.lower, 1) members, within the
+// cardinality upper bound (memberCap), where the children that ask for members
 // (asksMember) take the room first and any other child only the room they
 // leave. The top-up then adds the members the attribute still needs
 // (remainingLowerNeeded), within the same bound, one at a time, each from
@@ -2229,17 +2234,15 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 		}
 		own[i] = true
 		asks := asksMember(child)
+		// An optional child the policy keeps (occurrences lower bound 0)
+		// still gets one member, so the tree carries it once;
+		// ownMemberSkipped above drops the others, under Required every
+		// optional child but one that leads to an entry. Only the top-up
+		// below can build a member of a dropped child, to meet the
+		// attribute's lower bound.
 		childCount := 1
-		if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() {
-			if occ.Lower() > 0 || g.opts.Policy == Required {
-				childCount = occ.Lower()
-			}
-			// occ.Lower()==0 → under Large and Medium, still produce one
-			// fill so the resulting tree carries each child the policy
-			// keeps at least once (ownMemberSkipped above drops the
-			// others). Under Required an optional child gets none: only
-			// the top-up below can build one, to meet the attribute's
-			// lower bound.
+		if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0 {
+			childCount = occ.Lower()
 		}
 		for range childCount {
 			// A child that asks for no member leaves the room the others
@@ -2256,8 +2259,8 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 	}
 	// Top-up to the count the attribute needs when the members planned
 	// so far fall short of it, under every policy (e.g. Large or Medium
-	// skipped a child the lower bound still needs, or Required built no
-	// member of an optional child). Where the BMM, the cardinality or a
+	// skipped a child the lower bound still needs, or Required skipped an
+	// optional child). Where the BMM, the cardinality or a
 	// child's occurrences asks for the member (not existenceOnly) and
 	// no child that is not a slot has room, the seed is the first slot, and
 	// buildChild synthesises a slot-shaped fill: an RM value of the slot's
@@ -3251,22 +3254,82 @@ func newHierObjectID() *rm.HierObjectID {
 // archetype, and of a later use of one only where that use holds other
 // archetypes, not one of each use. Under Large every other child gets its
 // members, each named or unnamed use of one archetype included, which the
-// validator binds by room and by trial. Required skips no child here: it
-// sizes each child by its occurrences lower bound, which gives an optional
-// child no member. The top-up to the attribute's lower bound can still
+// validator binds by room and by trial. Under Required an optional child
+// gets none unless it leads to an entry (leadsToEntry) and Medium would
+// build it (repeatsUse), so the content holds a member of each entry and
+// of each SECTION on the way to one that Medium builds there, and no other
+// optional child. The top-up to the attribute's lower bound can still
 // build a member of a skipped child.
 func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int, own []bool) bool {
 	switch g.opts.Policy {
 	case Large:
 		return g.optionalUndescribed(children[i])
 	case Medium:
-		return g.optionalUndescribed(children[i]) ||
-			identityTaken(children, i, own) && !g.addsArchetype(children, i, own)
+		return g.optionalUndescribed(children[i]) || g.repeatsUse(children, i, own)
 	case Required:
-		return false
+		return !childRequired(children[i]) && (!g.leadsToEntry(children[i]) || g.repeatsUse(children, i, own))
 	}
 	// Unreachable: Generate refuses any other Policy value first.
 	return false
+}
+
+// repeatsUse reports whether children[i] is a further use that Medium
+// gives no member of its own: a sibling that gets a member of its own
+// carries its identity (identityTaken), and it holds no archetype that no
+// such sibling holds (addsArchetype). Required skips such a child too
+// where it leads to an entry (leadsToEntry).
+func (g *generator) repeatsUse(children []*tcimpl.CompiledNode, i int, own []bool) bool {
+	return identityTaken(children, i, own) && !g.addsArchetype(children, i, own)
+}
+
+// leadsToEntry reports whether child, an allowed child of a list, is one
+// Required gives a member of its own for the entries it leads to: it is
+// not a slot, it is not optional with undescribed content
+// (optionalUndescribed), and it is an entry root (entryRoot) or a SECTION
+// whose items hold such a child (holdsEntry). The RM holds a SECTION or an
+// entry only in a COMPOSITION's content or a SECTION's items, so only
+// those lists have such a child.
+func (g *generator) leadsToEntry(child *tcimpl.CompiledNode) bool {
+	if child.IsSlot() {
+		return false
+	}
+	switch {
+	case entryRoot(child):
+	case nodeClass(child) == "SECTION":
+		if items := child.Attribute("items"); items == nil || !g.holdsEntry(child, items) {
+			return false
+		}
+	default:
+		return false
+	}
+	return !g.optionalUndescribed(child)
+}
+
+// holdsEntry reports whether attr of node, an attribute the walk does not
+// skip (walkSkips), has an allowed child that leads to an entry
+// (leadsToEntry): any of them for a list, and for a single-valued
+// attribute the child it binds its value to (bindingAlternative). Required
+// visits such an attribute although it is optional.
+func (g *generator) holdsEntry(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	children := tcimpl.AllowedChildNodes(attr)
+	if len(children) == 0 || walkSkips(node, attr) {
+		return false
+	}
+	if attr.Cardinality() == template.Single {
+		return g.leadsToEntry(bindingAlternative(children, builtRMType(children[0])))
+	}
+	return slices.ContainsFunc(children, g.leadsToEntry)
+}
+
+// entryRoot reports whether node is an entry the template names: it names
+// an archetype id, and the class the walk builds for it (nodeClass) is an
+// ENTRY class or GENERIC_ENTRY.
+func entryRoot(node *tcimpl.CompiledNode) bool {
+	if node.ArchetypeID() == "" {
+		return false
+	}
+	class := nodeClass(node)
+	return class == "GENERIC_ENTRY" || descendsFrom(class, "ENTRY")
 }
 
 // identityTaken reports whether children[i] is optional and a sibling that
@@ -3274,10 +3337,11 @@ func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int, own
 // identity: a required sibling before or after it, or an optional sibling
 // before it that the policy does not skip. An optional sibling that gets
 // no member of its own, as one that needs undescribed content, carries
-// none. Under Medium such a child gets no member of its own, so the
-// attribute holds one member of an identity where the template asks for
-// no more, though the top-up to the attribute's lower bound can still
-// build one, from the child it takes (materialiseMultiple); a required
+// none. Under Medium, and under Required where it leads to an entry, such
+// a child gets no member of its own unless it adds an archetype
+// (repeatsUse), so the attribute holds one member of an identity where the
+// template asks for no more, though the top-up to the attribute's lower
+// bound can still build one, from the child it takes (materialiseMultiple); a required
 // child is always built. A slot does not count as a sibling. A sibling
 // carries an identity as the validator binds a member by it
 // (carriesIdentity), so an archetype root also carries its node id: an
@@ -3321,10 +3385,11 @@ func siblingOwnsMember(children []*tcimpl.CompiledNode, i, j int, own []bool) bo
 
 // addsArchetype reports whether children[i] holds an archetype
 // (heldArchetypes) that no sibling that gets a member of its own
-// (siblingOwnsMember, given own) holds. Under Medium such a child gets its
-// member although a sibling carries its identity (identityTaken), so a
-// later use of one archetype is built where it holds archetypes the uses
-// before it do not, and skipped where it adds none.
+// (siblingOwnsMember, given own) holds. Under Medium, and under Required
+// where it leads to an entry, such a child gets its member although a
+// sibling carries its identity (identityTaken), so a later use of one
+// archetype is built where it holds archetypes the uses before it do not,
+// and skipped where it adds none.
 func (g *generator) addsArchetype(children []*tcimpl.CompiledNode, i int, own []bool) bool {
 	held := make(map[string]bool)
 	for j, sib := range children {
@@ -3346,7 +3411,10 @@ func (g *generator) addsArchetype(children []*tcimpl.CompiledNode, i int, own []
 // passes no slot and no optional child that needs undescribed content
 // (optionalUndescribed), which gets no member of its own. A slot holds no
 // archetype. The answer does not depend on the policy, and it is kept per
-// node for the call, so the caller must not change the slice.
+// node for the call, so the caller must not change the slice. Required
+// reads it too, for an entry or a SECTION on the way to one, though it
+// builds fewer of those roots, such as no optional CLUSTER in an entry: a
+// later use that holds one gets its member there as under Medium.
 func (g *generator) heldArchetypes(node *tcimpl.CompiledNode) []string {
 	if node.IsSlot() {
 		return nil

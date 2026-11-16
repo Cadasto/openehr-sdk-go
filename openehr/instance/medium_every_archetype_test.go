@@ -37,9 +37,9 @@ func contentShape[T any](items []T) string {
 // SECTION whose items list two more. Medium builds one member of each
 // archetype, the nested ones included, and none of the second use, whose
 // identity the first carries and which holds no other archetype; Large
-// also builds that second use. Required
-// builds no optional child, and the content is optional. Every root passes
-// the RM floor and the template validator, under every policy, both value
+// also builds that second use. Required builds the entries and the SECTION
+// Medium builds, each entry to its mandatory parts. Every root passes the
+// RM floor and the template validator, under every policy, both value
 // fills and both compile modes.
 func TestREQ107_MediumBuildsEveryOptionalArchetype(t *testing.T) {
 	const (
@@ -61,7 +61,7 @@ func TestREQ107_MediumBuildsEveryOptionalArchetype(t *testing.T) {
 	want := map[instance.Policy]string{
 		instance.Large:    strings.Join([]string{first, second, first, nested}, ","),
 		instance.Medium:   strings.Join([]string{first, second, nested}, ","),
-		instance.Required: "",
+		instance.Required: strings.Join([]string{first, second, nested}, ","),
 	}
 	for _, implicit := range []bool{true, false} {
 		c := compileOPTText(t, opt, implicit)
@@ -88,10 +88,10 @@ func TestREQ107_MediumBuildsEveryOptionalArchetype(t *testing.T) {
 // own, because it needs undescribed content, carries no identity for the
 // siblings after it. The content lists two optional uses of one
 // OBSERVATION archetype, the first with a protocol that admits only a
-// slot, so under Medium, as under Large, the second gets its member, which
-// has no protocol. Required builds no optional child, and the content is
-// optional. Every root passes the RM floor and the template validator,
-// under every policy, both value fills and both compile modes.
+// slot, so under Medium and Required, as under Large, the second gets its
+// member, which has no protocol. Every root passes the RM floor and the
+// template validator, under every policy, both value fills and both
+// compile modes.
 func TestREQ107_MediumSkippedSiblingCarriesNoIdentity(t *testing.T) {
 	slottedProtocol := optSingle("protocol", optSlot("ITEM_TREE", "at0002"))
 	opt := guardOPT(guardCompositionID, guardMultiple("content", guardExistence01,
@@ -100,7 +100,7 @@ func TestREQ107_MediumSkippedSiblingCarriesNoIdentity(t *testing.T) {
 	want := map[instance.Policy]string{
 		instance.Large:    usedObservationID,
 		instance.Medium:   usedObservationID,
-		instance.Required: "",
+		instance.Required: usedObservationID,
 	}
 	for _, implicit := range []bool{true, false} {
 		c := compileOPTText(t, opt, implicit)
@@ -135,9 +135,11 @@ func TestREQ107_MediumSkippedSiblingCarriesNoIdentity(t *testing.T) {
 // member. A root that needs undescribed content, which Medium does not
 // build, is not held. A later use that adds no archetype gets none, so
 // Large still builds more. The cases are uses of one SECTION archetype
-// under a composition's content, and CLUSTERs of one node id under a
-// CLUSTER's items. Every root passes the RM floor and the template
-// validator, under every policy, both value fills and both compile modes.
+// under a composition's content, which Required builds as Medium does,
+// since each use it builds leads to an entry, and CLUSTERs of one node id
+// under a CLUSTER's items, of which Required builds only the required one.
+// Every root passes the RM floor and the template validator, under every
+// policy, both value fills and both compile modes.
 func TestREQ107_MediumBuildsALaterUseThatAddsAnArchetype(t *testing.T) {
 	const (
 		section = "openEHR-EHR-SECTION.adhoc.v1"
@@ -184,7 +186,7 @@ func TestREQ107_MediumBuildsALaterUseThatAddsAnArchetype(t *testing.T) {
 					section + "()", section + "(" + obsD + ")", obsD,
 				}, ","),
 				instance.Medium:   strings.Join([]string{section + "(" + obsA + ")", section + "(" + obsB + ")", obsD}, ","),
-				instance.Required: obsD,
+				instance.Required: strings.Join([]string{section + "(" + obsA + ")", section + "(" + obsB + ")", obsD}, ","),
 			},
 		},
 		{

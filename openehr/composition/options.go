@@ -78,8 +78,9 @@ func WithNow(t time.Time) Option {
 // further use of one only where that use holds another archetype.
 // instance.Large builds a member of every optional archetype the template
 // names and of every use of one, the nodes Set needs to route a value
-// into, and instance.Required builds only what the template makes
-// mandatory and a composition's context; instance.Complete and
+// into, and instance.Required builds what the template makes mandatory, a
+// composition's context and each entry the content names, with only its
+// mandatory parts; instance.Complete and
 // instance.Minimal are other names for Large and Required. NewSkeleton
 // accepts the three. NewBuilder builds on
 // Large when no WithPolicy is given and accepts only Large, since Set does

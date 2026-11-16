@@ -72,8 +72,9 @@ func itemsShape(items []rm.Item) string {
 // an optional child that needs undescribed content gets no member of its
 // own, an attribute that is not required and whose members would all be
 // undescribed or need it is not visited, a top-up takes a child that needs
-// none, and Medium passes over an optional archetype root that needs some
-// while it builds the ones after it. The rule reads a node's own
+// none, and Medium and Required, which builds each entry the content
+// names, pass over an optional archetype root that needs some while they
+// build the ones after it. The rule reads a node's own
 // attributes only, so a required node below an optional one keeps its
 // undescribed members and the optional node is kept. Every root passes the
 // RM floor and the template validator, under every policy, both value
@@ -255,7 +256,7 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 				undescribedObservation(slotted, guardOccurrences01, describedHistory, slottedProtocol),
 				undescribedObservation(described, guardOccurrences01, describedHistory),
 				undescribedObservation(third, guardOccurrences01, describedHistory))),
-			large: described + "," + third, medium: described + "," + third, required: "",
+			large: described + "," + third, medium: described + "," + third, required: described + "," + third,
 		},
 	}
 	for _, tc := range cases {

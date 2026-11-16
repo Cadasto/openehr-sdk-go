@@ -729,7 +729,7 @@ type Policy int
 
 const (
     Medium   Policy = iota // the default: required attributes and those with an allowed OPT child, a member of each optional archetype
-    Required               // required attributes and a composition's context, each OPT child up to its occurrences lower bound
+    Required               // required attributes, a composition's context, a member of each entry the content names at its mandatory parts
     Large                  // every attribute the visit rule allows, a member of each optional archetype and of each use of one
 
     Minimal  = Required // alias
@@ -841,13 +841,13 @@ Of the attributes the rules above leave, `Generate` **MUST** visit those this ta
 |---|---|
 | `Large` | every attribute the compiled node carries |
 | `Medium` | every attribute that is required or that has an allowed OPT child |
-| `Required` | every attribute that is required, except one that only its cardinality lower bound requires, and none for its allowed OPT child alone |
+| `Required` | every attribute that is required, except one that only its cardinality lower bound requires, and none for its allowed OPT child alone unless that child leads to an entry (*Members of a list*) |
 
 A cardinality lower bound counts the members of a container that exists and does not ask for the container, which its existence decides ([§ REQ-111 *Template terms*](#template-terms)).
-So `Required` leaves out an optional list that only its cardinality asks a member of, such as a `COMPOSITION`'s `content` at existence `0..1` and cardinality `1..*` whose children are all optional, and the bound counts the members of a list `Required` visits for another reason (*What a visit writes*).
+So `Required` leaves out an optional list that only its cardinality asks a member of, such as an `ITEM_TREE`'s `items` at existence `0..1` and cardinality `1..*` whose children are all optional, and the bound counts the members of a list `Required` visits for another reason (*What a visit writes*).
 The three follow the levels of the ITS-REST template example's `detail_level` ([`definition-validation.openapi.yaml`](../../resources/its-rest/definition-validation.openapi.yaml)):
 
-- `Required` builds its `required` level, the data points the template makes mandatory and a composition's `context`;
+- `Required` builds its `required` level, the data points the template makes mandatory, a composition's `context`, and a member of each entry the content names, at its mandatory parts (*Members of a list*);
 - `Medium` its `medium` level, with a member of each optional archetype under an attribute, and of a further use of one only where that use holds another archetype (*Sibling identity*);
 - `Large` a member of every optional archetype the template names that needs no undescribed content (§ [Slot fills](#slot-fills)), and of every use of one, named or not, short of the `complete` level (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *The `Complete` level*).
 
@@ -871,7 +871,7 @@ When the attribute has no allowed OPT child, it takes a value built from its BMM
 A visited multi-valued attribute gets, in OPT order, these members of each allowed OPT child that is not a slot:
 
 - under `Large` and `Medium`, `max(occurrences.lower, 1)`, except an optional child (occurrences lower bound 0) that needs undescribed content (§ [Slot fills](#slot-fills)), which gets none;
-- under `Required`, `occurrences.lower`, so that an optional child gets none of its own there;
+- under `Required`, `occurrences.lower`, so that an optional child gets none of its own there, except one that leads to an entry (below) and that the `Medium` rule below does not skip, which gets one;
 - under every policy, one of a child the OPT gives no occurrences, or occurrences with an unbounded lower bound, which is not optional.
 
 It gets no more members in all than its `cardinality.upper` when that is bounded.
@@ -886,6 +886,14 @@ An optional sibling that gets no member of its own, such as one that needs undes
 Under `Large`, an optional child whose identity a sibling carries gets its members as any other optional child does, so a `Large` root holds a member of every sibling of one identity that needs no undescribed content, whether the OPT pins a name on it or not, within the cardinality bound above.
 The validator binds those members by room and by trial ([§ REQ-102](#req-102--composition-validation) *Structural — binding items*), each to the sibling whose constraints built it wherever that sibling comes first among those with room (§ *Exceptions and known gaps*).
 An optional multi-valued attribute with no allowed OPT child gets no member, so nothing archetype-rooted appears without its `archetype_details`.
+
+A child *leads to an entry* where it is not a slot, is not an optional child that needs undescribed content (§ [Slot fills](#slot-fills)), and is one of:
+
+- an archetype root of an `ENTRY` class or of `GENERIC_ENTRY`;
+- a `SECTION` whose `items` hold a child that leads to an entry.
+
+Only a `COMPOSITION`'s `content` and a `SECTION`'s `items` hold such a child.
+So under `Required` the content holds a member of each entry archetype `Medium` builds there, and of each `SECTION` on the way to one, and `Required`'s own rule builds only the mandatory parts inside each member.
 
 ##### Sibling identity
 
@@ -1204,7 +1212,7 @@ A root `Generate` returns can break § Contract's output rule in these cases, an
   One whose `HISTORY` allows none of the events and summaries § [Precedence](#precedence) 2 tries gets neither, and breaks `Events_valid`.
   One whose list's cardinality lower bound exceeds the members its allowed children's occurrences upper bounds admit, none of them a slot, gets the members its top-up adds past its first allowed child's occurrences (§ Contract *What a visit writes*).
   One whose children's occurrences lower bounds add up past the cardinality upper bound of their list gets no root where the walk visits that list (§ [Errors](#errors)).
-  Where the walk does not, as under `Required`, which builds no member of an optional child that holds the list, the root holds no instance of the list and the contradiction does not reach it.
+  Where the walk does not, as under `Required` where the optional child that holds the list leads to no entry (§ Contract *Members of a list*), the root holds no instance of the list and the contradiction does not reach it.
 - **A value the caller supplies** through `Options` (a language, a territory, a composer, a uid from `UIDSource`) is written as given, valid or not.
 - **An RM invariant that relates the object to another**, such as PARTY `Relationships_validity` or PARTY_RELATIONSHIP `Source_valid` and `Target_valid`, which a single generated object cannot meet, is not kept.
 - **A placeholder code on an attribute an RM rule ties to a code set or terminology group** for which § Contract gives no default, such as a `normal_status`, or a DV_MULTIMEDIA `compression_algorithm` or `integrity_check_algorithm`, can break that rule.

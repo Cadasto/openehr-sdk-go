@@ -287,7 +287,7 @@ go run ./cmd/examples/generate-example \
 
 The policies:
 
-- `required` builds only the data points the template makes mandatory and a composition's context, and builds an optional list where the list holds a mandatory item, not where only the list's minimum item count asks for an item.
+- `required` builds the data points the template makes mandatory, a composition's context, and one member of each entry the content names, with the sections that lead to it, each with only its mandatory parts. Elsewhere it builds an optional list where the list holds a mandatory item, not where only the list's minimum item count asks for an item.
 - `medium` also builds every attribute the template constrains, with a member of each optional archetype under it whose content the template describes, and of a further use of one archetype only where that use holds another archetype.
 - `large` builds every attribute and a member of every optional archetype the template names, each of several uses of one archetype included, named or not.
 

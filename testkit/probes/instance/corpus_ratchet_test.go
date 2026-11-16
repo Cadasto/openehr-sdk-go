@@ -77,23 +77,45 @@ var corpusCompileFailures = []string{}
 
 // requiredBodies names the compiling vendored templates whose body holds
 // at least one ELEMENT under Required, under every value fill and seed:
-// the hollow-body floor under that policy. Required builds only what the
-// template makes mandatory and gives an optional child no member of its
-// own (REQ-107 Visit rule, What a visit writes), so a template that
-// requires no ELEMENT gets a body with none by design: the other 74
-// compiling COMPOSITION templates, whose ELEMENTs all sit below an
-// optional attribute or child (an optional content, or a required entry
-// whose items are optional), and Address.v2, which is ADDRESS-rooted, has
-// no content attribute, and leaves its details optional. An optional
-// content that only its cardinality asks a member of, at existence 0..1
-// and cardinality 1..* over optional archetype roots, is one Required
-// leaves out, as body_weight, clinical_notes.v0 and GECCO_Diagnose have
-// it. A listed template that becomes hollow under Required fails the
+// the hollow-body floor under that policy. Required builds each entry
+// archetype the content names, and each SECTION on the way to one, to its
+// mandatory parts only (REQ-107 What each policy visits), so a body holds
+// an ELEMENT only where the template makes one mandatory. The other 58
+// compiling templates get a body with none by design: COMPOSITION templates
+// whose entries leave every ELEMENT optional, such as social, nested.en.v1
+// and the minimal_* and Test_dv_* templates; generic_ehr_status.v1 and
+// generic_folder.v1, which constrain no ELEMENT; and Address.v2, which is
+// ADDRESS-rooted and leaves its details optional. The list is the shorter
+// side. A listed template that becomes hollow under Required fails the
 // ratchet, and so does an unlisted one that stops being hollow, as a
 // listed row that now passes does.
 var requiredBodies = []string{
+	"definition/body_weight",
+	"ehrbase-service/IDCR  - Generic MDT Output Report.v0",
+	"ehrbase-service/IDCR  - Laboratory Order.v0",
+	"ehrbase-service/IDCR - Procedures List.v1",
+	"ehrbase-service/IDCR - Service Request.v0",
+	"ehrbase-service/careplan.v1",
+	"templates/BMI",
+	"templates/IDCR -  Adverse Reaction List.v1",
+	"templates/IDCR - Laboratory Test Report.v0",
+	"templates/IDCR - Vital Signs Encounter - updated.v1",
+	"templates/IDCR - Vital Signs Encounter.v1",
+	"templates/IDCR Problem List.v1",
+	"templates/Referral Request.v1",
 	"templates/TestPerson.v2",
+	"templates/Vital signs CKM",
+	"templates/Vital signs monitoring",
+	"templates/blood_pressure_strict_existence",
+	"templates/body_weight",
+	"templates/clinical_content_validation",
+	"templates/clinical_notes.v0",
+	"templates/family_history.v.1.2.3",
+	"templates/test_template_rename_node",
 	"templates/test_template_rename_node_2",
+	"templates/vital_signs",
+	"webtemplate/Corona_Anamnese",
+	"webtemplate/GECCO_Diagnose",
 }
 
 // mediumHollowBodies names the compiling vendored templates of which a root
@@ -146,11 +168,12 @@ var mediumHollowBodies = []string{
 // validate. Under Medium the hollow-body floor is the mediumHollowBodies
 // list instead of a row.
 //
-// Required rows: none. Required visits only the attributes the template
-// makes mandatory and gives an optional child no member of its own
-// (REQ-107 Visit rule, What a visit writes), so it reaches none of the
-// optional archetypes the rows here fail in. Under Required the
-// hollow-body floor is the requiredBodies list instead of a row.
+// Required rows: none. Required gives an optional child a member of its
+// own only where it is an entry the content names or a SECTION on the way
+// to one, each built to its mandatory parts (REQ-107 What each policy
+// visits), so it reaches none of the optional CLUSTERs the rows here fail
+// in, and every entry it builds validates. Under Required the hollow-body
+// floor is the requiredBodies list instead of a row.
 //
 // No slot_fill rows: family_history.v.1.2.3's slot no example can fill sits
 // in the optional CLUSTER at0024, whose required items admit only slots, so

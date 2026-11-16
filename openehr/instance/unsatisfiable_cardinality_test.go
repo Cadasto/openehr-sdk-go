@@ -112,9 +112,9 @@ func TestREQ107_UnsatisfiableCardinalityIsRefused(t *testing.T) {
 // walk visits it: held by an optional SECTION, it makes Generate return an
 // error wrapping ErrConstraintUnsatisfiable and no root under Large and
 // Medium, which build that SECTION, and Required, which builds no member of
-// an optional child, returns a root without the list that passes the RM
-// floor and the template validator. It holds under both value fills and
-// both compile modes.
+// an optional SECTION that leads to no entry, returns a root without the
+// list that passes the RM floor and the template validator. It holds under
+// both value fills and both compile modes.
 func TestREQ107_UnsatisfiableCardinalityIsRefusedWhereVisited(t *testing.T) {
 	opt := optTemplate("SECTION", optCardinal("items", 0, 1,
 		optSectionChild("at0001", 0, 1, optCardinal("items", 0, 1, optSectionChild("at0002", 1, 1), optSectionChild("at0003", 1, 1)))))

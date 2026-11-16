@@ -51,14 +51,12 @@ func identityOptions(policy instance.Policy, uids *recordingUIDs) instance.Optio
 
 // identityTree is a compiled template whose generated tree the identity
 // checks read. nested reports whether that tree holds archetype_details
-// below its root; requiredBare, that it holds none under Required, since
-// the template makes every nested archetype optional and Required builds
-// none (REQ-107 Visit rule, What a visit writes).
+// below its root under every policy: Required too builds each entry the
+// content names (REQ-107 What each policy visits).
 type identityTree struct {
-	name         string
-	c            *templatecompile.Compiled
-	nested       bool
-	requiredBare bool
+	name   string
+	c      *templatecompile.Compiled
+	nested bool
 }
 
 // identityTrees are generated trees that hold many locatable classes:
@@ -77,8 +75,7 @@ func identityTrees(t *testing.T) []identityTree {
 	for _, name := range []string{
 		"templates/vital_signs", "templates/nested.en.v1", "templates/TestPerson.v2", "templates/cluster-slot.ehrbase.org.v0",
 	} {
-		bare := name == "templates/vital_signs" || name == "templates/nested.en.v1" || name == "templates/cluster-slot.ehrbase.org.v0"
-		trees = append(trees, identityTree{name: name, c: compileCorpusOPT(t, name), nested: true, requiredBare: bare})
+		trees = append(trees, identityTree{name: name, c: compileCorpusOPT(t, name), nested: true})
 	}
 	return trees
 }
@@ -183,8 +180,9 @@ func TestREQ107_NoLocatableCarriesAUIDItsOPTDoesNotRequire(t *testing.T) {
 // TestREQ107_TemplateIDOnTheRootOnly is the REQ-107 check that the
 // template id is written in the template root's archetype_details and in
 // no other archetype_details, such as a nested OBSERVATION's, a nested
-// archetyped CLUSTER's or a slot fill's, under every policy. Under Required
-// a template whose nested archetypes are all optional holds none to check.
+// archetyped CLUSTER's or a slot fill's, under every policy. Required
+// builds the optional entries of vital_signs, nested.en.v1 and
+// cluster-slot.ehrbase.org.v0 too, so each policy has nested ones to check.
 func TestREQ107_TemplateIDOnTheRootOnly(t *testing.T) {
 	for _, tree := range identityTrees(t) {
 		for _, policy := range everyPolicy {
@@ -213,13 +211,8 @@ func TestREQ107_TemplateIDOnTheRootOnly(t *testing.T) {
 				if tree.c.Root().ArchetypeID() == "" {
 					t.Fatalf("template root names no archetype, want one so it has archetype_details")
 				}
-				bare := policy == instance.Required && tree.requiredBare
-				wantNested := tree.nested && !bare
-				if wantNested && nested == 0 {
+				if tree.nested && nested == 0 {
 					t.Errorf("generated tree has no nested archetype_details, want at least one")
-				}
-				if !wantNested && tree.nested && nested > 0 {
-					t.Errorf("generated tree has %d nested archetype_details, want none: the template makes each nested archetype optional", nested)
 				}
 			})
 		}

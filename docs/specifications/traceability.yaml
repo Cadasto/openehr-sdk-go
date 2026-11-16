@@ -1694,6 +1694,7 @@ requirements:
       - openehr/instance/reference_range_bounds_test.go
       - openehr/instance/reference_uid_internal_test.go
       - openehr/instance/reproducible_test.go
+      - openehr/instance/required_content_test.go
       - openehr/instance/required_context_test.go
       - openehr/instance/required_empty_list_test.go
       - openehr/instance/required_mandatory_child_test.go

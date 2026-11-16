@@ -103,8 +103,8 @@ func firstDifference(a, b []byte) string {
 // RM type. No REQ-107 sentence binds that name (Placeholders leaves it to
 // the implementation); the test keeps both compile modes and every policy
 // to the same choice, on the vital_signs composition and each observation
-// in its content. vital_signs makes its content optional, so under
-// Required the composition holds none and only its own name is checked.
+// in its content, which every policy builds, Required included, although
+// vital_signs makes the content optional.
 func TestREQ107_ArchetypeRootIsNamedByItsNodeTerm(t *testing.T) {
 	for _, implicit := range []bool{true, false} {
 		c := compileFixtureMode(t, "vital_signs", implicit)
@@ -119,12 +119,6 @@ func TestREQ107_ArchetypeRootIsNamedByItsNodeTerm(t *testing.T) {
 					t.Fatalf("AsComposition: %v", err)
 				}
 				checkRootName(t, c, comp)
-				if policy == instance.Required {
-					if len(comp.Content) != 0 {
-						t.Errorf("COMPOSITION.content has %d members under Required, want none: vital_signs makes it optional", len(comp.Content))
-					}
-					return
-				}
 				if len(comp.Content) == 0 {
 					t.Fatal("COMPOSITION.content is empty; vital_signs pins observations")
 				}

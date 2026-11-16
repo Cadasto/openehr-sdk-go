@@ -181,10 +181,11 @@ func TestREQ101_REQ107_NewSkeletonDefaultsToMedium(t *testing.T) {
 
 // TestREQ101_REQ107_NewSkeletonAcceptsRequired checks that NewSkeleton
 // accepts REQ-107's Required through WithPolicy (REQ-101 skeleton policy)
-// and builds only what vital_signs makes mandatory: no content
-// OBSERVATION, so the composition's own archetype is the only one the
-// tree holds, and strictly fewer JSON values than the default skeleton.
-// The tree passes the template validator and the RM floor.
+// and builds the required level of vital_signs: each content OBSERVATION
+// once, to its mandatory parts, so the tree holds the composition's
+// archetype and the four observations', and strictly fewer JSON values
+// than the default skeleton. The tree passes the template validator and
+// the RM floor.
 func TestREQ101_REQ107_NewSkeletonAcceptsRequired(t *testing.T) {
 	t.Parallel()
 	c := compileFixture(t, "vital_signs")
@@ -200,7 +201,13 @@ func TestREQ101_REQ107_NewSkeletonAcceptsRequired(t *testing.T) {
 
 	got := make(map[string]int)
 	archetypeIDCounts(tree, got)
-	want := map[string]int{"openEHR-EHR-COMPOSITION.encounter.v1": 1}
+	want := map[string]int{
+		"openEHR-EHR-COMPOSITION.encounter.v1":        1,
+		"openEHR-EHR-OBSERVATION.blood_pressure.v1":   1,
+		"openEHR-EHR-OBSERVATION.body_temperature.v1": 1,
+		"openEHR-EHR-OBSERVATION.heart_rate.v1":       1,
+		"openEHR-EHR-OBSERVATION.respiration.v1":      1,
+	}
 	if !maps.Equal(got, want) {
 		t.Errorf("NewSkeleton(vital_signs, WithPolicy(Required)) archetype ids = %v, want %v", got, want)
 	}

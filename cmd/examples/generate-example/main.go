@@ -42,7 +42,7 @@ func main() {
 
 func run() error {
 	optFlag := flag.String("opt", "", "path to an ADL 1.4 operational template (default: the vendored vital_signs.opt)")
-	policyFlag := flag.String("policy", defaultPolicy, "how much to build; case does not matter: 'required' or its alias 'minimal' (the mandatory data and a composition's context), 'medium' (also every attribute the template constrains, with a member of each optional archetype under it, and of a further use of one where that use holds another archetype), 'large' or its alias 'complete' (also a member of every use of one archetype)")
+	policyFlag := flag.String("policy", defaultPolicy, "how much to build; case does not matter: 'required' or its alias 'minimal' (the mandatory data, a composition's context and each entry the content names, with only its mandatory parts), 'medium' (also every attribute the template constrains, with a member of each optional archetype under it, and of a further use of one where that use holds another archetype), 'large' or its alias 'complete' (also a member of every use of one archetype)")
 	territoryFlag := flag.String("territory", "NL", "ISO 3166-1 territory code; a COMPOSITION root requires one")
 	composerFlag := flag.String("composer-name", "Example Composer", "name recorded as the composition's composer")
 	flag.Parse()
@@ -112,9 +112,10 @@ const defaultPolicy = "medium"
 
 // parsePolicy reads the -policy text with instance.ParsePolicy, which
 // takes the names required, minimal, medium, large and complete in any
-// case. Required, and minimal with it, builds only the data points the
-// template makes mandatory and a composition's context, the ITS-REST
-// template example's detail_level=required. Medium also builds every
+// case. Required, and minimal with it, builds the data points the
+// template makes mandatory, a composition's context and each entry the
+// content names, with only its mandatory parts, the ITS-REST template
+// example's detail_level=required. Medium also builds every
 // attribute the template constrains, with a member of each optional
 // archetype under it, and of a further use of one where that use holds
 // another archetype, its detail_level=medium. Large, and complete with it

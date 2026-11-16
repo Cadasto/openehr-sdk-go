@@ -46,23 +46,30 @@ const (
 	// archetype root, and its node id otherwise. Medium is the zero value,
 	// so Options with no Policy builds it.
 	Medium Policy = iota
-	// Required builds only the data points the template makes mandatory
-	// and a composition's context, what the ITS-REST template example
-	// calls detail_level=required. It visits only the required
-	// attributes: an attribute the BMM marks mandatory, one whose
-	// existence lower bound is bounded and at least 1, or a multi-valued
-	// one holding an allowed OPT child that is not a slot and whose
-	// occurrences lower bound is at least 1; a cardinality lower bound
-	// alone does not make it visit an attribute, and nor does an allowed
-	// OPT child, except a COMPOSITION's context, which it visits as Medium
-	// does, so the context every policy writes is built under the OPT's
-	// constraints. A visited multi-valued attribute gets
-	// occurrences.lower members of each allowed OPT child that is not a
-	// slot, so an optional child gets none of its own. The top-up to the
-	// attribute's lower bound and the RM rules, such as an ELEMENT's
-	// value or null_flavour, still apply. An RM rule can add a node, such
-	// as the null_flavour of an ELEMENT whose value the template leaves
-	// optional, so its tree is not always smaller than Medium's.
+	// Required builds the data points the template makes mandatory, a
+	// composition's context and a member of each entry the content names,
+	// what the ITS-REST template example calls detail_level=required. It
+	// visits the required attributes: an attribute the BMM marks
+	// mandatory, one whose existence lower bound is bounded and at least
+	// 1, or a multi-valued one holding an allowed OPT child that is not a
+	// slot and whose occurrences lower bound is at least 1. A cardinality
+	// lower bound alone does not make it visit an attribute, and nor does
+	// an allowed OPT child, with two exceptions:
+	//   - a COMPOSITION's context, which it visits as Medium does, so the
+	//     context every policy writes is built under the OPT's constraints;
+	//   - a COMPOSITION's content and a SECTION's items that hold an
+	//     entry, an archetype root of an ENTRY class or GENERIC_ENTRY, or
+	//     a SECTION whose items hold one.
+	//
+	// A visited multi-valued attribute gets occurrences.lower members of
+	// each allowed OPT child that is not a slot, and one member of each
+	// optional entry, and of each optional SECTION on the way to one, that
+	// Medium builds there; any other optional child gets none of its own.
+	// So each entry holds only its mandatory parts. The top-up to the
+	// attribute's lower bound and the RM rules, such as an ELEMENT's value
+	// or null_flavour, still apply. An RM rule can add a node, such as the
+	// null_flavour of an ELEMENT whose value the template leaves optional,
+	// so its tree is not always smaller than Medium's.
 	Required
 	// Large builds a member of every optional archetype the template
 	// names, and of every use of one, that holds more than content the

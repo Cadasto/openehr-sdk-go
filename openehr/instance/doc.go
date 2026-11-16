@@ -63,14 +63,19 @@
 //     that only its cardinality lower bound asks for, nor one merely
 //     because it has an allowed template child, except a composition's
 //     context, which it visits as Medium does, so the context every
-//     policy writes is built under the template's constraints. A visited multi-valued
-//     attribute gets each allowed child that is not a slot as many times
-//     as its occurrences lower bound says, so an optional child gets none.
-//     It builds the data points the template makes mandatory and a
-//     composition's context, the required level. An RM rule can still add
-//     a node, such as the null flavour of an element whose value the
-//     template leaves optional, so its tree is not always smaller than
-//     Medium's.
+//     policy writes is built under the template's constraints, and a
+//     composition's content or a section's items that hold an entry: an
+//     archetype root of an ENTRY class or GENERIC_ENTRY, or a section
+//     whose items hold one. A visited multi-valued attribute gets each
+//     allowed child that is not a slot as many times as its occurrences
+//     lower bound says, and one member of each optional entry, and of each
+//     optional section on the way to one, that Medium builds there; any
+//     other optional child gets none. So it builds the data points the
+//     template makes mandatory, a composition's context, and each entry
+//     the content names with only its mandatory parts, the required
+//     level. An RM rule can still add a node, such as the null flavour of
+//     an element whose value the template leaves optional, so its tree is
+//     not always smaller than Medium's.
 //   - Large: every attribute the visit rule allows, the optional ones the
 //     template names included. A visited multi-valued attribute gets at
 //     least one member of each allowed child that is not a slot, each

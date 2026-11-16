@@ -17,7 +17,8 @@ import (
 // the policy builds is added (under instance.Medium, a member of each
 // optional archetype under an attribute, and of a further use of one where
 // that use holds another archetype; under instance.Large, also one of
-// every use of an archetype; under instance.Required, none),
+// every use of an archetype; under instance.Required, a member of each
+// entry the content names, with only its mandatory parts),
 // and primitive leaves carry ExampleValue defaults, so the resulting tree
 // is valid against `validation.ValidateComposition`.
 // NewSkeleton accepts instance.Medium, instance.Required and

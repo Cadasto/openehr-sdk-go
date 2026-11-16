@@ -19,8 +19,9 @@
 // package's default: a skeleton with a member of each optional archetype
 // under an attribute, and of a further use of one only where that use
 // holds another archetype.
-// `WithPolicy(instance.Required)` gives one with only what the template
-// makes mandatory and a composition's context, and
+// `WithPolicy(instance.Required)` gives one with what the template makes
+// mandatory, a composition's context and each entry the content names,
+// with only its mandatory parts, and
 // `WithPolicy(instance.Large)` one with a member of every optional
 // archetype and of every use of one. NewBuilder builds on instance.Large
 // when no WithPolicy is given, and refuses Medium and Required with
