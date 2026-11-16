@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -435,5 +436,75 @@ func TestREQ025_JWKSLiteralWithoutHTTPClientRefuses(t *testing.T) {
 		if !errors.Is(err, auth.ErrInvalidConfig) {
 			t.Errorf("Key(%q) on a JWKS literal without an HTTPClient error = %v, want auth.ErrInvalidConfig", kid, err)
 		}
+	}
+}
+
+// errCallerGaveUp is the cause a leading lookup's context ends with.
+var errCallerGaveUp = errors.New("caller gave up")
+
+// TestREQ026_JWKSLeaderContextEndedWithACauseGetsItsContextError pins
+// REQ-026 (idiom.md § Concurrency) with REQ-062 for the lookup leading a
+// key-set fetch when its context ends with a cause, as
+// context.WithCancelCause, context.WithTimeoutCause and errgroup end one.
+// The HTTP client then reports the cause instead of the context's error.
+// That lookup still gets an error that reports its context's error, and the
+// cause stays inside it.
+func TestREQ026_JWKSLeaderContextEndedWithACauseGetsItsContextError(t *testing.T) {
+	endings := []struct {
+		name string
+		// start returns the leading lookup's context and the function that
+		// ends it with errCallerGaveUp while its fetch is held at the server.
+		start func(t *testing.T) (context.Context, func())
+		// wantCtxErr is the error that context reports once it ended.
+		wantCtxErr error
+	}{
+		{
+			name: "cancelled with a cause",
+			start: func(t *testing.T) (context.Context, func()) {
+				ctx, cancel := context.WithCancelCause(t.Context())
+				t.Cleanup(func() { cancel(nil) })
+				return ctx, func() { cancel(errCallerGaveUp) }
+			},
+			wantCtxErr: context.Canceled,
+		},
+		{
+			name: "deadline with a cause",
+			start: func(t *testing.T) (context.Context, func()) {
+				ctx, cancel := context.WithTimeoutCause(t.Context(), time.Minute, errCallerGaveUp)
+				t.Cleanup(cancel)
+				return ctx, func() { time.Sleep(2 * time.Minute) } // past the deadline
+			},
+			wantCtxErr: context.DeadlineExceeded,
+		},
+	}
+	for _, ending := range endings {
+		t.Run(ending.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				release := make(chan struct{})
+				srv := httptest.NewTestServer(t, http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+					select {
+					case <-release:
+					case <-r.Context().Done():
+					}
+				}))
+				// The server's own cleanup waits for its handlers; release them first.
+				t.Cleanup(func() { close(release) })
+				jwks, err := smart.NewJWKS(srv.Client(), srv.URL+"/jwks")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				ctx, end := ending.start(t)
+				var wg sync.WaitGroup
+				wg.Go(func() { _, err = jwks.Key(ctx, "k1") })
+				synctest.Wait() // the fetch is held at the server
+				end()
+				wg.Wait()
+
+				if !errors.Is(err, ending.wantCtxErr) || !errors.Is(err, errCallerGaveUp) {
+					t.Errorf("Key() error = %v, want one that reports both its context's error %v and the cause %v", err, ending.wantCtxErr, errCallerGaveUp)
+				}
+			})
+		})
 	}
 }
