@@ -217,10 +217,7 @@ type rmattrFamily struct {
 
 // rmattrFamilies is the vocabulary this codec carries. A family absent here is
 // unmatched content (REQ-170): ignored by default, reported or refused on
-// request. A family the spec names and this codec defers would be the
-// exception, [rmattrDeferredFamilies]: the decode would read its keys and
-// refuse them in every mode, so they stay visible in the PROBE-086 census
-// instead of decoding into nothing.
+// request.
 //
 // `_identifier` is deliberately **not** a family here, though the corpus writes
 // it: it is only ever reached *inside* a party — nested in
@@ -276,15 +273,6 @@ var rmattrFamilies = map[string]rmattrFamily{
 	"_instruction_details": {attr: "instruction_details", decode: decodeRMAttrInstructionDetails},
 	ismReasonFamily:        {attr: "reason", owner: "ISM_TRANSITION", list: true, decode: decodeRMAttrIsmReason},
 }
-
-// rmattrDeferredFamilies are the families the spec names and this codec defers
-// (REQ-140 *Deliberate exclusions*), by the RM attribute each addresses: none
-// now. `_wf_definition` left it on 2026-11-10 and `_instruction_details` on
-// 2026-11-16, each when it gained a carrier. At an owner that declares the
-// attribute such a key would resolve but have no carrier, so it would be
-// refused in every mode (REQ-170); anywhere else it names nothing and is
-// unmatched content like any other unknown family.
-var rmattrDeferredFamilies = map[string]string{}
 
 // rmattrOwner is the resolved owner of an `_`-family group: the RM class name
 // the family is judged against, and a lazy accessor for the canonical-JSON node
@@ -409,8 +397,7 @@ type rmattrDecoded struct {
 //  1. a group whose owner path reaches no Web Template node, whose family is
 //     unrecognised, or whose family the owner's RM class does not declare is
 //     unmatched content (REQ-170): every key goes to the sink and the group is
-//     skipped. A deferred family is the exception where the owner declares
-//     it: [ErrNotModelled], which matches [ErrUnknownPath], in every mode;
+//     skipped;
 //  2. an instance whose `:index` is past its family's bound is ErrUnknownPath,
 //     judged before its tails, since the index makes every key of the
 //     instance malformed whatever follows it (REQ-170);
@@ -502,34 +489,14 @@ func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, gr
 // rmattrFamilyAt judges g's family against its owner: the family the decode
 // reads there and the RM class it is judged against. A family that names
 // nothing at this owner hands every key of g to the sink and returns
-// [errNothingMatched]; a deferred family the owner declares is refused, unless
-// every key of it holds JSON null, which carries nothing to drop: then it is
-// absent (REQ-053) and returns [errNothingMatched] too.
+// [errNothingMatched].
 func rmattrFamilyAt(owner rmattrOwner, g rmattrGroup) (rmattrFamily, string, error) {
-	if rmattrDeferredAt(owner.kind, g.family) {
-		if allNull(g.tails) {
-			return rmattrFamily{}, "", errNothingMatched
-		}
-		return rmattrFamily{}, "", fmt.Errorf("%w: %q spells %s.%s, a Simplified Formats path this SDK does not model; refused rather than ignored",
-			ErrNotModelled, g.prefix(), owner.kind, rmattrDeferredFamilies[g.family])
-	}
 	fam, judged, read := rmattrFamilyOf(owner.kind, owner.leaf, g.family)
 	if !read || (owner.valueOnly && !fam.value) {
 		g.dropAll()
 		return rmattrFamily{}, "", errNothingMatched
 	}
 	return fam, judged, nil
-}
-
-// rmattrDeferredAt reports whether family is one of [rmattrDeferredFamilies]
-// and an owner of RM class kind declares the attribute it addresses.
-func rmattrDeferredAt(kind, family string) bool {
-	attr, deferred := rmattrDeferredFamilies[family]
-	if !deferred {
-		return false
-	}
-	_, declared := rminfo.Default.AttributeRMType(bmmtype.Class(kind), attr)
-	return declared
 }
 
 // rmattrFamilyOf returns the family the decode reads under family at an owner
