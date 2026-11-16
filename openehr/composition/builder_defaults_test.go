@@ -1,11 +1,16 @@
 package composition_test
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // TestREQ101_REQ107_NewBuilderLanguageEncodingTimeAndOrdinal checks that
@@ -120,6 +125,72 @@ func collectOrdinals(s rm.ItemStructure, out *[]*rm.DVOrdinal) {
 		}
 		if o, ok := el.Value.(*rm.DVOrdinal); ok {
 			*out = append(*out, o)
+		}
+	}
+}
+
+// TestREQ107_SkeletonAndBuilderTakeTheTemplateDefaults checks that
+// NewSkeleton and NewBuilder, which seed from Generate, hold the default
+// value a template's constraints set on a data value, here the DV_TEXT
+// default value and the DV_COUNT 11 of a corpus template, in place of the
+// value the fill gives, under both value fills, as the REQ-107 Trust model
+// says of the generator they seed from.
+func TestREQ107_SkeletonAndBuilderTakeTheTemplateDefaults(t *testing.T) {
+	opt, err := readOPTFile(filepath.Join(fixtures.CorpusRoot(), "webtemplate", "constrain_test.opt"))
+	if err != nil {
+		t.Fatalf("readOPTFile: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	const (
+		textPath  = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v2]/data/events[at1042]/data/items[at1059]/value"
+		countPath = "/content[openEHR-EHR-OBSERVATION.abbey_pain_scale.v0]/data/events[at0002]/data/items[at0014]/value"
+	)
+	builders := map[string]func(t *testing.T, opts ...composition.Option) *rm.Composition{
+		"NewSkeleton": func(t *testing.T, opts ...composition.Option) *rm.Composition {
+			comp, err := composition.NewSkeleton(t.Context(), c, append(opts, composition.WithPolicy(instance.Large))...)
+			if err != nil {
+				t.Fatalf("NewSkeleton: %v", err)
+			}
+			return comp
+		},
+		"NewBuilder": func(t *testing.T, opts ...composition.Option) *rm.Composition {
+			b, err := composition.NewBuilder(t.Context(), c, opts...)
+			if err != nil {
+				t.Fatalf("NewBuilder: %v", err)
+			}
+			comp, err := b.Build()
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+			return comp
+		},
+	}
+	for name, build := range builders {
+		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+			t.Run(name+"/"+fill.String(), func(t *testing.T) {
+				comp := build(t, composition.WithTerritory("NL"), composition.WithComposer(testComposer()), composition.WithValueFill(fill))
+				texts, err := rmpath.ItemsAtPath(comp, textPath)
+				if err != nil || len(texts) == 0 {
+					t.Errorf("%s: %d items, %v; want the DV_TEXT default value", textPath, len(texts), err)
+				}
+				for _, text := range texts {
+					if v, ok := text.(*rm.DVText); !ok || v.Value != "default value" {
+						t.Errorf("%s = %#v; want the DV_TEXT default value", textPath, text)
+					}
+				}
+				counts, err := rmpath.ItemsAtPath(comp, countPath)
+				if err != nil || len(counts) == 0 {
+					t.Errorf("%s: %d items, %v; want the DV_COUNT default 11", countPath, len(counts), err)
+				}
+				for _, count := range counts {
+					if v, ok := count.(*rm.DVCount); !ok || v.Magnitude != 11 {
+						t.Errorf("%s = %#v; want the DV_COUNT default 11", countPath, count)
+					}
+				}
+			})
 		}
 	}
 }

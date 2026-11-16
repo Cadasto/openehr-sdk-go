@@ -103,7 +103,9 @@ func WithPolicy(p instance.Policy) Option {
 // WithValueFill selects how primitive leaves are valued. The default
 // (instance.ExampleFill) emits each constraint's representative example
 // value; instance.RandomFill draws in-constraint values that vary per
-// call. Seed it with WithValueSource for reproducibility.
+// call. Seed it with WithValueSource for reproducibility. Under either, a
+// data value the template's constraints give a default value takes that
+// default where it meets the node's constraints.
 func WithValueFill(f instance.ValueFill) Option {
 	return func(c *config) { c.valueFill = f }
 }

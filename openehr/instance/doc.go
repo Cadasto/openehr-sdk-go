@@ -249,6 +249,14 @@
 // wrote, else takes HL7:PIVL, or HL7:EIVL where the template rejects
 // HL7:PIVL.
 //
+// Under either value fill, a data value whose node the template's
+// constraints give a default value takes that default in place of the
+// value the fill wrote, where the default meets the node's constraints: the
+// node's own primitive constraint, an attribute the node requires, one it
+// prohibits, and the constraint of the allowed child each attribute value
+// matches. A default that does not meet them leaves the fill's value. An
+// assumed value the template states on a primitive constraint is not read.
+//
 // # Trust model
 //
 // The OPT walk is authoritative. RM children are created from the

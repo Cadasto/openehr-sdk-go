@@ -21,8 +21,10 @@ import (
 // a fixed set of optional RM attributes the template does not name; under
 // instance.Required, a member of each
 // entry the content names, with only its mandatory parts),
-// and primitive leaves carry ExampleValue defaults, so the resulting tree
-// is valid against `validation.ValidateComposition`.
+// and primitive leaves carry ExampleValue defaults, or the default value
+// the template's constraints set on a data value where it meets that
+// node's constraints, so the resulting tree is valid against
+// `validation.ValidateComposition`.
 // NewSkeleton accepts instance.Medium, instance.Required and
 // instance.Large, and so their other names instance.Minimal and
 // instance.Complete. It refuses any other Policy value, before generating

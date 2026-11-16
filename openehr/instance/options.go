@@ -144,7 +144,9 @@ var policyNames = [...]struct {
 }
 
 // ValueFill controls how primitive leaves are valued, orthogonally to
-// [Policy] (which controls which nodes are materialised).
+// [Policy] (which controls which nodes are materialised). Under either
+// fill, a value the template's constraints give a default value of its own
+// takes that default where it meets the node's constraints.
 type ValueFill int
 
 const (

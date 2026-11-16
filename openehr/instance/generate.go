@@ -2524,7 +2524,10 @@ func asksMember(child *tcimpl.CompiledNode) bool {
 // gets the archetype id of its fill (stampSlotFill), and is refused with
 // ErrSlotFillUnsupported when none can be derived. Every attribute builds
 // its OPT children here, so a child built to make up a lower bound is the
-// same as one built for its own occurrences.
+// same as one built for its own occurrences. Where the template's
+// <constraints> set a default value on child that validates under child's
+// constraints, that default is returned in place of the value built, under
+// either value fill (templateDefault).
 func (g *generator) buildChild(child *tcimpl.CompiledNode) (any, error) {
 	rmChild, err := g.makeChild(child)
 	if err != nil {
@@ -2539,6 +2542,9 @@ func (g *generator) buildChild(child *tcimpl.CompiledNode) (any, error) {
 	}
 	if err := g.walkNode(child, rmChild); err != nil {
 		return nil, err
+	}
+	if def := templateDefault(child, rmChild); def != nil {
+		return def, nil
 	}
 	return rmChild, nil
 }
