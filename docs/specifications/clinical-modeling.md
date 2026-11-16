@@ -739,6 +739,8 @@ An empty `Options.Language` **SHOULD** be read as `Compiled.Language()`, and as 
 
 #### Visit rule
 
+##### Attributes no policy visits
+
 Under every policy, `Generate` does not visit these attributes:
 
 - an attribute that no serialization carries, a BMM function among them: the set `rminfo.IsNonStorableAttr` names and [§ REQ-112 *Driver*](#driver) lists;
@@ -749,20 +751,32 @@ Under every policy, `Generate` does not visit these attributes:
 
 Under every policy, `Generate` does not visit an attribute the generator has no writer for (§ [Exceptions and known gaps](#exceptions-and-known-gaps), *Known gap: attributes the generator cannot write*) unless it is required, as defined below, by more than its cardinality lower bound alone, which does not ask for the container (below), and is not a list that only its existence asks a member of (*What a visit writes*), which is left out (*Known gap: required lists canonical JSON cannot carry empty*); where the walk would visit one, `Generate` returns the error § [Errors](#errors) names for it, since a root without it would fail the template validator.
 An OPT child is *allowed* unless its occurrences upper bound is 0, and the OPT *prohibits* an attribute whose existence upper bound is 0, or that has at least one OPT child and allows none of them; `Generate` does not visit an attribute the OPT prohibits unless an RM rule needs it (§ [Precedence](#precedence)), though it writes such a list present and empty where its existence asks for it (*What a visit writes*).
+
+##### Required attributes
+
 Wherever this requirement says the BMM marks an attribute mandatory, it reads the BMM on the class the walk builds for the attribute's node: a concrete descendant for a node that names an abstract class (*What a visit writes*), and the type *Generic and untyped types* gives an untyped one.
 An attribute is *required* when the BMM marks it mandatory, or its existence or cardinality lower bound is bounded and at least 1, or when the OPT declares it multi-valued and an allowed OPT child of it that is not a slot has an occurrences lower bound that is bounded and at least 1, unless the RM types the list's items as primitive values, such as a DV_MULTIMEDIA's `data`, to which no item binds ([§ REQ-102](#req-102--composition-validation) *A mandatory child under an optional list*).
 ADL 1.4 calls such a child mandatory in its container (*cADL*, *Occurrences*: the `PERSON` whose occurrences are `{1}` "is mandatory in the `GROUP`"), as AOM 2 does (validity rule VACMCO, "every mandatory child object"), and leaves an optional container to its existence.
 That the child also asks for its container, so that the attribute holding it is required, is the reading this specification chooses; EHRbase and FerroEHR read the template the same way when they refuse a composition that leaves such a list out, and the validators read it so too ([§ REQ-102](#req-102--composition-validation) *A mandatory child under an optional list*).
 The child of a single-valued attribute never makes the attribute required: ADL 1.4 says the attribute's existence already decides how often that child occurs (*Occurrences*).
 A child that states no occurrences, or occurrences with an unbounded lower bound, makes no attribute required, as the validators ask such a child for no member ([§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member*), although an attribute visited for another reason gives it one (*What a visit writes*).
+
+##### Attributes whose members would all be undescribed
+
 Under `Large` and `Medium`, `Generate` does not visit an attribute whose members would all be undescribed or need undescribed content (§ [Slot fills](#slot-fills): a slot fill, a LOCATABLE built from a BMM type, or an object of an archetype-root class for which the OPT names no archetype id, or a node that would hold one of them in a required attribute that can hold nothing else, such as an `EVALUATION` whose `data` the OPT leaves without a child, or a node with an attribute the generator has no writer for that the walk would visit), where that attribute is not required or only its cardinality lower bound requires it, except a `COMPOSITION`'s `context`, which *RM defaults* writes under every policy.
 A cardinality lower bound does not ask for the container (below), so this rule reads such a list as `Required` reads it: a `SECTION`'s `items` at existence `0..1` and cardinality `1..*` whose only child is an optional `ADMIN_ENTRY` the OPT names no archetype id for, a `COMPOSITION`'s `content` at that existence and cardinality whose only child is an optional `SECTION` that requires such an entry, or an `ITEM_TREE`'s `items` at that existence and cardinality whose only children are slots, whose members would be slot fills, or that has no allowed child, whose members would be ELEMENTs built from its BMM type, is left out under every policy, and validators accept it absent ([§ REQ-102](#req-102--composition-validation) *A mandatory child under an optional list*).
+
+##### Item structures that would hold no item
+
 Under every policy, `Generate` does not visit a single-valued attribute that is not required, as defined above, where the value a visit would write (*What a visit writes*) is an item structure that would hold no item: an `ITEM_TREE` or `ITEM_LIST` whose `items`, or an `ITEM_TABLE` whose `rows`, would get no member, because the structure's OPT node does not carry that attribute, the walk under the policy in force does not visit it, or the visit gives it no member (*What a visit writes*).
 A list whose cardinality upper bound is less than the members its allowed children ask for is not one the visit gives no member: the walk visits it, and § [Errors](#errors) refuses the root.
 The generator decides this by what the walk would write once the rules here and in *What a visit writes* have left children out, not by the OPT alone: an optional `protocol`, `state` or `other_context` whose `ITEM_TREE` holds no child, only slots, or only optional children that need undescribed content is left out, while one whose `ITEM_TREE` holds an optional `ELEMENT` is visited under `Large` and `Medium`, which build that `ELEMENT`.
 An `ITEM_SINGLE` and a `CLUSTER` always hold an item, since the BMM marks their `item` and `items` mandatory.
 That an optional structure with no item is left out is the reading this specification chooses, as such a structure carries no data the RM or the OPT asks for.
 A structure the RM or the OPT requires, as the BMM requires `EVENT.data`, or as an OPT requires a `protocol` it gives an existence lower bound of 1, is written, with no item where the walk gives it none, and with its list present and empty where the OPT requires that list by its existence (*What a visit writes*).
+
+##### What each policy visits
+
 Under `Large`, `Generate` **MUST** visit every other attribute the compiled node carries.
 Under `Medium`, it **MUST** visit every other attribute that is required or that has an allowed OPT child, and no other.
 Under `Required`, it **MUST** visit every other attribute that is required, except one that only its cardinality lower bound requires, and no other, an attribute with an allowed OPT child included.
@@ -774,19 +788,33 @@ An attribute the BMM marks mandatory that a compiled node does not carry, as und
 
 #### What a visit writes
 
+##### Single-valued attributes
+
 A visited single-valued attribute takes the RM type its first allowed OPT child names, or, where that child names an abstract RM class or an AOM 1.4 primitive short name, the concrete type the generator builds for it (a concrete descendant of the abstract class, the *RM defaults* below where one applies; for a short name, its canonical DV wrapper, § REQ-102 *RM type match*), built under the constraints of the child the binding tiers of [§ REQ-102](#req-102--composition-validation) *Structural — alternatives* bind a value of that type to: the first child, unless a later one names that type exactly or is the AOM 1.4 short name that type wraps.
 That child is the first of its tier and the value built under it validates under it, so the validator, which tries the children of the tier in OPT order, binds what the generator built to the child whose constraints built it.
 When the attribute has no allowed OPT child, it takes a value built from its BMM type.
+
+##### Members of a list
+
 A visited multi-valued attribute gets, in OPT order, `max(occurrences.lower, 1)` members of each allowed OPT child that is not a slot under `Large` and `Medium`, except an optional child (occurrences lower bound 0) that needs undescribed content (§ [Slot fills](#slot-fills)), and `occurrences.lower` members under `Required`, so that an optional child (occurrences lower bound 0) gets none of its own there; a child the OPT gives no occurrences, or occurrences with an unbounded lower bound, is not optional and gets one member under every policy; it gets no more members in all than its `cardinality.upper` when that is bounded, and within that bound the room goes first to the members asked for by the children whose occurrences lower bound is bounded and at least 1, which fit wherever § [Errors](#errors) does not refuse the list: any other child, before or after them, gets only the room they leave, and the members still stand in OPT order, so `CLUSTER.items` at cardinality `0..1` over an optional `at0001` and a required `at0002` holds the `at0002` member alone; under `Medium`, where one optional archetype per attribute is the rule, an optional child (occurrences lower bound 0) whose identity a required sibling, before or after it, or an earlier optional sibling carries gets no member of its own (the top-up below can still build one).
 Under `Large`, such a child gets its members as any other optional child does, so a `Large` root holds a member of every sibling of one identity that needs no undescribed content, whether the OPT pins a name on it or not, within the cardinality bound above; the validator binds those members by room and by trial ([§ REQ-102](#req-102--composition-validation) *Structural — binding items*), each to the sibling whose constraints built it wherever that sibling comes first among those with room (§ *Exceptions and known gaps*).
+
+##### Sibling identity
+
 A child's identity is its archetype id when it is an archetype root and its `node_id` otherwise, and a child with neither has no identity and is never skipped; a sibling other than a slot carries an identity when it is that sibling's archetype id or `node_id`, as [§ REQ-102](#req-102--composition-validation) *Structural — binding items* binds a LOCATABLE member.
 So under `Medium` an optional child that is not an archetype root gets no member when an archetype root before it has its `node_id`, while under `Large` the optional archetype roots under one attribute each get their members, of one archetype or of several.
 Under `Medium`, an optional archetype root after the first optional archetype root of the attribute that needs no undescribed content, in OPT order, gets no member of its own either, whatever its archetype, so the attribute holds at most one optional archetype.
 A name the OPT pins on a child is not part of this identity, although the validator also tells siblings apart by it: under `Medium`, optional named siblings of one archetype after the first get no member, and under `Large` each gets its members, except one that needs undescribed content (§ [Slot fills](#slot-fills)), as any optional child does, such as a named sibling whose required attribute holds only slots.
+
+##### Top-up
+
 When that leaves the attribute with fewer members than it needs (its cardinality lower bound, or one member when the BMM or its existence requires it), it is topped up to that count one member at a time, in OPT order, from a child that still has room: a child has room while the members built of it, its own and the top-up's, number fewer than its occurrences upper bound, and always where it states no upper bound, the same room by which the validator binds an item ([§ REQ-102](#req-102--composition-validation) *Structural — binding items*), and a slot always has room, since the compiled template does not carry its occurrences (*Known gap: slot occurrences*).
 Each member is one of its first allowed child with room that needs no undescribed content (§ [Slot fills](#slot-fills)) and whose identity no earlier sibling with room carries, a child that gets no member of its own under `Large` or `Medium` included, else of its first allowed child with room that is not a slot and that `Generate` does not refuse for what it holds itself (an object of an archetype-root class the OPT names no archetype id for, or a node with an attribute the generator has no writer for that the walk would visit, § [Errors](#errors)), else a fill of its first slot, else of its first allowed child with room that is not a slot, which `Generate` then refuses, and, where it has no allowed child, a member built from its BMM type.
 So `CLUSTER.items` at cardinality `3..*` over an `at0001` at occurrences `1..1` and an `at0002` at `0..*` holds one `at0001` member and two `at0002` members under every policy.
 Only where no allowed child has room, as in an OPT whose cardinality lower bound exceeds what its children's occurrences allow (§ [Exceptions and known gaps](#exceptions-and-known-gaps)), is the member one of its first allowed child, past that child's occurrences.
+
+##### Lists only their existence asks for
+
 Where only its existence asks for that member, because the BMM does not mark the attribute mandatory, neither its cardinality lower bound nor the occurrences lower bound of a child it allows is bounded and at least 1, and it is not a list that [§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member* names as one the RM makes non-empty once present, the top-up takes only its first source, a member of the first allowed child with room that needs no undescribed content and whose identity no earlier sibling with room carries, and the attribute gets no member where it has no such child, since, as that section says, a present list with no member meets its existence.
 Such a list is still there: existence says whether the container is there at all, and cardinality how many members it holds (AOM 1.4, *Attribute Node Types*).
 So a list whose existence lower bound is bounded and at least 1, that the walk visits or the OPT prohibits by prohibiting every child of it, and that the walk gives no member, this way or any other, **MUST** be written present and empty where canonical JSON carries an empty list, which [reference-model.md § Property → Go field](reference-model.md#property--go-field) names, namely `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows`, and is left out otherwise (*Known gap: required lists canonical JSON cannot carry empty*).
@@ -794,6 +822,9 @@ A list the RM makes non-empty once present does not meet its existence with no m
 A HISTORY's `events`, while the HISTORY has no `summary`, are left to § [Precedence](#precedence) 2, which gives a HISTORY left with neither one of them.
 Any other such list whose existence lower bound is bounded and at least 1 is topped up to one member from the sources above, as a list its cardinality asks a member of is, so that it holds a member or `Generate` returns the error § [Errors](#errors) names for the member it cannot build: `ErrArchetypeIDMissing` for an object of an archetype-root class the OPT names no archetype id for, and `ErrSlotFillUnsupported` for a slot whose includes cannot be satisfied.
 So, at that existence, an `ITEM_LIST` or `ITEM_TREE` whose `items` the OPT leaves without a child, or with slots only, holds no items: it is written with an empty `items` where the RM or the OPT requires the structure, as the BMM requires `EVENT.data`, and left out where the attribute that holds it is not required (*Visit rule*), a `COMPOSITION`'s `content` whose only child is a slot gets that slot's fill, and a `SECTION`'s `items` the OPT leaves without a child is refused with `ErrArchetypeIDMissing`, since the member its BMM type gives is an archetype root.
+
+##### Lists the OPT writes single-valued
+
 An attribute the RM declares multi-valued that the OPT writes as a single-valued one, such as `COMPOSITION.content` or `ITEM_TREE.items` under a `C_SINGLE_ATTRIBUTE`, is written as the list the RM declares, as the template validator reads it ([§ REQ-171](#req-171--validation-engine) *Structural access*): the value a visit builds from its allowed children, as for any single-valued attribute, is its one member, so such an `ITEM_TREE.items` over an `ELEMENT` holds that `ELEMENT`.
 With no allowed child, where the BMM does not mark it mandatory and it is not a list the RM makes non-empty once present whose existence lower bound is at least 1, only its existence asks for a member, so it gets none, written present and empty as above where its existence lower bound is at least 1, and `Generate` **MUST NOT** refuse it with `ErrArchetypeIDMissing`; where it is such a list, or the BMM marks it mandatory, as it does `PERSON.identities`, it is topped up as above, from its BMM type.
 An optional multi-valued attribute with no allowed OPT child gets no member, so nothing archetype-rooted appears without its `archetype_details`.
@@ -836,6 +867,8 @@ A `COMPOSITION`'s `context` is written under every policy, `Required` included, 
 - a `DV_MULTIMEDIA`'s `media_type`: `text/plain` in `IANA_media-types`, so that `Media_type_valid` holds; and its `uri`, where § [Precedence](#precedence) 2 has it written and the OPT names no allowed child for it: `http://example.com`.
 
 Every `DV_MULTIMEDIA` the generator writes **SHOULD** carry inline `data`, a non-empty example payload that is the same under both `ValueFill` values, unless the OPT prohibits `data`, and a `size` that is the number of bytes of that `data`, which the RM defines as the original size of the unencoded data, unless the OPT's constraint on `size` rejects that number, when the size the walk wrote stays (§ [Precedence](#precedence) 1): the value then carries its content and meets DV_MULTIMEDIA `Not_empty` without a URI to resolve.
+
+##### The text of a coded value
 
 Where the OPT itself pins an `openehr` code on a coded text, the generator **SHOULD** write the code's rubric below as its text where the OPT's constraint on the text admits it, since a coded text's value is its code's term, and keeps the text the walk wrote where it does not (§ [Precedence](#precedence) 1) or where the code has no such rubric.
 The rubric is:
@@ -988,7 +1021,7 @@ A DV_MULTIMEDIA's `data` is an array of octets that no OPT child describes, so t
 #### Known gap: required lists canonical JSON cannot carry empty
 
 A list the OPT requires by its existence that the walk gives no member is left out where canonical JSON cannot carry it empty, which is any list but those [reference-model.md § Property → Go field](reference-model.md#property--go-field) names (§ Contract *What a visit writes*).
-Among the lists that cannot is a list the RM keeps non-empty once present other than those [§ REQ-112 *Non-empty lists*](#req-112--template-less-reference-model-validation-floor) evaluates, such as `PARTY.contacts`, `ACTOR.roles` or `ENTRY.other_participations`.
+Among the lists that cannot is a list the RM keeps non-empty once present other than those [§ REQ-112 *Non-empty lists*](#non-empty-lists) evaluates, such as `PARTY.contacts`, `ACTOR.roles` or `ENTRY.other_participations`.
 Validators report such a list `required` ([§ REQ-102](#req-102--composition-validation)), so a root that leaves one out is outside § Contract *Output*.
 
 #### Known gap: other generic types
@@ -1030,6 +1063,8 @@ Sound × validator-aligned ⇒ PROBE-027 cross-checks the contract.
 
 ### Slot fills
 
+#### Undescribed content
+
 A member is *undescribed* when no OPT node describes it: a slot fill, or a LOCATABLE built from the BMM type of an attribute with no allowed OPT child.
 An OPT node, not a slot, of a class the floor treats as an archetype root ([§ REQ-112](#req-112--template-less-reference-model-validation-floor) *Archetype roots*) for which the OPT names no archetype id describes no member the generator can build either, since the generator invents no archetype id (§ [Errors](#errors)): this specification reads it as undescribed content, as a slot nothing can fill is.
 A node *needs undescribed content* when it is a slot or such an archetype-root node, or when an attribute on it that is required (§ Contract *Visit rule*) can be given no member but an undescribed one: it has no allowed OPT child and its member would be a LOCATABLE, every allowed OPT child of it is a slot or such a node, or it is single-valued and the child that builds its member (§ Contract *What a visit writes*) is a slot or such a node.
@@ -1038,6 +1073,8 @@ So does a node with an attribute the generator has no writer for that the walk w
 The rule reads the node's own attributes only: below a child the OPT or the RM requires, the walk builds what § Contract says, undescribed members included where the BMM, a child's occurrences, or the cardinality of a list that one of those or its existence requires asks for a member, so the described content around them is kept; an attribute that only its existence requires, which a list the RM makes non-empty once present never is, gets no undescribed member, and is left with none where it has no other (*What a visit writes*).
 Such an attribute still counts as required in the definition above, so a node whose attribute of this kind can be given no member but an undescribed one still needs undescribed content, and is still left out where it is optional.
 So a slot the OPT leaves open, and an attribute it leaves without a child, get content only where the BMM, the OPT's counts, or the existence of a list the RM makes non-empty once present (*What a visit writes*) ask for a member of a node the RM or the OPT requires, never because the policy builds an optional node that holds nothing else, and never for any other existence or for a cardinality lower bound alone.
+
+#### Required slots
 
 A *required slot* is one the walk fills: one a top-up fills, or the first allowed child a visited single-valued attribute takes (§ Contract *What a visit writes*).
 The walk stamps a required slot, at every policy and through the builder, with an archetype id drawn from the parsed include grammar of [§ REQ-103](#req-103--primitive-constraint-introspection) *Slot assertions* when a safe example can be synthesized; when the OPT carried no parseable includes, the id **SHOULD** be `openEHR-EHR-<RMType>.example.v1`, which the validator's RM-type-prefix rule admits.
