@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
 	"os"
 	"slices"
 	"strconv"
@@ -127,6 +128,12 @@ type Report struct {
 	// leaf this SDK decoded and then dropped. Failure, not skip: there is no
 	// tolerated-drop bucket, deliberately (see case.go).
 	Missing []string
+	// Derived are surviving upstream keys the re-encode did not produce that
+	// spell a value the RM derives from keys it did produce: a DV_PROPORTION's
+	// bare value, its magnitude, which equals the numerator divided by the
+	// denominator the re-encode wrote ([settleDerived]). Sorted. One that does
+	// not equal them is Mismatched.
+	Derived []string
 	// Extra are keys the re-encode produced that upstream does not have,
 	// composition metadata aside (see [IsCompositionMeta]): a path this SDK
 	// spells differently. Failure, not skip.
@@ -202,7 +209,58 @@ func Run(t *Target, c Case) (Report, error) {
 	rep.Respelled = respelled
 
 	rep.Missing, rep.Extra, rep.Mismatched = compare(ours, emitted, t.Root)
+	rep.Derived, rep.Missing, rep.Mismatched = settleDerived(ours, emitted, rep.Missing, rep.Mismatched)
 	return rep, nil
+}
+
+// magnitudeTolerance is the codec's: decode reads a DV_PROPORTION's bare value
+// where it lies within one part in a billion of numerator/denominator.
+const magnitudeTolerance = 1e-9
+
+// settleDerived takes from missing, the keys of candidate the re-encode did
+// not produce, each that spells a DV_PROPORTION's bare value, its magnitude:
+// emitted holds the key's |numerator and |denominator, which the decode read
+// the value against and the re-encode wrote. Such a key is no drop, since the
+// RM holds no magnitude to drop, so it is compared with them instead. It
+// returns the keys that equal numerator/denominator, the codec's tolerance
+// allowed, as derived, the rest of missing, and mismatched with those that do
+// not appended, all sorted.
+func settleDerived(candidate, emitted map[string]any, missing, mismatched []string) (derived, rest, mismatchedOut []string) {
+	mismatchedOut = mismatched
+	for _, k := range missing {
+		num, hasNum := emitted[k+"|numerator"]
+		den, hasDen := emitted[k+"|denominator"]
+		if !hasNum || !hasDen {
+			rest = append(rest, k)
+			continue
+		}
+		m, okM := realOf(candidate[k])
+		n, okN := realOf(num)
+		d, okD := realOf(den)
+		if want := n / d; okM && okN && okD && d != 0 && math.Abs(m-want) <= magnitudeTolerance*math.Abs(want) {
+			derived = append(derived, k)
+			continue
+		}
+		mismatchedOut = append(mismatchedOut, fmt.Sprintf("%s: upstream=%v ours=%v/%v", k, candidate[k], num, den))
+	}
+	slices.Sort(mismatchedOut)
+	return derived, rest, mismatchedOut
+}
+
+// realOf reads v, a value [parseFlat] decoded, as a float64: a JSON number or
+// a numeric string.
+func realOf(v any) (float64, bool) {
+	switch v := v.(type) {
+	case json.Number:
+		f, err := v.Float64()
+		return f, err == nil
+	case string:
+		f, err := strconv.ParseFloat(v, 64)
+		return f, err == nil
+	case float64:
+		return v, true
+	}
+	return 0, false
 }
 
 // compare matches the surviving upstream subset against what the re-encode
@@ -453,7 +511,7 @@ func decodeSubset(t *Target, keys map[string]any, opt simplified.Option) (*rm.Co
 //     missing required suffix): the leaf's own entries go, but *not* the
 //     subtree beneath it, which belongs to other nodes or families.
 //   - Any other ErrUnknownPath refusal naming a path or a family prefix (an
-//     index past its bound, a deferred family): the entries under it go,
+//     index past its bound): the entries under it go,
 //     leaf and subtree, since everything under that segment is refused with
 //     it.
 func dropRefused(candidate map[string]any, key string, err error) (removed int, gap bool) {

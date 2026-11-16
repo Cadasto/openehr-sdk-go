@@ -70,6 +70,11 @@ func TestUpstreamFlatParity(t *testing.T) {
 				t.Errorf("compared %d upstream keys, pinned at %d — coverage moved; "+
 					"re-run with -census and update the pin", rep.Compared, want.compared)
 			}
+			if !slices.Equal(rep.Derived, derived[c.Name]) {
+				t.Errorf("derived %q, pinned at %q — the keys compared with the values "+
+					"they derive from moved; re-run with -census, update the pin, and record the change in SKIPPED.md",
+					rep.Derived, derived[c.Name])
+			}
 			if got := respellingStrings(rep.Respelled); !slices.Equal(got, respelled[c.Name]) {
 				t.Errorf("respelled %q, pinned at %q — the duplicate sibling respelling "+
 					"moved; re-run with -census, update the pin, and record the change in SKIPPED.md",
@@ -111,6 +116,11 @@ func TestPinnedCoversCorpus(t *testing.T) {
 	for name := range respelled {
 		if !present[name] {
 			t.Errorf("respelled fixture %q is not in the corpus — stale pin, or the fixture was renamed", name)
+		}
+	}
+	for name := range derived {
+		if !present[name] {
+			t.Errorf("derived fixture %q is not in the corpus — stale pin, or the fixture was renamed", name)
 		}
 	}
 	if len(cases) != len(pinned) {
@@ -173,6 +183,9 @@ func TestCensus(t *testing.T) {
 				lines = append(lines, "      UNMATCHED "+r.Key)
 			}
 		}
+		for _, d := range rep.Derived {
+			lines = append(lines, "      DERIVED  "+d)
+		}
 		for _, r := range rep.Respelled {
 			lines = append(lines, "      RESPELLED "+r.String())
 		}
@@ -212,6 +225,23 @@ type expectation struct {
 	compared int
 }
 
+// derived pins, per fixture, the upstream keys the re-encode does not write
+// because they spell a value the RM derives from keys it does write, each
+// compared with those (PROBE-086; REQ-053 decode reads a DV_PROPORTION's bare
+// value as its magnitude and checks it against its numerator and
+// denominator). A fixture absent here derives nothing. The corpus writes the
+// magnitude of its one DV_PROPORTION and of each bound of its normal range
+// and of its other reference range.
+var derived = map[string][]string{
+	"ehrbase_conformance_data_types_dv_proportion": {
+		"conformance-ehrbase.de.v0/conformance_section/conformance_observation/any_event:0/dv_proportion",
+		"conformance-ehrbase.de.v0/conformance_section/conformance_observation/any_event:0/dv_proportion/_normal_range/lower",
+		"conformance-ehrbase.de.v0/conformance_section/conformance_observation/any_event:0/dv_proportion/_normal_range/upper",
+		"conformance-ehrbase.de.v0/conformance_section/conformance_observation/any_event:0/dv_proportion/_other_reference_ranges:0/lower",
+		"conformance-ehrbase.de.v0/conformance_section/conformance_observation/any_event:0/dv_proportion/_other_reference_ranges:0/upper",
+	},
+}
+
 // respelled pins, per fixture, the upstream keys the comparison reads in this
 // SDK's spelling of a duplicate sibling id (PROBE-086; REQ-053 decode reads
 // the reference's `<id>2` as the `<id>_1` the Web Template writes). A fixture
@@ -239,7 +269,7 @@ var respelled = map[string][]string{
 var pinned = map[string]expectation{
 	"ehrbase_conformance_Element_feeder_audit":                {excluded: 0, compared: 67},
 	"ehrbase_conformance_Element_null_flavor":                 {excluded: 0, compared: 17},
-	"ehrbase_conformance_action":                              {excluded: 3, compared: 82},
+	"ehrbase_conformance_action":                              {excluded: 0, compared: 85},
 	"ehrbase_conformance_admin_entry":                         {excluded: 0, compared: 66},
 	"ehrbase_conformance_cluster":                             {excluded: 0, compared: 51},
 	"ehrbase_conformance_composition":                         {excluded: 0, compared: 29},
@@ -255,7 +285,7 @@ var pinned = map[string]expectation{
 	"ehrbase_conformance_data_types_dv_multimedia":            {excluded: 0, compared: 27},
 	"ehrbase_conformance_data_types_dv_ordinal":               {excluded: 0, compared: 28},
 	"ehrbase_conformance_data_types_dv_parsable":              {excluded: 0, compared: 19},
-	"ehrbase_conformance_data_types_dv_proportion":            {excluded: 5, compared: 34},
+	"ehrbase_conformance_data_types_dv_proportion":            {excluded: 0, compared: 39},
 	"ehrbase_conformance_data_types_dv_quantity":              {excluded: 0, compared: 42},
 	"ehrbase_conformance_data_types_dv_text":                  {excluded: 0, compared: 29},
 	"ehrbase_conformance_data_types_dv_time":                  {excluded: 0, compared: 22},

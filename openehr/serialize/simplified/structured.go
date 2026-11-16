@@ -26,7 +26,7 @@ func MarshalStructured(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	s, err := flatToStructured(flat)
+	s, err := flatToStructured(flat, bareAsValue)
 	if err != nil {
 		return nil, err
 	}
@@ -67,12 +67,20 @@ func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate, opts ...Optio
 }
 
 // FlatToStructured restructures FLAT JSON into STRUCTURED JSON (no OPT needed).
+//
+// Without a template the restructuring cannot tell which datatype a leaf has,
+// so a bare value beside the leaf's suffixes or members stays the "|" member,
+// the spelling of the FLAT key itself, and [StructuredToFlat] gives that key
+// back as written. Decode reads the "|" member as the bare value, as it reads
+// the "|value" member. For the reference implementation's "|value" spelling,
+// encode the composition with [MarshalStructured], which knows each leaf's
+// datatype.
 func FlatToStructured(data []byte) ([]byte, error) {
 	flat, err := unmarshalObject(data)
 	if err != nil {
 		return nil, err
 	}
-	s, err := flatToStructured(flat)
+	s, err := flatToStructured(flat, bareAsKey)
 	if err != nil {
 		return nil, err
 	}
@@ -97,8 +105,9 @@ func StructuredToFlat(data []byte) ([]byte, error) {
 // are processed in sorted order — output must not depend on Go map iteration
 // (determinism is a hard requirement) — and a key whose placement conflicts
 // with another key's (scalar vs object at one slot) is an error, never a
-// last-write-wins overwrite.
-func flatToStructured(flat map[string]any) (map[string]any, error) {
+// last-write-wins overwrite. spelling is the member a bare value beside its
+// leaf's members takes.
+func flatToStructured(flat map[string]any, spelling bareSpelling) (map[string]any, error) {
 	// A key that is no path in the FLAT grammar has no STRUCTURED member to
 	// become: refused, as decode refuses it (REQ-170).
 	if err := checkFlatKeys(flat); err != nil {
@@ -114,6 +123,10 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 	root := make(map[string]any)
 	budget := &allocBudget{limit: maxTotalNodes}
 	var ctxObj map[string]any
+	// bares holds the element objects a bare value was placed on, for
+	// [spellBareValues] to respell once every key is placed, where spelling
+	// asks for it.
+	var bares []map[string]any
 	for _, key := range slices.Sorted(maps.Keys(flat)) {
 		val := flat[key]
 		// Context is grouped under a ctx object with direct (non-arrayified)
@@ -136,9 +149,10 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 					if prev, taken := ctxObj[base]; taken {
 						// The field's direct value, placed before its suffixes by
 						// the sorted key order, moves onto the field's object as the
-						// `"|"` member, as a leaf slot's bare value does
-						// ([insertStructured]), so STRUCTURED → FLAT gives it back
-						// as the field's own key (REQ-140). A null one is carried
+						// `"|"` member, which a leaf slot's bare value keeps beside
+						// a |value of its own ([bareStructuredKey]): ctx/setting
+						// has one. STRUCTURED → FLAT gives it back as the field's
+						// own key (REQ-140). A null one is carried
 						// as written, as the null member, for decode to read as
 						// absent (REQ-053). An object never gets here: it is
 						// refused below, before its field's suffixes.
@@ -189,35 +203,103 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 			}
 			continue
 		}
-		if err := insertStructured(obj, rest, pk.suffix, val, budget); err != nil {
+		if err := insertStructured(obj, rest, pk.suffix, val, budget, &bares); err != nil {
 			return nil, fmt.Errorf("simplified: structured %q: %w", key, err)
 		}
+	}
+	if spelling == bareAsValue {
+		spellBareValues(bares)
 	}
 	return root, nil
 }
 
-// bareStructuredKey is the STRUCTURED member a leaf's **bare** FLAT value takes
-// when that leaf also carries |suffixes or nested `_` attributes, so the array
-// element has to be an object: `"|"` — the `"|"+suffix` convention with the empty
-// suffix the FLAT key itself spells.
+// bareSpelling is the STRUCTURED member [flatToStructured] gives a bare value
+// that sits beside its leaf's suffixes or members.
+type bareSpelling bool
+
+const (
+	// bareAsKey keeps the bare value as [bareStructuredKey], the FLAT key's
+	// own spelling. OPT-free conversion writes it: without a template it
+	// cannot tell whether the leaf's datatype has a bare value, so it gives
+	// the key back as written, and FLAT → STRUCTURED → FLAT and STRUCTURED →
+	// FLAT → STRUCTURED are both exact (REQ-053).
+	bareAsKey bareSpelling = false
+	// bareAsValue respells the bare value as [bareValueMember], the
+	// reference implementation's spelling ([spellBareValues]). Encode writes
+	// it, since encode writes a bare value only at a datatype that has one.
+	bareAsValue bareSpelling = true
+)
+
+// bareValueMember is the STRUCTURED member encode gives a leaf's **bare** FLAT
+// value when that leaf also carries |suffixes or nested `_` attributes, so the
+// array element has to be an object: `|value`, the reference implementation's
+// spelling (ADR 0014).
 //
 // A leaf carrying *only* a bare value stays a bare scalar in the array, which is
-// what every STRUCTURED body this codec has ever emitted looks like; the key
+// what every STRUCTURED body this codec has ever emitted looks like; the member
 // appears exactly where the alternative is a scalar/object collision. Several FLAT
 // leaves genuinely have that shape — a DV_TEXT beside `|formatting`, a DV_COUNT
-// beside `|normal_status`, any bare leaf carrying a REQ-140 `_` family, and (the
-// case that forced this) a DV_MULTIMEDIA, whose bare key is the uri and whose
-// `|mediatype` + `|size` are RM-mandatory. `"|"` is not a legal FLAT suffix, so the
-// inverse mapping is unambiguous without an OPT, which `|value` would not be
-// (DV_ORDINAL and DV_CODED_TEXT spell a real `|value`).
+// beside `|normal_status`, any bare leaf carrying a REQ-140 `_` family, a
+// DV_PARSABLE beside its RM-mandatory `|formalism`, and a DV_MULTIMEDIA, whose
+// bare key is the uri and whose `|mediatype` + `|size` are RM-mandatory.
+//
+// OPT-free STRUCTURED → FLAT writes the member as `x|value`, which the FLAT decode
+// reads as the bare value of every datatype that has one ([readsBareValue]), and
+// as the own `|value` of DV_CODED_TEXT, DV_ORDINAL and DV_SCALE, which have no
+// bare value: the Web Template decides at decode what the conversion cannot.
+// OPT-free FLAT → STRUCTURED writes no such member for a bare key: it keeps
+// [bareStructuredKey] ([bareAsKey]).
+const bareValueMember = "|" + bareValueSuffix
+
+// bareStructuredKey is the STRUCTURED member, `"|"`, that a bare value keeps
+// where its element also holds a `|value` suffix of its own: the `"|"+suffix`
+// convention with the empty suffix the FLAT key itself spells. The two values
+// then never share one member, and OPT-free conversion gives each back as
+// written. FLAT → STRUCTURED places every bare value here. OPT-free
+// conversion keeps it there ([bareAsKey]); encode moves it to
+// [bareValueMember] once every key is placed ([spellBareValues]), except a
+// null one and one beside a `|value` of its own. A ctx/ field keeps it too,
+// since ctx/setting has a `|value` of its own.
 const bareStructuredKey = "|"
+
+// emptyBareMember is the STRUCTURED member `""`, another spelling of a bare
+// value beside its leaf's members that decode reads as [bareStructuredKey].
+const emptyBareMember = ""
+
+// isBareMember reports whether name is [bareStructuredKey] or
+// [emptyBareMember], the members decode reads as the bare value of the
+// element they sit on.
+func isBareMember(name string) bool {
+	return name == bareStructuredKey || name == emptyBareMember
+}
+
+// spellBareValues moves the bare value of each element object in bares, which
+// holds it as [bareStructuredKey], to [bareValueMember], as encode writes it.
+// An element that also holds a |value suffix keeps [bareStructuredKey], so two
+// values never share one member. So does a null bare value, which carries
+// nothing and is absent wherever its key resolves (REQ-053), where a `|value`
+// would be a suffix a position with no bare value does not read. Encode
+// writes a bare value only at a datatype that has one, so the respelling
+// never turns a bare value into a datatype's own `|value`; OPT-free
+// conversion, which cannot tell the datatype, does not respell ([bareAsKey]).
+func spellBareValues(bares []map[string]any) {
+	for _, el := range bares {
+		v, held := el[bareStructuredKey]
+		if _, own := el[bareValueMember]; !held || own || v == nil {
+			continue
+		}
+		delete(el, bareStructuredKey)
+		el[bareValueMember] = v
+	}
+}
 
 // heldNull marks an array slot that a bare FLAT value of JSON null was placed
 // in, so that a suffix or child placed at the same slot later carries the null
-// as the `"|"` member, as it carries a bare value that is not null (REQ-053:
-// OPT-free conversion carries a null as written). A slot no key filled, such
-// as one padded before a higher :index, holds nil instead and gains no `"|"`.
-// The STRUCTURED map is only ever marshalled, and heldNull marshals as null.
+// as the bare value member, as it carries a bare value that is not null
+// (REQ-053: OPT-free conversion carries a null as written). A slot no key
+// filled, such as one padded before a higher :index, holds nil instead and
+// gains no member. The STRUCTURED map is only ever marshalled, and heldNull
+// marshals as null.
 type heldNull struct{}
 
 // MarshalJSON writes the null the slot holds.
@@ -226,10 +308,11 @@ func (heldNull) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
 // insertStructured places val at segs (relative to obj), growing arrays by
 // :index. A bare leaf sets the array element to the scalar value, unless the slot
 // already holds (or later needs) an object, in which case it takes
-// [bareStructuredKey]; a suffixed leaf sets a |suffix key on the element object.
-// The :index is bounded so a hostile key cannot force an unbounded allocation; two
-// values competing for one slot is an error, never a last-write-wins overwrite.
-func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any, budget *allocBudget) error {
+// [bareStructuredKey] and the object joins bares; a suffixed leaf sets a |suffix
+// key on the element object. The :index is bounded so a hostile key cannot force
+// an unbounded allocation; two values competing for one slot is an error, never a
+// last-write-wins overwrite.
+func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any, budget *allocBudget, bares *[]map[string]any) error {
 	seg := segs[0]
 	idx := max(seg.idx, 0)
 	if idx > maxRepeatIndex {
@@ -257,6 +340,7 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 			}
 			arr[idx] = val
 		case map[string]any:
+			*bares = append(*bares, cur)
 			return placeMember(cur, bareStructuredKey, val, seg.id, idx)
 		default:
 			// A second spelling holding null is absent beside the value the
@@ -277,15 +361,17 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 		case nil:
 		case heldNull:
 			el[bareStructuredKey] = nil
+			*bares = append(*bares, el)
 		default:
 			el[bareStructuredKey] = cur
+			*bares = append(*bares, el)
 		}
 		arr[idx] = el
 	}
 	if isLeaf {
 		return placeMember(el, "|"+suffix, val, seg.id, idx)
 	}
-	return insertStructured(el, segs[1:], suffix, val, budget)
+	return insertStructured(el, segs[1:], suffix, val, budget, bares)
 }
 
 // placeMember sets the member name of el, an array element at index idx of
@@ -433,14 +519,11 @@ func (w *structuredWalker) ctx(obj map[string]any) error {
 // vanish from the conversion — it is an error, per the fail-loud posture —
 // unless what it held was set aside as unmatched.
 func (w *structuredWalker) walk(path, member string, level memberLevel, obj map[string]any) error {
+	if err := w.bareValue(path, member, obj); err != nil {
+		return err
+	}
 	for k, v := range obj {
-		if k == bareStructuredKey {
-			// The leaf's bare value, spelled as a member because the element also
-			// carries suffixes or nested `_` attributes (see [bareStructuredKey]).
-			if _, taken := w.out[path]; taken {
-				return fmt.Errorf("%w: structured: %q is spelled twice", ErrUnknownPath, path)
-			}
-			w.out[path] = v
+		if isBareMember(k) {
 			continue
 		}
 		if strings.HasPrefix(k, "|") {
@@ -485,5 +568,32 @@ func (w *structuredWalker) walk(path, member string, level memberLevel, obj map[
 			}
 		}
 	}
+	return nil
+}
+
+// bareValue flattens the bare value obj, an object at path, holds beside its
+// suffixes or members as [bareStructuredKey] or [emptyBareMember], onto path
+// itself. The reference's [bareValueMember] is a suffix member like any other:
+// the FLAT decode reads `x|value` as the bare value of every datatype that has
+// one ([readsBareValue]). The two members here make one FLAT key, so where both
+// hold a value the values must agree, and the refusal names the object's
+// member path and neither value; a null one is absent beside the other
+// (REQ-053).
+func (w *structuredWalker) bareValue(path, member string, obj map[string]any) error {
+	v, pipe := obj[bareStructuredKey]
+	e, empty := obj[emptyBareMember]
+	switch {
+	case !pipe && !empty:
+		return nil
+	case pipe && empty && v != nil && e != nil && !sameCtxValue(v, e):
+		return fmt.Errorf("%w: structured: the %q and %q members of %q spell one bare value twice and disagree; remove one",
+			ErrUnknownPath, bareStructuredKey, emptyBareMember, member)
+	case !pipe || v == nil:
+		v = e
+	}
+	if _, taken := w.out[path]; taken {
+		return fmt.Errorf("%w: structured: %q is spelled twice", ErrUnknownPath, path)
+	}
+	w.out[path] = v
 	return nil
 }

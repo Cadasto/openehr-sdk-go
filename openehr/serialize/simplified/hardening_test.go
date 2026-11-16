@@ -285,7 +285,7 @@ func TestStructuredToFlatRejectsMalformed(t *testing.T) {
 //
 // A bare value *beside* the same leaf's |suffixes or nested members is no longer
 // in this list: it is a legal FLAT shape (a DV_MULTIMEDIA's uri beside its
-// mandatory `|mediatype`) and STRUCTURED spells it with the `"|"` member — see
+// mandatory `|mediatype`) and STRUCTURED spells it with the `|value` member — see
 // TestBareLeafBesideMembersThroughStructured. Nor is a null beside a value: a
 // null is absent (TestREQ053FlatToStructuredCarriesNull).
 func TestFlatToStructuredRejectsConflicts(t *testing.T) {

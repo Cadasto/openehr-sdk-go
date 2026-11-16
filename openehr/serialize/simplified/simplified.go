@@ -31,8 +31,8 @@ type decodeConfig struct {
 // unmatched whatever its value holds. A key the decode reads is never
 // unmatched, even where the decode then
 // refuses it, and these fail the decode in every mode: the keys with no
-// carrier (a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
-// `_instruction_details`); the reference's in-context
+// carrier (a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`);
+// the reference's in-context
 // spelling of RM data this codec's Web Template does not model (an ACTION's
 // ISM transition and time); at a leaf whose datatype
 // has neither a suffix set nor a sub-path grammar, its bare value and a suffix
@@ -213,9 +213,8 @@ var (
 	// ErrNotModelled is returned, in every mode, for a key the Simplified
 	// Formats define and the decode reads but this SDK does not model: an
 	// ACTION's ISM transition and time in the spelling the reference writes
-	// where the Web Template has no node for them, and the
-	// `_instruction_details` family. The decode refuses such a key rather than
-	// drop its data or replace it with a default.
+	// where the Web Template has no node for them. The decode refuses such a
+	// key rather than drop its data or replace it with a default.
 	//
 	// It also matches [ErrUnknownPath], so a check for that sentinel matches
 	// these refusals as before. A check for this one tells a key this SDK does

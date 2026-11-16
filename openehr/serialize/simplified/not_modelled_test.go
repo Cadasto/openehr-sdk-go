@@ -20,16 +20,16 @@ const notModelledAction = "conformance-ehrbase.de.v0/conformance_section/conform
 
 // TestREQ170NotModelledKeys — REQ-170. The reference's spelling of a
 // `transition` under an archetyped per-step ISM transition node, which the Web
-// Template does not model there, and the deferred family
-// `_instruction_details`, are refused in FLAT and in STRUCTURED, by default
-// and under strict, with ErrNotModelled and ErrUnknownPath, the key named and
-// its value not.
+// Template does not model there, is refused in FLAT and in STRUCTURED, by
+// default and under strict, with ErrNotModelled and ErrUnknownPath, the key
+// named and its value not. `_instruction_details` was refused the same way
+// until it gained its carrier; [TestREQ170InContextActionKeysAreRead] reads it
+// now.
 func TestREQ170NotModelledKeys(t *testing.T) {
 	wt, _ := conformanceTarget(t)
 	const secret = "secret-value-0451"
 	for _, key := range []string{
 		notModelledAction + "/transition/transition|code",
-		notModelledAction + "/_instruction_details|activity_id",
 	} {
 		body := mustJSON(t, eventBody(map[string]any{key: secret}))
 		for _, format := range []string{"FLAT", "STRUCTURED"} {
@@ -60,26 +60,30 @@ func TestREQ170NotModelledKeys(t *testing.T) {
 	}
 }
 
-// TestREQ170InContextActionKeysAreRead — REQ-170, REQ-053. The reference's
-// in-context spelling of an ACTION's ISM transition, `_reason` family
-// included, and its own `time` resolve in the Web Template, so they decode in
-// FLAT and in STRUCTURED, by default and under strict: none is refused as a
-// key this SDK does not model.
+// TestREQ170InContextActionKeysAreRead — REQ-170, REQ-053, REQ-140. The
+// reference's in-context spelling of an ACTION's ISM transition, `_reason`
+// family included, and its own `time` resolve in the Web Template, and the
+// ACTION's `_instruction_details` family is carried, so they decode in FLAT
+// and in STRUCTURED, by default and under strict: none is refused as a key
+// this SDK does not model.
 func TestREQ170InContextActionKeysAreRead(t *testing.T) {
 	wt, _ := conformanceTarget(t)
 	ism := notModelledAction + "/ism_transition"
 	body := mustJSON(t, eventBody(map[string]any{
-		ism + "/current_state|code":        "532",
-		ism + "/current_state|value":       "completed",
-		ism + "/current_state|terminology": "openehr",
-		ism + "/transition|code":           "548",
-		ism + "/transition|value":          "finish",
-		ism + "/transition|terminology":    "openehr",
-		ism + "/careflow_step|code":        "at0006",
-		ism + "/careflow_step|value":       "transition",
-		ism + "/careflow_step|terminology": "local",
-		ism + "/_reason:0":                 "reason 1",
-		notModelledAction + "/time":        "2022-01-31T10:33:28.72414+01:00",
+		ism + "/current_state|code":                                 "532",
+		ism + "/current_state|value":                                "completed",
+		ism + "/current_state|terminology":                          "openehr",
+		ism + "/transition|code":                                    "548",
+		ism + "/transition|value":                                   "finish",
+		ism + "/transition|terminology":                             "openehr",
+		ism + "/careflow_step|code":                                 "at0006",
+		ism + "/careflow_step|value":                                "transition",
+		ism + "/careflow_step|terminology":                          "local",
+		ism + "/_reason:0":                                          "reason 1",
+		notModelledAction + "/time":                                 "2022-01-31T10:33:28.72414+01:00",
+		notModelledAction + "/_instruction_details|composition_uid": "4cdc3017-d8c5-4cd3-9900-f3bb7171d006",
+		notModelledAction + "/_instruction_details|activity_id":     "activities[at0001]",
+		notModelledAction + "/_instruction_details|path":            "/content[openEHR-EHR-SECTION.conformance_section.v0]",
 	}))
 	structured, err := simplified.FlatToStructured(body)
 	if err != nil {

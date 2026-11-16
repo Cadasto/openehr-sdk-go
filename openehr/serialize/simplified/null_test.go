@@ -15,6 +15,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -164,8 +165,12 @@ func TestREQ053AllNullKeysReadAsAbsent(t *testing.T) {
 		"null INTERVAL_EVENT width":        {rmattrEvent + "/width": nil},
 		"null INTERVAL_EVENT sample_count": {rmattrEvent + "|sample_count": nil},
 		"null OBSERVATION history_origin":  {rmattrObs + "/history_origin": nil},
-		// A family this codec defers has no carrier; an all-null one is absent.
-		"null deferred family": {rmattrAction + "/_instruction_details|x": nil},
+		// A family whose every key is null carries nothing; it is absent.
+		"all-null instruction_details": {
+			rmattrAction + "/_instruction_details|composition_uid": nil,
+			rmattrAction + "/_instruction_details|activity_id":     nil,
+			rmattrAction + "/_instruction_details|path":            nil,
+		},
 		"null inlined participation identifier": {
 			rmattrContext + "/_participation:0|function":         "requester",
 			rmattrContext + "/_participation:0|identifiers_id:0": nil,
@@ -290,9 +295,18 @@ func TestREQ053InterconversionCarriesNull(t *testing.T) {
 // conversion is a mechanical restructuring, so a key holding null comes across
 // holding null in every shape: a lone bare value as a null array element, a
 // suffix as a null `|suffix` member, and a bare value beside the leaf's
-// suffixes or children as the null `"|"` member, as a bare value that is not
-// null is. A slot no key fills, before a higher :index, gains no `"|"`.
+// suffixes or children as the null `"|"` member, so it comes back as the bare
+// key it was written as, as a bare value that is not null does. Encode's
+// restructuring writes the same document, except that a bare value beside the
+// leaf's members that is not null takes the `|value` member (encode, where it
+// differs); a null one keeps `"|"` there too. A slot no key fills, before a
+// higher :index, gains no member.
 func TestREQ053FlatToStructuredCarriesNull(t *testing.T) {
+	const encodedBesideAChild = `{"t":{"x":[{"|value":"a","y":[1]}]}}`
+	encodes := map[string]string{
+		"two spellings beside a child, the null first":  encodedBesideAChild,
+		"two spellings beside a child, the null second": encodedBesideAChild,
+	}
 	for name, tc := range map[string]struct{ flat, want string }{
 		"lone bare value":         {`{"t/x": null}`, `{"t":{"x":[null]}}`},
 		"suffix":                  {`{"t/x|unit": null}`, `{"t":{"x":[{"|unit":null}]}}`},
@@ -337,6 +351,28 @@ func TestREQ053FlatToStructuredCarriesNull(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf("FlatToStructured(%s) = %s, want %s", tc.flat, out, tc.want)
+			}
+			encode, differs := encodes[name]
+			if !differs {
+				encode = tc.want
+			}
+			var flat map[string]any
+			if err := json.Unmarshal([]byte(tc.flat), &flat); err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := flatToStructured(flat, bareAsValue)
+			if err != nil {
+				t.Fatalf("flatToStructured(%s, bareAsValue) = %v", tc.flat, err)
+			}
+			out = mustJSON(t, encoded)
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal([]byte(encode), &want); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("flatToStructured(%s, bareAsValue) = %s, want %s", tc.flat, out, encode)
 			}
 		})
 	}
@@ -401,18 +437,46 @@ func TestREQ053DvFromSuffixesReadsNullAsAbsent(t *testing.T) {
 // bare value at a datatype with no bare spelling is unmatched beside a suffix
 // the datatype reads, and malformed alone. Null suffixes are absent, so a bare
 // value beside nothing else is alone, and refused as a value missing every
-// required suffix, rather than set aside while the null suffixes vanish.
+// required suffix, rather than set aside while the null suffixes vanish: a
+// DV_QUANTITY's, in FLAT and as the `"|"` member FLAT → STRUCTURED keeps or
+// the `""` member in STRUCTURED (a `|value` member is a suffix, and a
+// DV_QUANTITY has no bare value and no `|value`). A DV_PROPORTION's bare
+// value, its magnitude, is read in every spelling, so beside a null numerator
+// and denominator it is alone too, and refused as the proportion missing its
+// numerator.
 func TestREQ053BareValueBesideOnlyNullSuffixesIsAlone(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	body := rmattrBody(map[string]any{
+	// spellings decodes body, whose leaf's bare value is 1.5, in FLAT and in
+	// STRUCTURED with the bare value as each member in members, and returns
+	// the refusal each gives in every mode.
+	spellings := func(body map[string]any, members ...string) map[string]error {
+		doc, err := FlatToStructured(mustJSON(t, body))
+		if err != nil {
+			t.Fatalf("FlatToStructured: %v", err)
+		}
+		held := []byte(strconv.Quote(bareStructuredKey) + `:1.5`)
+		if !bytes.Contains(doc, held) {
+			t.Fatalf("FlatToStructured = %s, want the bare value 1.5 as the %q member", doc, bareStructuredKey)
+		}
+		out := map[string]error{"FLAT": refusedInEveryMode(t, wt, body)}
+		for _, member := range members {
+			spelled := bytes.Replace(doc, held, []byte(strconv.Quote(member)+`:1.5`), 1)
+			out["STRUCTURED "+strconv.Quote(member)+" member"] = structuredDocRefusedInEveryMode(t, wt, spelled)
+		}
+		return out
+	}
+	quantity := rmattrBody(map[string]any{rmattrElement: 1.5, rmattrElement + "|magnitude": nil, rmattrElement + "|unit": nil})
+	for form, err := range spellings(quantity, bareStructuredKey, emptyBareMember) {
+		if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "bare value") {
+			t.Errorf("DV_QUANTITY %s: decode = %v, want the lone bare value refused (ErrUnsupportedDatatype)", form, err)
+		}
+	}
+	proportion := rmattrBody(map[string]any{
 		rmattrProportion: 1.5, rmattrProportion + "|numerator": nil, rmattrProportion + "|denominator": nil,
 	})
-	for form, err := range map[string]error{
-		"FLAT":       refusedInEveryMode(t, wt, body),
-		"STRUCTURED": structuredRefusedInEveryMode(t, wt, body),
-	} {
-		if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "bare value") {
-			t.Errorf("%s: decode = %v, want the lone bare value refused (ErrUnsupportedDatatype)", form, err)
+	for form, err := range spellings(proportion, bareValueMember, bareStructuredKey, emptyBareMember) {
+		if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "missing required |numerator") {
+			t.Errorf("DV_PROPORTION %s: decode = %v, want the lone bare value refused as missing |numerator (ErrUnsupportedDatatype)", form, err)
 		}
 	}
 }

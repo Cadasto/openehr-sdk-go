@@ -75,8 +75,10 @@ func rmattrEncode(owner any, base string, out map[string]any) error {
 			return err
 		}
 	}
-	if err := deferredEntryRMAttrs(owner, base); err != nil {
-		return err
+	if a, ok := as[rm.Action](owner); ok {
+		if err := instructionDetailsRMAttr(out, base+"/_instruction_details", a.InstructionDetails); err != nil {
+			return err
+		}
 	}
 	return participationsRMAttr(out, base, "_other_participation", entryOtherParticipationsOf(owner))
 }
@@ -141,19 +143,6 @@ func wfDefinitionRMAttr(out map[string]any, path string, wf *rm.DVParsable) erro
 			key += "|value"
 		}
 		out[key] = v
-	}
-	return nil
-}
-
-// deferredEntryRMAttrs refuses the one ENTRY attribute whose family stays
-// deferred: ACTION `instruction_details`. Decode refuses its keys, so a value
-// written here could never be read back; and with no grammar there is nothing
-// to write. A populated one is therefore a typed error naming the key, never
-// the value (REQ-140), and an absent one writes nothing.
-func deferredEntryRMAttrs(owner any, base string) error {
-	if a, ok := as[rm.Action](owner); ok && a.InstructionDetails != nil {
-		return fmt.Errorf("%w: %q carries an ACTION.instruction_details, which has no FLAT grammar yet and no |raw carrier — deferred rather than dropped (see deviations.md)",
-			ErrUnsupportedDatatype, base+"/_instruction_details")
 	}
 	return nil
 }

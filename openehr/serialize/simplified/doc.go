@@ -85,6 +85,16 @@
 // earliest time the events carry. Any other spelling of the four, such as
 // "<event>/sample_count", is unmatched content.
 //
+// An abstract EVENT that occurs at most once has no Web Template node: the
+// Web Template folds it into its OBSERVATION, whose node holds the event's
+// "time" leaf. Its three interval keys are then spelled at the OBSERVATION,
+// as "<observation>/width", "<observation>/math_function" and
+// "<observation>|sample_count", and read and written there as at an EVENT
+// node. An OBSERVATION that folds in two or more such events gives those keys
+// to none of them: decode reads them as unmatched content, and encode refuses
+// an INTERVAL_EVENT among the events that holds any of the three with
+// [ErrUnsupportedDatatype].
+//
 // # An ELEMENT with several value types
 //
 // An ELEMENT with one value alternative, or with two that are a coded text
@@ -125,6 +135,59 @@
 // hold its current state's code, where exactly one does. A careflow step there
 // is kept whatever its code, for validation to judge.
 //
+// # An ACTION's instruction details
+//
+// An ACTION's instruction details travel as "<action>/_instruction_details"
+// with three suffixes: "|composition_uid", the id of the composition holding
+// the instruction, "|activity_id", and "|path", the instruction's path in
+// that composition. Decode reads them as a reference to an INSTRUCTION in the
+// "local" namespace whose id is a HIER_OBJECT_ID, and reads an empty "|path"
+// as none. It refuses details without "|composition_uid" or "|activity_id"
+// with [ErrUnsupportedDatatype]. Encode writes "|path" only when it is not
+// empty, and refuses with [ErrUnsupportedDatatype] a reference in another
+// namespace, to another type or with another kind of id, and details that
+// carry wf_details, since the three suffixes cannot carry them.
+//
+// # A bare value beside its leaf's members
+//
+// In STRUCTURED a leaf's bare value is its array element, as in
+// "dv_text": ["text"]. Where the leaf also carries suffixes or members, the
+// element is an object, and encode writes the bare value as its "|value"
+// member, as in "any": [{"|value": "text", "|formalism": "text/plain"}].
+// Where the leaf also carries a "|value" of its own, or the bare value is
+// null, encode writes it as the "|" member instead, so two values never share
+// one member. Decode reads "|value", "|" and "" as the bare value of every
+// datatype that has one, and refuses two of them that disagree. A coded text,
+// an ordinal and a scale have a "|value" of their own and no bare value.
+//
+// A proportion's bare value is its magnitude, the numerator divided by the
+// denominator, which the reference implementation writes beside them. Decode
+// reads it and refuses, with [ErrUnsupportedDatatype], one that differs from
+// that quotient by more than one part in a billion, or that stands beside a
+// zero denominator. The value holds no magnitude of its own, so a bare value
+// without both a numerator and a denominator is refused as the proportion
+// missing them, and encode writes none.
+//
+// An ordinal's or a scale's "|terminology" is its symbol's terminology. Without
+// one the symbol is in local, or, with [WithTemplate], in the terminology the
+// template's ordinal list gives its code and value. With [WithTemplate], an
+// ordinal's "|terminology" that names another terminology than that list
+// gives its code and value is refused with [ErrUnsupportedDatatype]. Encode
+// writes no "|terminology": an ordinal or a scale coded outside local rides
+// "|raw".
+//
+// FLAT reads "|value" the same way: "<leaf>|value" is the bare value of every
+// datatype that has one. [StructuredToFlat] writes a "|value" member as that
+// key and the "|" and "" members as the bare key, so the decode, which knows
+// each leaf's datatype, reads them, and the conversion needs no template.
+// [FlatToStructured] has no template either, so it cannot tell whether a
+// leaf's datatype has a bare value: it keeps a bare value beside its leaf's
+// members as the "|" member, the FLAT key's own spelling, and never writes
+// "|value" for it. Each conversion then gives the other's output back as
+// written, and a bare value the leaf's datatype has no place for stays one
+// the decode refuses, in STRUCTURED as in FLAT. For the "|value" spelling,
+// encode the composition with [MarshalStructured].
+//
 // # Unmatched content
 //
 // Input the decode does not read is unmatched: a key whose path the Web
@@ -135,18 +198,18 @@
 // whose name the FLAT grammar does not read at that level is unmatched
 // whatever its value holds, and is reported as that member; a name it reads
 // keeps the shape refusals. A key the decode reads is never unmatched, even
-// where the decode then refuses it: a PARTICIPATION `time`, a
-// FEEDER_AUDIT_DETAILS `other_details` and `_instruction_details` have no
-// carrier and fail the decode in every mode. So do the reference's spellings
+// where the decode then refuses it: a PARTICIPATION `time` and a
+// FEEDER_AUDIT_DETAILS `other_details` have no carrier and fail the decode in
+// every mode. So do the reference's spellings
 // of an ACTION's ISM transition and time where the Web Template does not
 // resolve them: a `current_state`, `transition` or `careflow_step` leaf under
 // a transition node with no child of that id (such as the careflow step of an
 // ACTION whose template constrains no transition), any of them or a `_reason`
 // family under an `ism_transition` segment the Web Template has no node for,
 // and an ACTION's `time` where it has no such leaf. They name RM data decode
-// would otherwise drop or replace. Those keys and `_instruction_details` are paths the
-// Simplified Formats define and this SDK does not model: their refusal matches
-// [ErrNotModelled] as well as [ErrUnknownPath]. A leaf whose
+// would otherwise drop or replace. Those keys are paths the Simplified Formats
+// define and this SDK does not model: their refusal matches [ErrNotModelled]
+// as well as [ErrUnknownPath]. A leaf whose
 // datatype has neither a suffix set nor a sub-path grammar refuses its bare
 // value and any suffix naming an attribute of its RM class.
 // So does malformed content: a value of the wrong shape, a missing required

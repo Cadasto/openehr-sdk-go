@@ -346,11 +346,11 @@ func structuredLocations(data []byte) (locator, error) {
 	var walk func(flatPath, memberPath string, obj orderedValue)
 	walk = func(flatPath, memberPath string, obj orderedValue) {
 		for _, m := range obj.members {
-			if m.name != bareStructuredKey && !strings.HasPrefix(m.name, "|") {
+			if !isBareMember(m.name) && !strings.HasPrefix(m.name, "|") {
 				put(memberKeyPrefix+memberPath+"/"+m.name, memberPath+"/"+m.name)
 			}
 			switch {
-			case m.name == bareStructuredKey:
+			case isBareMember(m.name):
 				put(flatPath, memberPath+"/"+m.name)
 			case strings.HasPrefix(m.name, "|"):
 				put(flatPath+m.name, memberPath+"/"+m.name)
@@ -446,20 +446,20 @@ func applyUnmatchedPolicy(cfg decodeConfig, loc locator, unmatched []string) err
 // decode reads at a value of rmType. judged is false for a datatype this codec
 // has no suffix set for, where the caller decides.
 //
-// The set is the datatype's own (allowedSuffixes), plus the `|raw` carrier
-// every mapped datatype takes. A DV_TEXT position also reads the DV_CODED_TEXT
-// suffixes, which select the coded subtype (REQ-053); a DV_CODED_TEXT position
-// reads `|other`. A STRING leaf reads its bare value and nothing else.
+// The set is the datatype's own ([readsSuffix]: allowedSuffixes, and |value
+// where the datatype has a bare value), plus the `|raw` carrier every mapped
+// datatype takes. A DV_TEXT position also reads the DV_CODED_TEXT suffixes,
+// which select the coded subtype (REQ-053); a DV_CODED_TEXT position reads
+// `|other`. A STRING leaf reads its bare value and nothing else.
 func leafSuffixMatched(rmType, suffix string) (matched, judged bool) {
 	if rmType == stringLeafType {
 		return suffix == "", true
 	}
-	allowed, known := allowedSuffixes[rmType]
-	if !known {
+	if _, known := allowedSuffixes[rmType]; !known {
 		return false, false
 	}
 	switch {
-	case allowed[suffix], suffix == "raw":
+	case readsSuffix(rmType, suffix), suffix == "raw":
 		return true, true
 	case rmType == "DV_TEXT":
 		return allowedSuffixes["DV_CODED_TEXT"][suffix], true

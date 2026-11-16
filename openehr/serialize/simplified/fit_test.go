@@ -270,6 +270,20 @@ func canonicalAttrValue(t *testing.T, rmType, path string, v any) []byte {
 	return b
 }
 
+// attrOfType returns a datatype and the path of an attribute of it whose RM
+// type is bmmType, a stand-in at which canonical JSON decodes a value of that
+// type.
+func attrOfType(t *testing.T, bmmType string) (rmType, path string) {
+	t.Helper()
+	for _, c := range [][2]string{{"DV_QUANTITY", "magnitude"}} {
+		if got, ok := attrBMMType(c[0], c[1]); ok && got == bmmType {
+			return c[0], c[1]
+		}
+	}
+	t.Fatalf("no stand-in attribute of RM type %s", bmmType)
+	return "", ""
+}
+
 // TestSuffixFitMatchesCanonicalJSON — REQ-053: the fit check refuses a value
 // exactly when the canonical-JSON decode of its attribute does. For every
 // suffix of every datatype and a spread of values (strings that are and are
@@ -287,12 +301,17 @@ func TestSuffixFitMatchesCanonicalJSON(t *testing.T) {
 	}
 	for rmType, fits := range suffixFits {
 		for suffix, fit := range fits {
-			path, own := suffixAttrPaths[rmType][suffix]
-			if !own {
+			at, path := rmType, suffixAttrPaths[rmType][suffix]
+			if path == "" {
 				path = orderedSuffixAttrPaths[suffix]
 			}
+			if _, derived := derivedSuffixFits[rmType][suffix]; derived {
+				// A function is no attribute: its fit is judged against an
+				// attribute of its type.
+				at, path = attrOfType(t, fit.bmmType)
+			}
 			for _, v := range values {
-				_, decodeErr := typereg.Default.Decode(canonicalAttrValue(t, rmType, path, v))
+				_, decodeErr := typereg.Default.Decode(canonicalAttrValue(t, at, path, v))
 				if got, want := fit.admits(v), decodeErr == nil; got != want {
 					t.Errorf("suffixFits[%s][%q].admits(%#v) = %v, but canonical JSON at %s decodes it with error %v",
 						rmType, suffix, v, got, path, decodeErr)
@@ -365,7 +384,8 @@ func TestREQ053FitNamesTheKeyAtEveryPosition(t *testing.T) {
 // distinct from its neighbours, so a suffix whose recorded attribute path is
 // wrong finds another suffix's value there. An input shorthand and the suffix
 // it stands for are the exception: they spell one attribute, so they hold one
-// value, since two that differ are refused.
+// value, since two that differ are refused. So is a DV_PROPORTION's bare value,
+// its numerator divided by its denominator, since one that is not is refused.
 var fullSuffixSets = map[string]map[string]any{
 	"DV_TEXT":       {"": "t", "value": "t", "formatting": "f"},
 	"DV_CODED_TEXT": {"code": "c", "value": "v", "terminology": "t", "formatting": "f"},
@@ -381,10 +401,10 @@ var fullSuffixSets = map[string]map[string]any{
 	},
 	"DV_COUNT":   {"": 7, "magnitude_status": "=", "normal_status": "N", "accuracy": 1.5, "accuracy_is_percent": true},
 	"DV_BOOLEAN": {"": true},
-	"DV_ORDINAL": {"code": "c", "value": "v", "ordinal": 4},
-	"DV_SCALE":   {"code": "c", "value": "v", "ordinal": 4.5},
+	"DV_ORDINAL": {"code": "c", "value": "v", "ordinal": 4, "terminology": "t"},
+	"DV_SCALE":   {"code": "c", "value": "v", "ordinal": 4.5, "terminology": "t"},
 	"DV_PROPORTION": {
-		"numerator": 2.5, "denominator": 3.5, "type": 1, "magnitude_status": "=", "normal_status": "N",
+		"": 2.5 / 3.5, "numerator": 2.5, "denominator": 3.5, "type": 1, "magnitude_status": "=", "normal_status": "N",
 		"accuracy": 1.5, "accuracy_is_percent": true, "precision": 3,
 	},
 	"DV_IDENTIFIER": {"": "i", "id": "i", "issuer": "is", "assigner": "as", "type": "ty"},
@@ -417,6 +437,15 @@ func TestSuffixAttrPathsAreWhereTheValueLands(t *testing.T) {
 			t.Fatalf("dvFromSuffixes(%s, %v) = %v", rmType, sfx, err)
 		}
 		for suffix, want := range sfx {
+			if fit, derived := derivedSuffixFits[rmType][suffix]; derived {
+				// A function of the value's attributes is checked against
+				// them and stored nowhere.
+				_, function, _ := strings.Cut(fit.attr, ".")
+				if got, stored := dv[function]; stored {
+					t.Errorf("%s bare value %#v was stored as %s = %#v in %#v", rmType, want, function, got, dv)
+				}
+				continue
+			}
 			path, own := suffixAttrPaths[rmType][suffix]
 			if !own {
 				path = orderedSuffixAttrPaths[suffix]

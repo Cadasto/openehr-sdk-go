@@ -2,6 +2,7 @@ package simplified_test
 
 // REQ-053 — STRUCTURED format and FLAT<->STRUCTURED interconversion (no OPT).
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -394,10 +395,12 @@ func TestMappingsThroughStructured(t *testing.T) {
 // bodies (`…/dv_count` = 7 beside `…/dv_count/_normal_range/lower`) that predates
 // the underscore families, since C0's `_uid` collided identically.
 //
-// The bare value now takes the `"|"` member on that object, which is the
-// `"|"+suffix` convention with the empty suffix the FLAT key itself spells and is
-// therefore reversible without an OPT. Round-tripped in both directions here for
-// every shape that forced the collision.
+// OPT-free conversion now keeps the bare value as the `"|"` member on that
+// object, the FLAT key's own spelling, which STRUCTURED → FLAT writes back as
+// the bare key. Each shape that forced the collision is round-tripped in both
+// directions here, and both are exact: FLAT → STRUCTURED → FLAT gives the bare
+// key back as written, and STRUCTURED → FLAT → STRUCTURED gives the document
+// back.
 func TestBareLeafBesideMembersThroughStructured(t *testing.T) {
 	for name, flat := range map[string]map[string]any{
 		// The scalar families carry the interconversion's explicit `:0` (every
@@ -424,16 +427,24 @@ func TestBareLeafBesideMembersThroughStructured(t *testing.T) {
 			if !reflect.DeepEqual(got, flat) {
 				t.Errorf("FLAT -> STRUCTURED -> FLAT mismatch:\n got  %#v\n want %#v\n via  %s", got, flat, s)
 			}
+			again, err := simplified.FlatToStructured(back)
+			if err != nil {
+				t.Fatalf("FlatToStructured(StructuredToFlat): %v", err)
+			}
+			if !bytes.Equal(again, s) {
+				t.Errorf("STRUCTURED -> FLAT -> STRUCTURED = %s, want %s", again, s)
+			}
 		})
 	}
 }
 
-// TestBareStructuredMemberIsTheEmptySuffix — REQ-053. The bare value's STRUCTURED
-// member is exactly `"|"`, and the element it sits on is an object only where the
-// collision forced one: a leaf carrying nothing but a bare value stays a bare
-// scalar, which is what every STRUCTURED body this codec emitted before Phase C3
-// looks like.
-func TestBareStructuredMemberIsTheEmptySuffix(t *testing.T) {
+// TestBareStructuredMemberIsThePipe — REQ-053. The bare value's STRUCTURED
+// member, as OPT-free FLAT → STRUCTURED writes it, is exactly `"|"`, and the
+// element it sits on is an object only where the collision forced one: a leaf
+// carrying nothing but a bare value stays a bare scalar, which is what every
+// STRUCTURED body this codec emitted before Phase C3 looks like. Encode writes
+// `|value` instead (TestREQ053StructuredBareValueIsTheValueMember).
+func TestBareStructuredMemberIsThePipe(t *testing.T) {
 	plain, err := simplified.FlatToStructured(mustJSON(t, map[string]any{"t/e:0": "v"}))
 	if err != nil {
 		t.Fatalf("FlatToStructured: %v", err)
@@ -736,7 +747,8 @@ func TestFeederAuditThroughStructured(t *testing.T) {
 	if err := json.Unmarshal(fb, &back); err != nil {
 		t.Fatal(err)
 	}
-	// Every *segment* comes back with the interconversion's explicit `:index`.
+	// Every *segment* comes back with the interconversion's explicit `:index`,
+	// and the bare `original_content` as the bare key it was written as.
 	want := map[string]any{}
 	for k, v := range flat {
 		want[indexEverySegment(k)] = v
@@ -744,10 +756,17 @@ func TestFeederAuditThroughStructured(t *testing.T) {
 	if !reflect.DeepEqual(back, want) {
 		t.Errorf("FLAT -> STRUCTURED -> FLAT:\n got  %#v\n want %#v", back, want)
 	}
+	again, err := simplified.FlatToStructured(fb)
+	if err != nil {
+		t.Fatalf("FlatToStructured(StructuredToFlat): %v", err)
+	}
+	if !bytes.Equal(again, sb) {
+		t.Errorf("STRUCTURED -> FLAT -> STRUCTURED = %s, want %s", again, sb)
+	}
 }
 
 // TestMultimediaLeafThroughStructured — REQ-053/REQ-140. The DV_MULTIMEDIA leaf is
-// the case that forced the `"|"` member: its bare key is the uri and its
+// the case that forced a bare value member: its bare key is the uri and its
 // `|mediatype` + `|size` are RM-mandatory, so the element is always an object *and*
 // always carries a bare value. Its `_charset` / `_language` / `_thumbnail` members
 // nest as arrays beside them.
@@ -785,5 +804,12 @@ func TestMultimediaLeafThroughStructured(t *testing.T) {
 	}
 	if !reflect.DeepEqual(back, flat) {
 		t.Errorf("FLAT -> STRUCTURED -> FLAT:\n got  %#v\n want %#v", back, flat)
+	}
+	again, err := simplified.FlatToStructured(fb)
+	if err != nil {
+		t.Fatalf("FlatToStructured(StructuredToFlat): %v", err)
+	}
+	if !bytes.Equal(again, sb) {
+		t.Errorf("STRUCTURED -> FLAT -> STRUCTURED = %s, want %s", again, sb)
 	}
 }

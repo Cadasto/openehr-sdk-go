@@ -28,7 +28,7 @@ type levelKind int
 
 const (
 	// levelOpaque reads every name and judges nothing below it: the content
-	// is the FLAT decode's to refuse (a deferred family, PARTICIPATION.time,
+	// is the FLAT decode's to refuse (PARTICIPATION.time,
 	// FEEDER_AUDIT_DETAILS.other_details, a `_reason` family under an
 	// `ism_transition` the Web Template has no node for), or a body converted
 	// without a template.
@@ -235,9 +235,6 @@ func nodeLevel(node *webtemplate.Node, rel string) memberLevel {
 // an owner of RM class kind holding leaf ("" unless the owner is a collapsed
 // ELEMENT). read is false where the family names nothing there.
 func familyLevel(kind, leaf, name string) (memberLevel, bool) {
-	if rmattrDeferredAt(kind, name) {
-		return opaqueLevel, true
-	}
 	fam, _, read := rmattrFamilyOf(kind, leaf, name)
 	if !read {
 		return memberLevel{}, false

@@ -612,7 +612,8 @@ Input is matched when it names something the decoder reads, even where the decod
 These refusals are not unmatched content and stay errors in every mode:
 
 - a `_type` or `xsi:type` that names no RM class, a dispatch failure that would otherwise drop the whole subtree under it;
-- a FLAT or STRUCTURED key that resolves but has no carrier: PARTICIPATION `time`, FEEDER_AUDIT_DETAILS `other_details` and `_instruction_details` (§ REQ-140 *Deliberate exclusions*); and, at a leaf whose datatype has neither a suffix set nor a sub-path grammar, its bare value and a suffix that names an attribute of its RM class; a `null` one in this bullet reads as absent (§ REQ-053);
+- a FLAT or STRUCTURED key that resolves but has no carrier: PARTICIPATION `time` and FEEDER_AUDIT_DETAILS `other_details` (§ REQ-140 *Deliberate exclusions*); and, at a leaf whose datatype has neither a suffix set nor a sub-path grammar, its bare value and a suffix that names an attribute of its RM class.
+  A `null` one in this bullet reads as absent (§ REQ-053);
 - a FLAT or STRUCTURED key the decoder recognises as the reference's spelling of RM data the Web Template this SDK builds does not model, resolved or not, since ignoring it would drop that data or let a default replace it (the reference spellings, listed below); a `null` one in this bullet reads as absent (§ REQ-053);
 - matched content that is malformed: a value of the wrong shape, a missing required suffix (a `null` one among them, § REQ-053), two spellings of one field that disagree, an index past its bound;
 - a FLAT key that is not well formed, which names no path at all: one with an empty path segment (`a//b|`, or a leading or trailing `/`), a segment with no id before its `:index`, a second `|suffix`, or a segment after its `|suffix`.
@@ -625,7 +626,7 @@ The reference spellings the decoder recognises are these, wherever the Web Templ
 - under an `ism_transition` segment the Web Template has no node for, a `_reason` family too;
 - the ACTION's own `time` leaf, with any suffix.
 
-A refusal of a key the *Simplified Formats* define and this SDK does not model, a reference spelling or `_instruction_details`, **MUST** wrap `simplified.ErrNotModelled`, a sentinel that also matches `simplified.ErrUnknownPath`.
+A refusal of a reference spelling, a key the *Simplified Formats* define and this SDK does not model, **MUST** wrap `simplified.ErrNotModelled`, a sentinel that also matches `simplified.ErrUnknownPath`.
 A caller can then tell such a key from unmatched content, whose strict refusal matches `simplified.ErrUnknownPath` alone.
 The refusal names the key, or its family instance, and no file of this repository.
 
@@ -686,7 +687,7 @@ REST reads through `transport` and the `openehr/client/*` packages decode with t
 - The report option receives each of those items once, in document order, by the paths above, and the decode returns the same value as the default.
 - Under strict, each of those inputs fails with an error that wraps the codec's sentinel, names the first item's path and carries none of its value.
 - An unknown `_type` or `xsi:type` fails in every mode; each carrier-less FLAT key above fails in every mode, except a `null` one, which § REQ-053 reads as absent; an absent mandatory member does not fail under strict.
-- Each reference spelling and `_instruction_details` fails in every mode with an error that matches both `simplified.ErrNotModelled` and `simplified.ErrUnknownPath` and names the key or its family instance; a mistyped key refused under strict does not match `simplified.ErrNotModelled`.
+- Each reference spelling fails in every mode with an error that matches both `simplified.ErrNotModelled` and `simplified.ErrUnknownPath` and names the key or its family instance; a mistyped key refused under strict does not match `simplified.ErrNotModelled`.
 - A FLAT body carrying `a//b|` fails in every mode with `simplified.ErrUnknownPath` naming that key, and so does its FLAT → STRUCTURED conversion.
 - A canonical-JSON document reporting 1000 items under a spine 150 levels deep allocates at most twice as much as the same items under a spine 2 levels deep, under the unmatched and the missing-member options.
   A canonical-XML document reporting one item per level, under each of the three options, allocates at most three times as much when its depth doubles from 400 levels to 800, where a cost of depth times items would give four times.
@@ -829,10 +830,15 @@ Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-
 **FLAT** is a single-level map of `path → primitive | object`.
 **STRUCTURED** is the same data as nested JSON keyed by the same segment `id`s, where every data value is wrapped in an **array** (even at cardinality `0..1` / `1..1`) and attribute suffixes appear as `|`-prefixed keys.
 A leaf's **bare** FLAT value is the array element itself.
-Where the same leaf also carries `|`-suffixes or nested members (a DV_MULTIMEDIA's uri beside its mandatory `|mediatype`, a DV_TEXT beside `|formatting`, any bare leaf carrying a `_`-attribute, § REQ-140), that element **MUST** be an object whose `"|"` member holds the bare value: the `"|"+suffix` convention with the empty suffix the FLAT key itself spells.
-OPT-free interconversion reads and writes it as that empty suffix in both directions, which is what makes the mapping reversible without a template where `|value` would not be (DV_ORDINAL and DV_CODED_TEXT spell a real `|value`).
+Where the same leaf also carries `|`-suffixes or nested members (a DV_MULTIMEDIA's uri beside its mandatory `|mediatype`, a DV_TEXT beside `|formatting`, any bare leaf carrying a `_`-attribute, § REQ-140), that element is an object, and template-driven encode **MUST** write the bare value as its `|value` member, the reference implementation's spelling.
+Two values never share one member: where the leaf also carries a `|value` of its own, the bare value **MUST** stay the `"|"` member, the `"|"+suffix` convention with the empty suffix the FLAT key spells, and so **MUST** a null bare value.
+Decode **MUST** read the `|value`, `"|"` and `""` members as the bare value at every datatype that has one, and refuse two of them that disagree (§ REQ-170); DV_CODED_TEXT, DV_ORDINAL and DV_SCALE have no bare value, and their `|value` is their own.
+OPT-free FLAT → STRUCTURED has no template to tell whether a leaf's datatype has a bare value, so it writes every bare value beside its leaf's members as the `"|"` member and never respells it.
+OPT-free STRUCTURED → FLAT writes `"|"` and `""` as the bare key and `|value` as `x|value`, which FLAT decode reads by the leaf's datatype (*Input shorthands*, below).
+So both OPT-free round trips give a bare value back as written: FLAT → STRUCTURED → FLAT gives back `x` and `x|value`, and STRUCTURED → FLAT → STRUCTURED gives back `"|"` and `|value`, so every document encode writes comes back exactly; a `""` member comes back as `"|"`.
+Neither conversion changes what a body means: a bare value where the leaf's datatype has none, which encode never writes, stays the bare key decode refuses, in STRUCTURED as in FLAT.
 The member appears only where the alternative is a scalar/object collision: a leaf carrying nothing but a bare value **MUST** stay a bare scalar, so a leaf that cannot collide is spelled identically either way.
-*Not corpus-pinned:* no vendored STRUCTURED body exercises the shape, so `"|"` is this specification's choice within the format's own conventions — the same standing as the DV_SCALE suffix set (§ REQ-140) — and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears.
+*Reference-pinned:* the reference implementation's template examples write `|value` here, so [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) makes it the spelling encode writes; `""` is another implementation's, and `"|"` the one earlier releases of this codec wrote and OPT-free conversion keeps.
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
 #### Composition-level metadata
@@ -845,7 +851,7 @@ The reference implementation spells six of the `ctx/` fields as real paths under
 | territory | `ctx/territory` | `<root>/territory\|code` | `ISO_3166-1` |
 | composer name | `ctx/composer_name` | `<root>/composer\|name` | |
 | composer self | `ctx/composer_self` | `<root>/composer_self` | |
-| time | `ctx/time` | `<root>/context/start_time` | |
+| time | `ctx/time` | `<root>/context/start_time`, or its `\|value`, as any DV_DATE_TIME's bare value | |
 | setting | `ctx/setting\|code` and `ctx/setting\|value` | `<root>/context/setting\|code` and `\|value` | `openehr` |
 
 Decode **MUST** accept either spelling of a field in the table, reading a real path whose segments carry the index `:0`, the template root's own segment included (`<root>:0/composer:0|name`), as the unindexed spelling and refusing any other index there: each of these attributes is single-valued, and OPT-free STRUCTURED → FLAT conversion writes every segment with an index.
@@ -944,9 +950,10 @@ The codecs **MUST**:
 
     No node name below the root has a key in the formats, so a coded name the template leaves open (a code from an external reference set, or several codes and no pinned text) comes back as `DV_TEXT`.
   - The fourth is an ordinal's terminology.
-    The formats carry the code and the ordinal value of a `DV_ORDINAL`, a leaf or a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, but not its symbol's terminology, and decode without the template rebuilds the symbol in `local`, as the reference does.
-    Where the `C_DV_ORDINAL` pairs the template has at that position for that code and value agree on one terminology, decode gives the symbol that terminology.
-    A `|raw` value keeps its own, and a `DV_SCALE` symbol stays in `local`, since the compiled template holds no pairs for it.
+    The formats carry the code and the ordinal value of a `DV_ORDINAL`, a leaf or a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, and its symbol's terminology only as an optional `|terminology`, which decode reads as written.
+    Without one, decode without the template rebuilds the symbol in `local`, as the reference does.
+    Where the `C_DV_ORDINAL` pairs the template has at that position for that code and value agree on one terminology, decode gives a symbol without `|terminology` that terminology, and **MUST** refuse a `|terminology` that names another, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+    A `|raw` value keeps its own, and a `DV_SCALE` symbol takes its `|terminology`, else `local`, since the compiled template holds no pairs for it.
     Encode writes a `local` symbol without its terminology, so one the template codes in another terminology at that code and value, a value the template refuses, comes back in the template's terminology: that round trip changes it.
   - The fifth is what a coded value leaves out, which the *Simplified Formats* spec lets a client omit where the template defines it.
     A `DV_CODED_TEXT` leaf, the `|code` substitution at a `DV_TEXT` leaf included, with no `|terminology` takes the terminology its `defining_code` constraint names, where the alternatives at its path agree on one.
@@ -1009,15 +1016,21 @@ Each applies at a **Web Template leaf** — reachable with no `_`-segment in the
 
 | Leaf datatype | Suffix set |
 |---|---|
-| DV_PARSABLE | bare value + `\|formalism`, both RM-mandatory, so a DV_PARSABLE at a leaf is always fully captured and never rides `\|raw`. Decode also reads the value spelled `\|value`, as the *Simplified Formats* spec lists it. Encode writes the bare value, except at INSTRUCTION `_wf_definition`, where it writes `\|value` (§ REQ-140). Its `_charset` / `_language` members are § REQ-140 rows |
+| DV_PARSABLE | bare value + `\|formalism`, both RM-mandatory, so a DV_PARSABLE at a leaf is always fully captured and never rides `\|raw`. Decode also reads the value spelled `\|value`, as the *Simplified Formats* spec lists it and *Input shorthands* below reads it at every datatype with a bare value. Encode writes the bare value, except at INSTRUCTION `_wf_definition`, where it writes `\|value` (§ REQ-140). Its `_charset` / `_language` members are § REQ-140 rows |
 | DV_MULTIMEDIA | the bare key is the **`uri`** (a plain DV_URI); `\|mediatype` and `\|size` are RM-mandatory; `\|data` and `\|integrity_check` carry the base64 of the RM's `Byte[]`; `\|alternatetext`, `\|integrity_check_algorithm`, `\|compression_algorithm` optional. Note the reference's spellings: `\|mediatype` and `\|alternatetext` carry no underscore where the RM attribute does. Its `_charset` / `_language` / `_thumbnail` members are § REQ-140 rows, and the bare-code rule for its three CODE_PHRASE-valued attributes is § REQ-140's *DV_MULTIMEDIA coded attributes* behavioural rule |
 | STRING | bare value only: a JSON string carrying the RM `String` as written, with no suffix. The Web Template gives one RM `String` attribute a leaf of its own, the in-context ACTIVITY `action_archetype_id`, which is RM-mandatory; the reference writes it at the leaf's bare key (`…/current_activity/action_archetype_id: "/openEHR-EHR-CLUSTER.conformance_action.v0/"` in the PROBE-086 corpus). Decode refuses an empty one, and encode leaves it out (*A value its RM class forbids*, above) |
 | DV_INTERVAL&lt;T&gt; | not a suffix set at all: the § REQ-140 **interval grammar** (`_normal_range`'s row and the *Interval boundary flags* rule govern it in both positions), anchored on the bound datatype the Web Template names inside the angle brackets (`DV_INTERVAL<DV_QUANTITY>`, …), the only place the anchor can come from. `/lower` and `/upper` are not Web Template children, so the leaf's own keys reach no node and the codec resolves them against the leaf itself. A value of another type rides `\|raw` at the leaf, as at every other leaf, and decode reads a `\|raw` there as the whole value, refusing it beside the interval's own keys |
 
+The *Simplified Formats* spec lists a `DV_PROPORTION`'s bare value as its magnitude, "calculated on output", and the reference writes it beside `|numerator` and `|denominator`.
+Decode **MUST** read it as a bare value, and **MUST** refuse one that differs from numerator/denominator by more than one part in a billion of that quotient, or that stands beside a zero denominator, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+The RM holds no magnitude, so without both a numerator and a denominator the bare value is the proportion missing them, and encode writes none.
+
 ##### Input shorthands
 
 The *Simplified Formats* spec lets a client leave out two suffixes.
-Decode **MUST** read a `DV_IDENTIFIER`'s bare value as its `|id` ("For the input |id might be left out"), and a `DV_TEXT`'s `|value`, where no `|code` selects a `DV_CODED_TEXT`, as its bare value, wherever the datatype is read.
+Decode **MUST** read a `DV_IDENTIFIER`'s bare value as its `|id` ("For the input |id might be left out"), wherever the datatype is read.
+Decode **MUST** read `|value` as the bare value of every datatype that has one, wherever the datatype is read: a `DV_TEXT`'s where no `|code` selects a `DV_CODED_TEXT`, and a STRUCTURED bare value beside its leaf's members (§ REQ-053, above).
+That covers an underscore attribute whose value is such a datatype, `_end_time`'s among them (§ REQ-140), but not `_uid` or `_location`, a UID and a String rather than data values, which stay bare-only, like the STRING leaf.
 Two spellings of one value that disagree are refused (§ REQ-170).
 Encode writes `|id` and the bare value.
 
@@ -1047,21 +1060,24 @@ The codecs **MUST** read and write each, in FLAT and in STRUCTURED:
 
 | Key | RM attribute | Value |
 |---|---|---|
-| `<event>\|sample_count`, at an EVENT or INTERVAL_EVENT node | INTERVAL_EVENT `sample_count` | an RM `Integer`, refused where it does not fit, as a suffix value is (above) |
-| `<event>/math_function`, at an EVENT node | INTERVAL_EVENT `math_function` | a DV_CODED_TEXT leaf |
-| `<event>/width`, at an EVENT node | INTERVAL_EVENT `width` | a DV_DURATION leaf |
+| `<event>\|sample_count`, at an EVENT or INTERVAL_EVENT node or a folded EVENT | INTERVAL_EVENT `sample_count` | an RM `Integer`, refused where it does not fit, as a suffix value is (above) |
+| `<event>/math_function`, at an EVENT node or a folded EVENT | INTERVAL_EVENT `math_function` | a DV_CODED_TEXT leaf |
+| `<event>/width`, at an EVENT node or a folded EVENT | INTERVAL_EVENT `width` | a DV_DURATION leaf |
 | `<observation>/history_origin` | `origin` of the OBSERVATION's `data` HISTORY | a DV_DATE_TIME leaf |
 
 An INTERVAL_EVENT node has `math_function` and `width` leaves of its own.
-Decode **MUST** rebuild an event at an EVENT node as an INTERVAL_EVENT where the body gives it any of the three INTERVAL_EVENT keys, and as a POINT_EVENT otherwise.
+A folded EVENT is the abstract EVENT the Web Template lifts into its OBSERVATION's node, one that occurs at most once ([clinical-modeling.md § *Output shape*](clinical-modeling.md#output-shape)); its `<event>` is the OBSERVATION's path, as the reference writes it.
+Decode **MUST** rebuild an event at an EVENT node or a folded EVENT as an INTERVAL_EVENT where the body gives it any of the three INTERVAL_EVENT keys, and as a POINT_EVENT otherwise.
 Each key is single-valued, so an index past `:0` on it is past its bound (§ REQ-170).
 
 Encode **MUST** write:
 
 - `|sample_count` where the INTERVAL_EVENT holds one;
-- `math_function` and `width` for an INTERVAL_EVENT at an EVENT node;
+- `math_function` and `width` for an INTERVAL_EVENT at an EVENT node or a folded EVENT;
 - `history_origin`, unless the origin sets `value` alone and that value is, as written, the earliest time its events carry, the origin decode gives a HISTORY with no `history_origin`; an origin that sets any other attribute, such as `magnitude_status`, is written.
 
+Where an EVENT node, or the OBSERVATION node a folded EVENT is spelled at, has a child whose `id` is `math_function` or `width`, that key is the child's, which decode reads as the child, so encode refuses an INTERVAL_EVENT there, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+An OBSERVATION that folds in two or more EVENTs gives the three keys to none of them: decode reads them there as unmatched content (§ REQ-170), and encode refuses an INTERVAL_EVENT among those events that holds any of the three, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
 Every other spelling of the four, such as `<event>/sample_count` or `<observation>|history_origin`, is unmatched content (§ REQ-170).
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
@@ -1104,9 +1120,10 @@ The codec **MUST** support, in **both** directions — encode emitting every pop
 | | `_provider` | PARTY_PROXY (below) — the party grammar, with PARTY_SELF spelled by `\|_type` |
 | ISM_TRANSITION (an ACTION's in-context `ism_transition` node or a per-step `ism_transition[atNNNN]` node) | `_reason:N` | DV_TEXT — the DV_TEXT leaf grammar, one key per reason; the corpus writes the bare value |
 | INSTRUCTION | `_wf_definition` | DV_PARSABLE per [§ REQ-053 *Leaf datatypes*](#leaf-datatypes) — written `\|value` + `\|formalism`, the spelling of ITS-REST 1.1.0 *Simplified Formats* § INSTRUCTION and of the corpus; decode reads the value bare too |
+| ACTION | `_instruction_details` | INSTRUCTION_DETAILS — `\|composition_uid` and `\|activity_id`, both RM-mandatory, and `\|path`. Decode builds `instruction_id` as a LOCATABLE_REF of namespace `local` and type `INSTRUCTION`, its `id` a HIER_OBJECT_ID from `\|composition_uid` and its `path` from `\|path`, an empty `\|path` read as absent. Encode writes `\|path` only when it is not empty. Any other suffix is unmatched content, the reference's `\|instruction_uid`, `\|wt_path`, `\|instruction_index` and `\|activity_index` among them |
 | EVENT_CONTEXT (under the real `context` segment) | `_health_care_facility` | PARTY_IDENTIFIED (below) |
 | | `_participation:N` | PARTICIPATION (below) |
-| | `_end_time` | bare value (DV_DATE_TIME) |
+| | `_end_time` | bare value (DV_DATE_TIME), which decode also reads as `\|value` (§ REQ-053 *Input shorthands*) |
 | | `_location` | bare value (String) |
 | DV_ORDERED leaf | `_normal_range` | DV_INTERVAL — `/lower` + `/upper` carrying the anchor datatype's own suffix form, `\|lower_included`, `\|upper_included`, `\|lower_unbounded`, `\|upper_unbounded` |
 | | `_other_reference_ranges:N` | REFERENCE_RANGE — the interval grammar (the RM's intervening `range` level **elided**) + `/meaning` (DV_TEXT / DV_CODED_TEXT) |
@@ -1151,9 +1168,9 @@ STRUCTURED carries the same vocabulary as nested members (`_`-keys as object mem
 
 #### DV_SCALE
 
-**DV_SCALE** takes the `DV_ORDINAL` suffix set — `|code` + `|value` + `|ordinal`, with `|ordinal` carrying DV_SCALE's **Real** `value`.
-The two classes differ only in that value's type, so decode **MUST** read, and encode write, the same three keys at a `DV_SCALE` leaf as at a `DV_ORDINAL` one.
-*Not corpus-pinned:* no vendored body and no reference sample spells a `DV_SCALE`, so this is this codec's choice within the format's conventions — the same standing as the STRUCTURED `"|"` member — and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears.
+**DV_SCALE** takes the `DV_ORDINAL` suffix set — `|code` + `|value` + `|ordinal`, with `|ordinal` carrying DV_SCALE's **Real** `value`, and the optional `|terminology` decode reads at both (§ REQ-053).
+The two classes differ only in that value's type, so decode **MUST** read, and encode write, the same keys at a `DV_SCALE` leaf as at a `DV_ORDINAL` one.
+*Not corpus-pinned:* no vendored body and no reference sample spells a `DV_SCALE`, so this is this codec's choice within the format's conventions, and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears.
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
 #### Interval boundary flags
@@ -1205,11 +1222,12 @@ That suffix is the reference's own spelling of the same RM attribute in the OBJE
 
 A nested value the grammar reaches through a *datatype* position — an interval bound, a REFERENCE_RANGE `/meaning`, a `_charset`, a `_thumbnail`, an `original_content`, a `_wf_definition` — is read and written by that datatype's own leaf rules, except that a `_wf_definition` writes its value as `|value` (its row above).
 One whose extras the suffix set cannot carry therefore rides `|raw` **at its own key** rather than being refused: a thumbnail carrying its own charset is `_thumbnail|raw`, an `original_content` carrying one is `original_content|raw`.
-The families that reach a value through a *non-datatype* position instead (a party, a PARTICIPATION, a LINK, a FEEDER_AUDIT_DETAILS scalar) have no such carrier, and there every shape the suffixes cannot express **MUST** be a typed error.
+The families that reach a value through a *non-datatype* position instead (a party, a PARTICIPATION, a LINK, a FEEDER_AUDIT_DETAILS scalar, an INSTRUCTION_DETAILS) have no such carrier, and there every shape the suffixes cannot express **MUST** be a typed error.
+For an INSTRUCTION_DETAILS those shapes are an `instruction_id` whose namespace is not `local` or whose type is not `INSTRUCTION`, an `id` that is not a HIER_OBJECT_ID, and a `wf_details`.
 
 #### Deliberate exclusions
 
-Deliberate exclusions **MUST** be refused in both directions with a typed error naming the key, never decoded and dropped: PARTICIPATION `time`; FEEDER_AUDIT_DETAILS `other_details`; `_instruction_details` (ACTION), which the spec names and the pinned corpus does not exercise, **deferred** as a typed refusal.
+Deliberate exclusions **MUST** be refused in both directions with a typed error naming the key, never decoded and dropped: PARTICIPATION `time` and FEEDER_AUDIT_DETAILS `other_details`.
 
 ## AQL
 

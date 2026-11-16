@@ -63,8 +63,8 @@ var suffixAttrPaths = map[string]map[string]string{
 	"DV_QUANTITY":   {"magnitude": "magnitude", "unit": "units"},
 	"DV_COUNT":      {"": "magnitude"},
 	"DV_BOOLEAN":    {"": "value"},
-	"DV_ORDINAL":    {"code": "symbol/defining_code/code_string", "value": "symbol/value", "ordinal": "value"},
-	"DV_SCALE":      {"code": "symbol/defining_code/code_string", "value": "symbol/value", "ordinal": "value"},
+	"DV_ORDINAL":    {"code": "symbol/defining_code/code_string", "value": "symbol/value", "ordinal": "value", "terminology": "symbol/defining_code/terminology_id/value"},
+	"DV_SCALE":      {"code": "symbol/defining_code/code_string", "value": "symbol/value", "ordinal": "value", "terminology": "symbol/defining_code/terminology_id/value"},
 	"DV_PROPORTION": {"numerator": "numerator", "denominator": "denominator", "type": "type"},
 	"DV_IDENTIFIER": {"": "id", "id": "id", "issuer": "issuer", "assigner": "assigner", "type": "type"},
 	"CODE_PHRASE":   {"code": "code_string", "terminology": "terminology_id/value", "preferred_term": "preferred_term"},
@@ -75,6 +75,14 @@ var suffixAttrPaths = map[string]map[string]string{
 		"integrity_check_algorithm": "integrity_check_algorithm/code_string",
 		"compression_algorithm":     "compression_algorithm/code_string",
 	},
+}
+
+// derivedSuffixFits are the fits of the suffixes that spell an RM function of
+// a datatype's attributes rather than an attribute, which rminfo does not
+// resolve: a DV_PROPORTION's bare value, its magnitude, a Real. Decode checks
+// such a value against the attributes it derives from and stores nothing.
+var derivedSuffixFits = map[string]map[string]valueFit{
+	"DV_PROPORTION": {"": {attr: "DV_PROPORTION.magnitude", bmmType: "Real"}},
 }
 
 // valueFit is the RM attribute a suffix value fills: attr names it
@@ -99,6 +107,10 @@ var suffixFits = func() map[string]map[string]valueFit {
 		}
 		fits := make(map[string]valueFit, len(suffixes))
 		for suffix := range suffixes {
+			if fit, derived := derivedSuffixFits[rmType][suffix]; derived {
+				fits[suffix] = fit
+				continue
+			}
 			path, own := suffixAttrPaths[rmType][suffix]
 			if !own {
 				path = orderedSuffixAttrPaths[suffix]

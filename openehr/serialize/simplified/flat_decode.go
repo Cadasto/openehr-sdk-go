@@ -272,11 +272,13 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		}
 		// A key at an ELEMENT with value types reads as its first one.
 		leaf := valueLeaf(node)
-		if v, spelled := groups[base][sampleCountSuffix]; spelled && carriesSampleCount(leaf) {
-			// An event's sample count is a suffix on its node, which has no
-			// value of its own (REQ-053).
+		v, spelled := groups[base][sampleCountSuffix]
+		if event, carried := sampleCountEvent(leaf); spelled && carried {
+			// An event's sample count is a suffix on its node, or on the
+			// OBSERVATION node that folds the event in, which has no value of
+			// its own (REQ-053).
 			delete(groups[base], sampleCountSuffix)
-			if err := placeSampleCount(compJSON, sib.nodePath(leaf), leaf.AQLPath, predIndex, predType, v, keyOf(sampleCountSuffix), budget, tmpl, sib); err != nil {
+			if err := placeSampleCount(compJSON, sib.nodePath(event), event.AQLPath, predIndex, predType, v, keyOf(sampleCountSuffix), budget, tmpl, sib); err != nil {
 				return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 			}
 			if len(groups[base]) == 0 {
@@ -319,7 +321,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 				return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 			}
 			if nodeRMType(leaf) == "DV_ORDINAL" {
-				settleOrdinalTerminology(dv, tmpl.ordinalTerminologies(key))
+				if err := settleOrdinalTerminology(dv, tmpl.ordinalTerminologies(key)); err != nil {
+					return nil, fmt.Errorf("simplified: decode %q: %w", keyOf("terminology"), err)
+				}
 			}
 		}
 	}
@@ -439,10 +443,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 // and a null key is never refused for want of a carrier. A key the decode
 // does not read goes to sink whatever its value.
 //
-// A bare "" at a leaf of [unsetStringType] is absent the same way where no
-// other key of the leaf the decode reads holds a value and decorated is
-// false: encode writes no key for that value, so a decode, encode and decode
-// keeps the composition (REQ-053). decorated reports whether an underscore
+// A bare "" at a leaf of [unsetStringType], spelled as the bare key or as its
+// |value, is absent the same way where no other key of the leaf the decode
+// reads holds a value and decorated is false: encode writes no key for that
+// value, so a decode, encode and decode keeps the composition (REQ-053).
+// decorated reports whether an underscore
 // family decorates the leaf's value ([decoratesValue]); one keeps the "", as
 // a suffix does, since a decoration with no value is refused.
 func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink, decorated bool) (map[string]any, error) {
@@ -496,10 +501,18 @@ func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string)
 }
 
 // unsetBareValue reports whether sfx, the suffixes the decode reads at a leaf
-// of rmType, is a bare "" alone at one of [unsetStringType].
+// of rmType, is a bare "" alone at one of [unsetStringType], spelled as the
+// bare key, as its [bareValueSuffix], or as both.
 func unsetBareValue(rmType string, sfx map[string]any) bool {
-	v, bare := sfx[""]
-	return bare && len(sfx) == 1 && v == "" && unsetStringType(rmType)
+	if len(sfx) == 0 || !unsetStringType(rmType) {
+		return false
+	}
+	for suffix, v := range sfx {
+		if (suffix != "" && suffix != bareValueSuffix) || v != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // decoratingFamilies returns the families of the underscore groups that hold
@@ -1045,6 +1058,14 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// Template carries a node for the segment (REQ-170).
 		if overIndexed {
 			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
+		}
+		// |value spells the bare value of a datatype that has one, so at a
+		// real path whose bare key is an alias, the start time's, it is that
+		// alias, and a second spelling of the field (REQ-053).
+		if base, spelled := strings.CutSuffix(rel, "|"+bareValueSuffix); spelled && readsBareValue(metadataOwnedBaseType[base]) {
+			if _, isAlias := metadataAliases[base]; isAlias {
+				rel = base
+			}
 		}
 		// A witness, an alias or a suffix of a ctx/-owned leaf that holds null
 		// is absent (REQ-053), so it neither conflicts with another spelling
@@ -1637,8 +1658,9 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 			// Template has no node ([codecLeaf]). Each is single-valued, so an
 			// index past :0 on it is past its bound whatever follows it, and it
 			// is a leaf, so a segment below it resolves nothing. An
-			// INTERVAL_EVENT attribute under an abstract EVENT makes the event
-			// an INTERVAL_EVENT (REQ-053).
+			// INTERVAL_EVENT attribute of an abstract EVENT, at its node or
+			// at the OBSERVATION node that folds it in, makes the event an
+			// INTERVAL_EVENT (REQ-053).
 			leaf := codecLeaf(node, seg.id)
 			switch {
 			case leaf == nil:
@@ -1648,8 +1670,8 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 			case i != len(segs)-2:
 				return nil, nil, nil, errSegNotFound
 			}
-			if intervalEventLeaf(node, leaf) {
-				predType[bareAQLPath(node.AQLPath)] = "INTERVAL_EVENT"
+			if event, ok := intervalEventOf(node, leaf); ok {
+				predType[bareAQLPath(event)] = "INTERVAL_EVENT"
 			}
 			return leaf, predIndex, predType, nil
 		}
@@ -2586,7 +2608,9 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		if err := tmpl.completeCodedValue(value[end], key+"/"+end); err != nil {
 			return fmt.Errorf("simplified: decode %q: %w", g.prefix()+"/"+end, err)
 		}
-		settleOrdinalTerminology(value[end], tmpl.ordinalTerminologies(key+"/"+end))
+		if err := settleOrdinalTerminology(value[end], tmpl.ordinalTerminologies(key+"/"+end)); err != nil {
+			return fmt.Errorf("simplified: decode %q: %w", g.key(subTail(end, "terminology")), err)
+		}
 	}
 	return nil
 }
@@ -4236,7 +4260,7 @@ func dvFromSuffixesWith(holds, rmType string, listOpen bool, sfx map[string]any,
 	// (a decode with the template completes the coded text as it completes any
 	// other, [templateIndex.completeCodedValue]).
 	// Without |code the leaf stays a plain DV_TEXT, whose |value is its bare
-	// value ([shorthandSpellings]), and a stray |terminology is refused by the
+	// value ([foldBareValue]), and a stray |terminology is refused by the
 	// allowlist below, as before. The encoder is the exact inverse:
 	// leafToFlat routes a fully-captured DV_CODED_TEXT at a DV_TEXT leaf to the
 	// coded suffix set instead of |raw.
@@ -4262,10 +4286,14 @@ func dvFromSuffixesWith(holds, rmType string, listOpen bool, sfx map[string]any,
 	if err := checkSuffixAllowlist(rmType, sfx); err != nil {
 		return nil, err
 	}
+	sfx, keyOf, err := foldBareValue(rmType, sfx, keyOf)
+	if err != nil {
+		return nil, err
+	}
 	if err := checkSuffixFits(rmType, sfx, keyOf); err != nil {
 		return nil, err
 	}
-	sfx, err := foldShorthand(rmType, sfx, keyOf)
+	sfx, err = foldShorthand(rmType, sfx, keyOf)
 	if err != nil {
 		return nil, err
 	}
@@ -4348,16 +4376,15 @@ func dvFromSuffixesWith(holds, rmType string, listOpen bool, sfx map[string]any,
 		if err != nil {
 			return nil, err
 		}
-		// The suffixes carry no terminology for the symbol: it is rebuilt in
-		// "local", as the reference does, and a WithTemplate decode then gives
-		// it the template's ([settleOrdinalTerminology]).
-		symbol := map[string]any{
-			"_type": "DV_CODED_TEXT",
-			"defining_code": map[string]any{
-				"_type": "CODE_PHRASE", "code_string": code,
-				"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "local"},
-			},
+		// The symbol's terminology is the body's |terminology. Without one, a
+		// decode without the template rebuilds it in "local", as the
+		// reference does, and one with the template leaves it to
+		// [settleOrdinalTerminology], which gives it the template's.
+		dc := map[string]any{"_type": "CODE_PHRASE", "code_string": code}
+		if t, named := symbolTerminology(sfx, deferred); named {
+			dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
 		}
+		symbol := map[string]any{"_type": "DV_CODED_TEXT", "defining_code": dc}
 		if valued {
 			symbol["value"] = val
 		}
@@ -4367,8 +4394,10 @@ func dvFromSuffixesWith(holds, rmType string, listOpen bool, sfx map[string]any,
 		}
 		return dv, nil
 	case "DV_SCALE":
-		// The DV_ORDINAL grammar one class over: same symbol, same three
-		// suffixes, `|ordinal` carrying DV_SCALE's Real `value` (scaleToFlat).
+		// The DV_ORDINAL grammar one class over: same symbol, same suffixes,
+		// `|ordinal` carrying DV_SCALE's Real `value` (scaleToFlat). The
+		// compiled template holds no pairs for a scale, so its symbol's
+		// terminology is the body's |terminology, else "local".
 		code, err := requireSuffix(rmType, sfx, "code")
 		if err != nil {
 			return nil, err
@@ -4381,11 +4410,12 @@ func dvFromSuffixesWith(holds, rmType string, listOpen bool, sfx map[string]any,
 		if err != nil {
 			return nil, err
 		}
+		t, _ := symbolTerminology(sfx, false)
 		symbol := map[string]any{
 			"_type": "DV_CODED_TEXT", "value": val,
 			"defining_code": map[string]any{
 				"_type": "CODE_PHRASE", "code_string": code,
-				"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "local"},
+				"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": t},
 			},
 		}
 		return map[string]any{"_type": "DV_SCALE", "value": scale, "symbol": symbol}, nil
@@ -4401,6 +4431,13 @@ func dvFromSuffixesWith(holds, rmType string, listOpen bool, sfx map[string]any,
 		typ, err := requireSuffix(rmType, sfx, "type")
 		if err != nil {
 			return nil, err
+		}
+		// The bare value is the proportion's magnitude, an RM function of
+		// the numerator and the denominator: it holds nothing the value
+		// does, so it is checked against them and not stored.
+		if magnitude, given := sfx[""]; given && !proportionMagnitudeAgrees(magnitude, num, den) {
+			return nil, fmt.Errorf("%w: %s is not the DV_PROPORTION's numerator divided by its denominator",
+				ErrUnsupportedDatatype, suffixLabel(keyOf, ""))
 		}
 		dv := map[string]any{"_type": "DV_PROPORTION", "numerator": num, "denominator": den, "type": typ}
 		if err := applyOrderedSuffixes(dv, sfx); err != nil {
@@ -4554,10 +4591,10 @@ var allowedSuffixes = map[string]map[string]bool{
 	},
 	"DV_COUNT":   {"": true, "magnitude_status": true, "normal_status": true, "accuracy": true, "accuracy_is_percent": true},
 	"DV_BOOLEAN": {"": true},
-	"DV_ORDINAL": {"code": true, "value": true, "ordinal": true},
-	"DV_SCALE":   {"code": true, "value": true, "ordinal": true},
+	"DV_ORDINAL": {"code": true, "value": true, "ordinal": true, "terminology": true},
+	"DV_SCALE":   {"code": true, "value": true, "ordinal": true, "terminology": true},
 	"DV_PROPORTION": {
-		"numerator": true, "denominator": true, "type": true,
+		"": true, "numerator": true, "denominator": true, "type": true,
 		"magnitude_status": true, "normal_status": true,
 		"accuracy": true, "accuracy_is_percent": true, "precision": true,
 	},
@@ -4571,6 +4608,43 @@ var allowedSuffixes = map[string]map[string]bool{
 	},
 }
 
+// magnitudeTolerance is how far a DV_PROPORTION's bare value may lie from
+// numerator/denominator, relative to it, and still agree with it
+// ([proportionMagnitudeAgrees]). The reference writes the double the division
+// gives, which agrees to the last bit; one part in a billion also admits a
+// producer that divides in decimal, and refuses a value rounded to fewer
+// digits.
+const magnitudeTolerance = 1e-9
+
+// proportionMagnitudeAgrees reports whether magnitude, a DV_PROPORTION's bare
+// value, is num/den to within [magnitudeTolerance] of it, each read as
+// canonical JSON reads an RM Real. A zero denominator gives no magnitude, so
+// no value agrees with it.
+func proportionMagnitudeAgrees(magnitude, num, den any) bool {
+	m, okM := realOf(magnitude)
+	n, okN := realOf(num)
+	d, okD := realOf(den)
+	if !okM || !okN || !okD || d == 0 {
+		return false
+	}
+	want := n / d
+	return math.Abs(m-want) <= magnitudeTolerance*math.Abs(want)
+}
+
+// realOf reads v, a decoded JSON value that fits an RM Real, as canonical JSON
+// reads one: a number, or a numeric string.
+func realOf(v any) (float64, bool) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return 0, false
+	}
+	var r rm.Real
+	if r.UnmarshalJSON(b) != nil {
+		return 0, false
+	}
+	return float64(r), true
+}
+
 // shorthandSpelling is a second spelling decode reads for one attribute of a
 // datatype: short is the suffix ("" for the bare value) a client may write in
 // place of full, the suffix encode writes.
@@ -4579,13 +4653,76 @@ type shorthandSpelling struct {
 }
 
 // shorthandSpellings are the input shorthands of the ITS-REST 1.1.0
-// Simplified Formats: a DV_IDENTIFIER's id may be written as the bare value
-// ("For the input |id might be left out"), and a DV_TEXT's or a DV_PARSABLE's
-// value as `|value`. Decode reads either spelling; encode writes full only.
+// Simplified Formats a datatype has of its own: a DV_IDENTIFIER's id may be
+// written as the bare value ("For the input |id might be left out"). Decode
+// reads either spelling; encode writes full only. The shorthand every
+// datatype with a bare value has, `|value`, is [foldBareValue]'s.
 var shorthandSpellings = map[string]shorthandSpelling{
 	"DV_IDENTIFIER": {short: "", full: "id", attr: "id"},
-	"DV_TEXT":       {short: "value", full: "", attr: "value"},
-	"DV_PARSABLE":   {short: "value", full: "", attr: "value"},
+}
+
+// bareValueSuffix is the suffix that spells the bare value of every datatype
+// that has one ([readsBareValue]): an input shorthand the ITS-REST 1.1.0
+// Simplified Formats list for DV_TEXT and DV_PARSABLE, and the member the
+// reference writes a bare value as in STRUCTURED beside the leaf's suffixes.
+const bareValueSuffix = "value"
+
+// readsBareValue reports whether rmType has a bare value, which its
+// [bareValueSuffix] spells a second time. The datatypes with a `|value` of
+// their own, DV_CODED_TEXT, DV_ORDINAL and DV_SCALE, have none.
+func readsBareValue(rmType string) bool {
+	return allowedSuffixes[rmType][""]
+}
+
+// readsSuffix reports whether decode reads suffix ("" for the bare value) at
+// a value of rmType: one in its [allowedSuffixes], or [bareValueSuffix] where
+// it has a bare value.
+func readsSuffix(rmType, suffix string) bool {
+	return allowedSuffixes[rmType][suffix] || (suffix == bareValueSuffix && readsBareValue(rmType))
+}
+
+// foldBareValue reads the [bareValueSuffix] in sfx, a suffix map of rmType
+// with no nulls left, as the bare value where rmType has one
+// ([readsBareValue]). The map returned holds it under "", and the key
+// function returned names the key it arrived under. Both spellings may be
+// present when they hold the same value; two that differ are refused naming
+// both keys and neither value, rather than one being chosen (REQ-053). Each
+// value is first checked against its RM attribute, so a value that does not
+// fit is refused as [checkSuffixFits] refuses it. sfx and keyOf come back
+// unchanged when there is nothing to fold.
+func foldBareValue(rmType string, sfx map[string]any, keyOf func(string) string) (map[string]any, func(string) string, error) {
+	v, spelled := sfx[bareValueSuffix]
+	if !spelled || !readsBareValue(rmType) {
+		return sfx, keyOf, nil
+	}
+	out := maps.Clone(sfx)
+	delete(out, bareValueSuffix)
+	spelledKey := keyOf
+	if keyOf != nil {
+		spelledKey = func(suffix string) string {
+			if suffix == "" {
+				return keyOf(bareValueSuffix)
+			}
+			return keyOf(suffix)
+		}
+	}
+	// The other suffixes sort before |value, so they are judged first, as
+	// one check over the whole map judges them.
+	if err := checkSuffixFits(rmType, out, keyOf); err != nil {
+		return nil, nil, err
+	}
+	if err := checkSuffixFits(rmType, map[string]any{"": v}, spelledKey); err != nil {
+		return nil, nil, err
+	}
+	if w, both := out[""]; both {
+		if !sameCtxValue(v, w) {
+			return nil, nil, fmt.Errorf("%w: %s and %s spell the %s bare value twice and disagree; remove one",
+				ErrUnknownPath, suffixLabel(keyOf, ""), suffixLabel(keyOf, bareValueSuffix), rmType)
+		}
+		return out, keyOf, nil
+	}
+	out[""] = v
+	return out, spelledKey, nil
 }
 
 // foldShorthand rewrites the shorthand spelling in sfx, a suffix map of rmType
@@ -4660,14 +4797,14 @@ func applyOrderedSuffixes(dv, sfx map[string]any) error {
 // checkSuffixAllowlist rejects any suffix a datatype does not map, naming the
 // first such suffix in sorted order, so a leaf with two names the same one on
 // every run. An unmapped rmType is left to the switch (ErrUnsupportedDatatype).
-// |other is allowed only for DV_CODED_TEXT (the case then enforces listOpen).
+// |other is allowed only for DV_CODED_TEXT (the case then enforces listOpen),
+// and |value at every datatype with a bare value ([readsSuffix]).
 func checkSuffixAllowlist(rmType string, sfx map[string]any) error {
-	allowed, known := allowedSuffixes[rmType]
-	if !known {
+	if _, known := allowedSuffixes[rmType]; !known {
 		return nil
 	}
 	unexpected := func(k string) bool {
-		return !allowed[k] && (k != "other" || rmType != "DV_CODED_TEXT")
+		return !readsSuffix(rmType, k) && (k != "other" || rmType != "DV_CODED_TEXT")
 	}
 	first, refused := "", false
 	for k := range sfx {
@@ -4685,28 +4822,52 @@ func checkSuffixAllowlist(rmType string, sfx map[string]any) error {
 	return fmt.Errorf("%w: unexpected %s for %s", ErrUnsupportedDatatype, label, rmType)
 }
 
-// settleOrdinalTerminology gives the symbol of dv, a DV_ORDINAL decode built
-// from its suffixes in local, the terminology terms gives its code at its
-// ordinal value, where it gives one (REQ-053): the formats carry an ordinal's
-// code and value but not its terminology, and a WithTemplate decode takes it
-// from the template's C_DV_ORDINAL. dv has been placed already; the symbol is
-// changed in place.
+// symbolTerminology returns the terminology the symbol of an ordinal or a
+// scale built from sfx takes: its |terminology where the body gives one, and
+// otherwise "local", as the reference rebuilds it, unless deferred, where a
+// decode with the template settles it ([settleOrdinalTerminology]) and named
+// is false.
+func symbolTerminology(sfx map[string]any, deferred bool) (t any, named bool) {
+	if t, named = sfx["terminology"]; named || deferred {
+		return t, named
+	}
+	return "local", true
+}
+
+// settleOrdinalTerminology settles the terminology of the symbol of dv, a
+// DV_ORDINAL built from its suffixes, by terms, the terminology the template's
+// C_DV_ORDINAL pairs give each code and ordinal value (REQ-053). A symbol that
+// names none, since the body gives no |terminology, takes the one terms gives
+// its code at its value, and "local", as the reference rebuilds it, where
+// terms gives none. One the body names is kept, and refused, wrapping
+// [ErrUnsupportedDatatype], where terms gives its code and value another: the
+// template contradicts it. dv has been placed already; the symbol is changed
+// in place.
 //
 // The value is read as canonical JSON reads an Integer, from a JSON number or
 // a numeric string. One that is no Integer is refused when the tree is
 // decoded, so the terminology it would take does not matter.
-func settleOrdinalTerminology(dv any, terms map[ordinalPair]string) {
+func settleOrdinalTerminology(dv any, terms map[ordinalPair]string) error {
 	m, _ := dv.(map[string]any)
 	symbol, _ := m["symbol"].(map[string]any)
 	code, _ := symbol["defining_code"].(map[string]any)
+	if code == nil {
+		return nil
+	}
 	codeString, _ := code["code_string"].(string)
-	value, err := strconv.ParseFloat(fmt.Sprint(m["value"]), 64)
-	if err != nil {
-		return
+	t := ""
+	if value, err := strconv.ParseFloat(fmt.Sprint(m["value"]), 64); err == nil {
+		t = terms[ordinalPair{code: codeString, value: int(value)}]
 	}
-	if t := terms[ordinalPair{code: codeString, value: int(value)}]; t != "" {
-		code["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
+	named, given := code["terminology_id"].(map[string]any)
+	switch {
+	case !given:
+		code["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": cmp.Or(t, "local")}
+	case t != "" && named["value"] != t:
+		return fmt.Errorf("%w: the DV_ORDINAL's terminology is not the one the template gives its code and ordinal value",
+			ErrUnsupportedDatatype)
 	}
+	return nil
 }
 
 // leafListOpen reports whether a Web Template leaf constrains an open value-set

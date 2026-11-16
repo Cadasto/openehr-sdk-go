@@ -686,6 +686,7 @@ Its client scenarios map to SDK coverage as follows:
   Why each spelling is held out, and why the match is suffix-aware, is in [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md) § How the exclusion list is produced.
 
   Within the modelled subset the re-encode reproduces the upstream path set with equal leaf values: a dropped, invented or altered key is a failure, and there is no tolerated-drop list.
+  The one key decode reads and encode does not write, a DV_PROPORTION's bare value ([wire.md § REQ-053](wire.md#req-053) *Leaf datatypes*), is compared with the `|numerator` divided by the `|denominator` the re-encode wrote, to the codec's tolerance, so a value that disagrees is a failure too.
   The excluded set is derived from what the codec itself reports as unmatched content and from its own decode refusals, never kept by hand, and each refusal removes only what it names.
   The harness package's own tests pin the excluded and compared counts per fixture, so the unmodelled surface can shrink deliberately but never grow unnoticed.
   A fixture that compares **nothing** fails: exact agreement over an empty compared set is vacuous.
@@ -701,7 +702,7 @@ Its client scenarios map to SDK coverage as follows:
   Per grammar family:
   (a) **decode**: a FLAT body carrying the family's keys decodes into the typed RM attribute (never a `|raw` detour), and re-encoding reproduces the input as a [wire-equivalent](#terms) document.
   (b) **encode**: a composition populated with the attribute emits exactly the family's key set: no silent drop, and no `|raw` fallback where the grammar carries the value.
-  (c) **refusals**: the `_instruction_details` keys fail with typed errors naming the key, and are never decoded and dropped.
+  (c) **refusals**: the keys of a deliberate exclusion fail with typed errors naming the key, and are never decoded and dropped.
   (d) **STRUCTURED**: the same fixtures interconvert FLAT ↔ STRUCTURED preserving the underscore vocabulary (`_`-keys as members, arrays for `:N`).
   The PROBE-086 census moves in step: the `path not in web template` excluded family shrinks by the underscore keys a family carries, and the per-fixture compared and excluded pins are re-baselined in the same change, so a family whose corpus keys stay excluded fails this probe rather than becoming a census footnote.
 - **Modes:** In-repo (round-trip property against vendored fixtures; no backend).

@@ -400,7 +400,6 @@ func TestREQ170CarrierlessKeysRefusedInEveryMode(t *testing.T) {
 			rmattrObs + "/_feeder_audit/originating_system_audit|system_id":     "orig",
 			rmattrObs + "/_feeder_audit/originating_system_audit|other_details": "boom",
 		}, ErrUnsupportedDatatype},
-		{"_instruction_details", map[string]any{rmattrAction + "/_instruction_details|activity_id": "activities[at0001]"}, ErrUnknownPath},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := refusedInEveryMode(t, wt, rmattrBody(tc.keys))
@@ -435,6 +434,12 @@ func TestREQ170MalformedMatchedContentRefusedInEveryMode(t *testing.T) {
 		// required suffix.
 		{"wf_definition without its formalism", map[string]any{
 			rmattrSection + "/conformance_instruction/_wf_definition|value": "wf",
+		}},
+		// `_instruction_details` sat in the carrier-less table while the family
+		// was deferred; it is an INSTRUCTION_DETAILS now, and one without its
+		// composition_uid is a missing required suffix.
+		{"instruction_details without its composition_uid", map[string]any{
+			rmattrAction + "/_instruction_details|activity_id": "activities[at0001]",
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1289,8 +1294,9 @@ func TestREQ170StrictWithReportPassesTheFirstPath(t *testing.T) {
 // missing every suffix it requires, and a bare ctx/setting that is neither a
 // code nor a rubric of the openEHR setting group names no setting (REQ-053):
 // both fail by default, under the report option and under strict, naming no
-// value. Beside a suffix the datatype reads, DV_PROPORTION's derived bare
-// magnitude stays unmatched content.
+// value. A DV_PROPORTION's bare value is its magnitude, which it holds nothing
+// beside: alone it is the proportion missing its numerator, refused the same
+// way, and beside its numerator and denominator it is read, nothing unmatched.
 func TestREQ170LoneBareValueIsAMissingSuffix(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const secret = "secret-value-0451"
@@ -1301,6 +1307,7 @@ func TestREQ170LoneBareValueIsAMissingSuffix(t *testing.T) {
 		"DV_CODED_TEXT": rmattrBody(map[string]any{rmattrCodedText: secret}),
 		"DV_QUANTITY":   quantity,
 		"DV_ORDINAL":    rmattrBody(map[string]any{rmattrEvent + "/dv_ordinal": secret}),
+		"DV_PROPORTION": rmattrBody(map[string]any{rmattrProportion: 0.5}),
 		"ctx/setting":   rmattrBody(map[string]any{"ctx/setting": secret}),
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -1314,12 +1321,20 @@ func TestREQ170LoneBareValueIsAMissingSuffix(t *testing.T) {
 		})
 	}
 	t.Run("DV_PROPORTION bare beside its numerator", func(t *testing.T) {
-		assertUnmatched(t, wt, rmattrBody(map[string]any{
+		operands := rmattrBody(map[string]any{
 			rmattrProportion + "|numerator":   1,
 			rmattrProportion + "|denominator": 2,
 			rmattrProportion + "|type":        0,
-			rmattrProportion:                  0.5,
-		}), rmattrProportion)
+		})
+		withBare := maps.Clone(operands)
+		withBare[rmattrProportion] = 0.5
+		got, err := UnmarshalFlat(mustJSON(t, withBare), wt, WithStrict())
+		if err != nil {
+			t.Fatalf("UnmarshalFlat(strict) = %v, want the bare value read", err)
+		}
+		if want := decodeRMAttr(t, wt, operands); !bytes.Equal(canonical(t, got), canonical(t, want)) {
+			t.Errorf("decoded\n%s\nwant what the numerator and denominator alone give\n%s", canonical(t, got), canonical(t, want))
+		}
 	})
 }
 
