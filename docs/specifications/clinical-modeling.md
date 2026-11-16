@@ -417,7 +417,7 @@ comp.ArchetypeNodeID matches the OPT root's archetype id.
 
 - RM-mandatory attrs at the root (Category, Composer, Language, Territory);
 - template-driven existence checks at every OPT node whose attribute existence lower bound is ≥ 1;
-- a multi-valued attribute fails that check when its list is absent, and when it is present and empty only where the template asks for a member there too: its cardinality lower bound, or the occurrences lower bound of a child it allows, is ≥ 1, or the list is one the floor holds non-empty once present (*An existence lower bound alone asks for no member* below).
+- a multi-valued attribute fails that check as [*Multi-valued attributes*](#multi-valued-attributes) below says.
 
 #### Structural — prohibited attributes
 
@@ -427,12 +427,7 @@ Under a single-valued attribute, a child that is not allowed binds no value: the
 
 #### Structural — child cardinality
 
-For each C_MULTIPLE_ATTRIBUTE of an object the instance carries:
-
-- other than a list the template prohibits or one whose items are primitive values, whose children are never counted (*A mandatory child under an optional list* below), the items bound to each child are counted against its `Occurrences()`;
-- on a list that is absent or empty, only the children *A mandatory child under an optional list* below names are counted, each holding no item;
-- and the RM child count against the parsed `CompiledAttribute.ChildMultiplicity()` interval when the list holds an item or is present and the template requires it by its existence;
-- a list the template requires by its existence that the instance does not carry fails existence alone (*A mandatory child under an optional list* below).
+For each C_MULTIPLE_ATTRIBUTE of an object the instance carries, the items bound to each counted child are counted against its `Occurrences()`, and the list's items against the parsed `CompiledAttribute.ChildMultiplicity()` interval, in the cases [*Multi-valued attributes*](#multi-valued-attributes) below gives.
 
 #### Structural — alternatives (C_SINGLE_ATTRIBUTE)
 
@@ -531,43 +526,64 @@ Not checked: it needs a live external terminology; [§ REQ-111](#req-111--public
 ### Multi-valued attributes
 
 Existence and child-count cardinality are **independent constraints** on a list: existence says whether the container exists, and cardinality how many members it holds.
-So a multi-valued attribute with `existence.lower ≥ 1` and `cardinality.lower ≥ 1` whose list is present and empty fails both, and validators **MUST** report both `required` and `cardinality` at its path, as collect-all makes natural; a consumer that de-duplicates for display can treat the pair as one failure at that path.
-A list's own `cardinality` is also reported, where it fails, while the list holds an item.
-Validators **MUST NOT** report it while the list is absent, nor while the list is present and empty and the template leaves it optional by its existence (*A mandatory child under an optional list* below).
-A list the template requires by its existence, its existence lower bound bounded and at least 1, that the instance does not carry, absent as [§ REQ-171 *Structural access*](#structural-access) reads presence, fails existence alone: there is no container to count, so the `occurrences` of its children **MUST NOT** be reported either.
+On an attribute the OPT declares multi-valued, of an object the instance carries, validators **MUST** report exactly the template findings this table gives for the list's existence, its own cardinality and the occurrences of its counted children:
+
+| The list | Existence, rule `existence`, at the list's path | Its cardinality, code `cardinality`, rule `cardinality`, at the list's path | Each counted child, code `cardinality`, rule `occurrences` |
+|---|---|---|---|
+| is absent, and required by its existence | `required` | none | none |
+| is absent, and not required by its existence | none | none | where it fails |
+| is present and empty, and required by its existence | `required`, where the template asks for a member | where it fails | where it fails |
+| is present and empty, and not required by its existence | none | none | where it fails |
+| holds an item, on an attribute the template does not prohibit | none | where it fails | where it fails |
+| holds an item, on an attribute the template prohibits | `prohibited`, and the list is not entered | none | none |
+
+The table's terms:
+
+- a list is absent or present as [§ REQ-171 *Structural access*](#structural-access) reads presence;
+- a list is *required by its existence* where its existence lower bound is bounded and at least 1;
+- where the template *asks for a member* is defined in *An existence lower bound alone asks for no member* below, and which children are *counted* in *A mandatory child under an optional list* below;
+- a count *fails* where it lies outside its interval: the list's items outside its cardinality, or the items bound to a child outside the child's occurrences, so a list with no item fails each counted child whose occurrences lower bound is bounded and at least 1.
+
+So a list that is present and empty, with existence and cardinality lower bounds of 1, draws both `required` and `cardinality` at its path, as collect-all makes natural; a consumer that de-duplicates for display can treat the pair as one failure at that path.
+A list required by its existence that the instance does not carry draws `required` alone, whatever its counts ask: there is no container to count.
+Which layer reports a list both layers find absent or empty is in [§ REQ-171 *One finding per defect*](#one-finding-per-defect).
 
 #### An existence lower bound alone asks for no member
 
-On a multi-valued attribute, existence says whether the container exists and cardinality how many members it holds (ADL 1.4, *Attribute constraints*, *Existence*), so a container with no member meets an existence lower bound of 1 where the counts allow none (AOM 1.4, `C_MULTIPLE_ATTRIBUTE`: existence "says whether the container object will be there (at all)", cardinality "how many items" the container holds).
-A list the instance does not carry is no container, so it fails that existence whatever its counts ask: validators **MUST** report `required` on the template layer, rule `existence`, at the path of a multi-valued attribute whose existence lower bound is bounded and at least 1 and whose list is absent, as [§ REQ-171 *Structural access*](#structural-access) reads presence, and nothing for its children's `occurrences` or its own `cardinality` (above).
+On a multi-valued attribute, existence says whether the container exists and cardinality how many members it holds (ADL 1.4, *Attribute constraints*, *Existence*).
+So a container with no member meets an existence lower bound of 1 where the counts allow none (AOM 1.4, `C_MULTIPLE_ATTRIBUTE`: existence "says whether the container object will be there (at all)", cardinality "how many items" the container holds).
+A list the instance does not carry is no container, so it fails that existence whatever its counts ask.
 Canonical JSON can carry such a list with no member: it writes `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` present and empty ([reference-model.md § Property → Go field](reference-model.md#property--go-field)).
 Two readings cannot carry it: canonical XML writes no element for an empty list ([wire.md § REQ-056](wire.md#req-056)), and a FLAT or STRUCTURED decode without the template has no key for a structure with no member ([wire.md § REQ-053](wire.md#req-053)), so a document read from either with such a list holding no member draws `required` there.
 A FLAT or STRUCTURED decode given the template rebuilds a required structure with no member with its list present and empty where the generator writes it so ([wire.md § REQ-053](wire.md#req-053)).
-Validators **MUST NOT** report `required` on the template layer for the existence of a multi-valued attribute whose list is present and empty, unless the template asks for a member there.
-Where it does, and the existence lower bound is bounded and at least 1, the template layer reports `required` there, rule `existence`.
-The template asks for one where its cardinality lower bound, or the occurrences lower bound of a child it allows, is bounded and at least 1, or where the list is one the floor holds non-empty once present.
+The template *asks for a member* where its cardinality lower bound, or the occurrences lower bound of a child it allows, is bounded and at least 1, or where the list is one the floor holds non-empty once present.
 A child that states no occurrences, or occurrences with an unbounded lower bound, asks for none here, although the generator builds a member of it ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *What a visit writes*).
-The lists the floor holds non-empty once present are those [§ REQ-112 *Non-empty lists*](#non-empty-lists) evaluates: `COMPOSITION.content`, `EVENT_CONTEXT.participations`, `INSTRUCTION.activities`, `SECTION.items` and `ATTESTATION.items`, and `HISTORY.events` while the HISTORY has no `summary`: the rules [§ REQ-112 *Non-empty lists*](#non-empty-lists) evaluates refuse such a list that is present and holds no item, and a HISTORY with neither an event nor a summary, so the container its existence asks for cannot exist without a member.
+The lists the floor holds non-empty once present are those [§ REQ-112 *Non-empty lists*](#non-empty-lists) evaluates: `COMPOSITION.content`, `EVENT_CONTEXT.participations`, `INSTRUCTION.activities`, `SECTION.items` and `ATTESTATION.items`, and `HISTORY.events` while the HISTORY has no `summary`.
+Those rules refuse such a list that is present and holds no item, and a HISTORY with neither an event nor a summary, so the container its existence asks for cannot exist without a member.
+So such a list that its existence requires draws `required` both when it is absent and when it is present and empty.
 The RM gives other lists the same rule, `ENTRY.other_participations`, `ACTOR.roles` and `PARTY.contacts` among them; the floor does not evaluate it there, so their existence asks for no member.
 `LOCATABLE.links` is one of them that the floor does evaluate, and it reports a `links` that is present and holds no item ([§ REQ-112 *LOCATABLE links and EVENT_CONTEXT location*](#locatable-links-and-event_context-location)), but it is not among the lists the floor holds non-empty for the template's sake, so the existence of `links` asks for no member either.
-On a list the floor holds non-empty once present, where its existence lower bound is bounded and at least 1, validators **MUST** report `required` on the template layer, rule `existence`, both when the list is absent and when it is present and empty, and that finding stands for the RM rule that reads the list ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
-An absent list draws `required` alone, whatever asks for a member, as the paragraph above says; the RM layer still reports an RM-mandatory container where the template reports nothing ([§ REQ-171](#req-171--validation-engine) *One finding per defect*).
 So an `ITEM_LIST` or `ITEM_TREE` whose `items` carry existence `1..1`, cardinality `0..*` and no allowed child validates with its `items` present and empty, and draws `required` at them where they are left out.
 
 #### A mandatory child under an optional list
 
-On an object the instance carries, validators **MUST** count against its occurrences each allowed child, not a slot, of an attribute the OPT declares multi-valued, both words as [§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *Visit rule* defines them, whether the list holds items, is present and empty, or is absent, with three exceptions.
-An absent list the template requires by its existence fails existence alone (above).
-A list whose items are primitive values, such as a DV_MULTIMEDIA's `data`, has items the walk counts but binds to no child, so its children are counted neither when it holds items nor when it holds none.
-A list the template prohibits (*Structural — prohibited attributes* above) leaves its children nothing to count: holding an item, it draws `prohibited` alone and is not entered, and holding none, absent or present and empty, it draws nothing from its children, so that an instance that leaves it out validates, unless its existence lower bound is at least 1, which asks for the container (*An existence lower bound alone asks for no member*).
+The *counted* children of a list are the allowed children, not slots, of an attribute the OPT declares multi-valued, both words as [§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *Visit rule* defines them, with two exceptions:
+
+- a list whose items are primitive values, such as a DV_MULTIMEDIA's `data`, has items the walk counts but binds to no child, so its children are counted neither when it holds items nor when it holds none;
+- a list the template prohibits (*Structural — prohibited attributes* above) leaves its children nothing to count: holding an item, it draws `prohibited` alone and is not entered, and holding none, absent or present and empty, it draws nothing from its children.
+
+So an instance that leaves a prohibited list out validates, unless its existence lower bound is at least 1, which asks for the container (*An existence lower bound alone asks for no member*).
+A counted child is counted whether the list holds items, is present and empty, or is absent, except on an absent list the template requires by its existence, which fails existence alone (the table's first row).
 The children of a list the OPT writes as a single-valued attribute, as some OPTs write a `COMPOSITION`'s `content` under a `C_SINGLE_ATTRIBUTE`, are alternatives that attribute's existence decides (§ REQ-107 *Visit rule*), so an absent such list draws nothing from them.
-An absent list holds no item, so each such child whose occurrences lower bound is bounded and at least 1 draws its occurrences finding, `cardinality` with rule `occurrences`, at the path § *Issue paths* writes for a node the OPT requires and the instance lacks: the child's own predicate below the list's path, or the list's path for a child that declares no id.
-ADL 1.4 calls such a child mandatory in its container and leaves an optional container to its existence; that the child also asks for its container is the reading § REQ-107 *Visit rule* chooses, so that a list `Generate` leaves out under `Required` that the template leaves optional by its existence is one validators accept as absent.
-On a list the template leaves optional by its existence, the list's own `cardinality` is not reported when the list is absent, since ADL 1.4 makes such a container "optional, but if present" bound by its cardinality (*Cardinality*), nor when it is present and empty, since canonical XML writes no element for an empty list ([wire.md § REQ-056](wire.md#req-056)) and canonical JSON leaves out a present empty optional list other than those [reference-model.md § Property → Go field](reference-model.md#property--go-field) names ([wire.md § REQ-052](wire.md#req-052), *An absent mandatory member*): an absent and an empty optional list draw the same template findings, as they do on existence.
+An absent list holds no item, so a counted child's occurrences finding there is written at the path § *Issue paths* writes for a node the OPT requires and the instance lacks: the child's own predicate below the list's path, or the list's path for a child that declares no id.
+ADL 1.4 calls a child whose occurrences lower bound is at least 1 mandatory in its container and leaves an optional container to its existence; that the child also asks for its container is the reading § REQ-107 *Visit rule* chooses, so that a list `Generate` leaves out under `Required` that the template leaves optional by its existence is one validators accept as absent.
+On a list the template leaves optional by its existence, the list's own `cardinality` is not reported when the list is absent, since ADL 1.4 makes such a container "optional, but if present" bound by its cardinality (*Cardinality*).
+Nor is it reported when the list is present and empty, since canonical XML writes no element for an empty list ([wire.md § REQ-056](wire.md#req-056)) and canonical JSON leaves out a present empty optional list other than those [reference-model.md § Property → Go field](reference-model.md#property--go-field) names ([wire.md § REQ-052](wire.md#req-052), *An absent mandatory member*).
+So an absent and an empty optional list draw the same template findings, as they do on existence.
 
 #### Open multi-valued attributes
 
-When a C_MULTIPLE_ATTRIBUTE declares no `<children>` (the OPT pinned only existence / cardinality, not membership), validators MUST accept any RM item under that attribute without firing `slot_fill`.
+When a C_MULTIPLE_ATTRIBUTE declares no `<children>` (the OPT pinned only existence / cardinality, not membership), validators **MUST** accept any RM item under that attribute without firing `slot_fill`.
 The constraint surface is the attribute itself; the items inside are unconstrained.
 This admits the OPT idiom "items here, any shape allowed" — e.g. a SECTION whose /items is open to any archetype-root content.
 
@@ -1537,7 +1553,7 @@ The *DV_INTERVAL* entry below leaves a pair of bounds unordered when either has 
 `Limits_consistent`: when neither side is unbounded, `lower.is_strictly_comparable_to(upper) and lower <= upper`.
 The floor reads two bounds as strictly comparable as the RM defines `is_strictly_comparable_to` for their type: two DV_COUNT; two DV_QUANTITY with equal `units`; two DV_PROPORTION of one `type`; two DV_DATE, two DV_TIME, two DV_DATE_TIME or two DV_DURATION.
 Each of these definitions compares a value with one of its own class, so the floor reads bounds of two classes as not strictly comparable, a DV_COUNT beside another DV_ORDERED included, although DV_COUNT's definition reads `Return True` for any.
-When neither side is unbounded and each side holds a bound, the floor **MUST** report, each as `rm_invariant` at the interval with the rule `DV_INTERVAL.Limits_consistent`:
+When neither side is unbounded and each side holds a bound, the floor reports, each as `rm_invariant` at the interval with the rule `DV_INTERVAL.Limits_consistent`:
 
 - a pair it reads as not strictly comparable (bounds of two classes, two DV_QUANTITY in different `units`, or two DV_PROPORTION of different `type`);
 - and a strictly comparable pair whose `lower` is above its `upper` by the order below.
@@ -1553,7 +1569,7 @@ Of the pairs it reads as strictly comparable, it orders none that holds a DV_PRO
 #### Interval flags
 
 BASE `Lower_included_valid` and `Upper_included_valid` (`lower_unbounded implies not lower_included`, and the same for `upper`).
-On every interval the walk reaches, a DV_INTERVAL value, a typed `normal_range` and a REFERENCE_RANGE `range` among them, the floor **MUST** report a side marked both unbounded and included as `lower_included_valid` or `upper_included_valid` at the interval's path.
+On every interval the walk reaches, a DV_INTERVAL value, a typed `normal_range` and a REFERENCE_RANGE `range` among them, the floor reports a side marked both unbounded and included as `lower_included_valid` or `upper_included_valid` at the interval's path.
 Canonical JSON, canonical XML, FLAT and STRUCTURED decode such a side as written ([wire.md § REQ-169](wire.md#req-169--interval-boundary-flag-defaults)), and an RM value built in Go can carry it too, so this entry is where it is reported.
 
 #### OBJECT_REF / PARTY_REF / ACCESS_GROUP_REF / LOCATABLE_REF
@@ -1577,13 +1593,13 @@ The `performer` proxy, `mode` and `time` are walked like any other present attri
 
 #### DV_TEXT / DV_CODED_TEXT
 
-The floor **MUST** report a present-but-empty `mappings` (`Mappings_valid`) as `mappings_valid`; DV_CODED_TEXT inherits `mappings` from DV_TEXT via embedding, so both dispatch through the same evaluator.
+The floor reports a present-but-empty `mappings` (`Mappings_valid`) as `mappings_valid`; DV_CODED_TEXT inherits `mappings` from DV_TEXT via embedding, so both dispatch through the same evaluator.
 The floor cannot distinguish an absent `mappings` key from an explicit JSON `null` — canjson decodes both to a nil slice — so only a decoded literal `"mappings":[]` (a non-nil empty slice) is flagged; null and absent are indistinguishable and both valid.
 `mappings` is a walked container: each element is a TERM_MAPPING node of its own, checked by the entry below wherever it sits.
 
 #### TERM_MAPPING
 
-The floor **MUST** report a `match` outside `{'>', '=', '<', '?'}` (`term_mapping_match`) as an invariant violation on the mapping node itself, so the check fires for a mapping under a DV_TEXT / DV_CODED_TEXT `mappings` container, for one nested under a mapping's own `purpose`, and for a TERM_MAPPING handed to `ValidateRM` as the root.
+The floor reports a `match` outside `{'>', '=', '<', '?'}` (`term_mapping_match`) as an invariant violation on the mapping node itself, so the check fires for a mapping under a DV_TEXT / DV_CODED_TEXT `mappings` container, for one nested under a mapping's own `purpose`, and for a TERM_MAPPING handed to `ValidateRM` as the root.
 The RM-mandatory `match` and `target` (CODE_PHRASE) fall under the required-set walk, and `target`'s and `purpose`'s own invariants apply inside each mapping; an empty `match` therefore reports both `required` and `term_mapping_match` at the same path.
 
 #### Non-empty lists
@@ -1614,7 +1630,7 @@ The diagnostic names the class and the attribute, never a value, the scheme bein
 
 The class-level `Is_archetype_root` invariant fixes `is_archetype_root` true on every class whose BMM declares it, and together with `LOCATABLE.Archetyped_valid` (`is_archetype_root xor archetype_details = Void`) that makes `archetype_details` mandatory on those nodes even though LOCATABLE declares it 0..1; `Archetyped_valid` alone does not, since a non-root node with no details satisfies it.
 The declaring classes are COMPOSITION, EHR_ACCESS, EHR_STATUS, PARTY (with its concrete descendants PERSON, ORGANISATION, GROUP, AGENT, ROLE) and ENTRY (with its concrete descendants ADMIN_ENTRY, OBSERVATION, EVALUATION, INSTRUCTION, ACTION).
-The floor **MUST** report an absent or `null` `archetype_details` as `is_archetype_root` at `…/archetype_details` on a node of such a class, and on no other: classes that declare no `Is_archetype_root` (FOLDER, PARTY_RELATIONSHIP, EXTRACT, GENERIC_ENTRY, the demographic parts PARTY_IDENTITY, CONTACT, ADDRESS and CAPABILITY, and the data-structure classes) leave the attribute optional.
+The floor reports an absent or `null` `archetype_details` as `is_archetype_root` at `…/archetype_details` on a node of such a class, and **MUST NOT** report it on any other: classes that declare no `Is_archetype_root` (FOLDER, PARTY_RELATIONSHIP, EXTRACT, GENERIC_ENTRY, the demographic parts PARTY_IDENTITY, CONTACT, ADDRESS and CAPABILITY, and the data-structure classes) leave the attribute optional.
 This positive set is closed: the floor takes it from the `Is_archetype_root` entries of the inventory of [§ REQ-171 *Where the RM rules come from*](#where-the-rm-rules-come-from), and the [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator from a closed list held equal to it and to the vendored BMM's `Is_archetype_root` declarations, so a BMM bump that adds a root class fails the build ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md)).
 This is a class invariant of the object, not a storage rule, so it holds for a detached object exactly as for a persisted one.
 Rules that need stored history (`VERSIONED_COMPOSITION.Archetype_node_id_valid`) and requiring `ARCHETYPED.template_id` (0..1 in the RM) stay out of scope.
@@ -1622,7 +1638,7 @@ Rules that need stored history (`VERSIONED_COMPOSITION.Archetype_node_id_valid`)
 #### ARCHETYPED
 
 Wherever an `archetype_details` node is present, on any LOCATABLE, its two RM-mandatory attributes `archetype_id` (`ARCHETYPE_ID`) and `rm_version` (`String`) are value-typed, so the value-based walk cannot tell absent from `null` from empty (they decode to the same zero value).
-On a value validated with no report of missing members, the value-based entries (`ValidateRM` and the typed sugars) **MUST** report an empty `archetype_id.value` as `required` at `…/archetype_details/archetype_id/value` (SDK policy: `OBJECT_ID.value` is RM-mandatory and has no non-empty invariant of its own) and an empty `rm_version` as `rm_version_valid` (`Rm_version_valid: not rm_version.is_empty`) at `…/archetype_details/rm_version`.
+On a value validated with no report of missing members, the value-based entries (`ValidateRM` and the typed sugars) report an empty `archetype_id.value` as `required` at `…/archetype_details/archetype_id/value` (SDK policy: `OBJECT_ID.value` is RM-mandatory and has no non-empty invariant of its own) and an empty `rm_version` as `rm_version_valid` (`Rm_version_valid: not rm_version.is_empty`) at `…/archetype_details/rm_version`.
 Absent and `null` decode to the same zero values and are reported the same way, and an ARCHETYPED handed to `ValidateRM` as the root is checked the same way, with the findings at `/archetype_id/value` and `/rm_version`.
 With a decode's report of missing members, an absent or `null` member is read as [§ *Value-typed mandatory presence*](#value-typed-mandatory-presence) says.
 Validating the `ARCHETYPE_ID` grammar is out of scope for this catalogue.
@@ -1660,8 +1676,10 @@ An optional attribute is checked only when present, ELEMENT's `null_flavour` onl
 A group invariant asks the openEHR terminology itself (`terminology (Terminology_id_openehr).has_code_for_group_id (…)`), so it holds only when the CODE_PHRASE's `terminology_id` is `openehr` and its `code_string` is a member of the group: a setting coded in `local`, or in any terminology other than `openehr`, breaks `Setting_valid` whatever its code string.
 A code-set invariant holds when the `code_string` is a member of the code set under the accessor's membership rule, which ignores letter case for the ISO and IANA sets; the `terminology_id` is not compared, because the RM's `CODE_SET_ACCESS.has_code` takes the bare code.
 The CODE_PHRASE an invariant reads is the attribute itself for a CODE_PHRASE attribute, and the attribute's `defining_code` for a DV_CODED_TEXT one.
-The floor **MUST** report each breach as `code_not_in_value_set` at that CODE_PHRASE's path (`…/language`, `…/context/setting/defining_code`).
-An empty `code_string` is no member, so on a value validated with no report of missing members `code_not_in_value_set` is drawn by a mandatory value-typed attribute that decoded empty, such as a COMPOSITION `language` the source left out or a PARTY_RELATED `relationship`, beside whatever the walk already reports for it (`required` for an omitted COMPOSITION `language`, `required` at its `code_string` for one that carries a terminology id and a blank code).
+The floor reports each breach as `code_not_in_value_set` at that CODE_PHRASE's path (`…/language`, `…/context/setting/defining_code`).
+An empty `code_string` is no member.
+So on a value validated with no report of missing members, `code_not_in_value_set` is drawn by a mandatory value-typed attribute that decoded empty, such as a COMPOSITION `language` the source left out or a PARTY_RELATED `relationship`.
+It is drawn beside whatever the walk already reports for it: `required` for an omitted COMPOSITION `language`, `required` at its `code_string` for one that carries a terminology id and a blank code.
 With the report, an omitted `language` is `required` at `…/language` alone (§ *Value-typed mandatory presence*).
 A PARTICIPATION and a PARTY_RELATED are nodes of the walk wherever they sit (the PARTICIPATION and PARTY_PROXY entries above), a participation's `performer` and a root included, so their rows apply there as on any other node: at `…/other_participations[i]/mode/defining_code`, say, or `…/performer/relationship/defining_code`.
 The RM's other coded invariants are not in this entry (*What the floor does not evaluate* below).
@@ -1704,7 +1722,7 @@ The floor closes this by reading what the decode found missing, the report of mi
   The typed wrappers and `ValidateRM` without the option keep that blind spot, which their godoc names.
 - On `ValidateJSON` and `ValidateXML`, input that does not decode into `root`, malformed input, a canonical-JSON document whose root is not an object, a canonical-XML document with content before or after its root element or a root that fails its decode, **MUST** surface a single `invalid_shape` at `/` and a not-OK `Result`, with the decode error, whose text may quote the input, in the issue's `Value` and not in its `Detail` ([§ REQ-168](#req-168--value-free-validation-diagnostics)); JSON `null` raises no decode error, so its issue's `Value` is empty.
   A nil `root`, or one that is no registered RM value, draws the entry's `nil_root` or `rm_type_unknown` guard, as `ValidateRM` does.
-- `ValidateRMEHRStatusBytes(data)` is kept as `ValidateJSON(data, new(rm.EHRStatus), nil)` and is deprecated: an omitted or `null` `subject` is `required` at `/subject`, a supplied subject, even the bare form, **MUST NOT** draw a `required`, and presence is read at every level.
+- `ValidateRMEHRStatusBytes(data)` is kept as `ValidateJSON(data, new(rm.EHRStatus), nil)` and is deprecated: an omitted or `null` `subject` is `required` at `/subject`, a supplied subject, even the bare form, draws no `required`, and presence is read at every level.
 
 ### Out of scope
 
