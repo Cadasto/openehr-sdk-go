@@ -144,19 +144,23 @@ var mediumHollowBodies = []string{
 // and path, or JSON path).
 //
 // Large rows: under Large every optional child that needs no undescribed
-// content gets its member, each use of one archetype, named or not,
-// included (REQ-107 What a visit writes). So Large builds a member of each
-// optional archetype use under an attribute, and reaches the TestPerson.v2
-// identifier clusters, the clinical_content_validation EVALUATION and each
-// of the four named SECTION.adhoc.v1 roots of Corona_Anamnese, whose roots
-// all validate. Under Large no template's body is hollow but those of
-// generic_ehr_status.v1 and generic_folder.v1, which constrain no ELEMENT by
-// design and have their hollow_body rows: any other hollow_body failure
-// there fails the ratchet.
-// The builder builds on Large when no WithPolicy is given, so its rows are
-// Large rows, under either fill. It has none: every COMPOSITION root it
-// builds passes under both fills and every seed, and each row below is on a
-// root it does not build (TestPerson.v2 is PERSON-rooted, the two generic
+// content gets its members, each use of one archetype, named or not,
+// included, and two of each child that may occur more than once (REQ-107
+// What a visit writes). So Large builds
+// members of each optional archetype use under an attribute, and reaches
+// the TestPerson.v2 identifier clusters, two of each, the
+// clinical_content_validation EVALUATION and each of the four named
+// SECTION.adhoc.v1 roots of Corona_Anamnese, whose roots all validate. The
+// two members of each identifier cluster stand side by side among the
+// details' items, so the floor names them by position. Under Large no
+// template's body is hollow but those of generic_ehr_status.v1 and
+// generic_folder.v1, which constrain no ELEMENT by design and have their
+// hollow_body rows: any other hollow_body failure there fails the ratchet.
+// The builder builds on Large when no WithPolicy is given, short of its
+// repeats (REQ-101), so its rows are Large
+// rows, under either fill. It has none: every COMPOSITION root it builds
+// passes under both fills and every seed, and each row below is on a root
+// it does not build (TestPerson.v2 is PERSON-rooted, the two generic
 // templates EHR_STATUS- and FOLDER-rooted).
 //
 // Medium rows: Medium gives an attribute a member of each optional
@@ -194,10 +198,14 @@ var corpusRatchet = []ratchetFailure{
 	{template: "templates/generic_ehr_status.v1", entry: "generate", policy: "large", fill: "random", reason: "hollow_body:/"},
 	{template: "templates/generic_folder.v1", entry: "generate", policy: "large", fill: "example", reason: "hollow_body:/"},
 	{template: "templates/generic_folder.v1", entry: "generate", policy: "large", fill: "random", reason: "hollow_body:/"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[18]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[19]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[20]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[21]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[18]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[19]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[20]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[21]/items[at0006]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},

@@ -1385,6 +1385,7 @@ requirements:
       - openehr/composition/typecheck_test.go
       - openehr/composition/typecheck_tiers_test.go
       - openehr/composition/uid_source_test.go
+      - openehr/instance/large_repeats_test.go
       - openehr/instance/untyped_child_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
@@ -1658,6 +1659,7 @@ requirements:
       - openehr/instance/interval_temporal_internal_test.go
       - openehr/instance/interval_zone_test.go
       - openehr/instance/items_rule_test.go
+      - openehr/instance/large_repeats_test.go
       - openehr/instance/large_uses_test.go
       - openehr/instance/local_term_text_test.go
       - openehr/instance/locatable_name_test.go

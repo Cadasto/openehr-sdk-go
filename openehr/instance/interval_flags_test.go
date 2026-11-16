@@ -34,6 +34,17 @@ var intervalTemplates = []string{
 // content, which Required does not visit, so it builds no interval there.
 var intervalPolicies = largeAndMedium
 
+// builtIntervals is the number of DV_INTERVAL values the generator builds
+// for the vendored DV_COUNT interval OPT under policy: the ELEMENT that holds
+// the interval may occur more than once, so Large builds two members of it
+// and Medium one (REQ-107 Members of a list).
+func builtIntervals(policy instance.Policy) int {
+	if policy == instance.Large {
+		return 2
+	}
+	return 1
+}
+
 // intervalOptions returns the generator options the interval tests share.
 func intervalOptions(policy instance.Policy) instance.Options {
 	return instance.Options{
@@ -253,16 +264,17 @@ func TestGenerateIntervalIncludedFollowsOPT(t *testing.T) {
 				walkIntervals(generateCanonical(t, c, intervalOptions(policy)), "", func(_ string, iv map[string]any) {
 					found = append(found, iv)
 				})
-				if len(found) != 1 {
-					t.Fatalf("generated %d DV_INTERVAL values, want 1", len(found))
+				if want := builtIntervals(policy); len(found) != want {
+					t.Fatalf("generated %d DV_INTERVAL values, want %d", len(found), want)
 				}
-				iv := found[0]
-				for side, want := range map[string]sideWant{"lower": tc.lower, "upper": tc.upper} {
-					open, _ := iv[side+"_unbounded"].(bool)
-					included, _ := iv[side+"_included"].(bool)
-					if open != want.open || included != want.included {
-						t.Errorf("%s side: (%s_unbounded, %s_included) = (%v, %v), want (%v, %v)",
-							side, side, side, open, included, want.open, want.included)
+				for i, iv := range found {
+					for side, want := range map[string]sideWant{"lower": tc.lower, "upper": tc.upper} {
+						open, _ := iv[side+"_unbounded"].(bool)
+						included, _ := iv[side+"_included"].(bool)
+						if open != want.open || included != want.included {
+							t.Errorf("interval %d, %s side: (%s_unbounded, %s_included) = (%v, %v), want (%v, %v)",
+								i, side, side, side, open, included, want.open, want.included)
+						}
 					}
 				}
 			})

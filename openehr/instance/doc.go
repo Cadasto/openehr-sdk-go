@@ -79,11 +79,16 @@
 //   - Large: every attribute the visit rule allows, the optional ones the
 //     template names included. A visited multi-valued attribute gets at
 //     least one member of each allowed child that is not a slot, each
-//     use of one archetype, named or not, included. So Large builds a
-//     member of every optional archetype the template names, and of every
-//     use of one, except one that holds only content the template does
-//     not describe (below). It stops short of the complete level, every
-//     data point the template allows, which no level of its own builds yet.
+//     use of one archetype, named or not, included, and two of a child
+//     whose occurrences upper bound is above 1 or unbounded, within the
+//     attribute's cardinality. So Large builds a member of every optional
+//     archetype the template names, and of every use of one, except one
+//     that holds only content the template does not describe (below), and
+//     a second member of each that may repeat. It stops short of the
+//     complete level, every data point the template allows, which no
+//     level of its own builds yet. The composition builder seeds a
+//     Builder with Large short of the second members, the nodes its Set
+//     routes values into.
 //
 // Under Large and Medium the generator builds an optional node only where
 // it holds more than content the template does not describe: a slot fill;
@@ -223,7 +228,8 @@
 // openehr/rm, openehr/rm/typereg, openehr/rm/rminfo, openehr/template,
 // openehr/template/constraints, openehr/terminology,
 // internal/templatecompile (engine node types),
-// internal/templateinstance/rmwrite, internal/bmmtype and
+// internal/templateinstance/rmwrite, internal/templateinstance/builderseed
+// (the composition builder's mark), internal/bmmtype and
 // internal/rmroots. It does not import openehr/serialize,
 // openehr/client, transport, auth, openehr/composition (which uses
 // this package, not the reverse), or openehr/validation.

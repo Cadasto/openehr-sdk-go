@@ -73,17 +73,21 @@ const (
 	Required
 	// Large builds a member of every optional archetype the template
 	// names, and of every use of one, that holds more than content the
-	// template does not describe (see the package documentation). It
-	// visits every attribute the visit rule allows: every attribute the
-	// compiled node carries, the optional ones the OPT names included. A
-	// visited multi-valued attribute gets at least one member of each
-	// allowed OPT child that is not a slot, except an optional child that
-	// holds only such content: optional archetype roots each get theirs,
-	// of one archetype or of several, whether the template tells them
-	// apart by a name or not, and so do optional siblings of one node id.
-	// It stops short of the ITS-REST template example's
-	// detail_level=complete (every data point the template allows), which
-	// no level of its own builds yet.
+	// template does not describe (see the package documentation), and
+	// two members of each node that may occur more than once. It visits
+	// every attribute the visit rule allows: every attribute the compiled
+	// node carries, the optional ones the OPT names included. A visited
+	// multi-valued attribute gets max(occurrences.lower, 1) members of
+	// each allowed OPT child that is not a slot, and
+	// max(occurrences.lower, 2) of one whose occurrences upper bound is
+	// above 1 or unbounded, within the attribute's cardinality, except an
+	// optional child that holds only such content: optional archetype
+	// roots each get theirs, of one archetype or of several, whether the
+	// template tells them apart by a name or not, and so do optional
+	// siblings of one node id. It stops short of the ITS-REST template
+	// example's detail_level=complete (every data point the template
+	// allows), which no level of its own builds yet. The composition
+	// builder seeds a Builder with Large short of the second members.
 	Large
 
 	// Minimal is another name for Required.

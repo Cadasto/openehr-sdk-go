@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/builderseed"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -108,10 +109,10 @@ func contentArchetypeIDs(tree any) []string {
 // skeleton policy when no WithPolicy is given: NewSkeleton builds the
 // tree REQ-107's Medium, the instance package's zero Policy, builds. On
 // vital_signs that tree holds each of the template's four optional content
-// OBSERVATIONs, as Large's does, and as many JSON values as
-// instance.Generate under Medium. Of two optional siblings that share an
-// at-code, the default builds the first alone, as Medium does, where Large
-// builds both.
+// OBSERVATIONs once, where Large's holds two of each, since each may occur
+// any number of times, and as many JSON values as instance.Generate under
+// Medium. Of two optional siblings that share an at-code, the default
+// builds the first alone, as Medium does, where Large builds both.
 func TestREQ101_REQ107_NewSkeletonDefaultsToMedium(t *testing.T) {
 	t.Parallel()
 	t.Run("vital_signs", func(t *testing.T) {
@@ -150,8 +151,9 @@ func TestREQ101_REQ107_NewSkeletonDefaultsToMedium(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewSkeleton(vital_signs, WithPolicy(Large)): %v", err)
 		}
-		if got := contentArchetypeIDs(decodedJSON(t, large)); !slices.Equal(got, want) {
-			t.Errorf("NewSkeleton(vital_signs, WithPolicy(Large)) content archetype ids = %v, want %v", got, want)
+		wantLarge := slices.Sorted(slices.Values(slices.Concat(want, want)))
+		if got := contentArchetypeIDs(decodedJSON(t, large)); !slices.Equal(got, wantLarge) {
+			t.Errorf("NewSkeleton(vital_signs, WithPolicy(Large)) content archetype ids = %v, want %v", got, wantLarge)
 		}
 	})
 	t.Run("optional named siblings", func(t *testing.T) {
@@ -289,11 +291,16 @@ func TestREQ101_REQ107_NewBuilderAcceptsOnlyLarge(t *testing.T) {
 
 // TestREQ101_NewBuilderDefaultsToLarge checks REQ-101's skeleton policy
 // for NewBuilder when no WithPolicy is given: it builds on REQ-107's Large,
-// whatever the instance package's zero Policy is. On vital_signs its
-// skeleton holds a member of each of the four optional content
-// OBSERVATIONs, and as many JSON values as instance.Generate under Large.
-// That an explicit WithPolicy of another level is refused, the zero value
-// included, is TestREQ101_REQ107_NewBuilderAcceptsOnlyLarge's check.
+// whatever the instance package's zero Policy is, as the builder's seed,
+// with one member of each optional archetype and of each use of one and
+// nothing more. On vital_signs its skeleton holds one member of each of the
+// four optional content OBSERVATIONs, and as many JSON values as
+// instance.Generate under Large called with the builder's mark
+// (builderseed.With). It holds fewer than NewSkeleton under Large, which
+// builds two members of each OBSERVATION, since each may occur any number
+// of times. That an explicit WithPolicy of another level is refused, the
+// zero value included, is TestREQ101_REQ107_NewBuilderAcceptsOnlyLarge's
+// check.
 func TestREQ101_NewBuilderDefaultsToLarge(t *testing.T) {
 	t.Parallel()
 	c := compileFixture(t, "vital_signs")
@@ -316,17 +323,24 @@ func TestREQ101_NewBuilderDefaultsToLarge(t *testing.T) {
 	if got := contentArchetypeIDs(tree); !slices.Equal(got, want) {
 		t.Errorf("NewBuilder(vital_signs) with no WithPolicy: skeleton content archetype ids = %v, want %v", got, want)
 	}
-	large, err := instance.Generate(t.Context(), c, instance.Options{
+	seed, err := instance.Generate(builderseed.With(t.Context()), c, instance.Options{
 		Policy:    instance.Large,
 		Territory: "NL",
 		Composer:  testComposer(),
 		Now:       policyNow,
 	})
 	if err != nil {
-		t.Fatalf("Generate(vital_signs, Large): %v", err)
+		t.Fatalf("Generate(vital_signs, Large) with the builder's mark: %v", err)
 	}
-	if got, want := jsonValueCount(tree), jsonValueCount(decodedJSON(t, large)); got != want {
-		t.Errorf("NewBuilder(vital_signs) with no WithPolicy: skeleton holds %d JSON values, want Generate(Large)'s %d", got, want)
+	if got, want := jsonValueCount(tree), jsonValueCount(decodedJSON(t, seed)); got != want {
+		t.Errorf("NewBuilder(vital_signs) with no WithPolicy: skeleton holds %d JSON values, want the builder seed's %d", got, want)
+	}
+	large, err := composition.NewSkeleton(t.Context(), c, policyOptions(composition.WithPolicy(instance.Large))...)
+	if err != nil {
+		t.Fatalf("NewSkeleton(vital_signs, WithPolicy(Large)): %v", err)
+	}
+	if got, full := jsonValueCount(tree), jsonValueCount(decodedJSON(t, large)); got >= full {
+		t.Errorf("NewBuilder(vital_signs) with no WithPolicy: skeleton holds %d JSON values, want fewer than NewSkeleton(Large)'s %d", got, full)
 	}
 }
 

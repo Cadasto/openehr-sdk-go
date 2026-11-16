@@ -730,7 +730,7 @@ type Policy int
 const (
     Medium   Policy = iota // the default: required attributes and those with an allowed OPT child, a member of each optional archetype
     Required               // required attributes, a composition's context, a member of each entry the content names at its mandatory parts
-    Large                  // every attribute the visit rule allows, a member of each optional archetype and of each use of one
+    Large                  // every attribute the visit rule allows, a member of each optional archetype and of each use of one, two of each repeating node
 
     Minimal  = Required // alias
     Complete = Large    // alias
@@ -849,7 +849,9 @@ The three follow the levels of the ITS-REST template example's `detail_level` ([
 
 - `Required` builds its `required` level, the data points the template makes mandatory, a composition's `context`, and a member of each entry the content names, at its mandatory parts (*Members of a list*);
 - `Medium` its `medium` level, with a member of each optional archetype under an attribute, and of a further use of one only where that use holds another archetype (*Sibling identity*);
-- `Large` a member of every optional archetype the template names that needs no undescribed content (§ [Slot fills](#slot-fills)), and of every use of one, named or not, short of the `complete` level (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *The `Complete` level*).
+- `Large`, short of the `complete` level (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *The `Complete` level*):
+  - a member of every optional archetype the template names that needs no undescribed content (§ [Slot fills](#slot-fills)), and of every use of one, named or not;
+  - two members of each node that may occur more than once (*Members of a list*).
 
 An attribute the BMM marks mandatory that a compiled node does not carry, as under `templatecompile.WithoutImplicitAttributes`, is visited as if the node carried it with no OPT child.
 
@@ -870,13 +872,17 @@ When the attribute has no allowed OPT child, it takes a value built from its BMM
 
 A visited multi-valued attribute gets, in OPT order, these members of each allowed OPT child that is not a slot:
 
-- under `Large` and `Medium`, `max(occurrences.lower, 1)`, except an optional child (occurrences lower bound 0) that needs undescribed content (§ [Slot fills](#slot-fills)), which gets none;
+- under `Large`, `max(occurrences.lower, 2)` of a child whose occurrences lower bound is bounded and whose upper bound is above 1 or unbounded, and `max(occurrences.lower, 1)` of any other;
+- under `Medium`, and in the skeleton the composition builder seeds a `Builder` with under `Large` ([§ REQ-101](#req-101--generic-opt-driven-composition-builder)), `max(occurrences.lower, 1)`;
+- under `Large` and `Medium` alike, none of an optional child (occurrences lower bound 0) that needs undescribed content (§ [Slot fills](#slot-fills));
 - under `Required`, `occurrences.lower`, so that an optional child gets none of its own there, except one that leads to an entry (below) and that the `Medium` rule below does not skip, which gets one;
 - under every policy, one of a child the OPT gives no occurrences, or occurrences with an unbounded lower bound, which is not optional.
 
 It gets no more members in all than its `cardinality.upper` when that is bounded.
-Within that bound the room goes first to the members asked for by the children whose occurrences lower bound is bounded and at least 1, which fit wherever § [Errors](#errors) does not refuse the list: any other child, before or after them, gets only the room they leave, and the members still stand in OPT order.
-So `CLUSTER.items` at cardinality `0..1` over an optional `at0001` and a required `at0002` holds the `at0002` member alone.
+Within that bound the room goes first to the members asked for by the children whose occurrences lower bound is bounded and at least 1, as many of each as that bound, which fit wherever § [Errors](#errors) does not refuse the list.
+Any other member gets only the room they leave, whether it is of a child before or after them, of an optional child, or the second member `Large` gives a child whose lower bound is 1.
+The members still stand in OPT order.
+So `CLUSTER.items` at cardinality `0..1` over an optional `at0001` and a required `at0002` holds the `at0002` member alone, and under `Large`, at cardinality `0..2` over an optional `at0001` that may occur any number of times and a required `at0002`, one member of each.
 Under `Medium`, an optional child (occurrences lower bound 0) gets no member of its own where both hold, though the top-up below can still build one:
 
 - a sibling that gets a member of its own carries its identity (*Sibling identity*): a required sibling, before or after it, or an earlier optional sibling that gets one;
@@ -1221,8 +1227,9 @@ A root `Generate` returns can break § Contract's output rule in these cases, an
 - **An earlier sibling with room that carries a later, required one's identity, where neither pins a name** (§ Contract *What a visit writes*): the validator binds an item to the first of them that has room and under whose constraints it validates ([§ REQ-102](#req-102--composition-validation) *Structural — binding items*).
   So the earlier sibling takes the member built for the later one wherever that member validates under it.
   Under `Medium` an optional earlier sibling gets no member of its own and takes the later one's.
-  Under `Large` it gets a member of its own, unless the list's cardinality upper bound leaves it no room once the later sibling has its members (§ Contract *What a visit writes*): it then gets none and takes the later one's, as under `Medium`, as an optional `at0001` before a required `at0001` in `CLUSTER.items` at cardinality `1..1` does.
-  Its own member fills it where its occurrences upper bound is 1; where that occurrences bound leaves it room for a second member, as a bound above 1, or none, does, it takes the later one's as well.
+  Under `Large` it gets members of its own, two where its occurrences upper bound is above 1, unless the list's cardinality upper bound leaves it no room once the later sibling has its members (§ Contract *What a visit writes*).
+  It then gets none and takes the later one's, as under `Medium`, as an optional `at0001` before a required `at0001` in `CLUSTER.items` at cardinality `1..1` does.
+  Its own members fill it where its occurrences upper bound is 1 or 2; where that occurrences bound leaves it room for another member, as a bound above 2, or none, does, it takes the later one's as well.
   A required earlier sibling with no occurrences upper bound always has room and takes the later one's member beside its own, under every policy.
   A root can then fail the template validator by the later sibling's occurrences.
 - **A `PARTY` without a `uid`** (§ Contract *Identity*): the generator writes a `PARTY`'s `uid` only where the OPT requires it, so a `PARTY` it writes otherwise breaks `PARTY.Uid_mandatory`, which the floor does not evaluate ([§ REQ-112](#req-112--template-less-reference-model-validation-floor) *What the floor does not evaluate*).

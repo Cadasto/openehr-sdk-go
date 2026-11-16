@@ -17,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
@@ -243,16 +244,16 @@ func TestValidateComposition_REQ102_CorpusVitalSignsListsAreOptional(t *testing.
 // REQ-102 — blood_pressure_strict_existence, the blood pressure OBSERVATION of
 // vital_signs.opt as Ocean Template Designer exported it, gives the items of
 // the event's state and of the protocol an existence of 1..1 at a
-// cardinality of 0..*, with no child or slots only (issue 341). Its Large
-// instance writes both lists present and empty and validates clean; with
-// both lists left out it draws `required` at each, since the existence asks
-// for the list whatever its counts ask.
+// cardinality of 0..*, with no child or slots only (issue 341). Its Medium
+// instance, one OBSERVATION with one event, writes both lists present and
+// empty and validates clean; with both lists left out it draws `required` at
+// each, since the existence asks for the list whatever its counts ask.
 func TestValidateJSON_REQ102_StrictExistenceAbsentListsAreRequired(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "blood_pressure_strict_existence")
-	root, err := generateExample(t, c)
+	root, err := generateUnder(t, c, instance.Medium)
 	if err != nil {
-		t.Fatalf("Generate(blood_pressure_strict_existence, Large): %v", err)
+		t.Fatalf("Generate(blood_pressure_strict_existence, Medium): %v", err)
 	}
 	raw, err := canjson.Marshal(root)
 	if err != nil {

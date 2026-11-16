@@ -115,11 +115,12 @@ func TestREQ107_LargeWritesEveryNamedUseOfAnArchetype(t *testing.T) {
 
 // TestREQ107_REQ102_LargeWritesEveryUnnamedSiblingOfOneIdentity is the
 // REQ-107 check of What a visit writes that, under Large, each optional
-// sibling of one identity that pins no name gets its member, where under
+// sibling of one identity that pins no name gets its members, where under
 // Medium the siblings after the first get none: two optional OBSERVATION
 // roots of one archetype, the first allowing one occurrence or any number,
-// and two optional ELEMENTs of one node id whose values differ in type.
-// The template validator binds each member to the first sibling with room
+// the second of which Large builds two members of (Members of a list), and
+// two optional ELEMENTs of one node id whose values differ in type. The
+// template validator binds each member to the first sibling with room
 // under whose constraints it validates (REQ-102 Structural — binding
 // items), so both roots pass it, and the RM floor, under both value fills.
 func TestREQ107_REQ102_LargeWritesEveryUnnamedSiblingOfOneIdentity(t *testing.T) {
@@ -127,26 +128,31 @@ func TestREQ107_REQ102_LargeWritesEveryUnnamedSiblingOfOneIdentity(t *testing.T)
 		name  string
 		opt   string
 		count func(t *testing.T, comp *rm.Composition) int
+		// large is the number of siblings Large builds; Medium builds one.
+		large int
 	}{
 		{
 			name:  "two roots of one occurrence",
 			opt:   optUsesTemplate(optObservationUse("", 0, 1), optObservationUse("", 0, 1)),
 			count: func(_ *testing.T, comp *rm.Composition) int { return len(comp.Content) },
+			large: 2,
 		},
 		{
 			name:  "an open root before a root of one occurrence",
 			opt:   optUsesTemplate(optObservationUse("", 0, -1), optObservationUse("", 0, 1)),
 			count: func(_ *testing.T, comp *rm.Composition) int { return len(comp.Content) },
+			large: 3,
 		},
 		{
 			name:  "two ELEMENTs of one node id",
 			opt:   optTwinElements(),
 			count: func(t *testing.T, comp *rm.Composition) int { return len(otherContextItems(t, comp)) },
+			large: 2,
 		},
 	}
 	for _, tc := range cases {
 		c := compileOPTText(t, tc.opt, true)
-		for policy, want := range map[instance.Policy]int{instance.Large: 2, instance.Medium: 1} {
+		for policy, want := range map[instance.Policy]int{instance.Large: tc.large, instance.Medium: 1} {
 			for _, opts := range usesOptions(policy) {
 				t.Run(fmt.Sprintf("%s/%v/%v", tc.name, policy, opts.ValueFill), func(t *testing.T) {
 					comp := generateComposition(t, c, opts)
@@ -163,23 +169,26 @@ func TestREQ107_REQ102_LargeWritesEveryUnnamedSiblingOfOneIdentity(t *testing.T)
 
 // TestREQ107_REQ102_LargeFillsAnOptionalSiblingBeforeARequiredOne is the
 // REQ-107 check, beside Exceptions and known gaps, that under Large an
-// optional sibling of one occurrence before a required one of its
-// identity, neither pinning a name, gets a member of its own: the member
-// fills it, so the validator binds the required sibling's member to the
-// required sibling (REQ-102 Structural — binding items), and the root
-// validates. Under Medium the optional sibling gets none and the gap stays
+// optional sibling of one or two occurrences before a required one of its
+// identity, neither pinning a name, gets its members of its own, one, or
+// two where its occurrences upper bound is 2 (Members of a list): they fill
+// it, so the validator binds the required sibling's member to the required
+// sibling (REQ-102 Structural — binding items), and the root validates.
+// Under Medium the optional sibling gets none and the gap stays
 // (TestGenerate_REQ107_REQ102_OptionalSiblingBeforeARequiredOneKeepsItsGap).
 func TestREQ107_REQ102_LargeFillsAnOptionalSiblingBeforeARequiredOne(t *testing.T) {
-	c := compileOPTText(t, optUsesTemplate(optObservationUse("", 0, 1), optObservationUse("", 1, 1)), true)
-	for _, opts := range usesOptions(instance.Large) {
-		t.Run(opts.ValueFill.String(), func(t *testing.T) {
-			comp := generateComposition(t, c, opts)
-			if len(comp.Content) != 2 {
-				t.Fatalf("Generate(Large) built %d content items, want one per sibling", len(comp.Content))
-			}
-			noValidationErrors(t, comp, c)
-			noFloorErrors(t, comp)
-		})
+	for _, upper := range []int{1, 2} {
+		c := compileOPTText(t, optUsesTemplate(optObservationUse("", 0, upper), optObservationUse("", 1, 1)), true)
+		for _, opts := range usesOptions(instance.Large) {
+			t.Run(fmt.Sprintf("upper %d/%v", upper, opts.ValueFill), func(t *testing.T) {
+				comp := generateComposition(t, c, opts)
+				if want := upper + 1; len(comp.Content) != want {
+					t.Fatalf("Generate(Large) built %d content items, want %d: %d of the optional sibling and one of the required one", len(comp.Content), want, upper)
+				}
+				noValidationErrors(t, comp, c)
+				noFloorErrors(t, comp)
+			})
+		}
 	}
 }
 
@@ -187,15 +196,15 @@ func TestREQ107_REQ102_LargeFillsAnOptionalSiblingBeforeARequiredOne(t *testing.
 // Exceptions and known gaps check that, under Large, an optional sibling
 // that allows any number of occurrences before a required one of its
 // identity, neither pinning a name, still takes the required sibling's
-// member: it gets a member of its own and keeps room for another, so the
-// validator binds the second member there too (REQ-102 Structural —
-// binding items), and the root fails by the required sibling's
-// occurrences.
+// member: it gets two members of its own (Members of a list) and keeps room
+// for another, so the validator binds the third member there too (REQ-102
+// Structural — binding items), and the root fails by the required
+// sibling's occurrences.
 func TestREQ107_REQ102_LargeKeepsTheGapOfAnOpenOptionalSibling(t *testing.T) {
 	c := compileOPTText(t, optUsesTemplate(optObservationUse("", 0, -1), optObservationUse("", 1, 1)), true)
 	comp := generateComposition(t, c, corpusOptions(instance.Large)[0])
-	if len(comp.Content) != 2 {
-		t.Fatalf("Generate(Large) built %d content items, want one per sibling", len(comp.Content))
+	if len(comp.Content) != 3 {
+		t.Fatalf("Generate(Large) built %d content items, want two of the open sibling and one of the required one", len(comp.Content))
 	}
 	r := validation.ValidateComposition(comp, c)
 	want := []string{"cardinality /content[" + usedObservationID + "]"}

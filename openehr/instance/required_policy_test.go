@@ -91,11 +91,13 @@ type policyLevel struct {
 // policies build the three levels of the ITS-REST template example:
 // Required holds fewer JSON values than Medium, and Medium no more than
 // Large. Large builds a member of every optional archetype the template
-// names and of every use of one; Medium builds one member of each optional
-// archetype under an attribute, and of a later use of one only where it
-// holds other archetypes, so it builds what Large builds on vital_signs and
-// social, which use no archetype twice under one attribute, and every
-// archetype but fewer members on Corona_Anamnese, whose four uses of
+// names and of every use of one, and two of each that may occur more
+// than once; Medium builds one member of each optional archetype under an
+// attribute, and of a later use of one only where it holds other
+// archetypes, so it builds every archetype Large builds, with one member
+// where Large builds two, on vital_signs and social, which use no archetype
+// twice under one attribute, and every archetype but fewer members on
+// Corona_Anamnese, whose four uses of
 // SECTION.adhoc.v1 each hold other entries while the uses of
 // symptom_sign_screening and exposure_assessment under one section add
 // none; Required builds the entries and SECTIONs Medium builds, each to
@@ -118,12 +120,12 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "vital_signs",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 311, archetypes: map[string]int{
+				instance.Large: {values: 794, archetypes: map[string]int{
 					encounter: 1,
-					"openEHR-EHR-OBSERVATION.blood_pressure.v1":   1,
-					"openEHR-EHR-OBSERVATION.body_temperature.v1": 1,
-					"openEHR-EHR-OBSERVATION.heart_rate.v1":       1,
-					"openEHR-EHR-OBSERVATION.respiration.v1":      1,
+					"openEHR-EHR-OBSERVATION.blood_pressure.v1":   2,
+					"openEHR-EHR-OBSERVATION.body_temperature.v1": 2,
+					"openEHR-EHR-OBSERVATION.heart_rate.v1":       2,
+					"openEHR-EHR-OBSERVATION.respiration.v1":      2,
 				}},
 				instance.Medium: {values: 311, archetypes: map[string]int{
 					encounter: 1,
@@ -144,15 +146,15 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "social",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 649, archetypes: map[string]int{
+				instance.Large: {values: 1646, archetypes: map[string]int{
 					encounter: 1,
-					"openEHR-EHR-OBSERVATION.livingsituation.v1":        1,
-					"openEHR-EHR-OBSERVATION.languageproficiency.v1":    1,
-					"openEHR-EHR-OBSERVATION.participationinsociety.v1": 1,
-					"openEHR-EHR-OBSERVATION.helpfromothers.v1":         1,
-					"openEHR-EHR-EVALUATION.familysituation.v1":         1,
-					"openEHR-EHR-EVALUATION.education_summary.v1":       1,
-					"openEHR-EHR-CLUSTER.contact_persons_context.v1":    1,
+					"openEHR-EHR-OBSERVATION.livingsituation.v1":        2,
+					"openEHR-EHR-OBSERVATION.languageproficiency.v1":    2,
+					"openEHR-EHR-OBSERVATION.participationinsociety.v1": 2,
+					"openEHR-EHR-OBSERVATION.helpfromothers.v1":         2,
+					"openEHR-EHR-EVALUATION.familysituation.v1":         2,
+					"openEHR-EHR-EVALUATION.education_summary.v1":       2,
+					"openEHR-EHR-CLUSTER.contact_persons_context.v1":    4,
 				}},
 				instance.Medium: {values: 649, archetypes: map[string]int{
 					encounter: 1,
@@ -179,27 +181,27 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 			name:    "Corona_Anamnese",
 			compile: compileCoronaAnamnese,
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 2261, archetypes: map[string]int{
+				instance.Large: {values: 4411, archetypes: map[string]int{
 					report:                                              1,
-					"openEHR-EHR-CLUSTER.address_cc.v0":                 1,
-					"openEHR-EHR-CLUSTER.dwelling.v0":                   1,
-					"openEHR-EHR-CLUSTER.location.v1":                   1,
-					"openEHR-EHR-CLUSTER.occupation_record.v1":          1,
-					"openEHR-EHR-CLUSTER.organisation_cc.v0":            1,
+					"openEHR-EHR-CLUSTER.address_cc.v0":                 8,
+					"openEHR-EHR-CLUSTER.dwelling.v0":                   4,
+					"openEHR-EHR-CLUSTER.location.v1":                   2,
+					"openEHR-EHR-CLUSTER.occupation_record.v1":          2,
+					"openEHR-EHR-CLUSTER.organisation_cc.v0":            4,
 					"openEHR-EHR-CLUSTER.problem_qualifier.v1":          1,
-					"openEHR-EHR-EVALUATION.health_risk.v1":             1,
-					"openEHR-EHR-EVALUATION.living_arrangement.v0":      1,
+					"openEHR-EHR-EVALUATION.health_risk.v1":             2,
+					"openEHR-EHR-EVALUATION.living_arrangement.v0":      2,
 					"openEHR-EHR-EVALUATION.occupation_summary.v1":      1,
-					"openEHR-EHR-EVALUATION.problem_diagnosis.v1":       1,
+					"openEHR-EHR-EVALUATION.problem_diagnosis.v1":       2,
 					"openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1": 1,
-					"openEHR-EHR-INSTRUCTION.service_request.v1":        1,
+					"openEHR-EHR-INSTRUCTION.service_request.v1":        2,
 					"openEHR-EHR-OBSERVATION.body_temperature.v2":       1,
 					"openEHR-EHR-OBSERVATION.exposure_assessment.v0":    2,
 					"openEHR-EHR-OBSERVATION.medication_use.v0":         1,
-					"openEHR-EHR-OBSERVATION.story.v1":                  1,
+					"openEHR-EHR-OBSERVATION.story.v1":                  2,
 					"openEHR-EHR-OBSERVATION.symptom_sign_screening.v0": 10,
-					"openEHR-EHR-OBSERVATION.travel_event.v0":           1,
-					"openEHR-EHR-OBSERVATION.travel_history.v0":         1,
+					"openEHR-EHR-OBSERVATION.travel_event.v0":           2,
+					"openEHR-EHR-OBSERVATION.travel_history.v0":         2,
 					"openEHR-EHR-SECTION.adhoc.v1":                      4,
 				}},
 				instance.Medium:   {values: 1441, archetypes: coronaMedium},

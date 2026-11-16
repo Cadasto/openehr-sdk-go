@@ -637,11 +637,13 @@ func TestREQ053WithTemplateOrdinalTerminology(t *testing.T) {
 		}
 		return ord.Symbol.DefiningCode.TerminologyID.Value
 	}
-	// encode writes the skeleton of compiled as FLAT, and returns the body and
-	// the key of the ordinal, which the encoder writes as |raw.
+	// encode writes the Medium skeleton of compiled as FLAT, and returns the
+	// body and the key of the ordinal, which the encoder writes as |raw.
+	// Medium builds one member of each node that may repeat, so the body
+	// holds one ordinal, at valuePath.
 	encode := func(t *testing.T, wt *webtemplate.WebTemplate, compiled *templatecompile.Compiled) (map[string]any, string) {
 		t.Helper()
-		body, err := simplified.MarshalFlat(skeletonOf(t, compiled, instance.Large), wt)
+		body, err := simplified.MarshalFlat(skeletonOf(t, compiled, instance.Medium), wt)
 		if err != nil {
 			t.Fatalf("MarshalFlat: %v", err)
 		}

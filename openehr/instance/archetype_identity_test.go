@@ -68,17 +68,22 @@ func noValidationErrors(t *testing.T, comp *rm.Composition, c *templatecompile.C
 
 // TestREQ107_LargeKeepsEachOptionalContentArchetype is the REQ-107 check
 // that, under Large, optional archetype roots of different archetypes
-// under one attribute each get their member: vital_signs leaves its four
+// under one attribute each get their members: vital_signs leaves its four
 // content OBSERVATIONs optional, and every archetype root carries the node
 // id at0000, but the identity the skip compares for an archetype root is
-// its archetype id. The members come in OPT order and the composition
-// validates. It holds under both value fills.
+// its archetype id. Each root may occur any number of times, so each gets
+// two members (Members of a list). The members come in OPT order and the
+// composition validates. It holds under both value fills.
 func TestREQ107_LargeKeepsEachOptionalContentArchetype(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	want := []string{
 		"openEHR-EHR-OBSERVATION.blood_pressure.v1",
+		"openEHR-EHR-OBSERVATION.blood_pressure.v1",
+		"openEHR-EHR-OBSERVATION.body_temperature.v1",
 		"openEHR-EHR-OBSERVATION.body_temperature.v1",
 		"openEHR-EHR-OBSERVATION.heart_rate.v1",
+		"openEHR-EHR-OBSERVATION.heart_rate.v1",
+		"openEHR-EHR-OBSERVATION.respiration.v1",
 		"openEHR-EHR-OBSERVATION.respiration.v1",
 	}
 	for _, opts := range corpusOptions(instance.Large) {
@@ -136,16 +141,19 @@ func compileCoronaAnamnese(t *testing.T) *templatecompile.Compiled {
 // four optional SECTION.adhoc.v1 roots, told apart only by name, under
 // content after an optional OBSERVATION.story.v1, and the first of those
 // sections ('Symptome') holds eight optional symptom_sign_screening roots
-// around one optional body_temperature root. So content holds the story and
-// the four sections, in OPT order, and that section holds the nine roots.
-// The composition validates. It holds under both value fills.
+// around one optional body_temperature root. So content holds the story,
+// twice, since it may occur any number of times (Members of a list), and the
+// four sections, each of which occurs once at most, in OPT order, and that
+// section holds the nine roots. The composition validates. It holds under
+// both value fills.
 func TestREQ107_LargeWritesEachRepeatedOptionalArchetype(t *testing.T) {
 	const (
 		screening = "openEHR-EHR-OBSERVATION.symptom_sign_screening.v0"
 		adhoc     = "openEHR-EHR-SECTION.adhoc.v1"
+		story     = "openEHR-EHR-OBSERVATION.story.v1"
 	)
 	c := compileCoronaAnamnese(t)
-	wantContent := []string{"openEHR-EHR-OBSERVATION.story.v1", adhoc, adhoc, adhoc, adhoc}
+	wantContent := []string{story, story, adhoc, adhoc, adhoc, adhoc}
 	wantSections := []string{"Symptome", "Kontakt", "Risikogebiet", "Allgemeine Angaben"}
 	wantItems := []string{screening, screening, screening, screening, "openEHR-EHR-OBSERVATION.body_temperature.v2", screening, screening, screening, screening}
 	for _, opts := range corpusOptions(instance.Large) {
@@ -155,7 +163,7 @@ func TestREQ107_LargeWritesEachRepeatedOptionalArchetype(t *testing.T) {
 				t.Fatalf("Generate(Corona_Anamnese, Large) content = %v, want %v", got, wantContent)
 			}
 			var names []string
-			for _, item := range comp.Content[1:] {
+			for _, item := range comp.Content[2:] {
 				section, ok := item.(*rm.Section)
 				if !ok {
 					t.Fatalf("content item is %T, want *rm.Section", item)
@@ -165,7 +173,7 @@ func TestREQ107_LargeWritesEachRepeatedOptionalArchetype(t *testing.T) {
 			if !slices.Equal(names, wantSections) {
 				t.Errorf("content section names = %q, want %q", names, wantSections)
 			}
-			if got := contentIDs(comp.Content[1].(*rm.Section).Items); !slices.Equal(got, wantItems) {
+			if got := contentIDs(comp.Content[2].(*rm.Section).Items); !slices.Equal(got, wantItems) {
 				t.Errorf("section 'Symptome' items = %v, want %v", got, wantItems)
 			}
 			noValidationErrors(t, comp, c)

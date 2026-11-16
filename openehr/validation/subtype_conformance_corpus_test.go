@@ -17,9 +17,10 @@ import (
 
 // REQ-102 (Validation dimensions: RM type match) — a DV_CODED_TEXT
 // satisfies an OPT child declared as DV_TEXT. These tests take the Large
-// instance the generator builds for a vendored template, code one or more of
-// its DV_TEXT values on the canonical JSON, as a client holding wire data
-// would, and validate the result.
+// instance the generator builds for a vendored template, or the Medium one
+// where a test names issue paths, code one or more of its DV_TEXT values on
+// the canonical JSON, as a client holding wire data would, and validate the
+// result.
 
 // minCorpusSwept is the number of vendored templates the corpus sweep
 // measured: their Large instance validates clean and holds a DV_TEXT
@@ -34,8 +35,17 @@ const minCorpusSwept = 47
 // territory a COMPOSITION root needs; any other root ignores them.
 func generateExample(t *testing.T, c *templatecompile.Compiled) (any, error) {
 	t.Helper()
+	return generateUnder(t, c, instance.Large)
+}
+
+// generateUnder is generateExample under policy. A test that names the path
+// of one member of a node takes Medium, which builds one member of each node
+// that may repeat, where Large builds two and the validator names them by
+// position.
+func generateUnder(t *testing.T, c *templatecompile.Compiled, policy instance.Policy) (any, error) {
+	t.Helper()
 	return instance.Generate(t.Context(), c, instance.Options{
-		Policy:    instance.Large,
+		Policy:    policy,
 		Language:  "en",
 		Territory: "NL",
 		Composer:  &rm.PartyIdentified{Name: new("Test Composer")},
@@ -171,7 +181,8 @@ func TestValidateComposition_REQ102_CodedTextElementValueUnderTextChild(t *testi
 
 // REQ-102 — an ELEMENT name the OPT declares as DV_TEXT may be a
 // DV_CODED_TEXT. The coded name binds to the DV_TEXT child and is walked
-// there, so the child's C_STRING still checks its value.
+// there, so the child's C_STRING still checks its value. The instance is the
+// Medium one, whose ELEMENTs the issue paths name by node id.
 func TestValidateComposition_REQ102_CodedTextNameUnderTextChild(t *testing.T) {
 	t.Parallel()
 	const textOpen = "Test_dv_text_open_constraint.v0"
@@ -201,16 +212,16 @@ func TestValidateComposition_REQ102_CodedTextNameUnderTextChild(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			c := mustCompile(t, tc.template)
-			root, err := generateExample(t, c)
+			root, err := generateUnder(t, c, instance.Medium)
 			if err != nil {
-				t.Fatalf("Generate(%s): %v", tc.template, err)
+				t.Fatalf("Generate(%s, Medium): %v", tc.template, err)
 			}
 			if r := validateRoot(root, c); !r.OK {
-				t.Fatalf("precondition: the Large instance of %s has issues %q, want none", tc.template, issueKeys(r.Issues))
+				t.Fatalf("precondition: the Medium instance of %s has issues %q, want none", tc.template, issueKeys(r.Issues))
 			}
 			coded, n := editElementTexts(t, root, "name", withNodeID(tc.nodeID), tc.edit)
 			if n == 0 {
-				t.Fatalf("the Large instance of %s holds no DV_TEXT name on ELEMENT %s; update the node id", tc.template, tc.nodeID)
+				t.Fatalf("the Medium instance of %s holds no DV_TEXT name on ELEMENT %s; update the node id", tc.template, tc.nodeID)
 			}
 			r := validateRoot(coded, c)
 			got := issueKeys(r.Issues)

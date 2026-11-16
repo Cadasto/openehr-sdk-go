@@ -17,6 +17,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/rmlists"
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/builderseed"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -118,6 +119,9 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	g := &generator{
 		compiled: c,
 		opts:     opts,
+		// The composition builder seeds a Builder with Large short of its
+		// repeats (builderseed).
+		fullLarge: opts.Policy == Large && !builderseed.Asked(ctx),
 	}
 	if opts.ValueFill == RandomFill {
 		g.valueSampler = newSampler(opts.ValueSource)
@@ -155,6 +159,10 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 type generator struct {
 	compiled *templatecompile.Compiled
 	opts     Options
+	// fullLarge is set under Large, except on the call that seeds the
+	// composition builder: a child that may occur more than once then gets
+	// a second member (ownMembers).
+	fullLarge bool
 	// valueSampler draws in-constraint leaf values when opts.ValueFill
 	// is RandomFill; the zero value (used under ExampleFill) is never
 	// consulted. REQ-107.
@@ -2205,13 +2213,13 @@ func (p memberPlan) members() int { return len(p.own) + len(p.topUp) }
 // planMembers returns the members the walk builds for attr, a visited list
 // of optNode whose allowed children are children, without building any.
 // Each allowed child that is not a slot and that the policy does not skip
-// (ownMemberSkipped) gets max(occurrences.lower, 1) members, within the
-// cardinality upper bound (memberCap), where the children that ask for members
-// (asksMember) take the room first and any other child only the room they
-// leave. The top-up then adds the members the attribute still needs
-// (remainingLowerNeeded), within the same bound, one at a time, each from
-// the child topUpSeed names given the members built so far, and stops where
-// it names none.
+// (ownMemberSkipped) gets the members ownMembers gives it, within the
+// cardinality upper bound (memberCap), where the members the children ask
+// for (asksMember, their occurrences lower bounds) take the room first and
+// any other member only the room they leave. The top-up then adds the
+// members the attribute still needs (remainingLowerNeeded), within the same
+// bound, one at a time, each from the child topUpSeed names given the
+// members built so far, and stops where it names none.
 func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode) memberPlan {
 	var plan memberPlan
 	upperBound := memberCap(optNode, attr)
@@ -2233,26 +2241,22 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 			continue
 		}
 		own[i] = true
-		asks := asksMember(child)
-		// An optional child the policy keeps (occurrences lower bound 0)
-		// still gets one member, so the tree carries it once;
-		// ownMemberSkipped above drops the others, under Required every
-		// optional child but one that leads to an entry. Only the top-up
-		// below can build a member of a dropped child, to meet the
-		// attribute's lower bound.
-		childCount := 1
-		if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0 {
-			childCount = occ.Lower()
+		// The members a child asks for are its occurrences lower bound
+		// (asksMember); any further one, such as an optional child's one
+		// member or Large's second member, asks for none.
+		asked := 0
+		if asksMember(child) {
+			asked = child.Occurrences().Lower()
 		}
-		for range childCount {
-			// A child that asks for no member leaves the room the others
+		for k := range g.ownMembers(child) {
+			// A member the child does not ask for leaves the room the others
 			// still need to them.
-			if room := upperBound - total; upperBound >= 0 && (room <= 0 || !asks && room <= reserved) {
+			if room := upperBound - total; upperBound >= 0 && (room <= 0 || k >= asked && room <= reserved) {
 				break
 			}
 			plan.own = append(plan.own, child)
 			total++
-			if asks {
+			if k < asked {
 				reserved--
 			}
 		}
@@ -2286,6 +2290,29 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 		built[i]++
 	}
 	return plan
+}
+
+// ownMembers returns the number of members child, an allowed child that is
+// not a slot and that gets members of its own, gets before the cardinality
+// upper bound caps the list: max(occurrences.lower, 1), or, where the
+// generator builds repeats (Large, but for the composition builder's seed)
+// and child's occurrences upper bound is above 1 or unbounded,
+// max(occurrences.lower, 2). A child that states no occurrences, or whose
+// lower bound is unbounded, gets one. An optional child the policy keeps
+// (occurrences lower bound 0) so gets at least one member and the tree
+// carries it; ownMemberSkipped drops the others, under Required every
+// optional child but one that leads to an entry. Only the top-up can build a
+// member of a dropped child, to meet the attribute's lower bound.
+func (g *generator) ownMembers(child *tcimpl.CompiledNode) int {
+	occ := child.Occurrences()
+	if occ == nil || occ.LowerUnbounded() {
+		return 1
+	}
+	least := 1
+	if g.fullLarge && (occ.UpperUnbounded() || occ.Upper() > 1) {
+		least = 2
+	}
+	return max(occ.Lower(), least)
 }
 
 // builtPerChild returns, for each of children, the number of entries of own

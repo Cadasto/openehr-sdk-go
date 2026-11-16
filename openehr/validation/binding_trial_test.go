@@ -958,16 +958,26 @@ func TestGenerate_REQ107_REQ102_OptionalSiblingBeforeARequiredOneKeepsItsGap(t *
 // REQ-107 Exceptions and known gaps — an earlier sibling with room, here a
 // required one with no occurrences upper bound, that carries a later
 // required one's identity takes every member built for either, so the later
-// one appears 0 times under every policy.
+// one appears 0 times under every policy. Each policy builds one member of
+// the later sibling; of the earlier one, Large builds two, since it may
+// occur any number of times (Members of a list), and Medium and Required
+// one.
 func TestGenerate_REQ107_REQ102_EarlierSiblingWithRoomBeforeARequiredOneKeepsItsGap(t *testing.T) {
 	open := strings.Replace(reusedObservationChild("", 1),
 		"<upper_unbounded>false</upper_unbounded>", "<upper_unbounded>true</upper_unbounded>", 1)
 	open = strings.Replace(open, "<upper>1</upper>", "", 1)
 	c := mustCompileSyntheticOPT(t, reusedArchetypeOPTWith(open, reusedObservationChild("", 1)))
-	for _, policy := range []instance.Policy{instance.Large, instance.Medium, instance.Required} {
-		t.Run(fmt.Sprint(policy), func(t *testing.T) {
+	for _, tc := range []struct {
+		policy  instance.Policy
+		members int
+	}{
+		{policy: instance.Large, members: 3},
+		{policy: instance.Medium, members: 2},
+		{policy: instance.Required, members: 2},
+	} {
+		t.Run(fmt.Sprint(tc.policy), func(t *testing.T) {
 			out, err := instance.Generate(t.Context(), c, instance.Options{
-				Policy:    policy,
+				Policy:    tc.policy,
 				Territory: "NL",
 				Composer:  &rm.PartyIdentified{Name: new("Dr Jones")},
 				Now:       time.Date(2026, 10, 25, 9, 0, 0, 0, time.UTC),
@@ -979,8 +989,8 @@ func TestGenerate_REQ107_REQ102_EarlierSiblingWithRoomBeforeARequiredOneKeepsIts
 			if !ok {
 				t.Fatalf("Generate root = %T, want *rm.Composition", out)
 			}
-			if len(comp.Content) != 2 {
-				t.Fatalf("Generate built %d content items, want one for each required sibling", len(comp.Content))
+			if len(comp.Content) != tc.members {
+				t.Fatalf("Generate built %d content items, want %d: %d of the earlier required sibling and one of the later", len(comp.Content), tc.members, tc.members-1)
 			}
 			r := validation.ValidateComposition(comp, c)
 			want := []string{"cardinality /content[" + reusedID + "]"}

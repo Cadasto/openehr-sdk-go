@@ -127,26 +127,33 @@ func TestGenerateIntervalOrderKeepsEachSideInItsConstraint(t *testing.T) {
 	}
 	for _, tc := range cases {
 		c := compileSyntheticOPT(t, instance.EditCountBounds(t, opt, tc.lowerItem, tc.upperItem))
-		onlyInterval := func(t *testing.T, opts instance.Options) (lower, upper float64) {
+		// everyInterval returns the bounds of each DV_INTERVAL the generator
+		// builds under opts, as many as builtIntervals says.
+		everyInterval := func(t *testing.T, opts instance.Options) [][2]float64 {
 			t.Helper()
 			var found []map[string]any
 			walkIntervals(generateCanonical(t, c, opts), "", func(_ string, iv map[string]any) {
 				found = append(found, iv)
 			})
-			if len(found) != 1 {
-				t.Fatalf("generated %d DV_INTERVAL values, want 1", len(found))
+			if want := builtIntervals(opts.Policy); len(found) != want {
+				t.Fatalf("generated %d DV_INTERVAL values, want %d", len(found), want)
 			}
-			lower, upper, ok := boundedMagnitudes(found[0])
-			if !ok {
-				t.Fatalf("interval %v has no comparable bounded pair", found[0])
+			bounds := make([][2]float64, 0, len(found))
+			for _, iv := range found {
+				lower, upper, ok := boundedMagnitudes(iv)
+				if !ok {
+					t.Fatalf("interval %v has no comparable bounded pair", iv)
+				}
+				bounds = append(bounds, [2]float64{lower, upper})
 			}
-			return lower, upper
+			return bounds
 		}
 		for _, policy := range intervalPolicies {
 			t.Run(tc.name+"/ExampleFill/"+policy.String(), func(t *testing.T) {
-				lower, upper := onlyInterval(t, intervalOptions(policy))
-				if lower != tc.wantLower || upper != tc.wantUpper {
-					t.Errorf("bounds = [%v, %v], want [%v, %v]", lower, upper, tc.wantLower, tc.wantUpper)
+				for _, b := range everyInterval(t, intervalOptions(policy)) {
+					if b[0] != tc.wantLower || b[1] != tc.wantUpper {
+						t.Errorf("bounds = [%v, %v], want [%v, %v]", b[0], b[1], tc.wantLower, tc.wantUpper)
+					}
 				}
 			})
 		}
@@ -155,9 +162,10 @@ func TestGenerateIntervalOrderKeepsEachSideInItsConstraint(t *testing.T) {
 				opts := intervalOptions(instance.Large)
 				opts.ValueFill = instance.RandomFill
 				opts.ValueSource = rand.NewPCG(seed, 1)
-				lower, upper := onlyInterval(t, opts)
-				if lower > upper || !tc.lowerOK(lower) || !tc.upperOK(upper) {
-					t.Errorf("seed %d: bounds = [%v, %v], want lower <= upper, each inside its own side's constraint", seed, lower, upper)
+				for _, b := range everyInterval(t, opts) {
+					if lower, upper := b[0], b[1]; lower > upper || !tc.lowerOK(lower) || !tc.upperOK(upper) {
+						t.Errorf("seed %d: bounds = [%v, %v], want lower <= upper, each inside its own side's constraint", seed, lower, upper)
+					}
 				}
 			}
 		})
