@@ -19,17 +19,50 @@ The RM has deep polymorphism: `LOCATABLE → ENTRY → COMPOSITION`; `DATA_VALUE
 - **Marker interfaces for abstract categories.** An abstract RM category (`DATA_VALUE`, `ITEM_STRUCTURE`, `ENTRY`, …) is a Go interface with an unexported marker method (`isDataValue()`), which keeps a type outside the package from satisfying it by accident; a concrete type satisfies it through its method set, with no registration.
 - **The type registry for `_type`.** The `_type` discriminator maps onto a concrete Go type only through the type registry ([§ Type registry (REQ-040)](#type-registry-req-040)): no tag-magic dispatch on a peeked `_type`, and no generic "RM node" that holds any kind of RM value indistinguishably.
 
+### What is NOT in scope here
+
+- **Template-specific generated structs.** A typed Go struct for a specific OPT (e.g. a vital-signs template) is **not** part of `openehr/rm/` — that belongs in the consuming project (see [scope.md § Out of scope](scope.md#out-of-scope-v1)).
+- **The full RM type list.** The dictionary of types lives in `openehr/rm/`; this spec defines the *rules*, not the inventory.
+
 ## openEHR terminology vocabulary (REQ-034)
 
-The openEHR Terminology — the `openehr` terminology's **groups** (*audit change type*, *version lifecycle state*, *setting*, *participation mode*, *composition category*, …) and **code sets** (*normal statuses*, *compression algorithms*, *integrity check algorithms*), and the **external code sets** the Foundation publishes beside them (*languages* ISO_639-1, *countries* ISO_3166-1, *character sets* IANA_character-sets, *media types* IANA_media-types), that the RM's own invariants reference (`EVENT_CONTEXT.Setting_valid`, `AUDIT_DETAILS.Change_type_valid`, `PARTICIPATION.Mode_valid`, `DV_ORDERED.Normal_status_validity`, `ENTRY.Language_valid`, …) — is part of the specifications the SDK targets, published as a computable artefact by the openEHR Foundation. It is small, closed and versioned with the specifications; it is **not** a runtime terminology-service lookup. The external code sets are the snapshots the Foundation publishes with the TERM release, not the live ISO and IANA registers. Beside them the release publishes the **property-unit table**, `PropertyUnitData.xml`: for each code of the *property* group, the units of measure that measure it, with their UCUM codes, which a `C_DV_QUANTITY` constraint's `property` names ([clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection)). The SDK carries the terminology the way it carries the BMM ([§ REQ-041](#req-041--pinned-bmm-sources)):
+The openEHR Terminology — the `openehr` terminology's **groups** (*audit change type*, *version lifecycle state*, *setting*, *participation mode*, *composition category*, …) and **code sets** (*normal statuses*, *compression algorithms*, *integrity check algorithms*), and the **external code sets** the Foundation publishes beside them (*languages* ISO_639-1, *countries* ISO_3166-1, *character sets* IANA_character-sets, *media types* IANA_media-types), that the RM's own invariants reference (`EVENT_CONTEXT.Setting_valid`, `AUDIT_DETAILS.Change_type_valid`, `PARTICIPATION.Mode_valid`, `DV_ORDERED.Normal_status_validity`, `ENTRY.Language_valid`, …) — is part of the specifications the SDK targets, published as a computable artefact by the openEHR Foundation.
+It is small, closed and versioned with the specifications; it is **not** a runtime terminology-service lookup.
+The external code sets are the snapshots the Foundation publishes with the TERM release, not the live ISO and IANA registers.
+Beside them the release publishes the **property-unit table**, `PropertyUnitData.xml`: for each code of the *property* group, the units of measure that measure it, with their UCUM codes, which a `C_DV_QUANTITY` constraint's `property` names ([clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection)).
+The SDK carries the terminology the way it carries the BMM ([§ REQ-041](#req-041--pinned-bmm-sources)).
 
-- **Pinned source.** The Foundation's `openehr_terminology.xml`, `openehr_external_terminologies.xml` and `PropertyUnitData.xml` for one named TERM release, all three taken from the same upstream commit, are vendored byte-identical under `resources/terminology/`, with the release, the upstream commit and each file's sha256 recorded beside them. A version bump is an explicit, reviewable commit that moves them together; the pin is never hand-edited, and the build gate fails when a vendored file no longer matches its recorded sha256.
-- **Generated accessor.** A building-block package, `openehr/terminology`, **MUST** expose every group and every code set of the pin as typed, closed, source-ordered values — groups with code → rubric, rubric → code and membership lookups, code sets with membership lookups and the issuer and external identifier the pin gives each (`ISO_639-1`, `IANA_character-sets`, `openehr_normal_statuses`, …) — plus the pinned release version and the property-unit table: for each property code, the UCUM codes of the units the table lists for it, taken trimmed, once each and in source order, with the primary units marked, and a membership lookup. A unit the table gives no UCUM code contributes none. Its tables are generated from the pin, and the build gate fails when they drift from it; its import rule is in [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence).
-- **Membership.** A code set's membership lookup **MUST** ignore letter case when the pin names an issuer other than openEHR (the ISO and IANA sets), because those issuers do: the IANA character-set registry makes no distinction between upper and lower case, RFC 6838 §4.2 makes media type names case-insensitive, and RFC 5646 §2.1.1 treats the ISO 639 language and ISO 3166-1 region subtags of a language tag as case-insensitive. A membership lookup **MUST** be exact for an openEHR-issued code set, as a group's lookups are, and for a UCUM code, which is case-sensitive. A lookup **MUST** accept only a code the pinned set lists, under the letter-case rule above: a code the live ISO or IANA register holds and the pinned snapshot leaves out, such as one the register added after the release, is not a member until a release bump brings it in, and nor is an IANA alias the set leaves out, such as `ISO-8859-1` beside the listed name `ISO_8859-1:1987`.
-- **One home per code.** SDK code that mints, defaults, validates, or reconstructs an `openehr`-terminology coded value from a bare code or a bare rubric takes the code set, the rubric and the membership verdict from the accessor; a hand-typed openEHR code table or rubric outside it is a defect. A surface can keep named constants for the codes it promotes (`LifecycleStateComplete`, `ChangeTypeCreation`, …), but a surface that validates such a code **MUST** judge it by its group membership in the pin, and a `DV_CODED_TEXT` the SDK builds from a code **MUST** carry that code's pinned rubric as its `value`, never a rubric typed beside the code. A codec that instead *transports* a caller-supplied code-and-rubric pair whole — the FLAT `ctx/setting` `|code`+`|value`, say — transcribes it and does **not** re-validate its membership here; enforcing the RM instance invariants (`EVENT_CONTEXT.Setting_valid`, …) on decoded values is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this requirement's.
-- **Negative space.** A lookup of an unknown code or rubric **MUST** report absence (a false second return) rather than a fabricated value or a panic, on a nil group or property too.
+#### Pinned source
 
-*Out of scope:* external terminologies (SNOMED CT, LOINC, …) — [REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) covers the bindings an OPT declares, and a terminology *service* stays a consumer concern. Evaluating the RM's coded invariants against the accessor on an RM instance is the template-less RM floor's ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) § *Coded invariants*), not this requirement's.
+The Foundation's `openehr_terminology.xml`, `openehr_external_terminologies.xml` and `PropertyUnitData.xml` for one named TERM release, all three taken from the same upstream commit, are vendored byte-identical under `resources/terminology/`, with the release, the upstream commit and each file's sha256 recorded beside them.
+A version bump is an explicit, reviewable commit that moves them together; the pin is never hand-edited, and the build gate fails when a vendored file no longer matches its recorded sha256.
+
+#### Generated accessor
+
+A building-block package, `openehr/terminology`, **MUST** expose every group and every code set of the pin as typed, closed, source-ordered values — groups with code → rubric, rubric → code and membership lookups, code sets with membership lookups and the issuer and external identifier the pin gives each (`ISO_639-1`, `IANA_character-sets`, `openehr_normal_statuses`, …) — plus the pinned release version and the property-unit table: for each property code, the UCUM codes of the units the table lists for it, taken trimmed, once each and in source order, with the primary units marked, and a membership lookup.
+A unit the table gives no UCUM code contributes none.
+Its tables are generated from the pin, and the build gate fails when they drift from it; its import rule is in [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence).
+
+#### Membership
+
+A code set's membership lookup **MUST** ignore letter case when the pin names an issuer other than openEHR (the ISO and IANA sets), because those issuers do: the IANA character-set registry makes no distinction between upper and lower case, RFC 6838 §4.2 makes media type names case-insensitive, and RFC 5646 §2.1.1 treats the ISO 639 language and ISO 3166-1 region subtags of a language tag as case-insensitive.
+A membership lookup **MUST** be exact for an openEHR-issued code set, as a group's lookups are, and for a UCUM code, which is case-sensitive.
+A lookup **MUST** accept only a code the pinned set lists, under the letter-case rule above: a code the live ISO or IANA register holds and the pinned snapshot leaves out, such as one the register added after the release, is not a member until a release bump brings it in, and nor is an IANA alias the set leaves out, such as `ISO-8859-1` beside the listed name `ISO_8859-1:1987`.
+
+#### One home per code
+
+SDK code that mints, defaults, validates, or reconstructs an `openehr`-terminology coded value from a bare code or a bare rubric takes the code set, the rubric and the membership verdict from the accessor; a hand-typed openEHR code table or rubric outside it is a defect.
+A surface can keep named constants for the codes it promotes (`LifecycleStateComplete`, `ChangeTypeCreation`, …), but a surface that validates such a code **MUST** judge it by its group membership in the pin, and a `DV_CODED_TEXT` the SDK builds from a code **MUST** carry that code's pinned rubric as its `value`, never a rubric typed beside the code.
+A codec that instead *transports* a caller-supplied code-and-rubric pair whole — the FLAT `ctx/setting` `|code`+`|value`, say — transcribes it and does **not** re-validate its membership here; enforcing the RM instance invariants (`EVENT_CONTEXT.Setting_valid`, …) on decoded values is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this requirement's.
+
+#### Negative space
+
+A lookup of an unknown code or rubric **MUST** report absence (a false second return) rather than a fabricated value or a panic, on a nil group or property too.
+
+#### Out of scope
+
+External terminologies (SNOMED CT, LOINC, …) — [REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) covers the bindings an OPT declares, and a terminology *service* stays a consumer concern.
+Evaluating the RM's coded invariants against the accessor on an RM instance is the template-less RM floor's ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) § *Coded invariants*), not this requirement's.
 
 ## Type registry (REQ-040)
 
@@ -76,12 +109,7 @@ Because ADR 0002 D4 flattens the `LOCATABLE` fields into every concrete descenda
 - Accessors return the field verbatim, so a getter called on a typed-nil `*T` panics; a caller guards with `rm.IsTypedNil` before asserting or calling.
 - The surface is machine-owned: accessor emission resolves types through the same rules as struct-field rendering, and the generator's drift check covers it ([§ REQ-041](#req-041--pinned-bmm-sources)).
 
-## What is NOT in scope here
-
-- **Template-specific generated structs.** A typed Go struct for a specific OPT (e.g. a vital-signs template) is **not** part of `openehr/rm/` — that belongs in the consuming project (see [scope.md § Out of scope](scope.md#out-of-scope-v1)).
-- **The full RM type list.** The dictionary of types lives in `openehr/rm/`; this spec defines the *rules*, not the inventory.
-
-## Codec interaction
+### Codec interaction
 
 Codecs in `openehr/serialize/` are the consumers of the type registry on the read path, and the inverse on the write path:
 
@@ -137,6 +165,177 @@ The schema a generation target loads is not a pinned file but a root schema the 
 - **The RM root**, under an id of its own, includes `openehr_rm_1.2.0`, keeps its `rm_release`, and corrects `TRANSLATION_DETAILS.accreditation`, the spelling the openEHR ITS-XML schemas and ITS-JSON use and the RM schema misspells, until the RM schema is re-pinned with the upstream fix.
 - **Observable.** A generated type **MUST** carry the names its root declares, in Go, canonical JSON and canonical XML alike, `rm.TranslationDetails.Accreditation` and `aom14.CCodePhrase` among them. A document that writes a property in the pinned schema's spelling instead is unmatched content ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)); one that names a class by the pinned schema's name in `_type` or `xsi:type` names an unknown type and fails in every mode, as REQ-170 says.
 - **Gate.** The build gate runs the root check, a Go test in `internal/bmmgen`, on every root with its includes: every type name resolves after the merge; every class, property and extension entry a root declares carries its reason and upstream reference; each shadow still differs from the class it shadows, so a re-pin that lands the upstream fix fails the check until the shadow goes; no root's id is a pinned schema's; and a root's top-level members are P_BMM schema members or the SDK extension keys, so a misspelt key cannot be passed over. The drift check holds the generated output to the roots as it holds it to a pinned file. A generated file's header names the root and the pinned schemas it includes.
+
+#### Mapping rules
+
+How each P_BMM construct becomes Go code.
+
+##### Schema → Go package set
+
+| BMM schema | Go package | v1 |
+|---|---|---|
+| `openehr_base_1.3.0` | shared between `openehr/rm/` (primitives + foundational classes); no dedicated `openehr/base/` package — base types appear in their using packages. Where BASE and RM declare a class of one name (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, `RESOURCE_DESCRIPTION_ITEM`, `TRANSLATION_DETAILS`, `CODE_PHRASE`), `openehr/rm/` holds the RM form, which the root's precedence over its include gives it and which ADL 1.4 archetypes and OPTs carry; the BASE form, which AOM 2 uses, is emitted into AOM 2's package when that target is wired in | ✓ |
+| `openehr_rm_1.2.0`, through the SDK-authored RM root ([§ SDK-authored root schemas](#sdk-authored-root-schemas)) | `openehr/rm/` — one struct file per BMM package, e.g. `openehr/rm/data_types_quantity_gen.go`, plus its JSON and XML codec files when the package has concrete classes. The `org.openehr.rm.ehr_extract` package is **skipped** for v1. | ✓ (less ehr_extract) |
+| `openehr_am_1.4.0`, through the SDK-authored root `openehr_operational_template_1.4.0` ([§ SDK-authored root schemas](#sdk-authored-root-schemas)) | `openehr/aom/aom14/`, the AOM 1.4 classes and the ADL 1.4 operational template classes, one struct file per BMM package, e.g. `openehr/aom/aom14/archetype_gen.go`, plus its JSON and XML codec files when the package has concrete classes. The package is a sibling of `openehr/rm/`, **not** a sub-package of `openehr/template/`. Rationale: AOM is the in-memory model of an *archetype*; templates consume archetypes but AOM is the more fundamental sibling of RM. | ✓ |
+| `openehr_am_2.4.0` | `openehr/aom/aom2/` (when wired in) | deferred |
+| `openehr_lang_1.1.0` | would target `openehr/bmm/` (BMM meta-classes), but v1 hand-writes that loader against the P_BMM persistence shape — generation deferred | deferred |
+| `openehr_term_3.1.0` | would target `openehr/rm/terminology/` (terminology service interface) | deferred |
+
+**Why AOM is a sibling of RM, not a sub-package of template.** Archetypes and templates are distinct openEHR knowledge artefacts: archetypes define reusable clinical content (parsed from ADL into AOM); templates compose and constrain archetypes for a use case (parsed from OET into OPT). AOM is the in-memory form of an *archetype*; the compile step in `openehr/templatecompile` *consumes* AOM types but does not own them. Placing AOM at `openehr/aom/` keeps the parallel with `openehr/rm/`: both are top-level openEHR information models that the rest of the SDK depends on.
+
+##### Class → Go type
+
+| BMM class kind | Go output |
+|---|---|
+| Concrete class (`is_abstract` absent or `false`) | `type X struct { ... }` carrying its abstract ancestors' properties as its own, and embedding a concrete or whitelisted abstract-generic ancestor ([§ The shape of the RM in Go](#the-shape-of-the-rm-in-go)) |
+| Abstract class (`is_abstract: true`) | `type X interface { isX() }` plus a marker method on every concrete descendant. Per [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go). |
+| `P_BMM_INTERFACE` | `type X interface { isX() }`, a marker only ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4). The generator emits no methods for its `functions`: today that leaves the four of `CODE_SET_ACCESS` and the six of `TERMINOLOGY_ACCESS` out, and no class in the pinned BMM descends from an interface ([STRAND-12](research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag)) |
+| `P_BMM_ENUMERATION_STRING` | `type X string` + constants for each item |
+| `P_BMM_ENUMERATION_INTEGER` | `type X int` + constants for each item |
+| Generic class (`generic_parameter_defs` present) | Generic Go type `type X[T constraint] struct { ... }` where the constraint corresponds to the `conforms_to_type` upper bound |
+
+Inheritance via `ancestors` follows [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go): an abstract non-generic ancestor's properties are flattened into each concrete descendant, and only a concrete or whitelisted abstract-generic ancestor is embedded.
+
+LOCATABLE concrete descendants additionally receive the generated identity surface and the reverse registry of [§ Type registry (REQ-040)](#type-registry-req-040).
+
+##### Property → Go field
+
+| P_BMM property kind | Go field type |
+|---|---|
+| `P_BMM_SINGLE_PROPERTY` + `is_mandatory: true` | `T` (the mapped type) |
+| `P_BMM_SINGLE_PROPERTY` + `is_mandatory: false` or absent | `*T` (pointer to express optionality) |
+| `P_BMM_SINGLE_PROPERTY_OPEN` | `T` where `T` is the open generic parameter |
+| `P_BMM_CONTAINER_PROPERTY` | `[]T` for `List`, `Array` and `Set`; `map[string]V` for `Hash` — see § Container mapping |
+| `P_BMM_GENERIC_PROPERTY` | The generic instantiation, e.g. `*DVInterval[DVQuantity]` for `DV_INTERVAL<DV_QUANTITY>` |
+
+Three cases depart from the single-property rows. A non-mandatory property whose type the generator emits as a Go interface (an abstract class, or a concrete class with subtypes, emitted as a narrow `…Like` interface) stays `T`, because an interface field is already nilable. A mandatory property that closes a cycle of mandatory struct-typed properties, such as `ARCHETYPE.ontology` and `ARCHETYPE_ONTOLOGY.parent_archetype` in the pinned `openehr_am_1.4.0`, becomes `*T`, because Go cannot declare a struct that contains itself by value. A non-mandatory property whose BMM type is `Any` **MUST** be emitted as `*any`, because `Any` is a primitive and not a class the interface exception covers. The pinned `openehr_am_1.4.0` emits five, each an `assumed_value` it declares on `C_DEFINED_OBJECT` or `C_PRIMITIVE`; the AOM 1.4 root drops it from `C_COMPLEX_OBJECT` and `C_PRIMITIVE_OBJECT` and gives it, on the other classes that have one, the type the AM Release-1.4 schema gives it ([clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)), so the generated types hold none. A mandatory `Any` property **MUST** be emitted as `any`.
+
+JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitzero` on a non-mandatory single or generic property held as a pointer (`*T`, `*DVInterval[DVQuantity]`, `*[]T`, `*map[string]V`), so that only a nil pointer is omitted, and `omitempty` on a non-mandatory one that is not a pointer (a Go interface, or a `P_BMM_SINGLE_PROPERTY_OPEN` typed by the open generic parameter). A mandatory property whose Go field can hold no value carries an omit option, so that an absent one is left out of canonical JSON ([REQ-052](wire.md#req-052) § An absent mandatory member): `omitzero` on a list, map or `any` field and on one held as a pointer, a pointer that breaks a cycle included, so that only a nil value is left out and a present empty list or map is still written; and `omitempty` on a Go interface or on a field typed by its class's own generic parameter (a `P_BMM_SINGLE_PROPERTY_OPEN`, or a `P_BMM_SINGLE_PROPERTY` naming that parameter), so that a typed-nil pointer, which encodes as `null`, is left out too. Any other mandatory property, a struct held by value or a primitive, carries no omit option. A `P_BMM_CONTAINER_PROPERTY` field (`[]T`) carries `omitzero` when its cardinality lower bound is 1 or more, and `omitempty` when it is 0 or absent, with one exception: the item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` carry `omitzero`, so a present empty one is written as `[]` and only a nil one is left out. An archetype can make these lists mandatory by existence (an AOM 1.4 `C_MULTIPLE_ATTRIBUTE`'s `existence` says whether the list is there, its `cardinality` how many members it holds), a CDR refuses a structure that leaves its list out, and no RM invariant keeps them non-empty, so `[]` is RM-valid. Every other optional container keeps `omitempty`; one an invariant keeps non-empty, as `Mappings_valid` keeps `DV_TEXT.mappings`, could not take the exception, since `[]` would be RM-invalid. The generator reads the three from one list, `internal/rmlists`, which a test pins to the vendored BMM. A `P_BMM_GENERIC_PROPERTY` over `Hash` or `List` follows the single-property rule: a mandatory one is `map[string]V` or `[]T` with `omitzero`, and an optional one is `*map[string]V` or `*[]T` with `omitzero`. Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md). The generated `DVQuantity`, its doc comments left out, shows the rules: its abstract ancestors' fields (`Accuracy`, `MagnitudeStatus`, `NormalRange`, …) flattened in with no embedded ancestor, mandatory properties by value, optional single properties as pointers with `omitzero`, and an optional list with `omitempty`:
+
+```go
+type DVQuantity struct {
+	Accuracy             *Real                        `json:"accuracy,omitzero"`
+	AccuracyIsPercent    *bool                        `json:"accuracy_is_percent,omitzero"`
+	Magnitude            Real                         `json:"magnitude"`
+	MagnitudeStatus      *string                      `json:"magnitude_status,omitzero"`
+	NormalRange          *DVInterval[DVQuantity]      `json:"normal_range,omitzero"`
+	NormalStatus         *CodePhrase                  `json:"normal_status,omitzero"`
+	OtherReferenceRanges []ReferenceRange[DVQuantity] `json:"other_reference_ranges,omitempty"`
+	Precision            *Integer                     `json:"precision,omitzero"`
+	Units                string                       `json:"units"`
+	UnitsDisplayName     *string                      `json:"units_display_name,omitzero"`
+	UnitsSystem          *string                      `json:"units_system,omitzero"`
+}
+```
+
+##### Type → Go type expression
+
+| P_BMM type kind | Go expression |
+|---|---|
+| `P_BMM_SIMPLE_TYPE` with `type: "X"` | `X` (or its Go alias from the primitive map; see § Primitive type mapping) |
+| `P_BMM_GENERIC_TYPE` with `root_type: "Foo"`, `generic_parameters: ["Bar"]` | `Foo[Bar]` |
+| `P_BMM_CONTAINER_TYPE` with `container_type: "List"`, nested type | `[]T` (see § Container mapping) |
+
+##### Container mapping
+
+| BMM container_type | Go shape | Notes |
+|---|---|---|
+| `List` | `[]T` | Order matters; duplicates allowed |
+| `Array` | `[]T` | Same as List in Go; the distinction is historical |
+| `Set` | `[]T` | No uniqueness check is generated. Go has no native set, and modelling one as `map[T]struct{}` complicates JSON. |
+| `Hash` | `map[string]V` | Keys are `String` |
+
+The wire format JSON does not distinguish List/Set/Array — they all serialise as arrays. Modelling them all as `[]T` keeps round-tripping exact; the Set / Array semantics surface in validators and AQL path-resolution rather than in the type itself.
+
+##### Cardinality
+
+`P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) reaches the SDK through the generated attribute metadata in `openehr/rm/rminfo`: `AttrMeta.Container` marks a container property, and `AttrMeta.Required` is true when `cardinality.lower` is 1 or more, which the validation floor checks ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). The upper bound is not kept: no container in the pinned RM and BASE BMMs has a finite one.
+
+##### Functions
+
+`P_BMM_*` function definitions on classes (e.g. `DV_QUANTITY.add`, `DV_QUANTITY.less_than`) carry pre/post-conditions and operator aliases. The SDK's posture:
+
+- The generator emits **method stubs** for class functions, with the documented `pre_conditions` / `post_conditions` as `// Pre:` / `// Post:` comments. A `P_BMM_INTERFACE`'s functions are the exception: no stub is emitted for them (Class → Go type above, [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4).
+- The generator does **not** emit the function body — implementations are hand-written in non-generated files ([REQ-041](#req-041--pinned-bmm-sources)) where they are needed.
+- Functions that have not been hand-implemented **SHOULD** panic with a clear message (e.g. `panic("not implemented: DV_QUANTITY.add — implement in a non-generated file")`); this is one of the rare allowed panics in SDK code, justified by the fact that the function is documented in the BMM but not yet wired in.
+
+For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The RM functions the SDK implements, and those it leaves out, are specified in [§ RM behavioural functions](#rm-behavioural-functions).
+
+#### Primitive type mapping
+
+The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table below. Mappings are **fixed**; do not introduce alternative widenings.
+
+| BMM primitive | Go type | Notes |
+|---|---|---|
+| `Boolean` | `bool` | |
+| `Integer` | `rm.Integer` (underlying `int32`) | Pinned to 32-bit per the BMM spec. Emitted as the defined type `rm.Integer` so the codec can attach the wire-tolerance rule from [ADR 0004](../adr/0004-numeric-wire-tolerance.md). |
+| `Integer64` | `rm.Integer64` (underlying `int64`) | Emitted as the defined type `rm.Integer64` so the codec can attach the same wire-tolerance rule as `Integer` ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)). `DV_COUNT.magnitude` is the RM's one `Integer64` attribute. |
+| `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [ADR 0004](../adr/0004-numeric-wire-tolerance.md). |
+| `Double` | `float64` | Same as `Real`, no codec tolerance attached. |
+| `Character` | `rm.Character` | canonical JSON single-character **string**, not a number; hand-written named type, like `Integer`/`Real` |
+| `String` | `string` | |
+| `Octet` | `byte` | |
+| `Uri` | `string` | Not `net/url.URL`, so the text round-trips exactly as written |
+| `Any` | `any` | Optional properties differ: § [Property → Go field](#property--go-field). |
+| `Iso8601_date` | `string` | See § ISO 8601 types below |
+| `Iso8601_time` | `string` | |
+| `Iso8601_date_time` | `string` | |
+| `Iso8601_duration` | `string` | |
+| `Iso8601_type` | `string` | Abstract — supertype of the four above |
+| `Temporal` | `string` | Abstract |
+| `Numeric` | (abstract; not directly used) | |
+| `Ordered` | (abstract; not directly used) | |
+| `Ordered_Numeric` | (abstract; not directly used) | |
+| `Cardinality` | `rm.Cardinality` (struct) | Generated from the BASE schema — lower, upper, upper_unbounded |
+| `Multiplicity_interval` | `rm.MultiplicityInterval` (struct) | Generated from base BMM |
+| `Interval` | generic `Interval[T]` | Generated; ancestors set on dependent types |
+| `List` | `[]T` | See § Container mapping |
+| `Set` | `[]T` | See § Container mapping |
+| `Array` | `[]T` | See § Container mapping |
+| `Hash` | `map[string]V` | See § Container mapping |
+| `Container` | abstract; not directly used | |
+| `Terminology_code` | `rm.TerminologyCode` (struct) | Generated from base BMM |
+| `Terminology_term` | `rm.TerminologyTerm` (struct) | Generated from base BMM |
+
+##### ISO 8601 types
+
+The four ISO 8601 BMM types map to Go `string` rather than `time.Time` because:
+
+- The openEHR formats include partial dates (`yyyy`, `yyyy-mm`) and partial times (`HH`, `HH:MM`) that `time.Time` cannot round-trip without information loss.
+- Wire-format byte-fidelity matters for canonical JSON conformance (REQ-052).
+
+Helpers in `openehr/rm/` (hand-written, non-generated) **SHOULD** offer typed parsing into `time.Time` and back for consumers who need it, but the storage type is the wire-equivalent `string`.
+
+#### Generator output conventions
+
+- File naming: `<package_name>_gen.go` for generated files. Example: `openehr/rm/data_types_quantity_gen.go` corresponds to BMM package `org.openehr.rm.data_types.quantity`.
+- Header: every generated file begins with `// Code generated by bmmgen; DO NOT EDIT.` followed by a `// Source:` line naming the root schema and the pinned schemas it includes, for traceability.
+- RM release: the public constant `rm.Release` **MUST** carry the primary RM schema's `rm_release`. What the SDK writes into `ARCHETYPED.rm_version` is [wire.md § REQ-053](wire.md#req-053) for FLAT and STRUCTURED decode and [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) for the instance generator.
+- Hand-written companions: any file without the `_gen.go` suffix in the target package (such as the `*_funcs.go` files of `openehr/rm`) holds method bodies, helper functions, and codec hooks.
+- One Go package per generation target (BASE and RM both emit into `openehr/rm`), one file per BMM package (Go does not require a one-to-one directory mapping with BMM packages).
+- The generator emits a registrations file in `openehr/rm` (and in `openehr/aom/aom14`) which registers every concrete RM/AOM `_type` with its constructor (REQ-040). Per [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D3, the registration file lives in the target package — **not** under `openehr/rm/typereg/` — so the constructor closures can reference the target types directly without forming a `typereg → rm` import cycle.
+
+#### Documentation propagation
+
+The generator carries the BMM `documentation` field on classes, properties, and functions into the Go doc comments of the generated types, fields and methods. The transformation is verbatim — no rewording, no abbreviation. Markdown-style cross-refs (`_units_`, `\`magnitude\``) are converted to Go-doc-friendly equivalents.
+
+#### v1 scope summary
+
+**Generated in v1:**
+- `openehr/rm/` from the SDK-authored RM root over `openehr_rm_1.2.0` (excluding `ehr_extract`) + `openehr_base_1.3.0`.
+- The type registrations of `openehr/rm/typereg/`, which is itself hand-written, from the same.
+- `openehr/rm/rminfo/` from the same — the flattened attribute tables, the REQ-048 class graph and absence table, and the REQ-112 function table that `rminfo.IsNonStorableAttr` reads.
+- `internal/rmaccess` from the same — the attribute access of every registered class (REQ-171).
+- The invariant inventory of `openehr/validation` from the same and the hand-kept invariant ledger — the invariant inventory (REQ-171).
+- `openehr/aom/aom14/` from `openehr_operational_template_1.4.0`, the SDK-authored root over `openehr_am_1.4.0` + `openehr_base_1.3.0` and the RM root.
+
+**Deferred (BMM file kept, no v1 generation):**
+- AOM 2 (`openehr_am_2.4.0`) — consumers requesting ADL 2 / AOM 2 are out of v1 scope.
+- LANG (`openehr_lang_1.1.0`) — `openehr/bmm/` is hand-written for v1; the LANG BMM remains as a reference / cross-check.
+- TERM (`openehr_term_3.1.0`) — terminology service interface not required by v1 consumers.
+- RM `ehr_extract` package — EHR Extract is a separate exchange surface not exercised by v1 use cases.
+
+Deferred items become future plan phases when consumer demand arises; the BMM-conformance contract above continues to apply.
 
 ### REQ-045 — BMM loader is a building block
 
@@ -280,181 +479,6 @@ A name reporting an absence reason **MUST** report not-known on every `Lookup` a
 **Acceptance:** the compiled-in answers equal an independent reduction of the pinned BMM (class universe, abstractness, immediate parents, transitive ancestors, per-attribute declaring class) — the equivalence [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) asserts. `ENTRY` reports abstract and expands to exactly the concrete entry classes; a concrete class expands to itself; a dead-end abstract class expands to nothing while still reporting as known. `LOCATABLE`-inherited attributes report `LOCATABLE` (or the redefining descendant) as their declaration site while the flattened lookup keeps answering unchanged. A name outside the universe is distinguishable from every in-universe answer on every question. The compiled-in absence table equals an independent reduction of the pinned BMM, in both directions, under the fixed precedence, with the negative-space consistency held on every out-of-universe name it exercises — what [PROBE-098](conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) asserts. Hand-editing a generated hierarchy field fails the drift check.
 
 **Out of scope:** runtime BMM loading (ruled out above, not deferred); AOM/AM class hierarchies; generic-parameter resolution beyond the root-type reduction the attribute tables already apply; selecting among multiple pinned schemas at run time; deriving *instantiability* beyond the BMM's own abstractness flag (an RM invariant that forbids a value is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this surface's); shipping any excluded model (the exclusions are pinned intent — PROBE-094 — and the absence reasons make them legible, not reversible); naming the *skipped package* for an excluded-package name (deferred until a consumer needs it); and policy — what a caller does with a reason is the caller's, not this surface's.
-
-### Mapping rules
-
-**Implements:** REQ-041
-
-How each P_BMM construct becomes Go code.
-
-#### Schema → Go package set
-
-| BMM schema | Go package | v1 |
-|---|---|---|
-| `openehr_base_1.3.0` | shared between `openehr/rm/` (primitives + foundational classes); no dedicated `openehr/base/` package — base types appear in their using packages. Where BASE and RM declare a class of one name (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, `RESOURCE_DESCRIPTION_ITEM`, `TRANSLATION_DETAILS`, `CODE_PHRASE`), `openehr/rm/` holds the RM form, which the root's precedence over its include gives it and which ADL 1.4 archetypes and OPTs carry; the BASE form, which AOM 2 uses, is emitted into AOM 2's package when that target is wired in | ✓ |
-| `openehr_rm_1.2.0`, through the SDK-authored RM root ([§ SDK-authored root schemas](#sdk-authored-root-schemas)) | `openehr/rm/` — one struct file per BMM package, e.g. `openehr/rm/data_types_quantity_gen.go`, plus its JSON and XML codec files when the package has concrete classes. The `org.openehr.rm.ehr_extract` package is **skipped** for v1. | ✓ (less ehr_extract) |
-| `openehr_am_1.4.0`, through the SDK-authored root `openehr_operational_template_1.4.0` ([§ SDK-authored root schemas](#sdk-authored-root-schemas)) | `openehr/aom/aom14/`, the AOM 1.4 classes and the ADL 1.4 operational template classes, one struct file per BMM package, e.g. `openehr/aom/aom14/archetype_gen.go`, plus its JSON and XML codec files when the package has concrete classes. The package is a sibling of `openehr/rm/`, **not** a sub-package of `openehr/template/`. Rationale: AOM is the in-memory model of an *archetype*; templates consume archetypes but AOM is the more fundamental sibling of RM. | ✓ |
-| `openehr_am_2.4.0` | `openehr/aom/aom2/` (when wired in) | deferred |
-| `openehr_lang_1.1.0` | would target `openehr/bmm/` (BMM meta-classes), but v1 hand-writes that loader against the P_BMM persistence shape — generation deferred | deferred |
-| `openehr_term_3.1.0` | would target `openehr/rm/terminology/` (terminology service interface) | deferred |
-
-**Why AOM is a sibling of RM, not a sub-package of template.** Archetypes and templates are distinct openEHR knowledge artefacts: archetypes define reusable clinical content (parsed from ADL into AOM); templates compose and constrain archetypes for a use case (parsed from OET into OPT). AOM is the in-memory form of an *archetype*; the compile step in `openehr/templatecompile` *consumes* AOM types but does not own them. Placing AOM at `openehr/aom/` keeps the parallel with `openehr/rm/`: both are top-level openEHR information models that the rest of the SDK depends on.
-
-#### Class → Go type
-
-| BMM class kind | Go output |
-|---|---|
-| Concrete class (`is_abstract` absent or `false`) | `type X struct { ... }` carrying its abstract ancestors' properties as its own, and embedding a concrete or whitelisted abstract-generic ancestor ([§ The shape of the RM in Go](#the-shape-of-the-rm-in-go)) |
-| Abstract class (`is_abstract: true`) | `type X interface { isX() }` plus a marker method on every concrete descendant. Per [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go). |
-| `P_BMM_INTERFACE` | `type X interface { isX() }`, a marker only ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4). The generator emits no methods for its `functions`: today that leaves the four of `CODE_SET_ACCESS` and the six of `TERMINOLOGY_ACCESS` out, and no class in the pinned BMM descends from an interface ([STRAND-12](research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag)) |
-| `P_BMM_ENUMERATION_STRING` | `type X string` + constants for each item |
-| `P_BMM_ENUMERATION_INTEGER` | `type X int` + constants for each item |
-| Generic class (`generic_parameter_defs` present) | Generic Go type `type X[T constraint] struct { ... }` where the constraint corresponds to the `conforms_to_type` upper bound |
-
-Inheritance via `ancestors` follows [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go): an abstract non-generic ancestor's properties are flattened into each concrete descendant, and only a concrete or whitelisted abstract-generic ancestor is embedded.
-
-LOCATABLE concrete descendants additionally receive the generated identity surface and the reverse registry of [§ Type registry (REQ-040)](#type-registry-req-040).
-
-#### Property → Go field
-
-| P_BMM property kind | Go field type |
-|---|---|
-| `P_BMM_SINGLE_PROPERTY` + `is_mandatory: true` | `T` (the mapped type) |
-| `P_BMM_SINGLE_PROPERTY` + `is_mandatory: false` or absent | `*T` (pointer to express optionality) |
-| `P_BMM_SINGLE_PROPERTY_OPEN` | `T` where `T` is the open generic parameter |
-| `P_BMM_CONTAINER_PROPERTY` | `[]T` for `List`, `Array` and `Set`; `map[string]V` for `Hash` — see § Container mapping |
-| `P_BMM_GENERIC_PROPERTY` | The generic instantiation, e.g. `*DVInterval[DVQuantity]` for `DV_INTERVAL<DV_QUANTITY>` |
-
-Three cases depart from the single-property rows. A non-mandatory property whose type the generator emits as a Go interface (an abstract class, or a concrete class with subtypes, emitted as a narrow `…Like` interface) stays `T`, because an interface field is already nilable. A mandatory property that closes a cycle of mandatory struct-typed properties, such as `ARCHETYPE.ontology` and `ARCHETYPE_ONTOLOGY.parent_archetype` in the pinned `openehr_am_1.4.0`, becomes `*T`, because Go cannot declare a struct that contains itself by value. A non-mandatory property whose BMM type is `Any` **MUST** be emitted as `*any`, because `Any` is a primitive and not a class the interface exception covers. The pinned `openehr_am_1.4.0` emits five, each an `assumed_value` it declares on `C_DEFINED_OBJECT` or `C_PRIMITIVE`; the AOM 1.4 root drops it from `C_COMPLEX_OBJECT` and `C_PRIMITIVE_OBJECT` and gives it, on the other classes that have one, the type the AM Release-1.4 schema gives it ([clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)), so the generated types hold none. A mandatory `Any` property **MUST** be emitted as `any`.
-
-JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitzero` on a non-mandatory single or generic property held as a pointer (`*T`, `*DVInterval[DVQuantity]`, `*[]T`, `*map[string]V`), so that only a nil pointer is omitted, and `omitempty` on a non-mandatory one that is not a pointer (a Go interface, or a `P_BMM_SINGLE_PROPERTY_OPEN` typed by the open generic parameter). A mandatory property whose Go field can hold no value carries an omit option, so that an absent one is left out of canonical JSON ([REQ-052](wire.md#req-052) § An absent mandatory member): `omitzero` on a list, map or `any` field and on one held as a pointer, a pointer that breaks a cycle included, so that only a nil value is left out and a present empty list or map is still written; and `omitempty` on a Go interface or on a field typed by its class's own generic parameter (a `P_BMM_SINGLE_PROPERTY_OPEN`, or a `P_BMM_SINGLE_PROPERTY` naming that parameter), so that a typed-nil pointer, which encodes as `null`, is left out too. Any other mandatory property, a struct held by value or a primitive, carries no omit option. A `P_BMM_CONTAINER_PROPERTY` field (`[]T`) carries `omitzero` when its cardinality lower bound is 1 or more, and `omitempty` when it is 0 or absent, with one exception: the item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` carry `omitzero`, so a present empty one is written as `[]` and only a nil one is left out. An archetype can make these lists mandatory by existence (an AOM 1.4 `C_MULTIPLE_ATTRIBUTE`'s `existence` says whether the list is there, its `cardinality` how many members it holds), a CDR refuses a structure that leaves its list out, and no RM invariant keeps them non-empty, so `[]` is RM-valid. Every other optional container keeps `omitempty`; one an invariant keeps non-empty, as `Mappings_valid` keeps `DV_TEXT.mappings`, could not take the exception, since `[]` would be RM-invalid. The generator reads the three from one list, `internal/rmlists`, which a test pins to the vendored BMM. A `P_BMM_GENERIC_PROPERTY` over `Hash` or `List` follows the single-property rule: a mandatory one is `map[string]V` or `[]T` with `omitzero`, and an optional one is `*map[string]V` or `*[]T` with `omitzero`. Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md). The generated `DVQuantity`, its doc comments left out, shows the rules: its abstract ancestors' fields (`Accuracy`, `MagnitudeStatus`, `NormalRange`, …) flattened in with no embedded ancestor, mandatory properties by value, optional single properties as pointers with `omitzero`, and an optional list with `omitempty`:
-
-```go
-type DVQuantity struct {
-	Accuracy             *Real                        `json:"accuracy,omitzero"`
-	AccuracyIsPercent    *bool                        `json:"accuracy_is_percent,omitzero"`
-	Magnitude            Real                         `json:"magnitude"`
-	MagnitudeStatus      *string                      `json:"magnitude_status,omitzero"`
-	NormalRange          *DVInterval[DVQuantity]      `json:"normal_range,omitzero"`
-	NormalStatus         *CodePhrase                  `json:"normal_status,omitzero"`
-	OtherReferenceRanges []ReferenceRange[DVQuantity] `json:"other_reference_ranges,omitempty"`
-	Precision            *Integer                     `json:"precision,omitzero"`
-	Units                string                       `json:"units"`
-	UnitsDisplayName     *string                      `json:"units_display_name,omitzero"`
-	UnitsSystem          *string                      `json:"units_system,omitzero"`
-}
-```
-
-#### Type → Go type expression
-
-| P_BMM type kind | Go expression |
-|---|---|
-| `P_BMM_SIMPLE_TYPE` with `type: "X"` | `X` (or its Go alias from the primitive map; see § Primitive type mapping) |
-| `P_BMM_GENERIC_TYPE` with `root_type: "Foo"`, `generic_parameters: ["Bar"]` | `Foo[Bar]` |
-| `P_BMM_CONTAINER_TYPE` with `container_type: "List"`, nested type | `[]T` (see § Container mapping) |
-
-#### Container mapping
-
-| BMM container_type | Go shape | Notes |
-|---|---|---|
-| `List` | `[]T` | Order matters; duplicates allowed |
-| `Array` | `[]T` | Same as List in Go; the distinction is historical |
-| `Set` | `[]T` | No uniqueness check is generated. Go has no native set, and modelling one as `map[T]struct{}` complicates JSON. |
-| `Hash` | `map[string]V` | Keys are `String` |
-
-The wire format JSON does not distinguish List/Set/Array — they all serialise as arrays. Modelling them all as `[]T` keeps round-tripping exact; the Set / Array semantics surface in validators and AQL path-resolution rather than in the type itself.
-
-#### Cardinality
-
-`P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) reaches the SDK through the generated attribute metadata in `openehr/rm/rminfo`: `AttrMeta.Container` marks a container property, and `AttrMeta.Required` is true when `cardinality.lower` is 1 or more, which the validation floor checks ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). The upper bound is not kept: no container in the pinned RM and BASE BMMs has a finite one.
-
-#### Functions
-
-`P_BMM_*` function definitions on classes (e.g. `DV_QUANTITY.add`, `DV_QUANTITY.less_than`) carry pre/post-conditions and operator aliases. The SDK's posture:
-
-- The generator emits **method stubs** for class functions, with the documented `pre_conditions` / `post_conditions` as `// Pre:` / `// Post:` comments. A `P_BMM_INTERFACE`'s functions are the exception: no stub is emitted for them (Class → Go type above, [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4).
-- The generator does **not** emit the function body — implementations are hand-written in non-generated files ([REQ-041](#req-041--pinned-bmm-sources)) where they are needed.
-- Functions that have not been hand-implemented **SHOULD** panic with a clear message (e.g. `panic("not implemented: DV_QUANTITY.add — implement in a non-generated file")`); this is one of the rare allowed panics in SDK code, justified by the fact that the function is documented in the BMM but not yet wired in.
-
-For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The RM functions the SDK implements, and those it leaves out, are specified in [§ RM behavioural functions](#rm-behavioural-functions).
-
-### Primitive type mapping
-
-**Implements:** REQ-041
-
-The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table below. Mappings are **fixed**; do not introduce alternative widenings.
-
-| BMM primitive | Go type | Notes |
-|---|---|---|
-| `Boolean` | `bool` | |
-| `Integer` | `rm.Integer` (underlying `int32`) | Pinned to 32-bit per the BMM spec. Emitted as the defined type `rm.Integer` so the codec can attach the wire-tolerance rule from [ADR 0004](../adr/0004-numeric-wire-tolerance.md). |
-| `Integer64` | `rm.Integer64` (underlying `int64`) | Emitted as the defined type `rm.Integer64` so the codec can attach the same wire-tolerance rule as `Integer` ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)). `DV_COUNT.magnitude` is the RM's one `Integer64` attribute. |
-| `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [ADR 0004](../adr/0004-numeric-wire-tolerance.md). |
-| `Double` | `float64` | Same as `Real`, no codec tolerance attached. |
-| `Character` | `rm.Character` | canonical JSON single-character **string**, not a number; hand-written named type, like `Integer`/`Real` |
-| `String` | `string` | |
-| `Octet` | `byte` | |
-| `Uri` | `string` | Not `net/url.URL`, so the text round-trips exactly as written |
-| `Any` | `any` | Optional properties differ: § [Property → Go field](#property--go-field). |
-| `Iso8601_date` | `string` | See § ISO 8601 types below |
-| `Iso8601_time` | `string` | |
-| `Iso8601_date_time` | `string` | |
-| `Iso8601_duration` | `string` | |
-| `Iso8601_type` | `string` | Abstract — supertype of the four above |
-| `Temporal` | `string` | Abstract |
-| `Numeric` | (abstract; not directly used) | |
-| `Ordered` | (abstract; not directly used) | |
-| `Ordered_Numeric` | (abstract; not directly used) | |
-| `Cardinality` | `rm.Cardinality` (struct) | Generated from the BASE schema — lower, upper, upper_unbounded |
-| `Multiplicity_interval` | `rm.MultiplicityInterval` (struct) | Generated from base BMM |
-| `Interval` | generic `Interval[T]` | Generated; ancestors set on dependent types |
-| `List` | `[]T` | See § Container mapping |
-| `Set` | `[]T` | See § Container mapping |
-| `Array` | `[]T` | See § Container mapping |
-| `Hash` | `map[string]V` | See § Container mapping |
-| `Container` | abstract; not directly used | |
-| `Terminology_code` | `rm.TerminologyCode` (struct) | Generated from base BMM |
-| `Terminology_term` | `rm.TerminologyTerm` (struct) | Generated from base BMM |
-
-#### ISO 8601 types
-
-The four ISO 8601 BMM types map to Go `string` rather than `time.Time` because:
-
-- The openEHR formats include partial dates (`yyyy`, `yyyy-mm`) and partial times (`HH`, `HH:MM`) that `time.Time` cannot round-trip without information loss.
-- Wire-format byte-fidelity matters for canonical JSON conformance (REQ-052).
-
-Helpers in `openehr/rm/` (hand-written, non-generated) **SHOULD** offer typed parsing into `time.Time` and back for consumers who need it, but the storage type is the wire-equivalent `string`.
-
-### Generator output conventions
-
-- File naming: `<package_name>_gen.go` for generated files. Example: `openehr/rm/data_types_quantity_gen.go` corresponds to BMM package `org.openehr.rm.data_types.quantity`.
-- Header: every generated file begins with `// Code generated by bmmgen; DO NOT EDIT.` followed by a `// Source:` line naming the root schema and the pinned schemas it includes, for traceability.
-- RM release: the public constant `rm.Release` **MUST** carry the primary RM schema's `rm_release`. What the SDK writes into `ARCHETYPED.rm_version` is [wire.md § REQ-053](wire.md#req-053) for FLAT and STRUCTURED decode and [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) for the instance generator.
-- Hand-written companions: any file without the `_gen.go` suffix in the target package (such as the `*_funcs.go` files of `openehr/rm`) holds method bodies, helper functions, and codec hooks.
-- One Go package per generation target (BASE and RM both emit into `openehr/rm`), one file per BMM package (Go does not require a one-to-one directory mapping with BMM packages).
-- The generator emits a registrations file in `openehr/rm` (and in `openehr/aom/aom14`) which registers every concrete RM/AOM `_type` with its constructor (REQ-040). Per [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D3, the registration file lives in the target package — **not** under `openehr/rm/typereg/` — so the constructor closures can reference the target types directly without forming a `typereg → rm` import cycle.
-
-### Documentation propagation
-
-The generator carries the BMM `documentation` field on classes, properties, and functions into the Go doc comments of the generated types, fields and methods. The transformation is verbatim — no rewording, no abbreviation. Markdown-style cross-refs (`_units_`, `\`magnitude\``) are converted to Go-doc-friendly equivalents.
-
-### v1 scope summary
-
-**Generated in v1:**
-- `openehr/rm/` from the SDK-authored RM root over `openehr_rm_1.2.0` (excluding `ehr_extract`) + `openehr_base_1.3.0`.
-- The type registrations of `openehr/rm/typereg/`, which is itself hand-written, from the same.
-- `openehr/rm/rminfo/` from the same — the flattened attribute tables, the REQ-048 class graph and absence table, and the REQ-112 function table that `rminfo.IsNonStorableAttr` reads.
-- `internal/rmaccess` from the same — the attribute access of every registered class (REQ-171).
-- The invariant inventory of `openehr/validation` from the same and the hand-kept invariant ledger — the invariant inventory (REQ-171).
-- `openehr/aom/aom14/` from `openehr_operational_template_1.4.0`, the SDK-authored root over `openehr_am_1.4.0` + `openehr_base_1.3.0` and the RM root.
-
-**Deferred (BMM file kept, no v1 generation):**
-- AOM 2 (`openehr_am_2.4.0`) — consumers requesting ADL 2 / AOM 2 are out of v1 scope.
-- LANG (`openehr_lang_1.1.0`) — `openehr/bmm/` is hand-written for v1; the LANG BMM remains as a reference / cross-check.
-- TERM (`openehr_term_3.1.0`) — terminology service interface not required by v1 consumers.
-- RM `ehr_extract` package — EHR Extract is a separate exchange surface not exercised by v1 use cases.
-
-Deferred items become future plan phases when consumer demand arises; the BMM-conformance contract above continues to apply.
 
 ## RM behavioural functions
 
