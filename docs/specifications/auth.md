@@ -238,7 +238,7 @@ For the signer, empty means nil, a nil RSA or ECDSA private key, or a signer who
 An RSA key under 1024 bits, the minimum `crypto/rsa` signs with, does not fit `RS256` or `RS384`; its size is read from the signer's public key, so an opaque signer is checked as a standard-library key is.
 `auth/smart` builds its own client assertion with it.
 
-**Configuration rules** (enforced at `FromConfig`):
+**Configuration rules** of `auth/clientcreds` (enforced at its `FromConfig`):
 
 | Configuration | Behaviour |
 |---|---|

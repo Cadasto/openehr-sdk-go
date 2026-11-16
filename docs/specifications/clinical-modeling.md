@@ -8,7 +8,7 @@ kind: specification
 
 Normative contract for the SDK's clinical-modeling artefacts: operational templates (OPT), templated composition assembly, and validation against templates.
 The AQL requirements, including the lint's checks against a compiled template, are in [aql.md](aql.md).
-Covers REQ-101 onwards.
+Covers REQ-101 onwards, except those AQL requirements.
 
 The "clinical modeling" band sits above the openEHR Reference Model and below the REST clients: it consumes RM types from `openehr/rm/` and AOM 1.4 constraint types from `openehr/aom/aom14/`, and produces typed building blocks usable by `openehr/composition/`, `openehr/validation/`, and `openehr/aql/`.
 
@@ -76,7 +76,7 @@ The shapes the schema types alone do not settle:
 In its default mode, `aom14.ReadOperationalTemplate` **MUST** read every OPT that *Round trip* names, and every OPT that differs from one only in the shapes the table below and [§ REQ-111](#req-111--public-compiled-template-bridge) *What the compile step tolerates* name, as they read each shape, except an OPT that:
 
 - holds one of the four readings the reader refuses in every mode (below);
-- the compile step refuses ([§ REQ-111](#req-111--public-compiled-template-bridge) *Reading the model*);
+- is one the compile step refuses ([§ REQ-111](#req-111--public-compiled-template-bridge) *Reading the model*);
 - lies past the bounds of [§ REQ-108](#req-108--untrusted-document-bounds).
 
 | The OPT holds | The reader reads it | Given `canxml.WithStrict` |

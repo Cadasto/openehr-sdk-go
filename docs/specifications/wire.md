@@ -103,7 +103,7 @@ Two endpoints take a request body shaped unlike their response, which is easy to
 - A composition write (`POST /ehr/{ehr_id}/composition`, `PUT /ehr/{ehr_id}/composition/{vo_uid}`, and `directory.Save` / `Update` alike) sends a bare `COMPOSITION`, and under `Prefer: return=representation` gets a bare `COMPOSITION` back, not the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope ([PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition)).
 - A contribution (`POST /ehr/{ehr_id}/contribution`) sends ITS-REST `Contribution_create`, each version carrying its payload inline, and gets back the persisted `CONTRIBUTION`, whose `versions[]` are `OBJECT_REF`s to versions the server assigned ([PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)).
   A submission shaped like the persisted `CONTRIBUTION` is refused, because its `OBJECT_REF`s point at versions that do not exist yet.
-  Its commit audit is the `UPDATE_AUDIT` DTO of SPECITS-95 ([ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)), not the persisted `AUDIT_DETAILS`.
+  Its commit audit has the shape of the `UPDATE_AUDIT` DTO of SPECITS-95 ([ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)), not of the persisted `AUDIT_DETAILS`; the `_type` it carries is [§ REQ-130](#req-130--contribution-builder) *Audit*'s.
 
 Which shape each submission path sends, and which server-assigned fields a request body omits, is [§ REQ-130](#req-130--contribution-builder)'s.
 

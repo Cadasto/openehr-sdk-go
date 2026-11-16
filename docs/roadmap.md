@@ -77,12 +77,12 @@ Everything below is `Partial`, `Planned`, `In delivery` or `Deferred`. Gaps that
 | SMART / Cadasto | Cadasto Extra API | **Planned** | `cadasto/extra/` |  |
 | SMART / Cadasto | Datamap V2 | **Planned** | `cadasto/datamap/` REQ-058 |  |
 | SMART / Cadasto | MPI preview | **Planned** | `cadasto/mpi/` |  |
-| SMART / Cadasto | Cadasto admin | **Partial** | `cadasto/admin/` REQ-083 | The health checks (`Live`, `Ready`, `ReadyBody`) have landed, but not the tenant, environment and system-info endpoints; distinct from the ITS Admin client |
+| SMART / Cadasto | Cadasto admin | **Partial** | `cadasto/admin/` | The health checks (`Live`, `Ready`, `ReadyBody`, REQ-083) have landed; the tenant, environment and system-info endpoints have no requirement yet; distinct from the ITS Admin client |
 | SMART / Cadasto | Care aggregates | **Planned** | `cadasto/care/` |  |
 | Conformance | Probe modes | **Partial** | `testkit/probes/` REQ-082 | See [Open probe modes](#open-probe-modes-req-082) below |
 | Conformance | Sandbox transport | **Partial** | `sandbox/` | The in-memory backend models the EHR resource and scripts the other routes, while the auth and discovery probes still stand up their own `httptest` identity servers ([Known gaps](probe-harness.md#cross-mode-agreement)) |
 | Conformance | openEHR conformance ratification | **Partial** | `testkit/conformance/webtemplate/` REQ-053/082 | PROBE-086 round-trips the pinned EHRbase FLAT corpus on the modelled subset, with the rest censused in [SKIPPED.md](../testkit/conformance/webtemplate/SKIPPED.md), and Live-CDR ratification is open |
-| Conformance | Cadasto API conformance | **Planned** | `testkit/corpus/cadasto/` REQ-083 | Anchored to the Cadasto platform API contract, for the extras beyond the health checks (stage 4) |
+| Conformance | Cadasto API conformance | **Planned** | `testkit/corpus/cadasto/` | Anchored to the Cadasto platform API contract, for the extras beyond the health checks (stage 4); no requirement covers them yet |
 | Conformance | OpenAPI fixtures | **Partial** | `testkit/corpus/` REQ-050 | The gaps are stored-query metadata bodies, a persisted CONTRIBUTION response, ITEM_TAG bodies and the `Identifier` write-response body ([coverage](../testkit/corpus/its_rest/README.md)) |
 
 ### Open probe modes (REQ-082)

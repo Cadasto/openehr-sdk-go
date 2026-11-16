@@ -41,7 +41,7 @@ Deciding together with REQ-140 avoids the failure mode ADR 0015 was written to c
 - **Positive — one grammar, no fork.** PARTICIPATION and PARTY_IDENTIFIED decompose identically at `context/_participation`, `_other_participation` (ENTRY), and inside `_feeder_audit` — a single implementation surface instead of a `ctx/` special case beside a `_` general case.
 - **Consistent with ADR 0015's own reasoning.** ADR 0015 chose `ctx/` for the scalar fields because that was the SDK's *already-emitted* spelling and the ITS-documented one; here the already-documented, reference-emitted spelling is the underscore form. Both decisions preserve the emitted surface consumers can already rely on and admit the other spelling only as input.
 - **Negative — the ITS `ctx/` sketch is not honoured on input.** A hand-authored payload using `ctx/participation…` loses those fields: decode drops them as unmatched content by default, reports them on request and refuses them under strict decoding (REQ-170). Accepted: no known producer emits it, a caller who needs to know can ask for the report or the refusal, and the alias path stays open.
-- **The REQ-115 FLAT author linter** inherits one vocabulary for context optionals — the underscore spelling — rather than two.
+- **A FLAT author linter**, if one is specified, inherits one vocabulary for context optionals — the underscore spelling — rather than two.
 
 ## Alternatives considered
 

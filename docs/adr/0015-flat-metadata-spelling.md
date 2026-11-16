@@ -10,7 +10,7 @@ date: 2026-08-03
 
 - **Status:** Accepted, 2026-08-03 — maintainer decision.
 - **Amended by:** [ADR 0029](0029-composer-real-path-carrier.md): decision 5's first bullet is reversed, and decision 2 gains one exception. The composer's real path carries the whole composer, decode reads `composer|id`, `|id_scheme` and `|id_namespace`, and encode writes a composer the `ctx/` short forms cannot carry at its real path.
-- **Introduces:** —. **Amends:** [REQ-053](../specifications/wire.md#req-053) (FLAT/STRUCTURED codecs — decode input surface). **Applies:** REQ-115 (FLAT author linter — consumes this decision), REQ-080 / PROBE-086 (the probe that surfaced it).
+- **Introduces:** —. **Amends:** [REQ-053](../specifications/wire.md#req-053) (FLAT/STRUCTURED codecs — decode input surface). **Applies:** REQ-080 / PROBE-086 (the probe that surfaced it).
 - **Related:** [ADR 0014](0014-webtemplate-reference-implementation-lock.md) pins the reference whose spelling this admits; the package deviation register is [`simplified/deviations.md`](../../openehr/serialize/simplified/deviations.md).
 
 ## Context
@@ -30,7 +30,7 @@ The ITS-REST *Simplified Formats* specification describes the `ctx/` prefix for 
 Two independent facts forced the decision now:
 
 1. **A real rejection that had turned into a silent success.** `UnmarshalFlat` never handled these keys correctly. They failed with `ErrUnsupportedDatatype` or `ErrUnknownPath` until a `CODE_PHRASE` leaf mapping made the coded pair **decode silently through ordinary leaf placement**, writing the RM node directly and bypassing the `ctx/` conflict check. A hard error over a pure respelling blocked adoption; an unnoticed bypass of the conflict check was worse. Both argue for one explicit, reviewed alias table.
-2. **REQ-115 is blocked on it.** The FLAT author linter's specification must first define "the required composition-level FLAT key set" as normative prose. That set cannot be written down without knowing which spelling is canonical, which is accepted, and which is an error.
+2. **A FLAT author linter is blocked on it.** Its specification must first define "the required composition-level FLAT key set" as normative prose. That set cannot be written down without knowing which spelling is canonical, which is accepted, and which is an error.
 
 ## Decision
 
@@ -49,14 +49,14 @@ Two independent facts forced the decision now:
 ## Consequences
 
 - **Positive — interop.** A body whose only unmodelled surface was the metadata spelling decodes; that was a hard adoption blocker and the main point of the change.
-- **Positive — REQ-115 unblocked.** The FLAT author linter states its required-key set in `ctx/` terms and names the real-path spellings as accepted aliases.
+- **Positive — a FLAT author linter is unblocked.** It can state its required-key set in `ctx/` terms and names the real-path spellings as accepted aliases.
 - **No output change, no break.** Encode emits `ctx/` only, so nothing downstream shifts; this is additive on the input surface. [ADR 0029](0029-composer-real-path-carrier.md) later made one exception, a composer the `ctx/` short forms cannot carry whole.
 - **Alias table is load-bearing.** Every accepted alias must be in one table with its `ctx/` target, so adding a sixth is a reviewed edit rather than scattered string comparisons.
 - **A template constraining a COMPOSITION-level `language` node is intercepted.** Such a key routes to `ctx/language` rather than through leaf placement. That is correct — it is the same RM attribute either way — but it means the alias table shadows those Web Template paths, which is why the table is restricted to attributes that genuinely *are* composition metadata.
 
 ## Alternatives considered
 
-- **`ctx/` only (status quo).** Rejected: leaves a hard failure on reference-authored FLAT, and leaves REQ-115 unable to state its contract.
+- **`ctx/` only (status quo).** Rejected: leaves a hard failure on reference-authored FLAT, and leaves a FLAT author linter unable to state its contract.
 - **Real paths only, dropping `ctx/`.** Rejected: `ctx/` is what the ITS-REST spec describes and what the SDK already emits; switching would break every existing consumer's stored FLAT for no interop gain.
 - **Accept both *and* emit both.** Rejected: duplicate keys for one value invite divergence between them, double the surface every consumer must handle, and would make the codec non-idempotent unless the pair is always written in lockstep.
 - **Accept both on input, emit the reference's real paths.** Rejected: it is a breaking output change for existing consumers, and it contradicts the spec's own `ctx/` guidance. If parity on those keys is ever wanted, it belongs behind an explicit output-dialect option, not as a default flip.
@@ -65,4 +65,4 @@ Two independent facts forced the decision now:
 ## Traceability
 
 - Amends: REQ-053
-- Applies: REQ-115, REQ-080
+- Applies: REQ-080

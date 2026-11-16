@@ -7,6 +7,7 @@ kind: specification
 **Status:** Draft
 
 Normative contract for the SDK's Archetype Query Language building blocks above the wire boundary: the parsed query tree, its canonical emission, the builder's write-side parity, and the static and semantic lint.
+Covers REQ-109, REQ-113, REQ-119, REQ-160, REQ-161 and REQ-163.
 The wire boundary, the executor and stored queries are in [wire.md § REQ-055](wire.md#req-055--wire-boundary) and [§ REQ-057](wire.md#req-057).
 
 ---
@@ -424,7 +425,7 @@ Balance holds in both directions: an unclosed `[` lets the emitted `]` close the
 A bare `--` at the very end starts no comment, since the byte after it is the emitted `]` and not a line break, so `[a/b='c'--]` is a contained malformation while `[a/b='c'-- ]` is the substitution.
 
 This accept set is a lexical condition, not a token, so it has no token names to walk.
-Tests confront a generated corpus with the parser at both bracket positions and in both directions: accepted text never re-parses as a different query, and refused text is never text the parser reads back unchanged ([PROBE-090](conformance.md#probe-090--aql-emission-round-trip-closure)).
+At both bracket positions and in both directions, accepted text never re-parses as a different query, and refused text is never text the parser reads back unchanged; [PROBE-090](conformance.md#probe-090--aql-emission-round-trip-closure) checks both against a generated corpus.
 
 ### Emit-side structural parity
 
@@ -479,7 +480,7 @@ There is no unverified `Emit`.
 
 [PROBE-090](conformance.md#probe-090--aql-emission-round-trip-closure) checks that every value kind survives emit, parse and compare in every value position, on both carriers.
 The guards derived from the grammar are checked against the vendored grammar by tests that read their cases from it, or generate them where a position has no token names to walk, rather than against a list a maintainer has to remember to update.
-Every guard has a test that fails when the guard is removed, and the accept direction has rows of its own, one per encoding the emitted text erases, so an over-refusal fails as surely as a missed splice.
+The accept direction has rows of its own, one per encoding the emitted text erases, so an over-refusal fails as surely as a missed splice.
 String-literal closure is also fuzzed.
 
 ---
@@ -627,7 +628,7 @@ Each is what `(*parse.Query).Emit` produces at that position, and any other spel
 
 Each new construct is tested to build, emit and pass the identity round trip `Build → ParseQuery → Emit`, and the verb functions and the struct builder emit the same strings for it.
 A builder-emitted `… CONTAINS VERSION v[LATEST_VERSION]` draws no `aql_version_no_predicate` from `lint.LintString`, and REQ-161's suppression shape `… CONTAINS VERSIONED_COMPOSITION vo[uid/value = $vo] CONTAINS VERSION v[ALL_VERSIONS]` builds end to end, draws no `aql_versioned_object_unreferenced`, and gets the same containment codes from `(*aql.Builder).VerifyContainment` as from the linter.
-Each refusal has a named test that fails when its guard is removed, the `VersionPredicate` row asserting a returned `aql.ErrInvalidQuery` rather than a recovered panic.
+The `VersionPredicate` refusal is a returned `aql.ErrInvalidQuery`, not a panic.
 Each `Col` shape above has its own row with its expected verdict, one per region kind for the open-region refusal, and the accept direction has rows of its own, one per encoding the emitted text erases, so an over-refusal fails as surely as a missed splice.
 
 ### Out of scope
@@ -1106,7 +1107,6 @@ It takes a nilable REQ-160 relation (§ Relation supply), and each code's severi
 
 ### Path-shape acceptance
 
-Every path-shape firing rule and silence rule has a named test, and each guard a test that fails when it is removed.
 The corpus carries three firing witnesses: the unpredicated repeating-segment projection over an `OBSERVATION` alias, a `LIMIT 50 OFFSET 100` query with no `ORDER BY`, and a repeating unpredicated segment whose path appears only in `WHERE`, which an implementation narrowed to the projection fails.
 The silence direction has a row per near-miss, so an over-firing linter cannot pass:
 
