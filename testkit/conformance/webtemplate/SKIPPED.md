@@ -130,7 +130,7 @@ It is **not** hand-maintained. `Run` decodes each upstream body with the codec's
 | a whole key, suffix and all (`<root>/language\|preferred_term`, a suffix the `ctx/language` short form cannot carry) | that one entry | `language\|code` beside it is an accepted alias and decodes |
 | a suffix of a leaf named by its base (`unexpected \|terminology for DV_TEXT`, a DV_TEXT `\|terminology` without the `\|code` that selects the coded subtype), or its bare value (`unexpected bare value for DV_STATE`, at a leaf whose datatype has neither a suffix set nor a sub-path grammar) | that one entry | the rest of the leaf decodes |
 | any other leaf refusal naming its base (`missing required \|id`) | the leaf's own entries | the subtree beneath it belongs to other nodes or families |
-| a path or family prefix (`ErrUnknownPath`: an index past its bound, a deferred family) | the entries under it, leaf and subtree | everything under that segment is refused with it |
+| a path or family prefix (`ErrUnknownPath`: an index past its bound) | the entries under it, leaf and subtree | everything under that segment is refused with it |
 
 Getting this wrong is not theoretical: the first cut dropped the whole leaf family plus subtree for every refusal, which cost 17 keys of real coverage and left `interval_event` comparing **nothing at all** — a fixture in the suite asserting zero. Until 2026-10-11 the composer's `external_ref` refusal named the leaf, and the harness removed `composer\|name` with it.
 

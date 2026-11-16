@@ -511,7 +511,7 @@ func decodeSubset(t *Target, keys map[string]any, opt simplified.Option) (*rm.Co
 //     missing required suffix): the leaf's own entries go, but *not* the
 //     subtree beneath it, which belongs to other nodes or families.
 //   - Any other ErrUnknownPath refusal naming a path or a family prefix (an
-//     index past its bound, a deferred family): the entries under it go,
+//     index past its bound): the entries under it go,
 //     leaf and subtree, since everything under that segment is refused with
 //     it.
 func dropRefused(candidate map[string]any, key string, err error) (removed int, gap bool) {
