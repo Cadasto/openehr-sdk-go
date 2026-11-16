@@ -12,7 +12,7 @@ Go `1.27.x`, module floor `1.27.0` ([releases.md § Minimum Go version](docs/rel
 
 The normative spec lives **in this repo** under [`docs/specifications/`](docs/specifications/) — self-contained; implementing or reviewing the SDK needs no external sources. Conventions (RFC-2119 keywords, status headers, identifiers, traceability): [`docs/specifications/README.md`](docs/specifications/README.md).
 
-`docs/specifications/` carries the RFC-2119 statements code, plans, and tests are measured against; `docs/architecture.md` carries the design narrative. **The specs record the contract; the maintainer's instruction outranks them.** When a request contradicts a sentence, name the sentence once, do the work and amend it in the same change. Without the maintainer, anything that disagrees with the specs is a finding and the specs win, except a section marked *implementation-aligned*, where code leads and the spec is reconciled in the same PR. A `draft` section binds once it merges. Never silently resolve an open [research strand](docs/specifications/research-strands.md) in code — surface the decision or land an [ADR](docs/adr/).
+`docs/specifications/` carries the RFC-2119 statements code, plans, and tests are measured against; `docs/architecture.md` carries the design narrative. **The specs record the contract; the maintainer's instruction outranks them.** When a request contradicts a sentence, name the sentence once, do the work and amend it in the same change. Without the maintainer, anything that disagrees with the specs is a finding and the specs win. No specification here is marked *implementation-aligned*, the sdd plugin's mode in which code leads and the spec is reconciled in the same PR. A `draft` section binds once it merges. Never silently resolve an open [research strand](docs/specifications/research-strands.md) in code — surface the decision or land an [ADR](docs/adr/).
 
 ## Documentation
 
@@ -86,7 +86,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | Live CDR (opt-in, not in `make ci`) | `make probe-record ARGS=…` records a cassette; `make cdr-crosscheck` checks generated documents against live CDRs. Environment variables are in [ci.md](docs/ci.md) |
 | FLAT corpus integrity | `make flat-check` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `make flat-drift` adds a network drift report (dev helper, not a gate). `make corpus-pins-check` holds every EHRbase corpus to the one commit per repository in `testkit/corpus/UPSTREAM_PINS.txt` |
-| Build Docker dev image | `make build-dev` (when host Go is missing, or for `make test-race` on a host without a C compiler; rebuild an image made before the dev stage gained gcc) |
+| Build Docker dev image | `make build-dev` (when host Go is missing, or for `make test-race` on a host without a C compiler) |
 | Docs site | `make docs-check` builds the site from `pages/` and asserts its output; `make docs-serve` previews it. The docs-theme brand layer is pinned by commit + sha256 in `sources.json` (bump recipe in its `$comment`) |
 
 **Gotchas worth the reading:**
@@ -132,7 +132,7 @@ The openehr-assistant plugin and its MCP tools answer RM paths, class definition
 
 ## Do not touch (yet)
 
-- Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md) and naming the REQs they amend in their header (the map lists no ADRs). Open decisions stay as [research strands](docs/specifications/research-strands.md) until an ADR lands.
+- Promoting a new numbered ADR without naming the REQs it amends in its header (the map lists no ADRs); `make spec-generate` then writes the index in [`docs/adr/README.md`](docs/adr/README.md).
 - `internal/bmmgen` and `internal/bmmdiff` — generator tooling, not public API; structural changes need rationale in [architecture.md](docs/architecture.md) and [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
 - Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
 - The `go.mod` `go` directive — the minor line's `.0` patch, never the toolchain patch you happen to run ([releases.md § Minimum Go version](docs/releases.md#minimum-go-version)): a mid-line floor makes every consumer and CI image on an earlier patch fetch a new toolchain, breaking air-gapped builds. Dev-image pins ([Dockerfile](Dockerfile)) move independently.

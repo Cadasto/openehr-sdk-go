@@ -39,7 +39,7 @@ While on `v0.x`, minor bumps may break the public API (release notes list every 
 
 ### `v1.0.0` gate
 
-Cut when all three hold ([`module-layout.md` § Versioning](specifications/module-layout.md#versioning)):
+Cut when all three hold:
 
 1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` or `retired`, with no `partial` and no `planned`. (`retired` is terminal: a retired requirement carries no active rule and will never land, so a gate demanding `landed` for every row could not be met.)
 2. The openEHR wire-conformance probe suite in [`conformance.md`](specifications/conformance.md) passes.
@@ -85,7 +85,7 @@ Preview notes locally without side effects: `bash scripts/release-notes.sh X.Y.Z
 ## References
 
 - [REQ-004](specifications/module-layout.md#req-004--semantic-versioning): semantic versioning
-- [`module-layout.md` § Versioning](specifications/module-layout.md#versioning): bump matrix + `v1.0.0` gates
+- [`module-layout.md` § Versioning](specifications/module-layout.md#versioning): bump matrix
 - [ADR 0001](adr/0001-bmm-version-bump-runbook.md): BMM bumps vs codegen
 - [`docs/ci.md`](ci.md): quality gate before tag
 - Release tooling: commit [0ee78296](https://github.com/Cadasto/openehr-sdk-go/commit/0ee78296) (the tag-driven release workflow and notes script)

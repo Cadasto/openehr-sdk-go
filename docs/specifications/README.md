@@ -24,16 +24,17 @@ Statements without these keywords are **informative** — context, rationale, ex
 
 ## Document kinds
 
-The repo uses several document kinds, each with a distinct role and boundary:
+Every document declares its kind in its frontmatter (`kind:`), from the vocabulary in [`docs/.sdd.yaml`](../.sdd.yaml) `doc_kinds`.
+The kinds this repository uses:
 
 | Kind | Answers | Normative? | Where it lives |
 |------|---------|------------|----------------|
-| **Specification** (this tree) | How must the system behave / be structured? | Yes (`MUST` / `SHALL` / `SHOULD` / `MAY`) | [`docs/specifications/`](.) — topic specs + REQ.md registry + traceability.yaml + conformance.md (PROBE-NNN) + research-strands.md (STRAND-NN) |
-| **ADR** | Which irreversible architectural fork did we take? | Decision record | [`docs/adr/`](../adr/) |
-| **Plan** | What exact work implements a slice? | No (delivery tasks) | [`docs/plans/`](../plans/) |
-| **Guide** | How do I work in this repo safely? | No | [`docs/architecture.md`](../architecture.md), [`docs/development-process.md`](../development-process.md), [`docs/ai-workflow.md`](../ai-workflow.md), [`docs/ci.md`](../ci.md) |
-| **Descriptor** | Machine-readable SDD conventions for tooling | Config (not prose) | [`docs/.sdd.yaml`](../.sdd.yaml) — REQ style, paths, build targets, PROBE/STRAND toggles; read by `sdd-*` skills |
-| **Roadmap** | What is still open, and which deployments are targeted? | No (status snapshot) | [`docs/roadmap.md`](../roadmap.md) |
+| `specification` (this tree) | How must the system behave / be structured? | Yes (`MUST` / `SHALL` / `SHOULD` / `MAY`) | [`docs/specifications/`](.) — topic specs + REQ.md registry + traceability.yaml + conformance.md (PROBE-NNN) + research-strands.md (STRAND-NN) |
+| `adr` | Which irreversible architectural fork did we take? | Decision record | [`docs/adr/`](../adr/) |
+| `reference` | A lookup that binds nothing | No | [retired-requirements.md](retired-requirements.md), [`docs/licensing.md`](../licensing.md) |
+| `guide` | How do I work in this repo, and what is still open? | No | [`docs/architecture.md`](../architecture.md), [`docs/development-process.md`](../development-process.md), [`docs/ai-workflow.md`](../ai-workflow.md), [`docs/roadmap.md`](../roadmap.md), [`docs/ci.md`](../ci.md) and the other pages under `docs/` |
+| `analysis` | What did a measurement or a study find? | No (evidence, dated) | [`docs/analysis/`](../analysis/) |
+| `plan` | What exact work implements a slice? | No (working note) | [`docs/plans/`](../plans/) |
 
 **Boundaries between kinds:**
 

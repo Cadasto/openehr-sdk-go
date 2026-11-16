@@ -14,11 +14,13 @@ Ask one question of every change: **does it alter a normative statement?** That 
 
 | | Full lane (the answer is yes) | Maintenance lane (the answer is no) |
 |---|---|---|
-| Typical change | New capability; an API, behaviour or error-contract change; a bug fix that shows the spec was wrong | Refactor, package move, performance, dependency bump, tooling, doc polish; a bug fix that brings code back in line with the existing spec |
-| Spec, registry, ADR | Updated in the same PR (spec-first for new capability) | Not touched. Needing to touch one means the change is full lane |
+| Typical change | New capability; an API, behaviour or error-contract change | Refactor, package move, performance, dependency bump, tooling, doc polish; a bug fix that brings code back in line with the spec, or that shows a spec sentence was wrong |
+| Spec, registry, ADR | Updated in the same PR (spec-first for new capability) | Only the sentence a bug fix shows was wrong, reworded in the same PR, adding no obligation and widening no contract. Any other spec edit, or an ADR, makes the change full lane |
 | `traceability.yaml` | Updated to the landed packages and probes; `make spec-generate` writes the tests | Only the package paths `make spec-check` names, when paths moved |
 | Gate | `make ci` | `make ci` |
 | PR body | The REQ / PROBE ids touched | One line: `Lane: maintenance (no normative change)` |
+
+A bug fix that shows a spec sentence was wrong carries the corrected sentence in the same PR (the sdd plugin's *implementation-aligned* mode): code wins until the sentence is updated, never later than that PR.
 
 `make spec-check` runs in both lanes, so the map cannot rot whichever lane a PR claims. A reviewer who finds a normative change in a maintenance-lane PR moves it to the full lane; that is a finding against the PR, not against the process.
 
@@ -32,11 +34,11 @@ REQ  (capability + acceptance)                  [gate: worth doing]
              └─ traceability.yaml + make spec-generate  [gate: Definition of Done, same PR]
 ```
 
-For new capability the spec leads (spec-first). When work on shipped code shows the spec itself was wrong, the code change and the spec correction land in the same PR (implementation-aligned): code wins until the spec is updated, never later than that PR.
+For new capability the spec leads (spec-first).
 
 - The registry in [REQ.md](specifications/REQ.md) is generated (`make spec-generate`); `make spec-check` fails when it is stale. Edit its source, never the table.
 - Each `traceability.yaml` row's `tests:` list is generated too: `make spec-generate` writes the sorted list of test files that cite the row's REQ, and `make spec-check` fails when a list is stale. A test file is a `*_test.go` file or a probe implementation under `testkit/probes/`; it cites `REQ-NNN` when that token appears with no letter, digit or underscore right before or after it, so a hyphen or a dot is a boundary and `pre-REQ-161` counts. So cite the REQ in the test that pins it, and never edit the list by hand.
-- A plan in [`plans/`](plans/) is optional, for work that spans several PRs. It is a committed working note outside this ladder: no generator or map reads it, but the drift gate checks it like any other document ([plans/README.md](plans/README.md)).
+- A plan in [`plans/`](plans/) is optional, for work that spans several PRs: a working note outside this ladder that no gate or reviewer reads, deleted once its work is served ([plans/README.md](plans/README.md)).
 
 There is no `SDK-GAP` identifier. `REQ`/`PROBE` is the feature register, and a newly found gap is worked under a REQ with a `PROBE` for wire conformance ([ADR 0012](adr/0012-retire-sdk-gap-identifier.md)).
 

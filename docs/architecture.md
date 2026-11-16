@@ -110,7 +110,7 @@ Runtime dependencies are kept few and auditable, and adding one needs a reason. 
 
 | Dependency | Scope | Rationale |
 |---|---|---|
-| `go.opentelemetry.io/otel`, `/trace` | `transport/` only | Distributed tracing. Pulls logr, xxhash transitively. |
+| `go.opentelemetry.io/otel`, `/trace` | `transport/`, and the probe in `testkit/probes/auth` that checks its spans | Distributed tracing. Pulls logr, xxhash transitively. |
 | `github.com/antlr4-go/antlr/v4` | `openehr/aql/parse` only | AQL parser runtime: pure Go, no transitive deps (ADR [0007](adr/0007-aql-antlr-grammar-profile.md)). The generator (Java) is containerised, never on the build/test path. |
 | `golang.org/x/oauth2` | `auth/smart` (+ probes) | RFC 7636 PKCE `code_verifier`/`code_challenge` generation (ADR [0009](adr/0009-smart-auth-library-scope.md)). Token sources/refresh/errors are the SDK's own `auth` types. |
 | `github.com/coreos/go-oidc/v3` | `auth/smart` (ID-token verification) | ID-token signature verification for SMART App Launch (ADR [0009](adr/0009-smart-auth-library-scope.md)). The verification lives in `auth/smart` beside the token exchange; `smart/` re-exports it and does not import go-oidc itself. |
@@ -151,7 +151,7 @@ The API is designed for Go: package-level functions, typed errors, `context.Cont
 
 openEHR's RM has deep polymorphism (LOCATABLE → ENTRY → COMPOSITION; DATA_VALUE → DV_QUANTITY). Go has no inheritance. The SDK uses concrete structs, embedded base structs, interfaces for abstract categories, and a central type registry for `_type` decoding. There is no reflection-heavy tag magic and no "generic RM node" superset type.
 
-Substitution slots follow the same rule. Where a slot's declared class has subtypes, such as `LOCATABLE.name` typed `DV_TEXT`, the field is a narrow `<Parent>Like` interface with `Get*` accessors, decoded through the one registry ([`idiom.md` § Substitution slots](specifications/idiom.md#substitution-slots-and-the-like-interfaces)). A per-slot tagged union was considered and rejected: a struct holding a kind discriminator and the concrete value, with one typed getter per subtype and its own `_type` decoder. That design repeats the dispatch in every union type, while the registry keeps it in one place that the JSON and XML codecs share. The union is worth revisiting only if the interface methods prove too awkward for callers ([PR 25](https://github.com/Cadasto/openehr-sdk-go/pull/25)).
+Substitution slots follow the same rule. Where a slot's declared class has subtypes, such as `LOCATABLE.name` typed `DV_TEXT`, the field is a narrow `<Parent>Like` interface with `Get*` accessors, decoded through the one registry ([`reference-model.md` § Substitution slots](specifications/reference-model.md#substitution-slots-and-the-like-interfaces)). A per-slot tagged union was considered and rejected: a struct holding a kind discriminator and the concrete value, with one typed getter per subtype and its own `_type` decoder. That design repeats the dispatch in every union type, while the registry keeps it in one place that the JSON and XML codecs share. The union is worth revisiting only if the interface methods prove too awkward for callers ([PR 25](https://github.com/Cadasto/openehr-sdk-go/pull/25)).
 
 ### Discovery is first-class
 
