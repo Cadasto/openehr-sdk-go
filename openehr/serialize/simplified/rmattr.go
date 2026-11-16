@@ -217,9 +217,9 @@ type rmattrFamily struct {
 
 // rmattrFamilies is the vocabulary this codec carries. A family absent here is
 // unmatched content (REQ-170): ignored by default, reported or refused on
-// request. The one the plan defers indefinitely (`_instruction_details`) is
-// the exception, [rmattrDeferredFamilies]: the decode reads its keys and
-// refuses them in every mode, so they stay visible in the PROBE-086 census
+// request. A family the spec names and this codec defers would be the
+// exception, [rmattrDeferredFamilies]: the decode would read its keys and
+// refuse them in every mode, so they stay visible in the PROBE-086 census
 // instead of decoding into nothing.
 //
 // `_identifier` is deliberately **not** a family here, though the corpus writes
@@ -270,21 +270,21 @@ var rmattrFamilies = map[string]rmattrFamily{
 		attr: "accuracy", attrType: "DV_DURATION", value: true,
 		decode: decodeRMAttrTemporalAccuracy,
 	},
-	"_feeder_audit":  {attr: "feeder_audit", decode: decodeRMAttrFeederAudit},
-	"_provider":      {attr: "provider", decode: decodeRMAttrProvider},
-	"_wf_definition": {attr: "wf_definition", decode: decodeRMAttrWfDefinition},
-	ismReasonFamily:  {attr: "reason", owner: "ISM_TRANSITION", list: true, decode: decodeRMAttrIsmReason},
+	"_feeder_audit":        {attr: "feeder_audit", decode: decodeRMAttrFeederAudit},
+	"_provider":            {attr: "provider", decode: decodeRMAttrProvider},
+	"_wf_definition":       {attr: "wf_definition", decode: decodeRMAttrWfDefinition},
+	"_instruction_details": {attr: "instruction_details", decode: decodeRMAttrInstructionDetails},
+	ismReasonFamily:        {attr: "reason", owner: "ISM_TRANSITION", list: true, decode: decodeRMAttrIsmReason},
 }
 
 // rmattrDeferredFamilies are the families the spec names and this codec defers
-// (REQ-140 *Deliberate exclusions*), by the RM attribute each addresses: only
-// `_instruction_details` now. At an owner that declares the attribute the key
-// resolves but has no carrier, so it is refused in every mode (REQ-170);
-// anywhere else it names nothing and is unmatched content like any other
-// unknown family.
-var rmattrDeferredFamilies = map[string]string{
-	"_instruction_details": "instruction_details",
-}
+// (REQ-140 *Deliberate exclusions*), by the RM attribute each addresses: none
+// now. `_wf_definition` left it on 2026-11-10 and `_instruction_details` on
+// 2026-11-16, each when it gained a carrier. At an owner that declares the
+// attribute such a key would resolve but have no carrier, so it would be
+// refused in every mode (REQ-170); anywhere else it names nothing and is
+// unmatched content like any other unknown family.
+var rmattrDeferredFamilies = map[string]string{}
 
 // rmattrOwner is the resolved owner of an `_`-family group: the RM class name
 // the family is judged against, and a lazy accessor for the canonical-JSON node

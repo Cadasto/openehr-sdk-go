@@ -165,8 +165,12 @@ func TestREQ053AllNullKeysReadAsAbsent(t *testing.T) {
 		"null INTERVAL_EVENT width":        {rmattrEvent + "/width": nil},
 		"null INTERVAL_EVENT sample_count": {rmattrEvent + "|sample_count": nil},
 		"null OBSERVATION history_origin":  {rmattrObs + "/history_origin": nil},
-		// A family this codec defers has no carrier; an all-null one is absent.
-		"null deferred family": {rmattrAction + "/_instruction_details|x": nil},
+		// A family whose every key is null carries nothing; it is absent.
+		"all-null instruction_details": {
+			rmattrAction + "/_instruction_details|composition_uid": nil,
+			rmattrAction + "/_instruction_details|activity_id":     nil,
+			rmattrAction + "/_instruction_details|path":            nil,
+		},
 		"null inlined participation identifier": {
 			rmattrContext + "/_participation:0|function":         "requester",
 			rmattrContext + "/_participation:0|identifiers_id:0": nil,

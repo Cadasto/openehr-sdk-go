@@ -547,22 +547,24 @@ func TestRMAttrEndTimeDecoratedRefusedOnEncode(t *testing.T) {
 
 // --- router: refusals ---------------------------------------------------
 
-// TestRMAttrDeferredFamiliesRefused — REQ-140 / REQ-170. The family this codec
-// defers, at an owner that declares it, resolves but has no carrier, so it
-// refuses loudly in every mode. A family that names nothing at its owner —
-// `_wf_definition` where the owner is no INSTRUCTION, `_identifier` (not a
+// TestRMAttrFamiliesNamingNothingAreUnmatched — REQ-140 / REQ-170. A family
+// that names nothing at its owner — `_instruction_details` where the owner is
+// no ACTION, `_wf_definition` where it is no INSTRUCTION, `_identifier` (not a
 // router family at all), a typo — is unmatched content: ignored by default,
-// ErrUnknownPath under strict. Either way the refusal names the family prefix,
-// which is what the PROBE-086 census scopes its exclusions by. The
-// `_wf_definition` an INSTRUCTION declares is carried, and its refusals are
-// in wf_definition_test.go.
-func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
+// ErrUnknownPath under strict. The refusal names the family prefix, which is
+// what the PROBE-086 census scopes its exclusions by. The
+// `_instruction_details` an ACTION declares and the `_wf_definition` an
+// INSTRUCTION declares are carried, and their refusals are in
+// instruction_details_test.go and wf_definition_test.go.
+func TestRMAttrFamiliesNamingNothingAreUnmatched(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, tc := range []struct {
 		key  string
 		want error
 	}{
-		{rmattrAction + "/_instruction_details|activity_id", ErrUnknownPath},
+		// A SECTION declares no instruction_details: the family names nothing
+		// here.
+		{rmattrSection + "/_instruction_details|activity_id", errUnmatched},
 		// `_identifier` is not a router family at all: every position that
 		// reaches a party reaches its identifier list through the party grammar
 		// (rmattr_party.go), so an ENTRY owner is a path that names no family.
@@ -590,15 +592,16 @@ func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 	}
 }
 
-// TestRMAttrBothDirectionRefusalsOnEncode — REQ-140. wire.md lists three
-// attributes as refused in both directions: PARTICIPATION `time`,
-// FEEDER_AUDIT_DETAILS `other_details` and ACTION `instruction_details`.
-// Decode refuses their keys (the test above, and the party and feeder-audit
-// tests). Encode must refuse a populated one too, with a typed error naming the
-// owner's FLAT path and the attribute but never the value or a requirement id,
-// and must stay silent when the attribute is absent. INSTRUCTION
-// `wf_definition` was the fourth until it gained its DV_PARSABLE carrier:
-// [TestRMAttrWfDefinitionWrittenOnEncode] pins what encode writes for it now.
+// TestRMAttrBothDirectionRefusalsOnEncode — REQ-140. wire.md lists two
+// attributes as refused in both directions: PARTICIPATION `time` and
+// FEEDER_AUDIT_DETAILS `other_details`. Decode refuses their keys (the party
+// and feeder-audit tests). Encode must refuse a populated one too, with a typed
+// error naming the owner's FLAT path and the attribute but never the value or a
+// requirement id, and must stay silent when the attribute is absent. INSTRUCTION
+// `wf_definition` and ACTION `instruction_details` were the third and fourth
+// until each gained its carrier: [TestRMAttrWfDefinitionWrittenOnEncode] and
+// the instruction details tests in instruction_details_test.go pin what encode
+// writes for them now.
 func TestRMAttrBothDirectionRefusalsOnEncode(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const secret = "do-not-echo-this-value"
@@ -631,20 +634,6 @@ func TestRMAttrBothDirectionRefusalsOnEncode(t *testing.T) {
 					d.OtherDetails = &rm.ItemTree{ArchetypeNodeID: "at0001", Name: &rm.DVText{Value: secret}}
 				}
 				firstObservation(t, c).FeederAudit = &rm.FeederAudit{OriginatingSystemAudit: d}
-			},
-		},
-		{
-			name: "ACTION instruction_details",
-			key:  rmattrAction + "/_instruction_details",
-			set: func(t *testing.T, c *rm.Composition, populated bool) {
-				a := firstAction(t, c)
-				a.InstructionDetails = nil
-				if populated {
-					a.InstructionDetails = &rm.InstructionDetails{
-						ActivityID:    secret,
-						InstructionID: rm.LocatableRef{ID: rm.HierObjectID{Value: secret}},
-					}
-				}
 			},
 		},
 	} {

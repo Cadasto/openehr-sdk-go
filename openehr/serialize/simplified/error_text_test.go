@@ -78,7 +78,7 @@ func TestREQ140DecodeRefusalTextNamesNoRequirementOrValue(t *testing.T) {
 			keys: map[string]any{audit + "|system_id": "orig", audit + "/other_details|x": refusalTextSecret},
 		},
 		{
-			name: "deferred family", key: rmattrAction + "/_instruction_details", want: ErrUnknownPath,
+			name: "INSTRUCTION_DETAILS without its composition_uid", key: rmattrAction + "/_instruction_details", want: ErrUnsupportedDatatype,
 			keys: map[string]any{rmattrAction + "/_instruction_details|activity_id": refusalTextSecret},
 		},
 		{

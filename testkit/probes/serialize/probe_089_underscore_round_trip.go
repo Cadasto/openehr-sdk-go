@@ -507,6 +507,29 @@ var Probe089Inputs = []Probe089Case{
 		},
 	},
 	{
+		// The values are the corpus's (`ehrbase_conformance_action`), which
+		// EHRbase writes on every ACTION.
+		Name: "action_instruction_details",
+		Rows: []string{"ACTION: _instruction_details"},
+		Keys: map[string]any{
+			probe089Action + "/dv_text":                                  "dv_text in description",
+			probe089Action + "/time":                                     "2022-01-31T10:33:28.72414+01:00",
+			probe089Action + "/language|code":                            "en",
+			probe089Action + "/language|terminology":                     "ISO_639-1",
+			probe089Action + "/ism_transition/current_state|code":        "532",
+			probe089Action + "/ism_transition/current_state|value":       "completed",
+			probe089Action + "/ism_transition/current_state|terminology": "openehr",
+			probe089Action + "/ism_transition/careflow_step|code":        "at0006",
+			probe089Action + "/ism_transition/careflow_step|value":       "transition",
+			probe089Action + "/ism_transition/careflow_step|terminology": "local",
+			probe089Action + "/_instruction_details|composition_uid":     "4cdc3017-d8c5-4cd3-9900-f3bb7171d006",
+			probe089Action + "/_instruction_details|activity_id":         "activities[at0001]",
+			probe089Action + "/_instruction_details|path":                "/content[openEHR-EHR-SECTION.conformance_section.v0]/items[openEHR-EHR-INSTRUCTION.conformance_instruction.v0]",
+			probe089Qty + "|magnitude":                                   65.9,
+			probe089Qty + "|unit":                                        "unit",
+		},
+	},
+	{
 		Name: "interval_leaf",
 		Rows: []string{"DV_INTERVAL<T> leaf (the interval grammar at a modelled node)"},
 		Keys: map[string]any{
@@ -550,19 +573,10 @@ type Probe089Refusal struct {
 // content, ignored by default, reported on request and refused under strict.
 var Probe089Refusals = []Probe089Refusal{
 	{
-		// Spec-named, corpus-unexercised as a decodable grammar: deferred as a
-		// typed refusal until a pinnable fixture lands, never decoded-and-dropped.
-		Name: "instruction_details_deferred",
-		Keys: map[string]any{
-			probe089Action + "/_instruction_details|activity_id":     "activities[at0001]",
-			probe089Action + "/_instruction_details|composition_uid": "4cdc3017-d8c5-4cd3-9900-f3bb7171d006",
-		},
-		Want:  simplified.ErrUnknownPath,
-		Names: []string{probe089Action + "/_instruction_details"},
-	},
-	{
 		// FEEDER_AUDIT_DETAILS.other_details is an ITEM_STRUCTURE the
-		// reference's suffix set has no channel for — the second deferral.
+		// reference's suffix set has no channel for. ACTION
+		// `_instruction_details` was deferred beside it until it gained its
+		// carrier, and round-trips above now.
 		Name: "feeder_audit_other_details_deferred",
 		Keys: map[string]any{
 			probe089Obs + "/_feeder_audit/originating_system_audit|system_id":       "orig",

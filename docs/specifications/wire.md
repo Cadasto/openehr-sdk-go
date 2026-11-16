@@ -591,7 +591,8 @@ Input is matched when it names something the decoder reads, even where the decod
 These refusals are not unmatched content and stay errors in every mode:
 
 - a `_type` or `xsi:type` that names no RM class, a dispatch failure that would otherwise drop the whole subtree under it;
-- a FLAT or STRUCTURED key that resolves but has no carrier: PARTICIPATION `time`, FEEDER_AUDIT_DETAILS `other_details` and `_instruction_details` (§ REQ-140 *Deliberate exclusions*); and, at a leaf whose datatype has neither a suffix set nor a sub-path grammar, its bare value and a suffix that names an attribute of its RM class; a `null` one in this bullet reads as absent (§ REQ-053);
+- a FLAT or STRUCTURED key that resolves but has no carrier: PARTICIPATION `time` and FEEDER_AUDIT_DETAILS `other_details` (§ REQ-140 *Deliberate exclusions*); and, at a leaf whose datatype has neither a suffix set nor a sub-path grammar, its bare value and a suffix that names an attribute of its RM class.
+  A `null` one in this bullet reads as absent (§ REQ-053);
 - a FLAT or STRUCTURED key the decoder recognises as the reference's spelling of RM data the Web Template this SDK builds does not model, resolved or not, since ignoring it would drop that data or let a default replace it (the reference spellings, listed below); a `null` one in this bullet reads as absent (§ REQ-053);
 - matched content that is malformed: a value of the wrong shape, a missing required suffix (a `null` one among them, § REQ-053), two spellings of one field that disagree, an index past its bound;
 - a FLAT key that is not well formed, which names no path at all: one with an empty path segment (`a//b|`, or a leading or trailing `/`), a segment with no id before its `:index`, a second `|suffix`, or a segment after its `|suffix`.
@@ -604,7 +605,7 @@ The reference spellings the decoder recognises are these, wherever the Web Templ
 - under an `ism_transition` segment the Web Template has no node for, a `_reason` family too;
 - the ACTION's own `time` leaf, with any suffix.
 
-A refusal of a key the *Simplified Formats* define and this SDK does not model, a reference spelling or `_instruction_details`, **MUST** wrap `simplified.ErrNotModelled`, a sentinel that also matches `simplified.ErrUnknownPath`.
+A refusal of a reference spelling, a key the *Simplified Formats* define and this SDK does not model, **MUST** wrap `simplified.ErrNotModelled`, a sentinel that also matches `simplified.ErrUnknownPath`.
 A caller can then tell such a key from unmatched content, whose strict refusal matches `simplified.ErrUnknownPath` alone.
 The refusal names the key, or its family instance, and no file of this repository.
 
@@ -663,7 +664,7 @@ REST reads through `transport` and the `openehr/client/*` packages decode with t
 - The report option receives each of those items once, in document order, by the paths above, and the decode returns the same value as the default.
 - Under strict, each of those inputs fails with an error that wraps the codec's sentinel, names the first item's path and carries none of its value.
 - An unknown `_type` or `xsi:type` fails in every mode; each carrier-less FLAT key above fails in every mode, except a `null` one, which § REQ-053 reads as absent; an absent mandatory member does not fail under strict.
-- Each reference spelling and `_instruction_details` fails in every mode with an error that matches both `simplified.ErrNotModelled` and `simplified.ErrUnknownPath` and names the key or its family instance; a mistyped key refused under strict does not match `simplified.ErrNotModelled`.
+- Each reference spelling fails in every mode with an error that matches both `simplified.ErrNotModelled` and `simplified.ErrUnknownPath` and names the key or its family instance; a mistyped key refused under strict does not match `simplified.ErrNotModelled`.
 - A FLAT body carrying `a//b|` fails in every mode with `simplified.ErrUnknownPath` naming that key, and so does its FLAT → STRUCTURED conversion.
 - A canonical-JSON document reporting 1000 items under a spine 150 levels deep allocates at most twice as much as the same items under a spine 2 levels deep, under the unmatched and the missing-member options.
   A canonical-XML document reporting one item per level, under each of the three options, allocates at most three times as much when its depth doubles from 400 levels to 800, where a cost of depth times items would give four times.
@@ -1074,6 +1075,7 @@ The codec **MUST** support, in **both** directions — encode emitting every pop
 | | `_provider` | PARTY_PROXY (below) — the party grammar, with PARTY_SELF spelled by `\|_type` |
 | ISM_TRANSITION (an ACTION's in-context `ism_transition` node or a per-step `ism_transition[atNNNN]` node) | `_reason:N` | DV_TEXT — the DV_TEXT leaf grammar, one key per reason; the corpus writes the bare value |
 | INSTRUCTION | `_wf_definition` | DV_PARSABLE per [§ REQ-053 *Leaf datatypes*](#leaf-datatypes) — written `\|value` + `\|formalism`, the spelling of ITS-REST 1.1.0 *Simplified Formats* § INSTRUCTION and of the corpus; decode reads the value bare too |
+| ACTION | `_instruction_details` | INSTRUCTION_DETAILS — `\|composition_uid` and `\|activity_id`, both RM-mandatory, and `\|path`. Decode builds `instruction_id` as a LOCATABLE_REF of namespace `local` and type `INSTRUCTION`, its `id` a HIER_OBJECT_ID from `\|composition_uid` and its `path` from `\|path`, an empty `\|path` read as absent. Encode writes `\|path` only when it is not empty. Any other suffix is unmatched content, the reference's `\|instruction_uid`, `\|wt_path`, `\|instruction_index` and `\|activity_index` among them |
 | EVENT_CONTEXT (under the real `context` segment) | `_health_care_facility` | PARTY_IDENTIFIED (below) |
 | | `_participation:N` | PARTICIPATION (below) |
 | | `_end_time` | bare value (DV_DATE_TIME) |
@@ -1170,11 +1172,12 @@ That suffix is the reference's own spelling of the same RM attribute in the OBJE
 
 A nested value the grammar reaches through a *datatype* position — an interval bound, a REFERENCE_RANGE `/meaning`, a `_charset`, a `_thumbnail`, an `original_content`, a `_wf_definition` — is read and written by that datatype's own leaf rules, except that a `_wf_definition` writes its value as `|value` (its row above).
 One whose extras the suffix set cannot carry therefore rides `|raw` **at its own key** rather than being refused: a thumbnail carrying its own charset is `_thumbnail|raw`, an `original_content` carrying one is `original_content|raw`.
-The families that reach a value through a *non-datatype* position instead (a party, a PARTICIPATION, a LINK, a FEEDER_AUDIT_DETAILS scalar) have no such carrier, and there every shape the suffixes cannot express **MUST** be a typed error.
+The families that reach a value through a *non-datatype* position instead (a party, a PARTICIPATION, a LINK, a FEEDER_AUDIT_DETAILS scalar, an INSTRUCTION_DETAILS) have no such carrier, and there every shape the suffixes cannot express **MUST** be a typed error.
+For an INSTRUCTION_DETAILS those shapes are an `instruction_id` whose namespace is not `local` or whose type is not `INSTRUCTION`, an `id` that is not a HIER_OBJECT_ID, and a `wf_details`.
 
 #### Deliberate exclusions
 
-Deliberate exclusions **MUST** be refused in both directions with a typed error naming the key, never decoded and dropped: PARTICIPATION `time`; FEEDER_AUDIT_DETAILS `other_details`; `_instruction_details` (ACTION), which the spec names and the pinned corpus does not exercise, **deferred** as a typed refusal.
+Deliberate exclusions **MUST** be refused in both directions with a typed error naming the key, never decoded and dropped: PARTICIPATION `time` and FEEDER_AUDIT_DETAILS `other_details`.
 
 ## AQL
 

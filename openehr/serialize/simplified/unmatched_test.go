@@ -400,7 +400,6 @@ func TestREQ170CarrierlessKeysRefusedInEveryMode(t *testing.T) {
 			rmattrObs + "/_feeder_audit/originating_system_audit|system_id":     "orig",
 			rmattrObs + "/_feeder_audit/originating_system_audit|other_details": "boom",
 		}, ErrUnsupportedDatatype},
-		{"_instruction_details", map[string]any{rmattrAction + "/_instruction_details|activity_id": "activities[at0001]"}, ErrUnknownPath},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := refusedInEveryMode(t, wt, rmattrBody(tc.keys))
@@ -435,6 +434,12 @@ func TestREQ170MalformedMatchedContentRefusedInEveryMode(t *testing.T) {
 		// required suffix.
 		{"wf_definition without its formalism", map[string]any{
 			rmattrSection + "/conformance_instruction/_wf_definition|value": "wf",
+		}},
+		// `_instruction_details` sat in the carrier-less table while the family
+		// was deferred; it is an INSTRUCTION_DETAILS now, and one without its
+		// composition_uid is a missing required suffix.
+		{"instruction_details without its composition_uid", map[string]any{
+			rmattrAction + "/_instruction_details|activity_id": "activities[at0001]",
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
