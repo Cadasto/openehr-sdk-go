@@ -6,13 +6,17 @@ kind: specification
 
 **Status:** Draft
 
-The idiomatic Go surface rules every public package in this SDK adheres to. Covers REQ-020, REQ-021, REQ-025 and REQ-026; the conventions of the retired REQ-022, REQ-023 and REQ-024 are [§ API conventions](#api-conventions).
+The idiomatic Go surface rules every public package in this SDK adheres to.
+Covers REQ-020, REQ-021, REQ-025 and REQ-026; the conventions of the retired REQ-022, REQ-023 and REQ-024 are [§ API conventions](#api-conventions).
 
-The premise: **the SDK is idiomatic Go.** Wire-level correctness is defined against the openEHR specifications and the conformance probes in [conformance.md](conformance.md), not by a particular source shape. Java-style "every type is an object", Python-style keyword arguments, repository-graph ports from other languages — none of these constrain the Go API.
+The premise: **the SDK is idiomatic Go.**
+Wire-level correctness is defined against the openEHR specifications and the conformance probes in [conformance.md](conformance.md), not by a particular source shape.
+Java-style "every type is an object", Python-style keyword arguments, repository-graph ports from other languages — none of these constrain the Go API.
 
 ## Context propagation (REQ-020)
 
-Every exported function or method that performs network I/O (HTTP, DNS, a discovery lookup) or waits on a deadline **MUST** take `context.Context` as its first parameter, and **MUST** honour that context's cancellation and deadline. The local readers are the exception: `probe.ValidateHAR` reads a local file the way `os.ReadFile` does, with no context, and `bmm.LoadAll` calls its `Resolver` without one.
+Every exported function or method that performs network I/O (HTTP, DNS, a discovery lookup) or waits on a deadline **MUST** take `context.Context` as its first parameter, and **MUST** honour that context's cancellation and deadline.
+The local readers are the exception: `probe.ValidateHAR` reads a local file the way `os.ReadFile` does, with no context, and `bmm.LoadAll` calls its `Resolver` without one.
 
 ```go
 // Correct
@@ -27,14 +31,16 @@ func (c *Client) GetComposition(id ObjectVersionID, ctx context.Context) (*rm.Co
 
 `context.Context` is also the carrier for:
 
-- **Request-scoped values** — primarily for OTel propagation. The SDK defines no context-value keys of its own for control flow, which would be an anti-pattern.
+- **Request-scoped values** — primarily for OTel propagation.
+  The SDK defines no context-value keys of its own for control flow, which would be an anti-pattern.
 - **Per-request auth** — a server acting for many users, such as an MCP server, attaches with `auth.WithTokenSource(ctx, ts)` a source for a token obtained for the openEHR API on the user's behalf; it never forwards the token its own caller sent (see [auth.md § Per-request TokenSource](auth.md#per-request-tokensource)).
 
 Pure functions (codecs, validators with no I/O, AQL string builders) **SHOULD NOT** take `context.Context`, because a context they never consult is noise at every call site.
 
 ## HTTP client injection (REQ-021)
 
-All outgoing network I/O **MUST** go through the `*http.Client` the caller injects, its `Transport`, `Jar` and `Timeout` included, and a constructor given no client refuses with an error rather than fall back to a client of its own. Constructors accept the client via functional option or wrapper:
+All outgoing network I/O **MUST** go through the `*http.Client` the caller injects, its `Transport`, `Jar` and `Timeout` included, and a constructor given no client refuses with an error rather than fall back to a client of its own.
+Constructors accept the client via functional option or wrapper:
 
 ```go
 // Explicit injection
@@ -44,7 +50,9 @@ client, err := transport.New(catalog,
 )
 ```
 
-The SDK allocates no `*http.Client` of its own. Three shallow copies of the injected client are the exceptions, each changing only its redirect policy, and each **MUST** leave the injected client unmodified: the copy that [auth.md § Credential-bearing requests](auth.md#credential-bearing-requests) prescribes for token, refresh and revocation requests; the copy the discovery resolver fetches with, to refuse a redirect to a URL that is not https ([auth.md § REQ-073](auth.md#req-073--discovery-trust-posture)); and the copy the transport sends a request carrying a credential header (`Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`) with, to refuse a redirect from https to a URL that is not https ([transport.md § REQ-092](transport.md#req-092--tls-posture)). Each copy keeps the injected client's `Transport`, `Jar` and `Timeout`.
+The SDK allocates no `*http.Client` of its own.
+Three shallow copies of the injected client are the exceptions, each changing only its redirect policy, and each **MUST** leave the injected client unmodified: the copy that [auth.md § Credential-bearing requests](auth.md#credential-bearing-requests) prescribes for token, refresh and revocation requests; the copy the discovery resolver fetches with, to refuse a redirect to a URL that is not https ([auth.md § REQ-073](auth.md#req-073--discovery-trust-posture)); and the copy the transport sends a request carrying a credential header (`Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`) with, to refuse a redirect from https to a URL that is not https ([transport.md § REQ-092](transport.md#req-092--tls-posture)).
+Each copy keeps the injected client's `Transport`, `Jar` and `Timeout`.
 
 Rationale:
 
@@ -75,14 +83,16 @@ client, err := transport.New(catalog,
 
 - An option is a value of one small interface type, typically `func(*config) error` or `func(*config)`.
 - Options are additive: applying two options of the same family has a well-defined result, typically "last write wins", with any exception for a slice-accumulator option documented on it.
-- The `config` struct is **unexported**; consumers configure it only through `With*` options. The auth providers (`auth/smart`, `auth/clientcreds`, `auth/jwtbearer`) are the exception: their options act on an exported `Config`, which also serves as the serialised form below.
+- The `config` struct is **unexported**; consumers configure it only through `With*` options.
+  The auth providers (`auth/smart`, `auth/clientcreds`, `auth/jwtbearer`) are the exception: their options act on an exported `Config`, which also serves as the serialised form below.
 - A public `Config` struct for serialised configuration (YAML, env) can exist, and the constructor routes it through the same option chain.
 
 The SDK does not use:
 
 - Setter methods after construction (`client.SetHTTPClient(...)`) — mutable after construction implies a hidden lock or a data race.
 - Builder-pattern intermediate types (`ehr.NewBuilder().WithX(...).Build()`) — verbose and harder to compose than functional options.
-- The "options bag" pattern (`transport.New(catalog, transport.Options{HTTPClient: ..., TokenSource: ...})`) — a second configuration style beside functional options. A keyed literal keeps compiling when a field is added, and [module-layout.md § Versioning](module-layout.md#versioning) does not class that as a breaking change.
+- The "options bag" pattern (`transport.New(catalog, transport.Options{HTTPClient: ..., TokenSource: ...})`) — a second configuration style beside functional options.
+  A keyed literal keeps compiling when a field is added, and [module-layout.md § Versioning](module-layout.md#versioning) does not class that as a breaking change.
 
 ### Surface shape
 
@@ -119,7 +129,10 @@ func DecodeAs[T any](data []byte) (T, error)
 func Decode(data []byte) (any, error) // forces type assertions everywhere
 ```
 
-Library code (non-test code outside `cmd/`) uses no reflection, with two exceptions: ordinary field mapping over struct tags (it is what `encoding/json` does), and uses that never choose a Go type from `_type`. The second exception has four classes: a typed-nil or zero-value check, a value comparison (`reflect.DeepEqual`), a type name in an error message, and an addressable copy that reaches pointer-receiver methods. The type registry ([reference-model.md § Type registry (REQ-040)](reference-model.md#type-registry-req-040)) is the only mechanism that projects the `_type` discriminator onto a concrete Go type. A guard test still checks this convention: it holds every library file that imports `reflect` to a reviewed list naming the class of each use.
+Library code (non-test code outside `cmd/`) uses no reflection, with two exceptions: ordinary field mapping over struct tags (it is what `encoding/json` does), and uses that never choose a Go type from `_type`.
+The second exception has four classes: a typed-nil or zero-value check, a value comparison (`reflect.DeepEqual`), a type name in an error message, and an addressable copy that reaches pointer-receiver methods.
+The type registry ([reference-model.md § Type registry (REQ-040)](reference-model.md#type-registry-req-040)) is the only mechanism that projects the `_type` discriminator onto a concrete Go type.
+A guard test still checks this convention: it holds every library file that imports `reflect` to a reviewed list naming the class of each use.
 
 - A constraint is a closed type set, such as `contribution.Versionable` (`rm.Composition | rm.EHRStatus | rm.Folder | rm.EHRAccess`), or a marker method plus the necessary method set — the same rule as for abstract categories.
 - A constraint appears only in the type parameter list of a function signature: `contribution.Creation[T Versionable](data *T, …)` keeps the caller's type, where a parameter of an interface type would erase it.
@@ -128,15 +141,21 @@ If a generic API is harder to read than a `T`-specific one for the most common c
 
 ### String iteration
 
-A check defined over **bytes** — a wire-format guard, a byte-exact scanner — iterates `for i := range len(s)`, never `for i := range s`. Ranging a string yields rune-start indices and skips UTF-8 continuation bytes, so a byte loop rewritten that way stops inspecting every byte. `for i := range s` is correct only where runes are genuinely the unit.
+A check defined over **bytes** — a wire-format guard, a byte-exact scanner — iterates `for i := range len(s)`, never `for i := range s`.
+Ranging a string yields rune-start indices and skips UTF-8 continuation bytes, so a byte loop rewritten that way stops inspecting every byte.
+`for i := range s` is correct only where runes are genuinely the unit.
 
-`go fix` deliberately declines to rewrite `for i := 0; i < len(s); i++` on a string for exactly this reason — it applies the `rangeint` fixer to slices only. A `range s` over a byte-oriented check is therefore always hand-written, and always worth a second look in review.
+`go fix` deliberately declines to rewrite `for i := 0; i < len(s); i++` on a string for exactly this reason — it applies the `rangeint` fixer to slices only.
+A `range s` over a byte-oriented check is therefore always hand-written, and always worth a second look in review.
 
 ### Imports and naming
 
-- **Import groups:** standard library; third-party; module-internal — separated by blank lines. `gofumpt` + `goimports` (run via `golangci-lint fmt` / `make fmt`) handle ordering and enforce the group separation.
-- **Package names:** short, lowercase, no underscores, no plurals (`composition`, not `compositions`). Avoid stuttering — `composition.Composition` is allowed if the type is the package's primary export; `composition.Service` and `composition.Repository` are preferred for non-primary types.
-- **Exported names:** `CamelCase`. Acronyms preserve case (`HTTPClient`, `JWKS`, `EHRID`).
+- **Import groups:** standard library; third-party; module-internal — separated by blank lines.
+  `gofumpt` + `goimports` (run via `golangci-lint fmt` / `make fmt`) handle ordering and enforce the group separation.
+- **Package names:** short, lowercase, no underscores, no plurals (`composition`, not `compositions`).
+  Avoid stuttering — `composition.Composition` is allowed if the type is the package's primary export; `composition.Service` and `composition.Repository` are preferred for non-primary types.
+- **Exported names:** `CamelCase`.
+  Acronyms preserve case (`HTTPClient`, `JWKS`, `EHRID`).
 - **Unexported names:** `camelCase` with leading lowercase.
 - **Constructor names:** `New<Thing>` returns `*Thing` or `Thing`; `New<Thing>(opts ...Option)` returns `(*Thing, error)` when configuration validation can fail.
 
@@ -156,9 +175,12 @@ A wrapped error **MUST** stay reachable with `errors.Is` and `errors.As`, and a 
 
 ### Typed errors
 
-A wire failure is a `*transport.WireError` matched by a status sentinel such as `transport.ErrPreconditionFailed` ([transport.md § REQ-093](transport.md#req-093--openehr-error-envelope-mapping)). Consumers detect classes with `errors.Is(err, transport.ErrPreconditionFailed)` and read the details with `errors.AsType[*transport.WireError]`. Discovery, parse, and auth errors **MUST** have their own sentinel or typed error, in their own package (such as `*discovery.DiscoveryError` and `*auth.ExchangeError`), so they are distinguishable from wire errors.
+A wire failure is a `*transport.WireError` matched by a status sentinel such as `transport.ErrPreconditionFailed` ([transport.md § REQ-093](transport.md#req-093--openehr-error-envelope-mapping)).
+Consumers detect classes with `errors.Is(err, transport.ErrPreconditionFailed)` and read the details with `errors.AsType[*transport.WireError]`.
+Discovery, parse, and auth errors **MUST** have their own sentinel or typed error, in their own package (such as `*discovery.DiscoveryError` and `*auth.ExchangeError`), so they are distinguishable from wire errors.
 
-To extract a typed error's fields — not just match a sentinel — SDK code uses the Go 1.26+ `errors.AsType[E]` form, which the module's minimum Go version ([releases.md § Minimum Go version](../releases.md#minimum-go-version)) always makes available. The older `errors.As(err, &target)` out-parameter remains where that shape is itself the subject, as in the nil-receiver guard in `openehr/client/query`:
+To extract a typed error's fields — not just match a sentinel — SDK code uses the Go 1.26+ `errors.AsType[E]` form, which the module's minimum Go version ([releases.md § Minimum Go version](../releases.md#minimum-go-version)) always makes available.
+The older `errors.As(err, &target)` out-parameter remains where that shape is itself the subject, as in the nil-receiver guard in `openehr/client/query`:
 
 ```go
 // Preferred — Go 1.26+ generic extraction
@@ -173,21 +195,29 @@ if errors.As(err, &we) {
 }
 ```
 
-Sentinel matching with `errors.Is` is unchanged. Neither form is nil-proof: a failed match leaves a nil typed pointer that a caller can box into a non-nil `error`, which is why the no-panic rule below covers the nil receiver.
+Sentinel matching with `errors.Is` is unchanged.
+Neither form is nil-proof: a failed match leaves a nil typed pointer that a caller can box into a non-nil `error`, which is why the no-panic rule below covers the nil receiver.
 
 ### No panics
 
-Library code **MUST NOT** panic on wire input or on caller input: it returns an error or fails closed instead. In particular:
+Library code **MUST NOT** panic on wire input or on caller input: it returns an error or fails closed instead.
+In particular:
 
 - Wire input (malformed JSON, unexpected `_type`): a typed error.
-- Caller input (nil maps, empty strings, invalid IDs, a nil argument, a zero-value struct whose interface fields are nil): a typed error, or a fail-closed answer. An exported constructor whose signature returns no error fails closed by returning a value that a documented validation or marshalling path rejects with an error.
-- A nil variadic option: skipped rather than invoked. `f(..., opts ...Option)` invites a caller to build one conditionally, so a nil element is caller input, not a programmer error.
-- A nil receiver on a decode method, whether every generated `UnmarshalJSONFrom` or the hand-written primitive codecs' `UnmarshalJSON` / `UnmarshalText` (`rm.Real`, `rm.Integer`, `rm.Integer64`, `rm.Character`): an error carrying `typereg.ErrNilReceiver`. A census over the type registry checks every registered library type for this guard.
-- A nil decoder or target handed to `typereg.DecodeInto` or `typereg.DecodePolymorphic`, or a nil `gotType` handed to `DecodeInto`: a `typereg.DecodeError` carrying `typereg.ErrNilArgument`. A typed nil inside a non-nil target is not caught up front; it reaches the decode and fails there.
-- A nil receiver on an exported method of an SDK error type (`Error`, `Unwrap` and any accessor) — the typed nil a failed `errors.As` / `errors.AsType` match leaves behind — and on the accessors of `transport.Client` (`Do`, `Catalog`, `HTTPClient`): an answer. An error type answers with the text its zero value produces unless its godoc documents a different nil-receiver text.
+- Caller input (nil maps, empty strings, invalid IDs, a nil argument, a zero-value struct whose interface fields are nil): a typed error, or a fail-closed answer.
+  An exported constructor whose signature returns no error fails closed by returning a value that a documented validation or marshalling path rejects with an error.
+- A nil variadic option: skipped rather than invoked.
+  `f(..., opts ...Option)` invites a caller to build one conditionally, so a nil element is caller input, not a programmer error.
+- A nil receiver on a decode method, whether every generated `UnmarshalJSONFrom` or the hand-written primitive codecs' `UnmarshalJSON` / `UnmarshalText` (`rm.Real`, `rm.Integer`, `rm.Integer64`, `rm.Character`): an error carrying `typereg.ErrNilReceiver`.
+  A census over the type registry checks every registered library type for this guard.
+- A nil decoder or target handed to `typereg.DecodeInto` or `typereg.DecodePolymorphic`, or a nil `gotType` handed to `DecodeInto`: a `typereg.DecodeError` carrying `typereg.ErrNilArgument`.
+  A typed nil inside a non-nil target is not caught up front; it reaches the decode and fails there.
+- A nil receiver on an exported method of an SDK error type (`Error`, `Unwrap` and any accessor) — the typed nil a failed `errors.As` / `errors.AsType` match leaves behind — and on the accessors of `transport.Client` (`Do`, `Catalog`, `HTTPClient`): an answer.
+  An error type answers with the text its zero value produces unless its godoc documents a different nil-receiver text.
 - Authentication failures: `ErrUnauthorized` or a wrapped equivalent.
 
-The one exception is the Go `Must`-prefix convention (`regexp.MustCompile`, `template.Must`): a constructor whose name begins with `Must` **MAY** panic on invalid input, because the prefix is the documented signal that it does. A non-panicking alternative **MUST** be available to callers — a sibling in the same package, or the standard-library call it wraps — so the panic is always the caller's explicit opt-in, and the godoc of the `Must` function says that it panics.
+The one exception is the Go `Must`-prefix convention (`regexp.MustCompile`, `template.Must`): a constructor whose name begins with `Must` **MAY** panic on invalid input, because the prefix is the documented signal that it does.
+A non-panicking alternative **MUST** be available to callers — a sibling in the same package, or the standard-library call it wraps — so the panic is always the caller's explicit opt-in, and the godoc of the `Must` function says that it panics.
 
 Except for `Must`-prefix constructors, panics are reserved for **programmer errors** the consumer cannot trigger via documented APIs (nil dereference of an unexported struct, broken invariant in the type registry).
 

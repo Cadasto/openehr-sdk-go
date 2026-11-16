@@ -957,7 +957,8 @@ A key the Web Template does not resolve, an unknown suffix and an unknown `ctx/`
 The codecs **MUST** use the canonical media types `application/openehr.wt.flat+json` (FLAT) and `application/openehr.wt.structured+json` (STRUCTURED) and never emit the deprecated `.schema`-suffixed variants, which they **SHOULD** accept on input for interoperability, since some servers still serve them though the specification retired them.
 Classification is per media-type token — one `Content-Type` value or one `Accept` media range, matched case-insensitively with well-formed parameters ignored, `q` included; a comma-separated `Accept` list is the caller's to split.
 A value whose type part or parameters do not parse — a comma-separated list among them — or that names neither format — including the WebTemplate resource type `application/openehr.wt+json`, a template projection rather than a composition format — **MUST** be refused with a typed error (`simplified.ErrUnknownMediaType`), never defaulted to a format.
-(`simplified.ParseMediaType` and `Format.MediaType` implement this; the codecs themselves take bytes, so negotiation happens one call before them. Recorded in the package [deviations register](../../openehr/serialize/simplified/deviations.md).)
+(`simplified.ParseMediaType` and `Format.MediaType` implement this; the codecs themselves take bytes, so negotiation happens one call before them.
+Recorded in the package [deviations register](../../openehr/serialize/simplified/deviations.md).)
 
 #### Leaf datatypes
 
