@@ -361,7 +361,7 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 				optSingle("denominator", dvReal("1")), optSingle("type", dvInteger("1")),
 				normalRangeOver("DV_PROPORTION", proportionValue("0"), proportionValue("9")), normalStatus("H")),
 			want:       "DV_PROPORTION 10/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 0/1 type 1 .. DV_PROPORTION 9/1 type 1]" + noRefs,
-			wantRandom: "DV_PROPORTION 67.6455659667825/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 0/1 type 1 .. DV_PROPORTION 9/1 type 1]" + noRefs,
+			wantRandom: "DV_PROPORTION 67.65/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 0/1 type 1 .. DV_PROPORTION 9/1 type 1]" + noRefs,
 		},
 		{
 			// The OPT lists 5 and 20. The bounds of the range, the values a

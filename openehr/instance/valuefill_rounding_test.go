@@ -144,3 +144,57 @@ func TestREQ107_RandomQuantityIsRoundedInsideItsRange(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ107_RandomProportionIsRounded is the REQ-107 Primitive-leaf value
+// fill check on a DV_PROPORTION RandomFill draws: its numerator and
+// denominator are whole numbers where its precision or its kind asks for
+// them, and are otherwise rounded as a quantity's magnitude is, to the
+// decimals its precision gives up to two. The RM floor and the template
+// validator pass.
+func TestREQ107_RandomProportionIsRounded(t *testing.T) {
+	r, closed := instance.RealRange, instance.Closed
+	numerator := optProportionPart("numerator", r(closed(0), closed(10)))
+	denominator := optProportionPart("denominator", r(closed(1), closed(10)))
+	cases := []struct {
+		name     string
+		attrs    []string
+		decimals int
+	}{
+		{
+			name:     "ratio with no precision",
+			attrs:    []string{numerator, denominator, optProportionPart("type", instance.IntList(0))},
+			decimals: 2,
+		},
+		{
+			name:     "ratio of precision 1",
+			attrs:    []string{numerator, denominator, optProportionPart("type", instance.IntList(0)), optProportionPart("precision", instance.IntList(1))},
+			decimals: 1,
+		},
+		{
+			name:     "ratio of precision 0",
+			attrs:    []string{numerator, denominator, optProportionPart("type", instance.IntList(0)), optProportionPart("precision", instance.IntList(0))},
+			decimals: 0,
+		},
+		{
+			name:     "ratio of precision 5",
+			attrs:    []string{numerator, denominator, optProportionPart("type", instance.IntList(0)), optProportionPart("precision", instance.IntList(5))},
+			decimals: 2,
+		},
+		{
+			name:     "fraction",
+			attrs:    []string{numerator, denominator, optProportionPart("type", instance.IntList(3))},
+			decimals: 0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, optProportionOver(tc.attrs...), true)
+			eachProportionRun(t, c, func(t *testing.T, what string, out any, p rm.DVProportion) {
+				if !decimalsAtMost(float64(p.Numerator), tc.decimals) || !decimalsAtMost(float64(p.Denominator), tc.decimals) {
+					t.Errorf("%s: DV_PROPORTION %s, want at most %d decimals on each operand", what, proportionText(p), tc.decimals)
+				}
+				checkValid(t, out, c)
+			})
+		})
+	}
+}

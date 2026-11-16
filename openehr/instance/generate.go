@@ -3103,6 +3103,27 @@ func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64
 	return true
 }
 
+// roundProportion rounds the numerator and the denominator RandomFill drew
+// for p, as a quantity's magnitude is rounded (quantityDecimals): to the
+// precision p carries where it is 0 or more and below
+// maxQuantityDecimals, and to maxQuantityDecimals otherwise. An operand
+// keeps its draw where the OPT's constraint on it, opt being the OPT node
+// of p, rejects the rounded value, and a denominator where it would round
+// to 0. settleProportion then makes whole numbers of them where the kind
+// or a precision of 0 asks for them.
+func roundProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
+	decimals := maxQuantityDecimals
+	if p.Precision != nil && *p.Precision >= 0 && int(*p.Precision) < decimals {
+		decimals = int(*p.Precision)
+	}
+	if v := roundTo(float64(p.Numerator), decimals); componentFits(bindingChild(opt, "numerator"), v) {
+		p.Numerator = rm.Real(v)
+	}
+	if v := roundTo(float64(p.Denominator), decimals); v != 0 && componentFits(bindingChild(opt, "denominator"), v) {
+		p.Denominator = rm.Real(v)
+	}
+}
+
 // integralPinned reports whether the OPT pins is_integral of opt, a
 // DV_PROPORTION, to true: a C_BOOLEAN on it that admits true alone. The
 // pinned RM has is_integral as a function, not an attribute, so the walk
@@ -3559,6 +3580,9 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.DVProportion:
 		// A bound of an interval is settled here too, before the interval's
 		// own walk puts its two bounds in order.
+		if g.opts.ValueFill == RandomFill {
+			roundProportion(opt, v)
+		}
 		settleProportion(opt, v)
 	case *rm.DVCodedText:
 		// Any coded text the OPT builds as a node of its own: an ELEMENT's
