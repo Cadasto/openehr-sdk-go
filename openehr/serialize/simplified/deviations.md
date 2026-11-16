@@ -135,11 +135,14 @@ Concretely:
   `ErrUnsupportedDatatype` naming the key (since 2026-11-16), where it wrote none of them, so
   decode rebuilt the event as a POINT_EVENT. Since 2026-11-17 (issue 452) the Web Template
   folds in an event of any type that is its HISTORY's only event at `max == 1`, as the
-  reference does, so `webtemplate.Build` folds in no two events at one OBSERVATION, and a
-  folded POINT_EVENT or INTERVAL_EVENT takes these keys too. A folded INTERVAL_EVENT has its
-  `math_function` and `width` as leaves of the OBSERVATION's node, at the event's own paths:
-  encode writes each once, there, and decode rebuilds the event as an INTERVAL_EVENT
-  whatever keys the body gives. Each is
+  reference does, so `webtemplate.Build` folds in no two events at one OBSERVATION. A folded
+  INTERVAL_EVENT takes these keys too, and has its `math_function` and `width` as leaves of
+  the OBSERVATION's node, at the event's own paths: encode writes each once, there, and
+  decode rebuilds the event as an INTERVAL_EVENT whatever keys the body gives. A folded
+  POINT_EVENT takes them in a decode without `WithTemplate`, which cannot tell it from a
+  folded abstract EVENT (below). A `WithTemplate` decode reads none of the three there: the
+  compiled template types the event a POINT_EVENT, which has none of them, and the reference
+  has no node for them, so they are unmatched content. Each, where read, is
   single-valued, so an index past `:0` on it is refused whatever follows it, and a segment
   below it is unmatched content, as below any leaf. Until
   then decode refused all four in every mode. Each other spelling of them
@@ -148,8 +151,10 @@ Concretely:
   - An event at an EVENT node, or folded into its OBSERVATION node and not an
     INTERVAL_EVENT there, is an INTERVAL_EVENT where the body gives it any of the three keys,
     and a POINT_EVENT otherwise. The Web Template does not tell a folded POINT_EVENT from a
-    folded abstract EVENT, so this holds for a folded POINT_EVENT too; the reference's filter
-    keeps each event it folds in, with its type, beside its Web Template (`Filter.filter`).
+    folded abstract EVENT, so without `WithTemplate` this holds for a folded POINT_EVENT too;
+    the reference's filter keeps each event it folds in, with its type, beside its Web
+    Template (`Filter.filter`). With `WithTemplate` the compiled template gives that type,
+    and a folded POINT_EVENT reads none of the three (since 2026-11-17, issue 452).
     The reference keys on `math_function` alone and
     refuses a `width` or `sample_count` it does not consume; a `WithTemplate` decode here
     gives the missing `math_function` and `width` their defaults instead (below).

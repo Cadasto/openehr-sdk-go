@@ -10,9 +10,13 @@ package simplified
 // any type (issue 452), has no node, so its three are spelled at the
 // OBSERVATION's (issue 456), where a folded INTERVAL_EVENT has its
 // `math_function` and `width` as children; where it folds in more than one,
-// those keys name none of them. The reference implementation gives none of
-// them a Web Template node either, so the codec reads and writes them itself,
-// and the Web Template stays the reference's.
+// those keys name none of them. With the template, a folded event it types
+// POINT_EVENT reads none of the three, as the reference gives them no node
+// there (issue 452); without it, a folded POINT_EVENT reads them as a folded
+// abstract EVENT does, since the Web Template does not tell the two apart.
+// The reference implementation gives none of them a Web Template node either,
+// so the codec reads and writes them itself, and the Web Template stays the
+// reference's.
 
 import (
 	"fmt"
@@ -69,6 +73,22 @@ func codecLeaf(parent *webtemplate.Node, id string) *webtemplate.Node {
 	return nil
 }
 
+// decodeCodecLeaf is [codecLeaf] for a decode with tmpl, the compiled
+// template's index, nil without the template: it returns nil for an
+// INTERVAL_EVENT attribute of an event the template types POINT_EVENT
+// ([templateIndex.typesPointEvent]). Such an event has none, and the
+// reference has no node for the key there.
+func decodeCodecLeaf(parent *webtemplate.Node, id string, tmpl *templateIndex) *webtemplate.Node {
+	leaf := codecLeaf(parent, id)
+	if leaf == nil {
+		return nil
+	}
+	if event, ok := intervalEventOf(parent, leaf); ok && tmpl.typesPointEvent(event) {
+		return nil
+	}
+	return leaf
+}
+
 // intervalAttrLeaf returns the leaf of the INTERVAL_EVENT attribute id of the
 // abstract EVENT or folded event at eventPath, `math_function` or `width`, or nil for any
 // other id.
@@ -93,6 +113,31 @@ func intervalEventOf(parent, leaf *webtemplate.Node) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// typesPointEvent reports whether the template types the event at eventPath a
+// POINT_EVENT, which holds none of the INTERVAL_EVENT attributes the codec
+// reads ([codecLeaf], [sampleCountEvent]). eventPath is the event's Web
+// Template path, through its OBSERVATION's `data` and an `events[…]` segment.
+// The compiled template keys the event without the HISTORY's node id, as
+// `data` is single-valued ([buildTemplateIndex]). A nil index, the one of a
+// decode without the template, types no event: there the Web Template alone
+// cannot tell a folded POINT_EVENT from a folded abstract EVENT, since it
+// gives either one leaf of its own, its `time`, at the OBSERVATION.
+func (x *templateIndex) typesPointEvent(eventPath string) bool {
+	if x == nil {
+		return false
+	}
+	segs := parseAQL(eventPath)
+	n := len(segs)
+	if n < 2 || segs[n-2].attr != "data" || segs[n-1].attr != "events" {
+		return false
+	}
+	start := 0
+	if n > 2 {
+		start = segs[n-3].end
+	}
+	return x.rmType(eventPath[:start]+"/data"+eventPath[segs[n-2].end:]) == "POINT_EVENT"
 }
 
 // foldedEvent returns the event an OBSERVATION node folds in, where
@@ -153,7 +198,8 @@ func foldedEventOf(depth int, ch *webtemplate.Node) (string, bool) {
 // OBSERVATION with its other children, and no other event has one, so the
 // event takes the type its template gives whatever key reaches it. Any other
 // folded event decodes as the POINT_EVENT [concreteType] gives, unless a key
-// spells one of its interval attributes ([codecLeaf]).
+// spells one of its interval attributes ([decodeCodecLeaf]), which one the
+// template types POINT_EVENT does not read.
 func markFoldedIntervalEvent(obs, child *webtemplate.Node, predType map[string]string) {
 	if nodeRMType(obs) != "OBSERVATION" || !strings.Contains(strings.TrimPrefix(child.AQLPath, obs.AQLPath), "/events[") {
 		return
@@ -185,15 +231,21 @@ func historyNodeID(obs *webtemplate.Node) (string, bool) {
 }
 
 // sampleCountEvent returns the event whose `|sample_count` a Web Template node
-// takes as a suffix: an event node's own, abstract or an INTERVAL_EVENT, and
-// an OBSERVATION node's that folds in an event ([foldedEvent]). It
+// takes as a suffix in a decode with tmpl, the compiled template's index, nil
+// without the template: an event node's own, abstract or an INTERVAL_EVENT,
+// and an OBSERVATION node's that folds in an event ([foldedEvent]), unless
+// tmpl types that event POINT_EVENT ([templateIndex.typesPointEvent]). It
 // reports false for any other node.
-func sampleCountEvent(node *webtemplate.Node) (*webtemplate.Node, bool) {
+func sampleCountEvent(node *webtemplate.Node, tmpl *templateIndex) (*webtemplate.Node, bool) {
 	switch nodeRMType(node) {
 	case "EVENT", "INTERVAL_EVENT":
 		return node, true
 	case "OBSERVATION":
-		return foldedEvent(node)
+		event, folded := foldedEvent(node)
+		if !folded || tmpl.typesPointEvent(event.AQLPath) {
+			return nil, false
+		}
+		return event, true
 	}
 	return nil, false
 }

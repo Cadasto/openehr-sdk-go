@@ -92,13 +92,15 @@
 // "<observation>/width", "<observation>/math_function" and
 // "<observation>|sample_count". A folded INTERVAL_EVENT has the first two as
 // leaves of the OBSERVATION's node, and decode rebuilds it as an
-// INTERVAL_EVENT whatever keys the body gives. Any other folded event is read
-// as at an abstract EVENT node: the Web Template does not tell a folded
-// POINT_EVENT from a folded EVENT, so any of the three keys makes it an
-// INTERVAL_EVENT. An OBSERVATION that folds in two or more events gives those
-// keys to none of them: decode reads them as unmatched content, and encode
-// refuses an INTERVAL_EVENT among the events that holds any of the three with
-// [ErrUnsupportedDatatype].
+// INTERVAL_EVENT whatever keys the body gives. With [WithTemplate], a folded
+// event the template types POINT_EVENT reads none of the three, which are
+// then unmatched content. Any other folded event is read as at an abstract
+// EVENT node, so any of the three keys makes it an INTERVAL_EVENT; without
+// [WithTemplate] that holds for a folded POINT_EVENT too, since the Web
+// Template does not tell it from a folded EVENT. An OBSERVATION that folds in
+// two or more events gives those keys to none of them: decode reads them as
+// unmatched content, and encode refuses an INTERVAL_EVENT among the events
+// that holds any of the three with [ErrUnsupportedDatatype].
 //
 // # An ELEMENT with several value types
 //

@@ -255,7 +255,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, err
 		}
-		node, predIndex, predType, err := resolveLeaf(wt, pk.segs, sib)
+		node, predIndex, predType, err := resolveLeaf(wt, pk.segs, sib, tmpl)
 		if errors.Is(err, errSegNotFound) {
 			// A key that does not resolve to a Web Template node is a wrong
 			// template, a typo, or an unsupported _-prefixed RM attribute (ctx/
@@ -273,7 +273,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		// A key at an ELEMENT with value types reads as its first one.
 		leaf := valueLeaf(node)
 		v, spelled := groups[base][sampleCountSuffix]
-		if event, carried := sampleCountEvent(leaf); spelled && carried {
+		if event, carried := sampleCountEvent(leaf, tmpl); spelled && carried {
 			// An event's sample count is a suffix on its node, or on the
 			// OBSERVATION node that folds the event in, which has no value of
 			// its own (REQ-053).
@@ -1637,8 +1637,10 @@ func unmarshalObject(data []byte) (map[string]any, error) {
 // apply one segment's index or type to another; the bare path prefix stays
 // unique per chain position. Returns errSegNotFound when a segment id is not
 // found, and refuses a key through a reused sibling that no pinned name tells
-// apart from the others (sib).
-func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSiblings) (*webtemplate.Node, map[string]int, map[string]string, error) {
+// apart from the others (sib). tmpl, the compiled template's index, nil
+// without the template, settles the attributes the codec reads where the Web
+// Template has no node ([decodeCodecLeaf]).
+func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSiblings, tmpl *templateIndex) (*webtemplate.Node, map[string]int, map[string]string, error) {
 	predIndex := make(map[string]int)
 	predType := make(map[string]string)
 	node := wt.Tree
@@ -1660,8 +1662,9 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 			// is a leaf, so a segment below it resolves nothing. An
 			// INTERVAL_EVENT attribute of an abstract EVENT, at its node or
 			// at the OBSERVATION node that folds it in, makes the event an
-			// INTERVAL_EVENT (REQ-053).
-			leaf := codecLeaf(node, seg.id)
+			// INTERVAL_EVENT (REQ-053); with the template, a folded event it
+			// types POINT_EVENT reads none (issue 452).
+			leaf := decodeCodecLeaf(node, seg.id, tmpl)
 			switch {
 			case leaf == nil:
 				return nil, nil, nil, errSegNotFound
@@ -2571,7 +2574,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	// interconversion's explicit-index spelling and anything higher is refused;
 	// a DV_INTERVAL leaf's index belongs to the ELEMENT the Web Template folded
 	// away, which may repeat, and the placement reads it.
-	node, predIndex, predType, err := resolveLeaf(wt, pk.segs, sib)
+	node, predIndex, predType, err := resolveLeaf(wt, pk.segs, sib, tmpl)
 	if err != nil {
 		// splitCompositeLeafKey resolved this path already, so the only ways
 		// here are an index past the bound of a single-valued attribute and the
@@ -2696,7 +2699,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 			resolve: func(string) (map[string]any, error) { return compJSON, nil },
 		}, nil
 	}
-	node, predIndex, predType, err := resolveLeaf(wt, segs, sib)
+	node, predIndex, predType, err := resolveLeaf(wt, segs, sib, tmpl)
 	if err != nil {
 		return rmattrOwner{}, err
 	}

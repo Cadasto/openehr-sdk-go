@@ -615,7 +615,7 @@ func TestWalkAQLGivesNoSiblingsNameToTheUnnamedSibling(t *testing.T) {
 				rmTypes:    map[string]string{bare: "EVALUATION"},
 				codedNames: map[string]codedName{},
 			}
-			_, predIndex, predType, err := resolveLeaf(wt, []flatSeg{{"root", -1}, {"b", 0}, {"x", -1}}, sib)
+			_, predIndex, predType, err := resolveLeaf(wt, []flatSeg{{"root", -1}, {"b", 0}, {"x", -1}}, sib, tmpl)
 			if err != nil {
 				t.Fatalf("resolveLeaf: %v", err)
 			}
