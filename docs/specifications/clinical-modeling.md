@@ -41,7 +41,8 @@ The shapes the schema types alone do not settle:
 - The model's two integer enumerations, `OPERATOR_KIND` on `EXPR_OPERATOR.operator` and the type of `timezone_validity` on `C_DATE`, `C_TIME` and `C_DATE_TIME`, are written as their integer codes: as element text in canonical XML, such as `2007` or `1001`, and as a JSON number of the same value in canonical JSON.
   Decode reads the code or the item name the root declares for it, as element text or as a JSON string.
   `timezone_validity` reads the `VALIDITY_KIND` words (`mandatory`, `optional`, `prohibited`), `disallowed` and the Release-1.0.2 codes `1001`, `1002` and `1003`, as [§ REQ-103](#req-103--primitive-constraint-introspection) reads them, so `prohibited` and `disallowed` both read as `1003`.
-  Any other value is refused in every mode, with `canxml.ErrInvalidShape` or `canjson.ErrInvalidShape`.
+  A `canxml` or `canjson` decode refuses any other value, in every mode, with `canxml.ErrInvalidShape` or `canjson.ErrInvalidShape`.
+  The model's reader reads a `timezone_validity` that names no `VALIDITY_KIND` as § *What the reader tolerates* says.
   The pinned `Archetype.xsd` admits both spellings of `timezone_validity`; the encoder writes the code because FerroEHR 5.5.0 refuses the words on template upload, while EHRbase 2.36.0 accepts both.
 - `EXPR_LEAF.item`, `Any` in the BMM and `xs:anyType` in the schema, decodes as the type its `xsi:type` names, read as [wire.md § REQ-056](wire.md#req-056) reads a discriminator: an AOM 1.4 class such as `C_STRING`, or an XML Schema built-in under a prefix bound to the XML Schema namespace, `xs:string` and `xsd:string` alike, as a `String`; an item with no `xsi:type` reads its text as a `String`.
   Element content in an item read as a `String`, which `xs:anyType` allows, is unmatched content ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)).
