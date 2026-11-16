@@ -152,7 +152,7 @@ A deprecated but legal construct is still one the SDK reads: until the removal r
   The parser never normalises one into the other and never picks one when a query carries both: that query is spec-invalid (§ 4.4.3), and reporting it as written is what lets the lint name it (`aql_top_with_limit`, [§ REQ-109](#req-109--aql-static-lint)).
   `Emit` renders both as written, since the profile accepts the text and the emitter is not the diagnosis layer.
 
-The profile's `top` production admits no `PARAMETER`, and the `SDK-AQL-003` parameter relaxation does not extend to it: the SDK does not widen a construct the specification is removing.
+The profile's `top` production admits no `PARAMETER`, and the [`SDK-AQL-003`](../../resources/aql/grammar/DIVERGENCES.md#sdk-aql-003--limit--offset-parameter-operands) parameter relaxation does not extend to it: the SDK does not widen a construct the specification is removing.
 The carrier therefore holds an integer count and does not reuse the `LIMIT` vocabulary (`parse.LimitExpr`), which has a parameter form and no direction.
 A count outside Go `int` is the residual above.
 The vocabulary lives in `openehr/aql` and is shared with the builder ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)), which also fixes its canonical spelling.
@@ -463,7 +463,7 @@ The write side of `openehr/aql` **MUST** be able to construct the vocabularies i
 Each is already parsed, structured and re-emitted by [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s AST, so what this requirement adds is the carriers, their guards, and the canonical spellings that make the mirror byte-exact, not a new model.
 
 Without these carriers a caller who needs one of the constructs abandons the typed builder for a hand-assembled string, the one construction route [§ REQ-055](wire.md#req-055--wire-boundary)'s injection guard cannot cover.
-Two shapes the SDK itself recommends depend on them: the explicit version predicate `aql_version_no_predicate` asks for ([§ REQ-161 § Checks](#checks), [SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)), and REQ-161's suppression shape `… CONTAINS VERSIONED_COMPOSITION vo[uid/value=$vo] CONTAINS VERSION v[ALL_VERSIONS]`.
+Two shapes the SDK itself recommends depend on them: the explicit version predicate `aql_version_no_predicate` asks for ([§ REQ-161 § `aql_version_no_predicate`](#aql_version_no_predicate), [SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)), and REQ-161's suppression shape `… CONTAINS VERSIONED_COMPOSITION vo[uid/value=$vo] CONTAINS VERSION v[ALL_VERSIONS]`.
 
 Every rule below is derived from the vendored grammar profile (`resources/aql/grammar/active/`, [ADR 0007](../adr/0007-aql-antlr-grammar-profile.md)), which stays the authority.
 
@@ -655,7 +655,7 @@ Recording a decline never widens the profile: admitting an engine extension is a
 | Deprecated `TOP` | `aql_deprecated_top` | Warning | A `SELECT TOP` clause **SHOULD** be replaced by `LIMIT` with `ORDER BY`: the modifier is deprecated from QUERY Release-1.1.0 and slated for removal ([§ REQ-113 § The `TOP` carrier](#the-top-carrier)). Fires once per query carrying a `TOP`. |
 | `TOP` with `LIMIT` | `aql_top_with_limit` | Error | A query **MUST NOT** use `TOP` and the `LIMIT` clause together (QUERY Release-1.1.0 § 4.4.3). Fires in addition to `aql_deprecated_top`. |
 | `TOP` with envelope `fetch` | `aql_top_with_fetch` | Error | A query carrying `TOP` **MUST NOT** also carry the request envelope's row limit: the openEHR Query API's common parameters state that `fetch` cannot be combined with AQL-top. Reachable only when the caller supplies `Options.Query`, and keyed on its `Fetch` alone: an `Offset` **MUST NOT** raise it, the exclusion naming the row limit only. Fires in addition to `aql_deprecated_top`. `Build()` also refuses an envelope `Offset` beside a `TOP` ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)), because it declines to author two row bounds; the lint reads a query it did not author, so it reports only the exclusion the Query API states. |
-| Bare / mixed `SELECT *` | `aql_select_star` | Warning | A projection carrying a `*` item **SHOULD** raise this code, and `COUNT(*)` **MUST NOT**: it uses the SDK-AQL-002 relaxation, and official QUERY 1.1.0's only use of `*` is `COUNT(*)`. |
+| Bare / mixed `SELECT *` | `aql_select_star` | Warning | A projection carrying a `*` item **SHOULD** raise this code, and `COUNT(*)` **MUST NOT**: it uses the [SDK-AQL-002](../../resources/aql/grammar/DIVERGENCES.md#sdk-aql-002--select-) relaxation, and official QUERY 1.1.0's only use of `*` is `COUNT(*)`. |
 
 The three `TOP` codes **MUST** key on the `TOP` clause's presence in the source, not on a decoded count: a count too large to represent leaves no bound to read ([§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s residual), and the query carrying it still draws them.
 The other half of each pair is read from its own channel: the in-text `LIMIT` clause for `aql_top_with_limit`, the request envelope's `Fetch` for `aql_top_with_fetch`.
@@ -748,7 +748,7 @@ The relation answers two questions — **operand containability** (may this clas
 
 Beside the two verdict questions the relation answers one reachability query that yields no verdict: `Unavoidable(anc, via, desc)` reports whether every containment route from `anc` to `desc` passes through `via`.
 It is computed over the same overlaid graph as the verdicts, so a consumer overlay changes its answer, and like every other method it reads a nil receiver as the default relation.
-Its consumer is `aql_contains_redundant_step` ([§ REQ-161 § Path-shape checks](#path-shape-checks)).
+Its consumer is `aql_contains_redundant_step` ([§ REQ-161 § `aql_contains_redundant_step`](#aql_contains_redundant_step)).
 
 #### Admissible is route-existence, not a claim of RM truth
 
@@ -875,42 +875,114 @@ REQ-109's Layer 2 **MUST** carry three additive check groups, each specified bel
 The layer contract is preserved: AST walk, collect-all, no CDR, no OPT ([§ REQ-109 § Layer 2](#layer-2--shape-ast-walk-no-cdr)).
 The relation and the RM facts the path-shape checks read are derived in-process from the pinned BMM, the latter through `openehr/rm/rminfo` ([REQ-048](reference-model.md#req-048--rm-meta-model-introspection-surface)), so the checks need no input beyond what Layer 2 already takes.
 Each path-shape rule is stated as a rule by the openEHR authoring guidance and is decidable from the query text plus the pin; path shape is otherwise covered only by the OPT-gated Layer 3.
-The codes reuse the REQ-109 issue model verbatim ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)), with `Span` on the offending class expression, path segment, projection item or path, as each catalogue row states.
+The codes reuse the REQ-109 issue model verbatim ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)), with `Span` on the offending class expression, path segment, projection item or path, as each code's entry states.
+The SDK adjudicates **no row semantics**: it does not deduplicate, reason about expected row counts, or refuse a row shape.
+The two fan-out advisories, [`aql_fanout_row_grain`](#aql_fanout_row_grain) and [`aql_fanout_path_grain`](#aql_fanout_path_grain), are the entire footprint.
 
 ### Checks
 
-The semantic and portability catalogue:
+The semantic and portability catalogue, one entry per code:
 
-| Check | Code | Severity | Rule |
-|---|---|---|---|
-| Impossible containment | `aql_impossible_containment` | Error | An adjacent FROM/CONTAINS pair of containable operands whose REQ-160 **pair verdict** is **Never** **MUST** raise this code — including junction operands (checked against the junction's enclosing parent) and `NOT CONTAINS` pairs (the exclusion is trivially true: a dead constraint is equally a defect). |
-| Non-containable target | `aql_contains_not_containable` | Error | A `CONTAINS` operand whose REQ-160 **containability verdict** is **Never** — a known class that is not a containment target, e.g. a `DV_*` type — **MUST** raise this code. |
-| Archetype/class mismatch | `aql_archetype_class_mismatch` | Error | A literal archetype predicate whose HRID type segment does not conform to the declared class (REQ-160 § Archetype/class conformance) **MUST** raise this code. `$param` archetype predicates are skipped — the CDR resolves the bound scope at execution (PROBE-021), the same skip REQ-109 Layer 3 applies. |
-| Unknown RM class | `aql_unknown_rm_class` | Warning | A class token whose REQ-160 verdict is **UnknownClass**, **or** a literal archetype predicate whose HRID type segment is not a class the relation knows (`ArchetypeMatches` → **UnknownClass**, REQ-160 § Archetype/class conformance), **MUST** raise this code, once per class-expression occurrence — Warning, because unknown is not wrong (future RM, demographic deployments, dialects). This is the code that fires when `aql_archetype_class_mismatch` is suppressed for an unknown type segment, so an unknown name is never silent. |
-| Containment by reference | `aql_containment_by_reference` | Warning | A pair whose REQ-160 pair verdict is **ByReference** **MUST** raise this code — Warning, because the hop is engine-specific: verify against the target CDR. |
-| `VERSION` without predicate | `aql_version_no_predicate` | Warning | A `VERSION` class expression carrying no version predicate **MUST** raise this code: the default is unspecified ([SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)), so portable queries **SHOULD** state `[LATEST_VERSION]` / `[ALL_VERSIONS]` explicitly. |
-| Unreferenced `VERSIONED_OBJECT` | `aql_versioned_object_unreferenced` | Warning | An operand **MUST** raise this code exactly when its class conforms to `VERSIONED_OBJECT` (REQ-160 § Containable operands: conformance, not a name list), it carries **no class-position predicate** of its own, and its alias roots no identified path outside FROM/CONTAINS: the step is redundant unless container-level attributes are read ([Discourse #14186](https://discourse.openehr.org/t/aql-versionedobject-grammar/14186)). A **class-position predicate** is any bracket the operand carries in class position, a standing predicate or an archetype predicate, and any one of them suppresses the code, because each selects the container and so is itself a container-level attribute read. The motivating shape is `… CONTAINS VERSIONED_COMPOSITION vo[uid/value=$vo] CONTAINS VERSION v[ALL_VERSIONS]`, the canonical *all versions of one composition* query, where the step does work although no identified path names its alias. A class-position predicate is not an identified path, so "outside FROM/CONTAINS" answers *referenced*, never *redundant*. |
-| Engine-defined row grain | `aql_fanout_row_grain` | Warning | **MUST** fire exactly when an `AND` containment junction that no inherited negation covers has two or more **projected** aliases among its class-expression **leaves**: the class expressions reached by flattening nested `AND` junctions, descending into neither an `OR` junction nor a negated node. An alias is **projected** when it roots at least one SELECT column, **or** when the projection carries a `*` item in any form (bare `SELECT *`, mixed `SELECT *, col`): a star projects **every** alias bound in FROM/CONTAINS, because the engine returns a column per alias, and a star roots no identified path, so a SELECT-column-only reading would exempt the shape where the question is most live. Negation is inherited downward and alternation is not: a `NOT CONTAINS` at any depth above an `AND` junction, including through an intervening un-negated `OR`, covers it, because a `NOT CONTAINS` collapses to a boolean filter on the parent row and multiplies nothing inside its excluded subtree, while an un-negated `AND` nested under an un-negated `OR` is covered by nothing and fires. So the code stays silent on an `AND` junction with one projected alias, on an `OR` junction with two (under named columns and under `SELECT *` alike, since alternation selects rows and does not multiply them), on `NOT CONTAINS (A AND B)`, and on `NOT CONTAINS (B OR (D AND E))`. Possibility is sign-blind and row multiplicity is not, which is why `aql_impossible_containment` checks a `NOT CONTAINS` pair and this code does not. `Detail` states that row multiplicity for this shape is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9). It covers the **junction** source of engine-defined row multiplicity (§ No double-reporting). |
+#### `aql_impossible_containment`
+
+- **Check:** Impossible containment; **severity:** Error.
+- **Fires:** An adjacent FROM/CONTAINS pair of containable operands whose REQ-160 **pair verdict** is **Never** **MUST** raise this code — including junction operands (checked against the junction's enclosing parent) and `NOT CONTAINS` pairs (the exclusion is trivially true: a dead constraint is equally a defect).
+- **Silent:** On a pair with an UnknownClass or Never-containability operand ([§ Pair-check suppression](#pair-check-suppression)).
+
+#### `aql_contains_not_containable`
+
+- **Check:** Non-containable target; **severity:** Error.
+- **Fires:** A `CONTAINS` operand whose REQ-160 **containability verdict** is **Never** — a known class that is not a containment target, e.g. a `DV_*` type — **MUST** raise this code.
+- **Silent:** `aql_contains_not_containable` is scoped to a `CONTAINS` operand, not to the FROM root.
+  A **FROM root** whose REQ-160 containability verdict is Never (`FROM DV_TEXT t …`) **MUST** raise no containability code, in the single-root or the root-junction spelling: the catalogue above authorises that code for a `CONTAINS` operand only.
+  The boundary binds that one code, not the root generally: a root's archetype predicate is checked by `aql_archetype_class_mismatch` exactly as a `CONTAINS` operand's would be, because that check is orthogonal to operand role, and an *unknown* root still raises `aql_unknown_rm_class` (unknown is not wrong).
+
+#### `aql_archetype_class_mismatch`
+
+- **Check:** Archetype/class mismatch; **severity:** Error.
+- **Fires:** A literal archetype predicate whose HRID type segment does not conform to the declared class (REQ-160 § Archetype/class conformance) **MUST** raise this code.
+- **Silent:** `$param` archetype predicates are skipped — the CDR resolves the bound scope at execution (PROBE-021), the same skip REQ-109 Layer 3 applies.
+  An archetype predicate whose declared class or HRID type segment is UnknownClass raises no `aql_archetype_class_mismatch`, since the class expression already carries `aql_unknown_rm_class` through the class-token or the type-segment arm, and REQ-160 § Archetype/class conformance yields no mismatch on an unknown name: one finding per defect, and no Error built on an unknown name.
+
+#### `aql_unknown_rm_class`
+
+- **Check:** Unknown RM class; **severity:** Warning.
+- **Fires:** A class token whose REQ-160 verdict is **UnknownClass**, **or** a literal archetype predicate whose HRID type segment is not a class the relation knows (`ArchetypeMatches` → **UnknownClass**, REQ-160 § Archetype/class conformance), **MUST** raise this code, once per class-expression occurrence — Warning, because unknown is not wrong (future RM, demographic deployments, dialects).
+- **Why:** This is the code that fires when `aql_archetype_class_mismatch` is suppressed for an unknown type segment, so an unknown name is never silent.
+
+#### `aql_containment_by_reference`
+
+- **Check:** Containment by reference; **severity:** Warning.
+- **Fires:** A pair whose REQ-160 pair verdict is **ByReference** **MUST** raise this code — Warning, because the hop is engine-specific: verify against the target CDR.
+- **Silent:** On a pair with an UnknownClass or Never-containability operand ([§ Pair-check suppression](#pair-check-suppression)).
+
+#### `aql_version_no_predicate`
+
+- **Check:** `VERSION` without predicate; **severity:** Warning.
+- **Fires:** A `VERSION` class expression carrying no version predicate **MUST** raise this code: the default is unspecified ([SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)), so portable queries **SHOULD** state `[LATEST_VERSION]` / `[ALL_VERSIONS]` explicitly.
+
+#### `aql_versioned_object_unreferenced`
+
+- **Check:** Unreferenced `VERSIONED_OBJECT`; **severity:** Warning.
+- **Fires:** An operand **MUST** raise this code exactly when its class conforms to `VERSIONED_OBJECT` (REQ-160 § Containable operands: conformance, not a name list), it carries **no class-position predicate** of its own, and its alias roots no identified path outside FROM/CONTAINS: the step is redundant unless container-level attributes are read ([Discourse #14186](https://discourse.openehr.org/t/aql-versionedobject-grammar/14186)).
+- **Silent:** A **class-position predicate** is any bracket the operand carries in class position, a standing predicate or an archetype predicate, and any one of them suppresses the code, because each selects the container and so is itself a container-level attribute read.
+  A class-position predicate is not an identified path, so "outside FROM/CONTAINS" answers *referenced*, never *redundant*.
+- **Why:** The motivating shape is `… CONTAINS VERSIONED_COMPOSITION vo[uid/value=$vo] CONTAINS VERSION v[ALL_VERSIONS]`, the canonical *all versions of one composition* query, where the step does work although no identified path names its alias.
+
+#### `aql_fanout_row_grain`
+
+- **Check:** Engine-defined row grain; **severity:** Warning.
+- **Fires:** **MUST** fire exactly when an `AND` containment junction that no inherited negation covers has two or more **projected** aliases among its class-expression **leaves**: the class expressions reached by flattening nested `AND` junctions, descending into neither an `OR` junction nor a negated node.
+  An alias is **projected** when it roots at least one SELECT column, **or** when the projection carries a `*` item in any form (bare `SELECT *`, mixed `SELECT *, col`): a star projects **every** alias bound in FROM/CONTAINS, because the engine returns a column per alias, and a star roots no identified path, so a SELECT-column-only reading would exempt the shape where the question is most live.
+  Negation is inherited downward and alternation is not: a `NOT CONTAINS` at any depth above an `AND` junction, including through an intervening un-negated `OR`, covers it, because a `NOT CONTAINS` collapses to a boolean filter on the parent row and multiplies nothing inside its excluded subtree, while an un-negated `AND` nested under an un-negated `OR` is covered by nothing and fires.
+- **Silent:** So the code stays silent on an `AND` junction with one projected alias, on an `OR` junction with two (under named columns and under `SELECT *` alike, since alternation selects rows and does not multiply them), on `NOT CONTAINS (A AND B)`, and on `NOT CONTAINS (B OR (D AND E))`.
+  Possibility is sign-blind and row multiplicity is not, which is why `aql_impossible_containment` checks a `NOT CONTAINS` pair and this code does not.
+- **Detail:** `Detail` states that row multiplicity for this shape is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9).
+  It covers the **junction** source of engine-defined row multiplicity (§ No double-reporting).
+
+#### Pair-check suppression
 
 An operand whose verdict is **UnknownClass** or whose containability is **Never** **MUST** suppress the pair checks (`aql_impossible_containment`, `aql_containment_by_reference`) for every pair it participates in.
-An archetype predicate whose declared class or HRID type segment is UnknownClass raises no `aql_archetype_class_mismatch`, since the class expression already carries `aql_unknown_rm_class` through the class-token or the type-segment arm, and REQ-160 § Archetype/class conformance yields no mismatch on an unknown name: one finding per defect, and no Error built on an unknown name.
-
-`aql_contains_not_containable` is scoped to a `CONTAINS` operand, not to the FROM root.
-A **FROM root** whose REQ-160 containability verdict is Never (`FROM DV_TEXT t …`) **MUST** raise no containability code, in the single-root or the root-junction spelling: the catalogue above authorises that code for a `CONTAINS` operand only.
-The boundary binds that one code, not the root generally: a root's archetype predicate is checked by `aql_archetype_class_mismatch` exactly as a `CONTAINS` operand's would be, because that check is orthogonal to operand role, and an *unknown* root still raises `aql_unknown_rm_class` (unknown is not wrong).
-
-The SDK adjudicates **no row semantics**: it does not deduplicate, reason about expected row counts, or refuse a row shape.
-The two fan-out advisories, `aql_fanout_row_grain` above and `aql_fanout_path_grain` (§ Path-shape checks), are the entire footprint.
 
 ### Path-shape checks
 
-| Check | Code | Severity | Rule |
-|---|---|---|---|
-| Unconstrained repeating segment | `aql_path_repeating_unpredicated` | Warning | An identified path segment **MUST** raise this code exactly when it types to a **multi-valued** RM attribute (`rminfo` `IsContainer`) and carries **no predicate** of any kind (a node id, a name and a standing comparison all count: presence suffices and content is **not** judged, § The conservative segment walk), once per offending segment, with `Span` on that segment, in **every** identified path the document records (`SELECT`, `WHERE` and `ORDER BY` alike, `parse.Document.Paths`): a `WHERE` filter or an `ORDER BY` key over an unconstrained repeating segment leaves the same which-occurrence question to the engine as a projected path. Whether `[at0006]` is the *right* node id is a template question owned by Layer 3's `aql_path_not_in_template`. |
-| Row bound without a total order | `aql_paging_no_order_by` | Warning | A query **MUST** raise this code exactly when it carries a **row bound** and no `ORDER BY`, at most once per query, `Detail` naming the channel(s) that carried the bound. A row bound is the **in-text** `LIMIT` clause (`parse.Document.HasLimit`; the profile's `limitClause` admits no `OFFSET` without a `LIMIT`, so keying on `LIMIT` misses no in-text spelling) or a supplied `Options.Query` whose `Fetch` **or** `Offset` is non-zero. Without a total order a page boundary is engine-defined, so successive pages can repeat or drop rows. A nil `Options.Query` leaves the envelope arm unable to fire, as it leaves the parameter-binding checks ([§ REQ-109 § Issue model and entry points](#issue-model-and-entry-points)), and a deprecated `TOP` is not a row bound here, because `aql_deprecated_top` already carries the `ORDER BY` remedy for that clause and one defect gets one finding. The envelope arm reads `Offset` as well as `Fetch`, unlike `aql_top_with_fetch`'s fetch-only scope: that code reports an exclusion the Query API *states*, while this one reports an unstable page boundary, which an offset into an unordered result produces on its own. |
-| Unaliased projection | `aql_select_no_alias` | Warning | A `SELECT` item **MUST** raise this code exactly when it is not a `*` item and carries no `AS` alias, once per item, with `Span` on the item where the item has a position of its own (a bare path) and the **zero `Span`** otherwise (a function-call or literal item, which `Detail`'s item ordinal locates instead), REQ-109's answer for an issue not attributable to a position ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)). A stored-query contract and every column-addressed result reader depend on stable column names, and an unaliased column's name is engine-defined. A `*` item is REQ-109's `aql_select_star`; a **bare alias** item (`SELECT o`) is **not** exempt, because it names no column either. |
-| Path row grain | `aql_fanout_path_grain` | Warning | A query **MUST** raise this code exactly when two projected identified paths rooted on the **same** alias diverge after their longest common prefix, **each** passing at least one unpredicated multi-valued segment at or after the divergence: the Cartesian-product shape, whose row multiplicity is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9), which `Detail` states as its sibling's does. It fires **once per alias**, not once per pair: the first offending pair in document order fixes the `Span` (the later path of that pair) and is named in `Detail`, so a wide projection yields one advisory rather than a quadratic report. So it stays silent on two paths whose multi-valued segments are all in their **common prefix** (one repeating scope, no product), on a pair in which **either** path predicates every multi-valued segment at or after the divergence, on paths rooted on **different** aliases (the junction question, `aql_fanout_row_grain`), and on a bare `SELECT *`, which projects no identified path (the star's row-grain question belongs to the junction code). |
-| Redundant containment step | `aql_contains_redundant_step` | Warning | A `CONTAINS` operand **MUST** raise this code exactly when **all** of the following hold: it is **not** the FROM root; it is **not** a leaf of the containment tree; it carries **no class-position predicate** of any kind, archetype, standing or version (`parse.ClassExpr.HasPredicate` false); its alias roots **no** identified path outside FROM/CONTAINS; it sits inside no containment **junction** and under no **negation**; its class does not conform to `VERSIONED_OBJECT` (§ No double-reporting); and its class is **unavoidable** under the REQ-160 relation, every containment route from its parent operand's class to its child operand's class passing through it. Removing such a step provably changes no result: `EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o` with `c` unreferenced, where every EHR→OBSERVATION route passes `COMPOSITION`. The rule is narrower than the guidance sentence it comes from ("containment is minimal"), and the narrowing is its substance: an **avoidable** intermediate narrows the result (removing `SECTION s` from `… CONTAINS SECTION s CONTAINS OBSERVATION o` admits observations outside sections), an unreferenced **leaf** is an existence filter, and inside a junction or under a negation removing the step changes the junction's arity or the excluded set, which the relation alone cannot prove inert. |
+The path-shape catalogue, one entry per code:
+
+#### `aql_path_repeating_unpredicated`
+
+- **Check:** Unconstrained repeating segment; **severity:** Warning.
+- **Fires:** An identified path segment **MUST** raise this code exactly when it types to a **multi-valued** RM attribute (`rminfo` `IsContainer`) and carries **no predicate** of any kind (a node id, a name and a standing comparison all count: presence suffices and content is **not** judged, § The conservative segment walk), once per offending segment, with `Span` on that segment, in **every** identified path the document records (`SELECT`, `WHERE` and `ORDER BY` alike, `parse.Document.Paths`): a `WHERE` filter or an `ORDER BY` key over an unconstrained repeating segment leaves the same which-occurrence question to the engine as a projected path.
+- **Why:** Whether `[at0006]` is the *right* node id is a template question owned by Layer 3's `aql_path_not_in_template`.
+
+#### `aql_paging_no_order_by`
+
+- **Check:** Row bound without a total order; **severity:** Warning.
+- **Fires:** A query **MUST** raise this code exactly when it carries a **row bound** and no `ORDER BY`, at most once per query, `Detail` naming the channel(s) that carried the bound.
+  A row bound is the **in-text** `LIMIT` clause (`parse.Document.HasLimit`; the profile's `limitClause` admits no `OFFSET` without a `LIMIT`, so keying on `LIMIT` misses no in-text spelling) or a supplied `Options.Query` whose `Fetch` **or** `Offset` is non-zero.
+- **Silent:** A nil `Options.Query` leaves the envelope arm unable to fire, as it leaves the parameter-binding checks ([§ REQ-109 § Issue model and entry points](#issue-model-and-entry-points)), and a deprecated `TOP` is not a row bound here, because `aql_deprecated_top` already carries the `ORDER BY` remedy for that clause and one defect gets one finding.
+- **Why:** Without a total order a page boundary is engine-defined, so successive pages can repeat or drop rows.
+  The envelope arm reads `Offset` as well as `Fetch`, unlike `aql_top_with_fetch`'s fetch-only scope: that code reports an exclusion the Query API *states*, while this one reports an unstable page boundary, which an offset into an unordered result produces on its own.
+
+#### `aql_select_no_alias`
+
+- **Check:** Unaliased projection; **severity:** Warning.
+- **Fires:** A `SELECT` item **MUST** raise this code exactly when it is not a `*` item and carries no `AS` alias, once per item, with `Span` on the item where the item has a position of its own (a bare path) and the **zero `Span`** otherwise (a function-call or literal item, which `Detail`'s item ordinal locates instead), REQ-109's answer for an issue not attributable to a position ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)).
+- **Silent:** A `*` item is REQ-109's `aql_select_star`; a **bare alias** item (`SELECT o`) is **not** exempt, because it names no column either.
+- **Why:** A stored-query contract and every column-addressed result reader depend on stable column names, and an unaliased column's name is engine-defined.
+
+#### `aql_fanout_path_grain`
+
+- **Check:** Path row grain; **severity:** Warning.
+- **Fires:** A query **MUST** raise this code exactly when two projected identified paths rooted on the **same** alias diverge after their longest common prefix, **each** passing at least one unpredicated multi-valued segment at or after the divergence: the Cartesian-product shape, whose row multiplicity is engine-defined (result-shape semantics are an open specification question, SPECQUERY-9), which `Detail` states as its sibling's does.
+  It fires **once per alias**, not once per pair: the first offending pair in document order fixes the `Span` (the later path of that pair) and is named in `Detail`, so a wide projection yields one advisory rather than a quadratic report.
+- **Silent:** So it stays silent on two paths whose multi-valued segments are all in their **common prefix** (one repeating scope, no product), on a pair in which **either** path predicates every multi-valued segment at or after the divergence, on paths rooted on **different** aliases (the junction question, `aql_fanout_row_grain`), and on a bare `SELECT *`, which projects no identified path (the star's row-grain question belongs to the junction code).
+
+#### `aql_contains_redundant_step`
+
+- **Check:** Redundant containment step; **severity:** Warning.
+- **Fires:** A `CONTAINS` operand **MUST** raise this code exactly when **all** of the following hold: it is **not** the FROM root; it is **not** a leaf of the containment tree; it carries **no class-position predicate** of any kind, archetype, standing or version (`parse.ClassExpr.HasPredicate` false); its alias roots **no** identified path outside FROM/CONTAINS; it sits inside no containment **junction** and under no **negation**; its class does not conform to `VERSIONED_OBJECT` (§ No double-reporting); and its class is **unavoidable** under the REQ-160 relation, every containment route from its parent operand's class to its child operand's class passing through it.
+  Removing such a step provably changes no result: `EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o` with `c` unreferenced, where every EHR→OBSERVATION route passes `COMPOSITION`.
+- **Why:** The rule is narrower than the guidance sentence it comes from ("containment is minimal"), and the narrowing is its substance: an **avoidable** intermediate narrows the result (removing `SECTION s` from `… CONTAINS SECTION s CONTAINS OBSERVATION o` admits observations outside sections), an unreferenced **leaf** is an existence filter, and inside a junction or under a negation removing the step changes the junction's arity or the excluded set, which the relation alone cannot prove inert.
 
 ### The conservative segment walk
 
