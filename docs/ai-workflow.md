@@ -73,6 +73,7 @@ The sdd plugin sets the orchestrator and worker rules. This repository adds:
 
 - **Code index in a worktree:** workers answer Go symbol questions with `gopls` run in the shell inside the worktree, plus `go doc` and `go list` (§ Recommended tooling), and the brief repeats this.
 - **The maintainer merges.** Agents open PRs, a draft only when asked.
+- **A sweep that changes keywords** across the specifications keeps a ledger of each keyword it removes, demotes or collapses (base sentence, new sentence, reason), and runs `make spec-kwdiff BASE=<base>` before review: in two earlier sweeps, workers widened or dropped a rule a caller relies on.
 - The worker model, parallelism, worktrees, the per-task review gate, the reviewers and the paths they skip are declared under `agents:` in [`.sdd.yaml`](.sdd.yaml). The model is passed per dispatch.
 
 ## Examples
