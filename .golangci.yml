@@ -48,7 +48,7 @@ linters:
       rules:
         # Doc comments on exported symbols — the long-deferred gap. Stutter
         # check OFF: ehr.EHRID / discovery.DiscoveryError / walk.WalkSubtree
-        # are deliberate, stable public API (idiom.md § public-API stability).
+        # are deliberate, stable public API (module-layout.md § REQ-004).
         - name: exported
           arguments:
             - disableStutteringCheck
