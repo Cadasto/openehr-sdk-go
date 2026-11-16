@@ -9,7 +9,7 @@ date: 2026-09-14
 # ADR 0021 — Encoded JSON member order is not part of the canonical JSON contract
 
 - **Status:** Accepted, 2026-09-14.
-- **Strand:** retires the byte-stability premise in [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance)'s remaining evidence item.
+- **Strand:** retires the byte-stability premise of the codec gate in [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance).
 - **Introduces:** —. **Amends:** [REQ-052](../specifications/wire.md#req-052) (the field-order profile and the probe obligation it carries).
 - **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (the codec decision this one unblocks); [REQ-056](../specifications/wire.md#req-056) (canonical XML, deliberately **not** relaxed: element order is part of an XML document's identity in a way member order is not part of a JSON object's, so PROBE-033 keeps its byte assertion); [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the validation floor the rewritten PROBE-030 asserts).
 

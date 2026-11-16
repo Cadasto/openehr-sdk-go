@@ -39,7 +39,17 @@ Resolved without an ADR: package-level functions are the primary surface; codifi
 
 ## STRAND-04 — RM polymorphism and codec performance
 
-Resolved by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md), with [ADR 0003](../adr/0003-rm-event-polymorphism.md), [ADR 0004](../adr/0004-numeric-wire-tolerance.md) and [ADR 0021](../adr/0021-json-member-order-not-a-contract.md) for its sub-questions; codified in [reference-model.md § Type registry (REQ-040)](reference-model.md#type-registry-req-040) and [wire.md § REQ-052](wire.md#req-052).
+**Status:** Partially resolved.
+
+[ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) settles the codec and holds its performance budget, with [ADR 0003](../adr/0003-rm-event-polymorphism.md), [ADR 0004](../adr/0004-numeric-wire-tolerance.md) and [ADR 0021](../adr/0021-json-member-order-not-a-contract.md) for the `EVENT` interface, numeric tolerance and member order; codified in [reference-model.md § Type registry (REQ-040)](reference-model.md#type-registry-req-040) and [wire.md § REQ-052](wire.md#req-052).
+
+**Still open:**
+
+- **Full RM inventory:** decode every BMM type through the registry, and find the sites that resist the pattern, such as an abstract generic class beyond `EVENT` that needs a whitelist decision (an ADR).
+- **Codec performance:** whether the `encoding/json/v2` path stays within ADR 0022's budget for seeder and benchmark workloads; a regression is a plan task, not a codec fork.
+- **Memory residency** of the `encoding/json/v2` path against the retired generated marshalers.
+
+**Resolution form:** the inventory and performance items resolve through benchmarks and a registry census, not a new ADR.
 
 ---
 
@@ -250,7 +260,7 @@ Resolved by [ADR 0035](../adr/0035-compile-step-reads-operational-template-model
 | [STRAND-01](#strand-01--extraction-from-reference-cdr) | Extraction from reference CDR | Resolved | REQ-013, [Boundary rules](module-layout.md#boundary-rules) |
 | [STRAND-02](#strand-02--shared-contract-source-of-truth-php--go) | Shared contract source-of-truth | Cancelled | — |
 | [STRAND-03](#strand-03--go-idiomatic-surface-validation) | Go-idiomatic surface | Resolved | REQ-021, [API conventions](idiom.md#api-conventions) |
-| [STRAND-04](#strand-04--rm-polymorphism-and-codec-performance) | RM polymorphism + codec perf | Resolved | [Generics and reflection](idiom.md#generics-and-reflection), REQ-040, REQ-052..053 |
+| [STRAND-04](#strand-04--rm-polymorphism-and-codec-performance) | RM polymorphism + codec perf | Partially resolved | [Generics and reflection](idiom.md#generics-and-reflection), REQ-040, REQ-052..053 |
 | [STRAND-05](#strand-05--smart-on-openehr-auth-library) | SMART-on-openEHR auth library | Resolved | REQ-061..064 |
 | [STRAND-06](#strand-06--concurrency-and-transport-hygiene) | Concurrency / transport hygiene | Open | REQ-021, REQ-026 |
 | [STRAND-07](#strand-07--versioning-and-module-path) | Versioning + module path | Resolved | REQ-001, REQ-004 |
