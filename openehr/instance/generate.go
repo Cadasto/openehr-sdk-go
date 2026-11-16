@@ -3051,19 +3051,25 @@ const (
 // taken. Where none can, the value stays as the walk wrote it. A numerator
 // or a denominator that already meets the rules is kept, and a new one is
 // the first of a fixed list of candidates (proportionOperand), so nothing
-// is drawn and the value is as reproducible as the walk's. The precision is
-// never changed. The walk writes each attribute from its own OPT
-// constraint, or, where the OPT says nothing, leaves its placeholder: 1
-// for the numerator and the denominator, 0 (a ratio) for the type, and no
-// precision. So the kind is settled here, once all of them are written.
-// opt is the OPT node of p.
+// is drawn and the value is as reproducible as the walk's. A value whose
+// OPT pins is_integral to true (integralPinned) takes whole numbers too,
+// whatever its kind. Such a value, a fraction and an integer fraction take
+// the precision 0 wherever the OPT admits 0 (zeroPrecisionAdmitted), which
+// meets Fraction_validity whether is_integral is read as whole-number
+// operands, as the RM floor reads it, or as a precision of 0, as the BMM
+// defines it; any other precision is never changed. The walk writes each
+// attribute from its own OPT constraint, or, where the OPT says nothing,
+// leaves its placeholder: 1 for the numerator and the denominator, 0 (a
+// ratio) for the type, and no precision. So the kind is settled here, once
+// all of them are written. opt is the OPT node of p.
 func settleProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
 	walked := int64(p.Type)
-	if settleProportionAs(opt, p, walked) {
+	integral := integralPinned(opt)
+	if settleProportionAs(opt, p, walked, integral) {
 		return
 	}
 	for kind := range int64(pkIntegerFraction + 1) {
-		if kind != walked && settleProportionAs(opt, p, kind) {
+		if kind != walked && settleProportionAs(opt, p, kind, integral) {
 			return
 		}
 	}
@@ -3071,13 +3077,15 @@ func settleProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
 
 // settleProportionAs settles p as a proportion of kind where the OPT admits
 // that type and the rules of kind can be met inside the OPT's constraints
-// on numerator and denominator, and reports whether it did. It leaves p
-// alone when it did not.
-func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64) bool {
+// on numerator and denominator, and reports whether it did. integral says
+// the OPT pins is_integral to true, so the numerator and the denominator
+// are whole numbers whatever the kind. It leaves p alone when it did not.
+func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64, integral bool) bool {
 	if kind < pkRatio || kind > pkIntegerFraction || !componentFits(bindingChild(opt, "type"), kind) {
 		return false
 	}
-	whole := wholeOperands(kind, p.Precision)
+	integral = integral || wholeOperands(kind, nil)
+	whole := integral || wholeOperands(kind, p.Precision)
 	denominator, ok := proportionDenominator(bindingChild(opt, "denominator"), float64(p.Denominator), kind, whole)
 	if !ok {
 		return false
@@ -3089,7 +3097,26 @@ func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64
 	p.Type = rm.Integer(kind)
 	p.Numerator = rm.Real(numerator)
 	p.Denominator = rm.Real(denominator)
+	if integral && zeroPrecisionAdmitted(opt) {
+		p.Precision = new(rm.Integer(0))
+	}
 	return true
+}
+
+// integralPinned reports whether the OPT pins is_integral of opt, a
+// DV_PROPORTION, to true: a C_BOOLEAN on it that admits true alone. The
+// pinned RM has is_integral as a function, not an attribute, so the walk
+// writes nothing for it, and the pin decides the operands here.
+func integralPinned(opt *tcimpl.CompiledNode) bool {
+	c, ok := primitiveOf(bindingChild(opt, "is_integral")).(constraints.CBoolean)
+	return ok && c.TrueValid && !c.FalseValid
+}
+
+// zeroPrecisionAdmitted reports whether the OPT admits the precision 0 on
+// opt, a DV_PROPORTION: it does not prohibit precision, and its constraint
+// on precision, where it has one, accepts 0.
+func zeroPrecisionAdmitted(opt *tcimpl.CompiledNode) bool {
+	return !prohibited(opt, "precision") && componentFits(bindingChild(opt, "precision"), int64(0))
 }
 
 // wholeOperands reports whether a proportion of kind with precision needs

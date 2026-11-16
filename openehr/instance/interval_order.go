@@ -1337,7 +1337,7 @@ func asKind(node *tcimpl.CompiledNode, p rm.DVProportion, kind int64) (rm.DVProp
 	if int64(p.Type) == kind {
 		return p, true
 	}
-	if p.NormalRange != nil || !settleProportionAs(node, &p, kind) {
+	if p.NormalRange != nil || !settleProportionAs(node, &p, kind, integralPinned(node)) {
 		return p, false
 	}
 	return p, true
