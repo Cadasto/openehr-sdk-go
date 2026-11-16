@@ -172,6 +172,13 @@ type generator struct {
 	// nowText is opts.Now as dateTimeDefault writes it, formatted on first
 	// use; "" until then.
 	nowText string
+	// enclosing is the locatable the walk is in, the nearest one that
+	// encloses whatever it builds now, or nil outside any; its name is the
+	// text a plain DV_TEXT takes (textDefault). enclosingType is the RM
+	// type its OPT node names, the name setLocatableIdentity falls back to
+	// where the OPT gives the node no term.
+	enclosing     rm.Locatable
+	enclosingType string
 	// undescribed holds, per template node, whether it needs content the
 	// template does not describe (needsUndescribed), locatableTypes, per
 	// RM type, whether the value built for it is a LOCATABLE
@@ -199,6 +206,11 @@ func (g *generator) nextUID() *rm.HierObjectID {
 func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	if optNode == nil || rmValue == nil {
 		return nil
+	}
+	if l, ok := rmValue.(rm.Locatable); ok && !rm.IsTypedNil(rmValue) {
+		saved, savedType := g.enclosing, g.enclosingType
+		g.enclosing, g.enclosingType = l, strings.TrimSpace(optNode.RMTypeName())
+		defer func() { g.enclosing, g.enclosingType = saved, savedType }()
 	}
 	// Slots are leaf fill-points: the slot body is not in this OPT, and
 	// the caller composes it via REQ-101 builder Set calls. A slot the
@@ -1565,7 +1577,7 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	}
 	switch v := rmValue.(type) {
 	case *rm.DVText:
-		v.Value = "example"
+		v.Value = g.textDefault()
 	case *rm.DVCodedText:
 		v.Value = "example"
 		v.DefiningCode = rm.CodePhrase{
@@ -1610,6 +1622,39 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 		v.Value = "example"
 		v.Formalism = "text/plain"
 	}
+}
+
+// exampleText is the text the generator writes where nothing gives a
+// string a meaning: the open-string example of a C_STRING.
+const exampleText = "example"
+
+// textDefault is the text a plain DV_TEXT takes where the template leaves
+// its value open: the name of its nearest enclosing locatable, as an
+// ELEMENT's value takes the ELEMENT's name, or exampleText where it has
+// none, as a DV_TEXT outside any locatable has. A name that is only the
+// RM type setLocatableIdentity falls back to, where the OPT gives the
+// locatable no term, names no concept, so it counts as none. A
+// DV_CODED_TEXT never takes it: its text is its code's (useCodedText).
+func (g *generator) textDefault() string {
+	if g.enclosing == nil {
+		return exampleText
+	}
+	name := g.enclosing.GetName()
+	if name == nil || rm.IsTypedNil(name) {
+		return exampleText
+	}
+	switch text := name.GetValue(); text {
+	case "", g.enclosingType, rmTypeOf(g.enclosing):
+		return exampleText
+	default:
+		return text
+	}
+}
+
+// openString reports whether cs leaves a string open: it lists no string
+// and has no pattern, so it gives no example of its own.
+func openString(cs constraints.CString) bool {
+	return len(cs.List) == 0 && cs.Pattern == ""
 }
 
 // dateTimeDefault is the ISO 8601 form Options.Now contributes to
@@ -2854,6 +2899,11 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		ex = sampleValue(pc, g.valueSampler)
 	}
 	if cs, ok := pc.(constraints.CString); ok {
+		if _, plain := rmValue.(*rm.DVText); plain && (attr == "" || attr == "value") && openString(cs) {
+			// A C_STRING that gives no example of its own leaves the text
+			// open, so it takes the text populatePrimitiveDefault gives.
+			ex = g.textDefault()
+		}
 		return applyStringLeaf(leaf, rmValue, attr, cs, ex)
 	}
 	if routedPrimitive(rmValue, attr) {
