@@ -6,6 +6,7 @@ package webtemplate_test
 
 import (
 	"maps"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -221,5 +222,51 @@ func TestREQ106CodedPinnedNameNamesTheNode(t *testing.T) {
 	const description = "The rate, measured in beats per minute."
 	if d := rate.LocalizedDescriptions[wt.DefaultLanguage]; d != description {
 		t.Errorf("pulse rate description = %q, want the archetype term's %q", d, description)
+	}
+}
+
+// TestREQ106NodesWithoutNodeIDAreNamedByTheirAttribute — REQ-106, issue 455:
+// a node with no node id, which no archetype term names, is named by the RM
+// attribute that holds it, as the reference names it (OPTParser.buildNode):
+// its name and localizedName are the attribute's name, it carries no
+// localized names, and its id stays the one the attribute gives it. On
+// IDCR - Procedures List.v1 that is the COMPOSITION's category and context,
+// and each archetyped transition step's current_state and careflow_step.
+// Across the vendored OPTs Build accepts, no node without a node id is left
+// without a name.
+func TestREQ106NodesWithoutNodeIDAreNamedByTheirAttribute(t *testing.T) {
+	const step = "/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition[at0034]"
+	wt := buildOPT(t, readFile(t, "../../../testkit/corpus/ehrbase-service/templates/IDCR - Procedures List.v1.opt"))
+	byPath := map[string]*webtemplate.Node{}
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) { byPath[n.AQLPath] = n })
+	for _, path := range []string{"/category", "/context", step + "/current_state", step + "/careflow_step"} {
+		attr := path[strings.LastIndexByte(path, '/')+1:]
+		n := byPath[path]
+		switch {
+		case n == nil:
+			t.Errorf("no node at %s — fixture or builder changed?", path)
+		case n.NodeID != "":
+			t.Errorf("%s: nodeId = %q, want none — fixture changed?", path, n.NodeID)
+		case n.ID != attr || n.Name != attr || n.LocalizedName != attr || len(n.LocalizedNames) != 0:
+			t.Errorf("%s: id %q, name %q, localizedName %q, localizedNames %v; want %s, %s, %s and none",
+				path, n.ID, n.Name, n.LocalizedName, n.LocalizedNames, attr, attr, attr)
+		}
+	}
+
+	built := 0
+	for _, path := range vendoredOPTs(t) {
+		_, w, refused := buildVendored(path)
+		if refused != nil {
+			continue
+		}
+		built++
+		walkOurTree(w.Tree, func(n *webtemplate.Node) {
+			if n.NodeID == "" && n.Name == "" {
+				t.Errorf("%s: %s (%s, id %s) has no name", filepath.Base(path), n.AQLPath, n.RMType, n.ID)
+			}
+		})
+	}
+	if built == 0 {
+		t.Fatal("Build accepted no vendored OPT — corpus layout changed?")
 	}
 }
