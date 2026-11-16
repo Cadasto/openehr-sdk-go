@@ -32,7 +32,8 @@ A consumer who needs only AQL imports `openehr/client/query/` without pulling in
 The SDK targets **openEHR REST `1.1.0`** as its primary contract surface. Concretely:
 
 - Endpoint shapes, request/response envelopes, and status-code semantics follow the 1.1.0 specification, the ITS-REST `Release-1.1.0` tag vendored in [`resources/its-rest/`](../../resources/its-rest/README.md).
-- Earlier versions (1.0.3, 1.0.2) are not targeted. A consumer who needs to talk to a 1.0.3 deployment can do so against a build of the SDK that has the 1.0.3 quirks documented; v1 does not promise backwards compatibility across REST major/minor versions.
+- Earlier versions (1.0.3, 1.0.2) are not targeted.
+  The SDK does not promise compatibility across REST major or minor versions.
 
 The version pin is enforced at discovery time (REQ-072), not on the first request. A mismatched advertised version **MUST** fail fast with a typed `DiscoveryError`.
 
@@ -74,6 +75,8 @@ openEHR REST 1.1.0 defines a family of `openehr-*` custom headers carrying RM an
 | `openehr-template-id` | request (composition writes) | declares the template id the payload conforms to | `composition.WithTemplateID(string)`; a FLAT or STRUCTURED write sends it by [§ REQ-173](#req-173--composition-representation-formats) |
 | `openehr-uri` | request / response | opaque openEHR resource pointer (selected endpoints) | typed on the affected method |
 | `openehr-item-tag` | request / response | ItemTag operations (REST 1.1.0 new resource) | exposed on `openehr/client/ehr/itemtags/` |
+| `openehr-version-item-tag` | request / response | the ItemTags of the VERSION a write commits or a read returns | `WithVersionItemTags` on the affected write; exposed on `openehr/client/ehr/itemtags/` |
+| `openehr-ehr-id` | request (AQL `POST`) | the EHR an AQL execution is scoped to | `query.WithEHRID` on a `POST` execution ([§ REQ-055](#req-055--wire-boundary) *EHR scoping*) |
 
 Response headers in this family **MUST** be surfaced on the typed response metadata returned by each method (alongside `ETag`, `Location`).
 
