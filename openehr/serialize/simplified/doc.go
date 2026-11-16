@@ -125,6 +125,23 @@
 // hold its current state's code, where exactly one does. A careflow step there
 // is kept whatever its code, for validation to judge.
 //
+// # A bare value beside its leaf's members
+//
+// In STRUCTURED a leaf's bare value is its array element, as in
+// "dv_text": ["text"]. Where the leaf also carries suffixes or members, the
+// element is an object, and encode writes the bare value as its "|value"
+// member, as in "any": [{"|value": "text", "|formalism": "text/plain"}].
+// Where the leaf also carries a "|value" of its own, or the bare value is
+// null, encode writes it as the "|" member instead, so two values never share
+// one member. Decode reads "|value", "|" and "" as the bare value of every
+// datatype that has one, and refuses two of them that disagree. A coded text,
+// an ordinal and a scale have a "|value" of their own and no bare value.
+//
+// FLAT reads "|value" the same way: "<leaf>|value" is the bare value of every
+// datatype that has one. [StructuredToFlat] writes a "|value" member as that
+// key and the "|" and "" members as the bare key, so the decode, which knows
+// each leaf's datatype, reads them, and the conversion needs no template.
+//
 // # Unmatched content
 //
 // Input the decode does not read is unmatched: a key whose path the Web

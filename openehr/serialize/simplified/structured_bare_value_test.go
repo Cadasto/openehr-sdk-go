@@ -291,3 +291,38 @@ func TestREQ053StructuredBareValueSpellingsThatDisagreeAreRefused(t *testing.T) 
 		}
 	}
 }
+
+// TestREQ053StructuredBareValueBesideItsOwnValueKeepsThePipe — REQ-053: two
+// values never share one member. Where a FLAT leaf carries both a bare value
+// and a `|value` of its own, as a coded text's rubric is, FLAT → STRUCTURED
+// keeps the bare value as the `"|"` member beside the `|value` one, whether or
+// not the two agree, and STRUCTURED → FLAT gives both keys back as written.
+func TestREQ053StructuredBareValueBesideItsOwnValueKeepsThePipe(t *testing.T) {
+	for name, tc := range map[string]struct{ flat, want string }{
+		"values differ": {
+			`{"t/e:0":"bare","t/e:0|code":"c","t/e:0|value":"rubric"}`,
+			`{"t":{"e":[{"|":"bare","|code":"c","|value":"rubric"}]}}`,
+		},
+		"values agree": {
+			`{"t/e:0":"same","t/e:0|value":"same"}`,
+			`{"t":{"e":[{"|":"same","|value":"same"}]}}`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			doc, err := simplified.FlatToStructured([]byte(tc.flat))
+			if err != nil {
+				t.Fatalf("FlatToStructured(%s) = %v", tc.flat, err)
+			}
+			if string(doc) != tc.want {
+				t.Errorf("FlatToStructured(%s) = %s, want %s", tc.flat, doc, tc.want)
+			}
+			back, err := simplified.StructuredToFlat(doc)
+			if err != nil {
+				t.Fatalf("StructuredToFlat(%s) = %v", doc, err)
+			}
+			if string(back) != tc.flat {
+				t.Errorf("StructuredToFlat(%s) = %s, want %s", doc, back, tc.flat)
+			}
+		})
+	}
+}

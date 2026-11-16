@@ -439,10 +439,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 // and a null key is never refused for want of a carrier. A key the decode
 // does not read goes to sink whatever its value.
 //
-// A bare "" at a leaf of [unsetStringType] is absent the same way where no
-// other key of the leaf the decode reads holds a value and decorated is
-// false: encode writes no key for that value, so a decode, encode and decode
-// keeps the composition (REQ-053). decorated reports whether an underscore
+// A bare "" at a leaf of [unsetStringType], spelled as the bare key or as its
+// |value, is absent the same way where no other key of the leaf the decode
+// reads holds a value and decorated is false: encode writes no key for that
+// value, so a decode, encode and decode keeps the composition (REQ-053).
+// decorated reports whether an underscore
 // family decorates the leaf's value ([decoratesValue]); one keeps the "", as
 // a suffix does, since a decoration with no value is refused.
 func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink, decorated bool) (map[string]any, error) {
@@ -496,10 +497,18 @@ func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string)
 }
 
 // unsetBareValue reports whether sfx, the suffixes the decode reads at a leaf
-// of rmType, is a bare "" alone at one of [unsetStringType].
+// of rmType, is a bare "" alone at one of [unsetStringType], spelled as the
+// bare key, as its [bareValueSuffix], or as both.
 func unsetBareValue(rmType string, sfx map[string]any) bool {
-	v, bare := sfx[""]
-	return bare && len(sfx) == 1 && v == "" && unsetStringType(rmType)
+	if len(sfx) == 0 || !unsetStringType(rmType) {
+		return false
+	}
+	for suffix, v := range sfx {
+		if (suffix != "" && suffix != bareValueSuffix) || v != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // decoratingFamilies returns the families of the underscore groups that hold
@@ -1045,6 +1054,14 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// Template carries a node for the segment (REQ-170).
 		if overIndexed {
 			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
+		}
+		// |value spells the bare value of a datatype that has one, so at a
+		// real path whose bare key is an alias, the start time's, it is that
+		// alias, and a second spelling of the field (REQ-053).
+		if base, spelled := strings.CutSuffix(rel, "|"+bareValueSuffix); spelled && readsBareValue(metadataOwnedBaseType[base]) {
+			if _, isAlias := metadataAliases[base]; isAlias {
+				rel = base
+			}
 		}
 		// A witness, an alias or a suffix of a ctx/-owned leaf that holds null
 		// is absent (REQ-053), so it neither conflicts with another spelling
@@ -4236,7 +4253,7 @@ func dvFromSuffixesWith(holds, rmType string, listOpen bool, sfx map[string]any,
 	// (a decode with the template completes the coded text as it completes any
 	// other, [templateIndex.completeCodedValue]).
 	// Without |code the leaf stays a plain DV_TEXT, whose |value is its bare
-	// value ([shorthandSpellings]), and a stray |terminology is refused by the
+	// value ([foldBareValue]), and a stray |terminology is refused by the
 	// allowlist below, as before. The encoder is the exact inverse:
 	// leafToFlat routes a fully-captured DV_CODED_TEXT at a DV_TEXT leaf to the
 	// coded suffix set instead of |raw.
@@ -4262,10 +4279,14 @@ func dvFromSuffixesWith(holds, rmType string, listOpen bool, sfx map[string]any,
 	if err := checkSuffixAllowlist(rmType, sfx); err != nil {
 		return nil, err
 	}
+	sfx, keyOf, err := foldBareValue(rmType, sfx, keyOf)
+	if err != nil {
+		return nil, err
+	}
 	if err := checkSuffixFits(rmType, sfx, keyOf); err != nil {
 		return nil, err
 	}
-	sfx, err := foldShorthand(rmType, sfx, keyOf)
+	sfx, err = foldShorthand(rmType, sfx, keyOf)
 	if err != nil {
 		return nil, err
 	}
@@ -4579,13 +4600,76 @@ type shorthandSpelling struct {
 }
 
 // shorthandSpellings are the input shorthands of the ITS-REST 1.1.0
-// Simplified Formats: a DV_IDENTIFIER's id may be written as the bare value
-// ("For the input |id might be left out"), and a DV_TEXT's or a DV_PARSABLE's
-// value as `|value`. Decode reads either spelling; encode writes full only.
+// Simplified Formats a datatype has of its own: a DV_IDENTIFIER's id may be
+// written as the bare value ("For the input |id might be left out"). Decode
+// reads either spelling; encode writes full only. The shorthand every
+// datatype with a bare value has, `|value`, is [foldBareValue]'s.
 var shorthandSpellings = map[string]shorthandSpelling{
 	"DV_IDENTIFIER": {short: "", full: "id", attr: "id"},
-	"DV_TEXT":       {short: "value", full: "", attr: "value"},
-	"DV_PARSABLE":   {short: "value", full: "", attr: "value"},
+}
+
+// bareValueSuffix is the suffix that spells the bare value of every datatype
+// that has one ([readsBareValue]): an input shorthand the ITS-REST 1.1.0
+// Simplified Formats list for DV_TEXT and DV_PARSABLE, and the member the
+// reference writes a bare value as in STRUCTURED beside the leaf's suffixes.
+const bareValueSuffix = "value"
+
+// readsBareValue reports whether rmType has a bare value, which its
+// [bareValueSuffix] spells a second time. The datatypes with a `|value` of
+// their own, DV_CODED_TEXT, DV_ORDINAL and DV_SCALE, have none.
+func readsBareValue(rmType string) bool {
+	return allowedSuffixes[rmType][""]
+}
+
+// readsSuffix reports whether decode reads suffix ("" for the bare value) at
+// a value of rmType: one in its [allowedSuffixes], or [bareValueSuffix] where
+// it has a bare value.
+func readsSuffix(rmType, suffix string) bool {
+	return allowedSuffixes[rmType][suffix] || (suffix == bareValueSuffix && readsBareValue(rmType))
+}
+
+// foldBareValue reads the [bareValueSuffix] in sfx, a suffix map of rmType
+// with no nulls left, as the bare value where rmType has one
+// ([readsBareValue]). The map returned holds it under "", and the key
+// function returned names the key it arrived under. Both spellings may be
+// present when they hold the same value; two that differ are refused naming
+// both keys and neither value, rather than one being chosen (REQ-053). Each
+// value is first checked against its RM attribute, so a value that does not
+// fit is refused as [checkSuffixFits] refuses it. sfx and keyOf come back
+// unchanged when there is nothing to fold.
+func foldBareValue(rmType string, sfx map[string]any, keyOf func(string) string) (map[string]any, func(string) string, error) {
+	v, spelled := sfx[bareValueSuffix]
+	if !spelled || !readsBareValue(rmType) {
+		return sfx, keyOf, nil
+	}
+	out := maps.Clone(sfx)
+	delete(out, bareValueSuffix)
+	spelledKey := keyOf
+	if keyOf != nil {
+		spelledKey = func(suffix string) string {
+			if suffix == "" {
+				return keyOf(bareValueSuffix)
+			}
+			return keyOf(suffix)
+		}
+	}
+	// The other suffixes sort before |value, so they are judged first, as
+	// one check over the whole map judges them.
+	if err := checkSuffixFits(rmType, out, keyOf); err != nil {
+		return nil, nil, err
+	}
+	if err := checkSuffixFits(rmType, map[string]any{"": v}, spelledKey); err != nil {
+		return nil, nil, err
+	}
+	if w, both := out[""]; both {
+		if !sameCtxValue(v, w) {
+			return nil, nil, fmt.Errorf("%w: %s and %s spell the %s bare value twice and disagree; remove one",
+				ErrUnknownPath, suffixLabel(keyOf, ""), suffixLabel(keyOf, bareValueSuffix), rmType)
+		}
+		return out, keyOf, nil
+	}
+	out[""] = v
+	return out, spelledKey, nil
 }
 
 // foldShorthand rewrites the shorthand spelling in sfx, a suffix map of rmType
@@ -4660,14 +4744,14 @@ func applyOrderedSuffixes(dv, sfx map[string]any) error {
 // checkSuffixAllowlist rejects any suffix a datatype does not map, naming the
 // first such suffix in sorted order, so a leaf with two names the same one on
 // every run. An unmapped rmType is left to the switch (ErrUnsupportedDatatype).
-// |other is allowed only for DV_CODED_TEXT (the case then enforces listOpen).
+// |other is allowed only for DV_CODED_TEXT (the case then enforces listOpen),
+// and |value at every datatype with a bare value ([readsSuffix]).
 func checkSuffixAllowlist(rmType string, sfx map[string]any) error {
-	allowed, known := allowedSuffixes[rmType]
-	if !known {
+	if _, known := allowedSuffixes[rmType]; !known {
 		return nil
 	}
 	unexpected := func(k string) bool {
-		return !allowed[k] && (k != "other" || rmType != "DV_CODED_TEXT")
+		return !readsSuffix(rmType, k) && (k != "other" || rmType != "DV_CODED_TEXT")
 	}
 	first, refused := "", false
 	for k := range sfx {

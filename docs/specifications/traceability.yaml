@@ -591,6 +591,7 @@ requirements:
       - internal/cstringvalue/cstringvalue_test.go
       - openehr/serialize/simplified/action_archetype_id_internal_test.go
       - openehr/serialize/simplified/archetype_details_test.go
+      - openehr/serialize/simplified/bare_value_internal_test.go
       - openehr/serialize/simplified/coded_name_internal_test.go
       - openehr/serialize/simplified/coded_name_test.go
       - openehr/serialize/simplified/completion_defaults_test.go
@@ -639,6 +640,7 @@ requirements:
       - openehr/serialize/simplified/sibling_spelling_test.go
       - openehr/serialize/simplified/simplified_test.go
       - openehr/serialize/simplified/string_leaf_test.go
+      - openehr/serialize/simplified/structured_bare_value_test.go
       - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/structured_test.go
       - openehr/serialize/simplified/template_completion_test.go
@@ -2555,6 +2557,7 @@ requirements:
       - openehr/serialize/simplified/rmattr_value_test.go
       - openehr/serialize/simplified/sibling_spelling_test.go
       - openehr/serialize/simplified/string_leaf_test.go
+      - openehr/serialize/simplified/structured_bare_value_test.go
       - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/subpath_sentinel_internal_test.go
       - openehr/serialize/simplified/template_completion_test.go
