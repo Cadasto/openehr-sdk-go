@@ -99,17 +99,14 @@ var requiredBodies = []string{
 // mediumHollowBodies names the compiling vendored templates of which a root
 // Generate returns under Medium, under some value fill or seed, holds no
 // ELEMENT: the hollow-body floor under that policy. Medium gives a
-// multi-valued attribute at most one optional archetype, its first optional
-// archetype root in OPT order that needs no undescribed content (REQ-107
-// What a visit writes), so a template whose kept optional archetype holds
-// no ELEMENT gets a body with none by design: clinical_content_validation,
-// whose content builds only that root, a SECTION.validation_section_test.v0
-// with no items. generic_ehr_status.v1 and generic_folder.v1 constrain no
-// ELEMENT at all, so their body is hollow under every policy. A listed
-// template that stops being hollow under Medium fails the ratchet, and so
-// does an unlisted one that becomes hollow, as an unlisted row does.
+// multi-valued attribute a member of each optional archetype that needs no
+// undescribed content (REQ-107 What a visit writes), so only a template
+// that constrains no ELEMENT at all gets a body with none:
+// generic_ehr_status.v1 and generic_folder.v1, whose body is hollow under
+// every policy. A listed template that stops being hollow under Medium
+// fails the ratchet, and so does an unlisted one that becomes hollow, as an
+// unlisted row does.
 var mediumHollowBodies = []string{
-	"templates/clinical_content_validation",
 	"templates/generic_ehr_status.v1",
 	"templates/generic_folder.v1",
 }
@@ -140,12 +137,12 @@ var mediumHollowBodies = []string{
 // root it does not build (TestPerson.v2 is PERSON-rooted, the two generic
 // templates EHR_STATUS- and FOLDER-rooted).
 //
-// Medium rows: Medium gives an attribute at most one optional archetype,
-// its first optional archetype root. The TestPerson.v2 identifier clusters
-// and the clinical_content_validation EVALUATION come after the first
-// optional root of their attribute, so Medium builds neither and has no row
-// there. Under Medium the hollow-body floor is the mediumHollowBodies list
-// instead of a row.
+// Medium rows: Medium gives an attribute a member of each optional
+// archetype, but none of a second use of one. So it reaches the
+// TestPerson.v2 identifier clusters, each of another archetype, and has
+// their floor_coded rows, and the clinical_content_validation EVALUATION,
+// whose root validates. Under Medium the hollow-body floor is the
+// mediumHollowBodies list instead of a row.
 //
 // Required rows: none. Required visits only the attributes the template
 // makes mandatory and gives an optional child no member of its own
@@ -176,6 +173,10 @@ var corpusRatchet = []ratchetFailure{
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
 }
 
 func TestREQ107_CorpusRatchet(t *testing.T) {

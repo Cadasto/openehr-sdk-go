@@ -107,11 +107,11 @@ func contentArchetypeIDs(tree any) []string {
 // TestREQ101_REQ107_NewSkeletonDefaultsToMedium checks REQ-101's
 // skeleton policy when no WithPolicy is given: NewSkeleton builds the
 // tree REQ-107's Medium, the instance package's zero Policy, builds. On
-// vital_signs that tree holds the first of the template's four optional
-// content OBSERVATIONs alone, where Large builds a member of each and
-// Required none, and as many JSON values as instance.Generate under
-// Medium. Of two optional siblings that share an at-code, the default
-// builds the first alone, as Medium does, where Large builds both.
+// vital_signs that tree holds each of the template's four optional content
+// OBSERVATIONs, as Large's does, and as many JSON values as
+// instance.Generate under Medium. Of two optional siblings that share an
+// at-code, the default builds the first alone, as Medium does, where Large
+// builds both.
 func TestREQ101_REQ107_NewSkeletonDefaultsToMedium(t *testing.T) {
 	t.Parallel()
 	t.Run("vital_signs", func(t *testing.T) {
@@ -123,7 +123,12 @@ func TestREQ101_REQ107_NewSkeletonDefaultsToMedium(t *testing.T) {
 		}
 		tree := decodedJSON(t, comp)
 
-		want := []string{"openEHR-EHR-OBSERVATION.blood_pressure.v1"}
+		want := []string{
+			"openEHR-EHR-OBSERVATION.blood_pressure.v1",
+			"openEHR-EHR-OBSERVATION.body_temperature.v1",
+			"openEHR-EHR-OBSERVATION.heart_rate.v1",
+			"openEHR-EHR-OBSERVATION.respiration.v1",
+		}
 		if got := contentArchetypeIDs(tree); !slices.Equal(got, want) {
 			t.Errorf("NewSkeleton(vital_signs) with no WithPolicy: content archetype ids = %v, want %v", got, want)
 		}
@@ -145,14 +150,8 @@ func TestREQ101_REQ107_NewSkeletonDefaultsToMedium(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewSkeleton(vital_signs, WithPolicy(Large)): %v", err)
 		}
-		wantLarge := []string{
-			"openEHR-EHR-OBSERVATION.blood_pressure.v1",
-			"openEHR-EHR-OBSERVATION.body_temperature.v1",
-			"openEHR-EHR-OBSERVATION.heart_rate.v1",
-			"openEHR-EHR-OBSERVATION.respiration.v1",
-		}
-		if got := contentArchetypeIDs(decodedJSON(t, large)); !slices.Equal(got, wantLarge) {
-			t.Errorf("NewSkeleton(vital_signs, WithPolicy(Large)) content archetype ids = %v, want %v, so the default is not Large", got, wantLarge)
+		if got := contentArchetypeIDs(decodedJSON(t, large)); !slices.Equal(got, want) {
+			t.Errorf("NewSkeleton(vital_signs, WithPolicy(Large)) content archetype ids = %v, want %v", got, want)
 		}
 	})
 	t.Run("optional named siblings", func(t *testing.T) {
@@ -223,17 +222,17 @@ func TestREQ101_REQ107_NewSkeletonAcceptsRequired(t *testing.T) {
 
 // TestREQ101_REQ107_NewBuilderAcceptsOnlyLarge checks REQ-101's skeleton
 // policy for NewBuilder: Set routes a value only into a node the skeleton
-// already holds, so it needs a member of every optional archetype, which
-// only REQ-107's Large builds. NewBuilder refuses Medium, whose skeleton
-// holds one optional archetype under an attribute, also given explicitly
-// as the zero value it is, and Required, whose skeleton holds none, and so
-// Minimal, with an error wrapping ErrUnsupportedPolicy that names the
-// policy, and no Builder. That error does not wrap
-// instance.ErrUnsupportedPolicy, since REQ-107 defines both levels. It
-// accepts Large, and so Complete. The Large
-// skeleton holds the heart-rate OBSERVATION of vital_signs, the third of
-// its four optional content archetypes, so a value set there builds
-// without error.
+// already holds, so it needs a member of every optional archetype and of
+// every use of one, which only REQ-107's Large builds. NewBuilder refuses
+// Medium, whose skeleton holds no second use of one archetype under an
+// attribute, also given explicitly as the zero value it is, and Required,
+// whose skeleton holds no optional archetype, and so Minimal, with an
+// error wrapping ErrUnsupportedPolicy that names the policy, and no
+// Builder. That error does not wrap instance.ErrUnsupportedPolicy, since
+// REQ-107 defines both levels. It accepts Large, and so Complete. The
+// Large skeleton holds the heart-rate OBSERVATION of vital_signs, the
+// third of its four optional content archetypes, so a value set there
+// builds without error.
 func TestREQ101_REQ107_NewBuilderAcceptsOnlyLarge(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

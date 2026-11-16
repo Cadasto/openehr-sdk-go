@@ -91,15 +91,19 @@ func TestREQ107_LargeKeepsEachOptionalContentArchetype(t *testing.T) {
 	}
 }
 
-// TestREQ107_MediumKeepsOneOptionalContentArchetype is the REQ-107 check
-// that, under Medium, an optional archetype root after the first optional
-// archetype root of an attribute gets no member of its own, whatever its
-// archetype: of vital_signs' four optional content OBSERVATIONs, content
-// holds the first alone. The composition validates. It holds under both
-// value fills.
-func TestREQ107_MediumKeepsOneOptionalContentArchetype(t *testing.T) {
+// TestREQ107_MediumKeepsEachOptionalContentArchetype is the REQ-107 check
+// that, under Medium, optional archetype roots of different archetypes
+// under one attribute each get their member: content holds all four of
+// vital_signs' optional content OBSERVATIONs, in OPT order. The
+// composition validates. It holds under both value fills.
+func TestREQ107_MediumKeepsEachOptionalContentArchetype(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
-	want := []string{"openEHR-EHR-OBSERVATION.blood_pressure.v1"}
+	want := []string{
+		"openEHR-EHR-OBSERVATION.blood_pressure.v1",
+		"openEHR-EHR-OBSERVATION.body_temperature.v1",
+		"openEHR-EHR-OBSERVATION.heart_rate.v1",
+		"openEHR-EHR-OBSERVATION.respiration.v1",
+	}
 	for _, opts := range corpusOptions(instance.Medium) {
 		t.Run(opts.ValueFill.String(), func(t *testing.T) {
 			comp := generateComposition(t, c, opts)
@@ -168,20 +172,34 @@ func TestREQ107_LargeWritesEachRepeatedOptionalArchetype(t *testing.T) {
 	}
 }
 
-// TestREQ107_MediumSkipsEveryLaterOptionalArchetype is the REQ-107 check
-// that, under Medium, the optional archetype roots after the first one of
-// an attribute get no member of their own, of another archetype or of the
-// same: Corona_Anamnese's content holds the optional OBSERVATION.story.v1
-// alone, and none of the four optional SECTION.adhoc.v1 roots after it.
-// The composition validates. It holds under both value fills.
-func TestREQ107_MediumSkipsEveryLaterOptionalArchetype(t *testing.T) {
+// TestREQ107_MediumBuildsEachOptionalArchetypeOnce is the REQ-107 check
+// that, under Medium, every optional archetype root under an attribute gets
+// a member unless an earlier optional sibling uses its archetype:
+// Corona_Anamnese's content holds the optional OBSERVATION.story.v1 and the
+// first of the four optional SECTION.adhoc.v1 roots after it ('Symptome').
+// That section holds the first of its eight optional symptom_sign_screening
+// roots and its optional body_temperature root, in OPT order. The
+// composition validates. It holds under both value fills.
+func TestREQ107_MediumBuildsEachOptionalArchetypeOnce(t *testing.T) {
+	const adhoc = "openEHR-EHR-SECTION.adhoc.v1"
 	c := compileCoronaAnamnese(t)
-	want := []string{"openEHR-EHR-OBSERVATION.story.v1"}
+	wantContent := []string{"openEHR-EHR-OBSERVATION.story.v1", adhoc}
+	wantItems := []string{"openEHR-EHR-OBSERVATION.symptom_sign_screening.v0", "openEHR-EHR-OBSERVATION.body_temperature.v2"}
 	for _, opts := range corpusOptions(instance.Medium) {
 		t.Run(opts.ValueFill.String(), func(t *testing.T) {
 			comp := generateComposition(t, c, opts)
-			if got := contentIDs(comp.Content); !slices.Equal(got, want) {
-				t.Errorf("Generate(Corona_Anamnese, Medium) content = %v, want %v", got, want)
+			if got := contentIDs(comp.Content); !slices.Equal(got, wantContent) {
+				t.Fatalf("Generate(Corona_Anamnese, Medium) content = %v, want %v", got, wantContent)
+			}
+			section, ok := comp.Content[1].(*rm.Section)
+			if !ok {
+				t.Fatalf("content item is %T, want *rm.Section", comp.Content[1])
+			}
+			if got, want := section.Name.GetValue(), "Symptome"; got != want {
+				t.Errorf("content section name = %q, want %q", got, want)
+			}
+			if got := contentIDs(section.Items); !slices.Equal(got, wantItems) {
+				t.Errorf("section 'Symptome' items = %v, want %v", got, wantItems)
 			}
 			noValidationErrors(t, comp, c)
 		})

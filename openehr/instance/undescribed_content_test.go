@@ -72,11 +72,12 @@ func itemsShape(items []rm.Item) string {
 // an optional child that needs undescribed content gets no member of its
 // own, an attribute that is not required and whose members would all be
 // undescribed or need it is not visited, a top-up takes a child that needs
-// none, and Medium's first optional archetype root is the first that needs
-// none. The rule reads a node's own attributes only, so a required node
-// below an optional one keeps its undescribed members and the optional
-// node is kept. Every root passes the RM floor and the template validator,
-// under every policy, both value fills and both compile modes.
+// none, and Medium passes over an optional archetype root that needs some
+// while it builds the ones after it. The rule reads a node's own
+// attributes only, so a required node below an optional one keeps its
+// undescribed members and the optional node is kept. Every root passes the
+// RM floor and the template validator, under every policy, both value
+// fills and both compile modes.
 func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing.T) {
 	const (
 		slotted   = "openEHR-EHR-OBSERVATION.slotted.v1"
@@ -247,13 +248,13 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 		},
 		{
 			// The content is optional, so no top-up stands in for the root
-			// Medium keeps.
-			name: "first optional archetype root under Medium is the first that needs none",
+			// that needs undescribed content.
+			name: "optional archetype roots after one that needs undescribed content",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence01,
 				undescribedObservation(slotted, guardOccurrences01, describedHistory, slottedProtocol),
 				undescribedObservation(described, guardOccurrences01, describedHistory),
 				undescribedObservation(third, guardOccurrences01, describedHistory))),
-			large: described + "," + third, medium: described, required: "",
+			large: described + "," + third, medium: described + "," + third, required: "",
 		},
 	}
 	for _, tc := range cases {

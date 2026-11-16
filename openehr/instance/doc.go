@@ -52,13 +52,10 @@
 //     template prohibits the list, or where the RM types its items as
 //     primitive values, such as a DV_MULTIMEDIA's data. A visited
 //     multi-valued attribute gets its members as under Large, except that
-//     an optional archetype after the first optional
-//     archetype of the attribute that holds more than content the
-//     template does not describe (below) gets none, whatever its
-//     archetype, and neither does an optional child whose identity a
-//     required or earlier sibling carries. So Medium builds at most one
-//     optional archetype under an attribute, the medium level. It is the
-//     zero value, and so the default.
+//     an optional child whose identity a required or earlier sibling
+//     carries gets none. So Medium builds a member of each optional
+//     archetype under an attribute, but not of each use of one, the
+//     medium level. It is the zero value, and so the default.
 //   - Required: the required attributes, in the sense above, but not one
 //     that only its cardinality lower bound asks for, nor one merely
 //     because it has an allowed template child, except a composition's
@@ -100,11 +97,11 @@
 // exists, so such a list is left out as Required leaves it out. A list with a child that makes it required
 // is visited, so that child gets its members although they hold only such
 // content. A composition's context is the exception: every policy writes
-// one, so the walk visits it whatever its members need. The first optional archetype Medium keeps is the first
-// that needs none. The check reads a node's own attributes only: below a
-// node the template or the RM requires, the walk builds what it always
-// builds, placeholders and slot fills included where something asks for a
-// member, so the described content around them is kept.
+// one, so the walk visits it whatever its members need. The check reads a
+// node's own attributes only: below a node the template or the RM
+// requires, the walk builds what it always builds, placeholders and slot
+// fills included where something asks for a member, so the described
+// content around them is kept.
 //
 // Under every policy, a visited multi-valued attribute gets no more
 // members than its cardinality upper bound, and within that bound the

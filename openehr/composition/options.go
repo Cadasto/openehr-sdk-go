@@ -74,12 +74,12 @@ func WithNow(t time.Time) Option {
 // WithPolicy selects the instance.Policy NewSkeleton passes to
 // instance.Generate, which decides which nodes the skeleton holds.
 // NewSkeleton's default is the instance package's, instance.Medium, which
-// builds at most one optional archetype under an attribute.
-// instance.Large builds a member of every optional archetype the template
-// names, the nodes Set needs to route a value into, and instance.Required
-// builds only what the template makes mandatory and a composition's
-// context; instance.Complete and instance.Minimal are other names for
-// Large and Required. NewSkeleton accepts the three. NewBuilder builds on
+// builds a member of each optional archetype under an attribute, but not
+// of each use of one. instance.Large builds a member of every optional
+// archetype the template names and of every use of one, the nodes Set
+// needs to route a value into, and instance.Required builds only what the
+// template makes mandatory and a composition's context; instance.Complete
+// and instance.Minimal are other names for Large and Required. NewSkeleton accepts the three. NewBuilder builds on
 // Large when no WithPolicy is given and accepts only Large, since Set does
 // not build a node the skeleton lacks: it refuses an explicit
 // WithPolicy(instance.Medium), though Medium is the zero value. Each

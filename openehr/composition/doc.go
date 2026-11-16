@@ -16,15 +16,17 @@
 // `WithValueFill`, `WithValueSource`, `WithUIDSource`) and the
 // path-assigning API.
 // With no WithPolicy, NewSkeleton builds instance.Medium, the instance
-// package's default: a skeleton with at most one optional archetype under
-// an attribute. `WithPolicy(instance.Required)` gives one with only what
-// the template makes mandatory and a composition's context, and
+// package's default: a skeleton with a member of each optional archetype
+// under an attribute, but not of each use of one.
+// `WithPolicy(instance.Required)` gives one with only what the template
+// makes mandatory and a composition's context, and
 // `WithPolicy(instance.Large)` one with a member of every optional
-// archetype. NewBuilder builds on instance.Large when no WithPolicy is
-// given, and refuses Medium and Required with [ErrUnsupportedPolicy],
-// because Set needs a member of every optional archetype, which only Large
-// builds. Both entry points refuse a Policy value the instance package does
-// not define with an error wrapping [ErrUnsupportedPolicy] and
+// archetype and of every use of one. NewBuilder builds on instance.Large
+// when no WithPolicy is given, and refuses Medium and Required with
+// [ErrUnsupportedPolicy], because Set needs a member of every optional
+// archetype and of every use of one, which only Large builds. Both entry
+// points refuse a Policy value the instance package does not define with
+// an error wrapping [ErrUnsupportedPolicy] and
 // [instance.ErrUnsupportedPolicy]. There is no second OPT walker here: the
 // generated attribute access of `internal/rmaccess` (read side) and
 // `rmwrite` (write side) provide the closed-dispatch attribute access the

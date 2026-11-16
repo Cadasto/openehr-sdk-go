@@ -36,10 +36,9 @@ func compileRealWorldFixture(t *testing.T, name string) *templatecompile.Compile
 // of six different archetypes. They all carry the node id at0000, but an
 // optional child yields only to an earlier optional sibling with its
 // identity, and an archetype root's identity is its archetype id. So Large
-// emits one content entry of each archetype, in OPT order. Medium builds at
-// most one optional archetype under an attribute, so it emits the first
-// alone. Large and Medium must each contain at least one ELEMENT; a hollow
-// tree passes the content check and both validators.
+// and Medium each emit one content entry of each archetype, in OPT order.
+// Large and Medium must each contain at least one ELEMENT; a hollow tree
+// passes the content check and both validators.
 func TestREQ107_GenerateSocialContentArchetypes(t *testing.T) {
 	opt, err := readOPTFile(fixtures.TemplateOptForName("social"))
 	if err != nil {
@@ -67,7 +66,14 @@ func TestREQ107_GenerateSocialContentArchetypes(t *testing.T) {
 		},
 		{
 			policy: instance.Medium,
-			want:   []string{"openEHR-EHR-OBSERVATION.livingsituation.v1"},
+			want: []string{
+				"openEHR-EHR-OBSERVATION.livingsituation.v1",
+				"openEHR-EHR-OBSERVATION.languageproficiency.v1",
+				"openEHR-EHR-OBSERVATION.participationinsociety.v1",
+				"openEHR-EHR-OBSERVATION.helpfromothers.v1",
+				"openEHR-EHR-EVALUATION.familysituation.v1",
+				"openEHR-EHR-EVALUATION.education_summary.v1",
+			},
 		},
 	} {
 		t.Run(tc.policy.String(), func(t *testing.T) {

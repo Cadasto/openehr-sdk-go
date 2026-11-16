@@ -1661,6 +1661,7 @@ requirements:
       - openehr/instance/large_uses_test.go
       - openehr/instance/local_term_text_test.go
       - openehr/instance/locatable_name_test.go
+      - openehr/instance/medium_every_archetype_test.go
       - openehr/instance/multimedia_data_test.go
       - openehr/instance/multimedia_uri_internal_test.go
       - openehr/instance/node_id_internal_test.go

@@ -477,14 +477,13 @@ func TestREQ107_MediumSkipsACollidingOptionalSibling(t *testing.T) {
 // the one the validator binds a member by: the node_id for an ELEMENT, the
 // archetype id for an archetype root. So the optional at0001 ELEMENTs get
 // no member beside the required one, while at0002, which no required
-// sibling carries, keeps its first optional sibling, and the optional root
-// of the second archetype gets none, since it follows the first optional
-// archetype root. Under Large every sibling gets its member, in OPT order:
-// the optional ELEMENTs beside the required one of their node_id, and both
-// roots of one archetype. The root passes the template validator under both
-// policies, which binds each member to the first sibling with room under
-// which it validates (REQ-102 Structural — binding items). It holds under
-// both value fills and both compile modes.
+// sibling carries, keeps its first optional sibling, and each archetype
+// keeps its first optional root. Under Large every sibling gets its
+// member, in OPT order: the optional ELEMENTs beside the required one of
+// their node_id, and both roots of one archetype. The root passes the
+// template validator under both policies, which binds each member to the
+// first sibling with room under which it validates (REQ-102 Structural —
+// binding items). It holds under both value fills and both compile modes.
 func TestREQ107_KeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 	element := func(nodeID string, lower int, valueType string) string {
 		return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", nodeID, lower, 1, optSingle("value", optNode(valueType, "")))
@@ -507,7 +506,7 @@ func TestREQ107_KeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 		element("at0002", 0, "DV_DURATION")))
 	want := map[instance.Policy][]string{
 		instance.Large:  {"DV_BOOLEAN", "DV_TEXT", clusterA, "DV_DATE", clusterB, "DV_COUNT", clusterA, "DV_DURATION"},
-		instance.Medium: {"DV_BOOLEAN", clusterA, "DV_DATE"},
+		instance.Medium: {"DV_BOOLEAN", clusterA, "DV_DATE", clusterB},
 	}
 	for _, implicit := range []bool{true, false} {
 		c := compileOPTText(t, opt, implicit)
@@ -548,8 +547,7 @@ func TestREQ107_KeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 // gets no member of its own, whether that sibling comes before or after it,
 // while under Large it gets one, in OPT order. A slot with an ELEMENT's
 // node_id does not count as its sibling, and optional roots of different
-// archetypes each get theirs under Large and only the first gets one under
-// Medium. The cases are archetype roots of one archetype under
+// archetypes each get theirs under both. The cases are archetype roots of one archetype under
 // CLUSTER.items in both orders, ELEMENTs of one node_id, roots of two
 // archetypes, and a slot before an optional ELEMENT of its node_id, which a
 // required ELEMENT of another node_id precedes so that no top-up builds it;
@@ -636,7 +634,7 @@ func TestREQ107_OptionalSiblingBesideARequiredOne(t *testing.T) {
 			lower:    1,
 			children: []string{root(clusterA, 0, "DV_TEXT"), root(clusterB, 0, "DV_COUNT")},
 			large:    []string{clusterA + "[DV_TEXT]", clusterB + "[DV_COUNT]"},
-			medium:   []string{clusterA + "[DV_TEXT]"},
+			medium:   []string{clusterA + "[DV_TEXT]", clusterB + "[DV_COUNT]"},
 		},
 		{
 			name:     "slot then optional element of its node_id",
@@ -832,19 +830,16 @@ func TestREQ107_NeverSkipsAChildWithNoIdentity(t *testing.T) {
 	}
 }
 
-// TestREQ107_MediumBuildsOneOptionalArchetypePerAttribute is the REQ-107
-// check that, under Medium, an optional archetype root after the first
-// optional archetype root of a multi-valued attribute, in OPT order, gets
-// no member of its own, whatever its archetype, while Large builds a member
-// of each optional archetype and Required builds none. The rule binds
-// archetype roots only: an optional ELEMENT between the two roots keeps
-// its member under Medium. Where the first optional root yields to a
-// required root of its archetype, it still counts as the first, so Medium
-// builds no optional archetype at all, while Large builds both optional
-// roots beside the required one. Each root passes the template
-// validator and the RM floor. It holds under both value fills and both
-// compile modes.
-func TestREQ107_MediumBuildsOneOptionalArchetypePerAttribute(t *testing.T) {
+// TestREQ107_MediumBuildsEveryOptionalArchetypeOfAnAttribute is the
+// REQ-107 check that, under Medium as under Large, each optional archetype
+// root of a multi-valued attribute gets a member of its own, whatever
+// archetypes come before it, while Required builds none. Where the first
+// optional root yields to a required root of its archetype, the optional
+// root of the other archetype still gets its member under Medium, while
+// Large builds both optional roots beside the required one. Each root
+// passes the template validator and the RM floor. It holds under both
+// value fills and both compile modes.
+func TestREQ107_MediumBuildsEveryOptionalArchetypeOfAnAttribute(t *testing.T) {
 	const clusterA, clusterB = "openEHR-EHR-CLUSTER.sibling_a.v1", "openEHR-EHR-CLUSTER.sibling_b.v1"
 	element := func(nodeID string, lower int, valueType string) string {
 		return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", nodeID, lower, 1, optSingle("value", optNode(valueType, "")))
@@ -870,7 +865,7 @@ func TestREQ107_MediumBuildsOneOptionalArchetypePerAttribute(t *testing.T) {
 			},
 			want: map[instance.Policy][]string{
 				instance.Large:    {"DV_TEXT", clusterA + "[DV_BOOLEAN]", "DV_COUNT", clusterB + "[DV_DATE]"},
-				instance.Medium:   {"DV_TEXT", clusterA + "[DV_BOOLEAN]", "DV_COUNT"},
+				instance.Medium:   {"DV_TEXT", clusterA + "[DV_BOOLEAN]", "DV_COUNT", clusterB + "[DV_DATE]"},
 				instance.Required: {"DV_TEXT"},
 			},
 		},
@@ -883,7 +878,7 @@ func TestREQ107_MediumBuildsOneOptionalArchetypePerAttribute(t *testing.T) {
 			},
 			want: map[instance.Policy][]string{
 				instance.Large:    {clusterA + "[DV_TEXT]", clusterA + "[DV_BOOLEAN]", clusterB + "[DV_DATE]"},
-				instance.Medium:   {clusterA + "[DV_TEXT]"},
+				instance.Medium:   {clusterA + "[DV_TEXT]", clusterB + "[DV_DATE]"},
 				instance.Required: {clusterA + "[DV_TEXT]"},
 			},
 		},
@@ -912,9 +907,9 @@ func TestREQ107_MediumBuildsOneOptionalArchetypePerAttribute(t *testing.T) {
 // TestREQ107_ArchetypeRootWithNoOccurrencesIsNotOptional is the REQ-107
 // check that an archetype root the OPT gives no occurrences is not an
 // optional child, since it has no occurrences lower bound of 0. Every
-// policy sizes it as one member, and Medium's one-optional-archetype rule
-// does not drop it: two such roots of different archetypes under
-// CLUSTER.items each get one member under Large, Medium and Required. The
+// policy sizes it as one member, Required included: two such roots of
+// different archetypes under CLUSTER.items each get one member under
+// Large, Medium and Required. The
 // root passes the template validator and the RM floor. It holds under both
 // value fills and both compile modes.
 func TestREQ107_ArchetypeRootWithNoOccurrencesIsNotOptional(t *testing.T) {

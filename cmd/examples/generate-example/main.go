@@ -42,7 +42,7 @@ func main() {
 
 func run() error {
 	optFlag := flag.String("opt", "", "path to an ADL 1.4 operational template (default: the vendored vital_signs.opt)")
-	policyFlag := flag.String("policy", defaultPolicy, "how much to build; case does not matter: 'required' or its alias 'minimal' (the mandatory data and a composition's context), 'medium' (also every attribute the template constrains, at most one optional archetype under each), 'large' or its alias 'complete' (a member of every optional archetype)")
+	policyFlag := flag.String("policy", defaultPolicy, "how much to build; case does not matter: 'required' or its alias 'minimal' (the mandatory data and a composition's context), 'medium' (also every attribute the template constrains, with a member of each optional archetype under it), 'large' or its alias 'complete' (also a member of every use of one archetype)")
 	territoryFlag := flag.String("territory", "NL", "ISO 3166-1 territory code; a COMPOSITION root requires one")
 	composerFlag := flag.String("composer-name", "Example Composer", "name recorded as the composition's composer")
 	flag.Parse()
@@ -115,10 +115,10 @@ const defaultPolicy = "medium"
 // case. Required, and minimal with it, builds only the data points the
 // template makes mandatory and a composition's context, the ITS-REST
 // template example's detail_level=required. Medium also builds every
-// attribute the template constrains, with at most one optional archetype
-// under each, its detail_level=medium. Large, and complete with it for
-// now, builds a member of every optional archetype the template names,
-// short of its detail_level=complete. Under each of them every primitive
+// attribute the template constrains, with a member of each optional
+// archetype under it, its detail_level=medium. Large, and complete with it
+// for now, also builds a member of every use of one archetype, short of
+// its detail_level=complete. Under each of them every primitive
 // leaf holds its example value. Any other text is an error that names the
 // flag, so a typo on the command line does not silently pick a default.
 func parsePolicy(name string) (instance.Policy, error) {

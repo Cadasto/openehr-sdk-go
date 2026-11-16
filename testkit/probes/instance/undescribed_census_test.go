@@ -60,14 +60,20 @@ type undescribedPin struct {
 // gap: slot occurrences). A list only its existence requires gets no undescribed
 // member (What a visit writes), so vital_signs' protocols and event states,
 // whose items the template leaves without a child or with slots only at an
-// existence of 1..1 and a cardinality of 0..*, hold none. Medium builds
-// only the first optional archetype root of a content attribute, so it does
-// not reach clinical_content_validation's EVALUATION. A new such member, or
-// a listed one that is gone, fails the census.
+// existence of 1..1 and a cardinality of 0..*, hold none. A new such
+// member, or a listed one that is gone, fails the census.
 var undescribedBelowRequired = []undescribedPin{
 	{
 		member: undescribedMember{
 			template: "templates/clinical_content_validation", policy: "large",
+			attr: "/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0,'Validation evaluation wth single']/data/item",
+			kind: "bmm", ident: "ELEMENT",
+		},
+		reason: "the RM requires the EVALUATION's data, which takes the ITEM_SINGLE at0001, and its item, which the template leaves without a child",
+	},
+	{
+		member: undescribedMember{
+			template: "templates/clinical_content_validation", policy: "medium",
 			attr: "/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0,'Validation evaluation wth single']/data/item",
 			kind: "bmm", ident: "ELEMENT",
 		},

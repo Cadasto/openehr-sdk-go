@@ -3237,45 +3237,25 @@ func newHierObjectID() *rm.HierObjectID {
 // not a slot, gets no member of its own under the policy in force. Under
 // Large and Medium, an optional child that needs content the OPT does not
 // describe gets none (optionalUndescribed). Under Medium, neither does a
-// child whose identity a sibling carries (identityTaken), nor an optional
-// archetype root after the first optional archetype root of the attribute
-// that needs no such content (laterOptionalArchetype), so the attribute
-// holds at most one optional archetype. Under Large every other child gets
-// its members, each named or unnamed use of one archetype included, which
-// the validator binds by room and by trial. Required skips no child here:
-// it sizes each child by its occurrences lower bound, which gives an
-// optional child no member. The top-up to the attribute's lower bound can
-// still build a member of a skipped child.
+// child whose identity a sibling carries (identityTaken), so the attribute
+// holds one member of every optional archetype, not one of each use of it.
+// Under Large every other child gets its members, each named or unnamed
+// use of one archetype included, which the validator binds by room and by
+// trial. Required skips no child here: it sizes each child by its
+// occurrences lower bound, which gives an optional child no member. The
+// top-up to the attribute's lower bound can still build a member of a
+// skipped child.
 func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int) bool {
 	switch g.opts.Policy {
 	case Large:
 		return g.optionalUndescribed(children[i])
 	case Medium:
-		return g.optionalUndescribed(children[i]) || identityTaken(children, i) || g.laterOptionalArchetype(children, i)
+		return g.optionalUndescribed(children[i]) || identityTaken(children, i)
 	case Required:
 		return false
 	}
 	// Unreachable: Generate refuses any other Policy value first.
 	return false
-}
-
-// laterOptionalArchetype reports whether children[i] is an optional
-// archetype root that comes after another optional archetype root among
-// its siblings, in OPT order, whatever the archetype of either, that needs
-// no content the OPT does not describe. Such an earlier root counts even
-// where identityTaken skips it, and a slot is not an archetype root.
-func (g *generator) laterOptionalArchetype(children []*tcimpl.CompiledNode, i int) bool {
-	return optionalArchetypeRoot(children[i]) && slices.ContainsFunc(children[:i], func(c *tcimpl.CompiledNode) bool {
-		return optionalArchetypeRoot(c) && !g.needsUndescribed(c)
-	})
-}
-
-// optionalArchetypeRoot reports whether child is an archetype root the OPT
-// leaves optional: it names an archetype id, is not a slot, and its
-// occurrences have a bounded lower bound of 0 (childRequired). A root with
-// no occurrences, or with an unbounded lower bound, counts as required.
-func optionalArchetypeRoot(child *tcimpl.CompiledNode) bool {
-	return !child.IsSlot() && child.ArchetypeID() != "" && !childRequired(child)
 }
 
 // identityTaken reports whether children[i] is optional and a sibling
@@ -3289,12 +3269,11 @@ func optionalArchetypeRoot(child *tcimpl.CompiledNode) bool {
 // (carriesIdentity), so an archetype root also carries its node id: an
 // optional child that is not a root gets no member after a root with its
 // node id, while optional archetype roots of different archetypes are not
-// skipped here, since a root's identity is its archetype id
-// (childIdentity); Medium skips the later ones by another rule
-// (laterOptionalArchetype). A child with no identity is never skipped. A
-// name the OPT pins on a child is not part of it. Optional and required
-// are as childRequired reads them: a child with no occurrences, or with an
-// unbounded lower bound, counts as required.
+// skipped, since a root's identity is its archetype id (childIdentity). A
+// child with no identity is never skipped. A name the OPT pins on a child
+// is not part of it. Optional and required are as childRequired reads
+// them: a child with no occurrences, or with an unbounded lower bound,
+// counts as required.
 func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
 	child := children[i]
 	if childRequired(child) {
