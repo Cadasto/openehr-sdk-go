@@ -345,11 +345,18 @@ func TestSamplerNonPositiveLimit(t *testing.T) {
 }
 
 // TestSampleValue_REQ107_DurationIsNotZero covers the REQ-107 RandomFill
-// draw of a C_DURATION: a duration that is not zero, a count from 1 to 12
-// of one designator the pattern names, drawn, which validates and varies,
-// inside a range too; else the count 1 of the first designator, in written
-// order, the constraint accepts; and else the constraint's example, which a
-// range that admits no whole count of any designator but zero gives.
+// draw of a C_DURATION: a duration that is not zero, a count of one
+// designator the pattern names, drawn, which validates and varies. Where
+// the constraint has no range the count is from 1 to 12. Where it has one,
+// the count is drawn among those of the designator inside the range, so the
+// draw spreads across it: between the two bounds where both are set, twelve
+// counts from the one bound where one is, and in a designator a bound is
+// written in first, so a range in years gives years whatever else the
+// pattern names, past the twelfth where the range reaches it. An excluded
+// bound is not drawn. Else the draw is the
+// count 1 of the first designator, in written order, the constraint
+// accepts; and else the constraint's example, which a range that admits no
+// whole count of any designator but zero gives.
 func TestSampleValue_REQ107_DurationIsNotZero(t *testing.T) {
 	t.Parallel()
 	closed := func(lower, upper string) constraints.TemporalRange {
@@ -361,6 +368,9 @@ func TestSampleValue_REQ107_DurationIsNotZero(t *testing.T) {
 		// letters are the designators, as written after P, a draw may
 		// carry.
 		letters []string
+		// lowest and highest are the counts a draw may carry, both
+		// included, or 0 for 1 to 12.
+		lowest, highest int
 		// fixed is the one value every draw takes, or "" for draws that
 		// vary.
 		fixed string
@@ -369,14 +379,36 @@ func TestSampleValue_REQ107_DurationIsNotZero(t *testing.T) {
 		{name: "years", c: constraints.CDuration{Pattern: "PY"}, letters: []string{"Y"}},
 		{name: "minutes", c: constraints.CDuration{Pattern: "PTM"}, letters: []string{"TM"}},
 		{name: "date designators", c: constraints.CDuration{Pattern: "PYMWD"}, letters: []string{"Y", "M", "W", "D"}},
-		{name: "years from 0 to 150", c: constraints.CDuration{Pattern: "PY", Range: closed("P0Y", "P150Y")}, letters: []string{"Y"}},
-		{name: "hours and minutes from 1 to 2 hours", c: constraints.CDuration{Pattern: "PTHM", Range: closed("PT1H", "PT2H")}, letters: []string{"TH"}},
-		{name: "years from 18, past every drawn count", c: constraints.CDuration{Pattern: "PY", Range: closed("P18Y", "P120Y")}, fixed: "P18Y"},
+		{name: "years from 0 to 150", c: constraints.CDuration{Pattern: "PY", Range: closed("P0Y", "P150Y")}, letters: []string{"Y"}, lowest: 1, highest: 150},
+		{name: "hours and minutes from 1 to 2 hours", c: constraints.CDuration{Pattern: "PTHM", Range: closed("PT1H", "PT2H")}, letters: []string{"TH"}, lowest: 1, highest: 2},
+		{name: "years from 18 to 120", c: constraints.CDuration{Pattern: "PY", Range: closed("P18Y", "P120Y")}, letters: []string{"Y"}, lowest: 18, highest: 120},
+		{name: "years from 18 to 120, in a pattern of date designators", c: constraints.CDuration{Pattern: "PYMWD", Range: closed("P18Y", "P120Y")}, letters: []string{"Y"}, lowest: 18, highest: 120},
+		{
+			name:    "years from 18, open above",
+			c:       constraints.CDuration{Pattern: "PY", Range: constraints.TemporalRange{Lower: "P18Y", LowerInclusive: true, UpperUnbounded: true}},
+			letters: []string{"Y"}, lowest: 18, highest: 29,
+		},
+		{
+			name:    "months up to 6, open below",
+			c:       constraints.CDuration{Pattern: "PM", Range: constraints.TemporalRange{Upper: "P6M", UpperInclusive: true, LowerUnbounded: true}},
+			letters: []string{"M"}, lowest: 1, highest: 6,
+		},
+		{
+			// A draw of 18 or 30 years would leave the range, and the
+			// pattern would then take months.
+			name:    "years between 18 and 30, both excluded",
+			c:       constraints.CDuration{Pattern: "PYM", Range: constraints.TemporalRange{Lower: "P18Y", Upper: "P30Y"}},
+			letters: []string{"Y"}, lowest: 19, highest: 29,
+		},
 		{name: "half a second at most", c: constraints.CDuration{Range: closed("PT0S", "PT0.5S")}, fixed: "P0D"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			lowest, highest := tc.lowest, tc.highest
+			if lowest == 0 {
+				lowest, highest = 1, 12
+			}
 			vals := draws(tc.c, newSampler(mrand.NewPCG(31, 32)), 16)
 			for _, v := range vals {
 				s, ok := v.(string)
@@ -392,22 +424,28 @@ func TestSampleValue_REQ107_DurationIsNotZero(t *testing.T) {
 					}
 					continue
 				}
-				if !durationOf(s, tc.letters) {
-					t.Errorf("draw %q, want a count from 1 to 12 of one of %v", s, tc.letters)
+				if !durationOf(s, tc.letters, lowest, highest) {
+					t.Errorf("draw %q, want a count from %d to %d of one of %v", s, lowest, highest, tc.letters)
 				}
 			}
 			if n := distinct(vals); tc.fixed == "" && n < 2 {
 				t.Errorf("16 draws gave %d distinct values, want them to vary", n)
 			}
+			if highest > 12 && !slices.ContainsFunc(vals, func(v any) bool {
+				s, _ := v.(string)
+				return durationOf(s, tc.letters, 13, highest)
+			}) {
+				t.Errorf("16 draws %v carry no count above 12, want them spread up to %d", vals, highest)
+			}
 		})
 	}
 }
 
-// durationOf reports whether s is a count from 1 to 12 of one of the
-// designators letters, each written as it follows P.
-func durationOf(s string, letters []string) bool {
+// durationOf reports whether s is a count from lowest to highest of one of
+// the designators letters, each written as it follows P.
+func durationOf(s string, letters []string, lowest, highest int) bool {
 	for _, l := range letters {
-		for n := 1; n <= 12; n++ {
+		for n := lowest; n <= highest; n++ {
 			if s == fmt.Sprintf("P%s%d%s", l[:len(l)-1], n, l[len(l)-1:]) {
 				return true
 			}

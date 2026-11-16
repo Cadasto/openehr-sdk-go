@@ -362,19 +362,24 @@ func TestREQ107_IdentifierHasAnIDShapeAndAnIssuer(t *testing.T) {
 // TestREQ107_DurationIsNotZeroUnderRandomFill is the REQ-107 Primitive-leaf
 // value fill check on a DV_DURATION whose value a C_DURATION constrains:
 // under RandomFill the value is a duration that is not zero and fits the
-// pattern, a count of one designator it names; under ExampleFill it is the
-// constraint's example, P0D for an open C_DURATION. The RM floor and the
-// template validator pass.
+// pattern, a count of one designator it names, from 1 to 12 where the
+// constraint has no range and among the counts inside its range where it
+// has one; under ExampleFill it is the constraint's example, P0D for an
+// open C_DURATION. The RM floor and the template validator pass.
 func TestREQ107_DurationIsNotZeroUnderRandomFill(t *testing.T) {
+	years := "<pattern>PY</pattern><range><lower_included>true</lower_included><upper_included>true</upper_included>" +
+		"<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>P18Y</lower><upper>P120Y</upper></range>"
 	cases := []struct {
-		name    string
-		body    string
-		example string
-		letters []string
+		name            string
+		body            string
+		example         string
+		letters         []string
+		lowest, highest int
 	}{
-		{name: "open C_DURATION", body: "", example: "P0D", letters: []string{"Y", "M", "W", "D", "TH", "TM", "TS"}},
-		{name: "hours and minutes", body: "<pattern>PTHM</pattern>", example: "PT0H", letters: []string{"TH", "TM"}},
-		{name: "years, months and days", body: "<pattern>PYMD</pattern>", example: "P0D", letters: []string{"Y", "M", "D"}},
+		{name: "open C_DURATION", body: "", example: "P0D", letters: []string{"Y", "M", "W", "D", "TH", "TM", "TS"}, lowest: 1, highest: 12},
+		{name: "hours and minutes", body: "<pattern>PTHM</pattern>", example: "PT0H", letters: []string{"TH", "TM"}, lowest: 1, highest: 12},
+		{name: "years, months and days", body: "<pattern>PYMD</pattern>", example: "P0D", letters: []string{"Y", "M", "D"}, lowest: 1, highest: 12},
+		{name: "years from 18 to 120", body: years, example: "P18Y", letters: []string{"Y"}, lowest: 18, highest: 120},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -383,8 +388,8 @@ func TestREQ107_DurationIsNotZeroUnderRandomFill(t *testing.T) {
 			eachSetting(t, opt, func(t *testing.T, opts instance.Options, out any) {
 				got := rootElementValue[*rm.DVDuration](t, out).Value
 				switch {
-				case opts.ValueFill == instance.RandomFill && !randomDuration(got, tc.letters):
-					t.Errorf("DV_DURATION.value = %q, want a count from 1 to 12 of one of %v", got, tc.letters)
+				case opts.ValueFill == instance.RandomFill && !randomDuration(got, tc.letters, tc.lowest, tc.highest):
+					t.Errorf("DV_DURATION.value = %q, want a count from %d to %d of one of %v", got, tc.lowest, tc.highest, tc.letters)
 				case opts.ValueFill != instance.RandomFill && got != tc.example:
 					t.Errorf("DV_DURATION.value = %q, want the example %q", got, tc.example)
 				}
@@ -393,11 +398,11 @@ func TestREQ107_DurationIsNotZeroUnderRandomFill(t *testing.T) {
 	}
 }
 
-// randomDuration reports whether s is a count from 1 to 12 of one of the
-// designators letters, each written as it follows P.
-func randomDuration(s string, letters []string) bool {
+// randomDuration reports whether s is a count from lowest to highest of one
+// of the designators letters, each written as it follows P.
+func randomDuration(s string, letters []string, lowest, highest int) bool {
 	for _, l := range letters {
-		for n := 1; n <= 12; n++ {
+		for n := lowest; n <= highest; n++ {
 			if s == fmt.Sprintf("P%s%d%s", l[:len(l)-1], n, l[len(l)-1:]) {
 				return true
 			}

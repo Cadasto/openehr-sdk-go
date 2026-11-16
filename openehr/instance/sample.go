@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"math"
 	mrand "math/rand/v2"
+	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
@@ -188,20 +190,34 @@ var durationDesignators = [...]struct{ prefix, letter string }{
 }
 
 // durationWindow is the largest count a drawn duration has of its one
-// designator.
+// designator where its constraint has no range, and how many counts it
+// draws among from the bound of a range bounded on one side.
 const durationWindow = 12
 
-// duration draws a duration that is not zero for c: a count from 1 to
+// maxDurationCount is the largest count durationCounts gives, so a count
+// read from a very long bound stays an int64; Validate then judges it.
+const maxDurationCount = math.MaxInt32
+
+// duration draws a duration that is not zero for c, a count of one
+// designator c accepts it in. Where c has no range, the count is from 1 to
 // durationWindow, drawn, of the first designator c accepts it in, from one
-// drawn at random on in written order and round again, so a range and the
-// pattern keep it; else the count 1 of the first designator c accepts, in
+// drawn at random on in written order and round again, so the pattern
+// keeps it. Where c has a range, the count is drawn among those of the
+// designator inside it (durationInRange), so the draw spreads across the
+// range. Else the draw is the count 1 of the first designator c accepts, in
 // written order; else nil, so sampleValue falls back to c's example.
 func (s sampler) duration(c constraints.CDuration) any {
 	n, start := 1+s.intN(durationWindow), s.intN(len(durationDesignators))
-	for i := range len(durationDesignators) {
-		d := durationDesignators[(start+i)%len(durationDesignators)]
-		if v := fmt.Sprintf("%s%d%s", d.prefix, n, d.letter); len(c.Validate(v)) == 0 {
+	if c.Range.IsBounded() {
+		if v, ok := s.durationInRange(c, start); ok {
 			return v
+		}
+	} else {
+		for i := range len(durationDesignators) {
+			d := durationDesignators[(start+i)%len(durationDesignators)]
+			if v := fmt.Sprintf("%s%d%s", d.prefix, n, d.letter); len(c.Validate(v)) == 0 {
+				return v
+			}
 		}
 	}
 	for _, d := range durationDesignators {
@@ -210,6 +226,132 @@ func (s sampler) duration(c constraints.CDuration) any {
 		}
 	}
 	return nil
+}
+
+// durationInRange draws a duration inside c's range: a count of one
+// designator, drawn among the counts of it the range admits
+// (durationCounts), that c accepts. It tries first the designators the
+// range's bounds are written in, and then every designator, each set from
+// the one at start on in written order and round again, so a range in
+// years gives years where c's pattern admits them. It returns false where
+// no draw fits c.
+func (s sampler) durationInRange(c constraints.CDuration, start int) (string, bool) {
+	every := make([]int, len(durationDesignators))
+	for i := range every {
+		every[i] = i
+	}
+	for _, set := range [][]int{rangeDesignators(c.Range), every} {
+		for i := range len(set) {
+			d := durationDesignators[set[(start+i)%len(set)]]
+			lo, hi, ok := durationCounts(c.Range, d.prefix, d.letter)
+			if !ok {
+				continue
+			}
+			if v := fmt.Sprintf("%s%d%s", d.prefix, lo+s.int64N(hi-lo+1), d.letter); len(c.Validate(v)) == 0 {
+				return v, true
+			}
+		}
+	}
+	return "", false
+}
+
+// rangeDesignators returns the designators the bounds of r are written in,
+// as indexes into durationDesignators in written order: a letter before T
+// in a bound is a date designator, and one after it a time designator. An
+// unbounded side gives none.
+func rangeDesignators(r constraints.TemporalRange) []int {
+	var bounds []string
+	if !r.LowerUnbounded {
+		bounds = append(bounds, r.Lower)
+	}
+	if !r.UpperUnbounded {
+		bounds = append(bounds, r.Upper)
+	}
+	var out []int
+	for i, d := range durationDesignators {
+		for _, b := range bounds {
+			part, clock, _ := strings.Cut(b, "T")
+			if d.prefix == "PT" {
+				part = clock
+			}
+			if strings.Contains(part, d.letter) {
+				out = append(out, i)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// durationCounts returns the counts, from lo to hi, of a duration written
+// as one count of the designator letter after prefix that lie inside r and
+// are above 0: those between r's bounds where it has both; durationWindow
+// of them from its bound where it has one, up from a lower bound and down
+// from an upper one; and none where it is open, a bound does not parse, or
+// no such count lies inside it. A count at an excluded bound is not one.
+func durationCounts(r constraints.TemporalRange, prefix, letter string) (lo, hi int64, ok bool) {
+	if !r.IsBounded() {
+		return 0, 0, false
+	}
+	unit, ok := durationLength(prefix + "1" + letter)
+	if !ok {
+		return 0, 0, false
+	}
+	lo, hi = 1, durationWindow
+	if !r.LowerUnbounded {
+		length, ok := durationLength(r.Lower)
+		if !ok {
+			return 0, 0, false
+		}
+		lo = max(1, durationCount(math.Ceil(length/unit)))
+		hi = lo + durationWindow - 1
+	}
+	if !r.UpperUnbounded {
+		length, ok := durationLength(r.Upper)
+		if !ok {
+			return 0, 0, false
+		}
+		hi = durationCount(math.Floor(length / unit))
+		if r.LowerUnbounded {
+			lo = max(1, hi-durationWindow+1)
+		}
+	}
+	// A count at an excluded bound, or one float64 rounding put just past a
+	// bound, leaves the range: step inside it.
+	inside := func(n int64) bool {
+		return len(constraints.CDuration{Range: r}.Validate(fmt.Sprintf("%s%d%s", prefix, n, letter))) == 0
+	}
+	for range 2 {
+		if lo <= hi && !inside(lo) {
+			lo++
+		}
+		if lo <= hi && !inside(hi) {
+			hi--
+		}
+	}
+	return lo, hi, lo <= hi && inside(lo) && inside(hi)
+}
+
+// durationLength returns the length in seconds of the ISO 8601 duration s,
+// BASE Iso8601_duration.to_seconds as the range of a C_DURATION reads it,
+// and false where s does not parse.
+func durationLength(s string) (float64, bool) {
+	d, err := iso8601.ParseDuration(s)
+	if err != nil {
+		return 0, false
+	}
+	return d.ToSeconds(), true
+}
+
+// durationCount returns x as a count, held between 0 and maxDurationCount.
+func durationCount(x float64) int64 {
+	switch {
+	case math.IsNaN(x) || x < 0:
+		return 0
+	case x > maxDurationCount:
+		return maxDurationCount
+	}
+	return int64(x)
 }
 
 // firstAccepted returns the first of forms, one drawn value written in
