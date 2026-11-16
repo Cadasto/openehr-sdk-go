@@ -48,3 +48,8 @@ Deciding together with REQ-140 avoids the failure mode ADR 0015 was written to c
 - **New `ctx/` short forms (emit + accept).** Rejected: requires inventing a suffix vocabulary the ITS spec does not define (structured participations with performer identifiers do not flatten onto the scalar `ctx/` pattern), diverges from the reference's emitted surface, and forks the PARTICIPATION grammar into two spellings.
 - **Accept both spellings now, emit underscore.** Rejected for scope: the alias table, disagreement rules, and witness handling exist for the scalar fields but would need per-suffix extension for structured values; no producer of the `ctx/` sketch is known. Deferred, not foreclosed.
 - **Emit `ctx/`, accept both (mirror ADR 0015 exactly).** Rejected: symmetry with ADR 0015 is superficial — ADR 0015 preserved an existing emitted surface; this would *create* a non-reference emitted surface and keep the reference's keys out of the parity comparison for good.
+
+## Traceability
+
+- Amends: REQ-053
+- Applies: REQ-140, REQ-080

@@ -53,3 +53,8 @@ Two Go realities, discovered while implementing, refine the decision above (reco
 - **Package functions only** (leave the methods stubbed, expose `rmid`/`rmpath` free functions). Most idiomatic, but abandons the BMM-generated method surface and leaves panicking stubs on the public types.
 - **Spec-faithful methods only** (every function a method, `item_at_path` returns `any`, preconditions panic). Closest to the spec, but spreads `any`-typed returns across the RM and keeps panics — rejected against REQ-024/025.
 - **Lift `rmread` to a shared low-level navigator** consumed by both `validation` and `rmpath`. Cleanest single-navigator design, but refactors already-landed, tested REQ-110 code and widens this change's blast radius — deferred.
+
+## Traceability
+
+- Introduces: REQ-120, REQ-121, REQ-122, REQ-123
+- Applies: REQ-013, REQ-014, REQ-024, REQ-025

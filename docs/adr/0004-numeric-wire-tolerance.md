@@ -72,3 +72,8 @@ Each is emitted by the BMM generator wherever the BMM primitive `Real` / `Intege
 - [`openehr/rm/real.go`](../../openehr/rm/real.go), [`openehr/rm/integer.go`](../../openehr/rm/integer.go), [`openehr/rm/integer64.go`](../../openehr/rm/integer64.go) — the defined types implementing this ADR.
 - [`internal/bmmgen/primitives.go`](../../internal/bmmgen/primitives.go) — the generator's mapping table.
 - [`testkit/corpus/compositions/vital_signs.json`](../../testkit/corpus/compositions/vital_signs.json) — concrete fixture with quoted-number magnitudes.
+
+## Traceability
+
+- Amends: REQ-052 (decode of quoted numbers)
+- Applies: REQ-041

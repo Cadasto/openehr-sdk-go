@@ -60,3 +60,7 @@ Nine of the twelve gaps were already fully carried by an existing `REQ` and its 
 - **Move work-tracking to GitHub issues.** Rejected: issues live outside the versioned tree, are invisible to `make spec-check`, and split the traceability chain across two systems.
 - **Keep GAP as a living identifier.** Rejected: a growing list with no product meaning, and a second identifier scheme to learn.
 - **Strip the living surface only, keeping archived-plan file names and released CHANGELOG lines.** Rejected in favour of a full purge, so the token survives only in git history with this ADR as its decoder.
+
+## Traceability
+
+- Amends: REQ-055, REQ-057, REQ-107, REQ-083 (content promoted from three gaps)

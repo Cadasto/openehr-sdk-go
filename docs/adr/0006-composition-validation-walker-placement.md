@@ -35,3 +35,7 @@ Implicit-attribute existence policy (validate BMM-mandatory implicits; deviation
 - **Positive:** Validation concerns and forbidden-import rules (REQ-013) stay in `openehr/validation/`; templatecompile does not depend on validation types.
 - **Positive:** OPT walk tooling stays usable without pulling in composition validation.
 - **Negative:** Two traversal implementations coexist (OPT walk vs composition lockstep) until an optional future extraction.
+
+## Traceability
+
+- Applies: REQ-102, REQ-110

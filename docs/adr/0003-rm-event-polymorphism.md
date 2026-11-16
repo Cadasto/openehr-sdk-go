@@ -41,3 +41,8 @@ Other abstract generics (including **VERSION**) continue to emit as generic stru
 
 - [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md)
 - [`internal/bmmgen/render.go`](../../internal/bmmgen/render.go) — `codecPolymorphicAbstractGeneric`
+
+## Traceability
+
+- Amends: ADR-0002 (D4)
+- Applies: REQ-033; STRAND-04 (in part)

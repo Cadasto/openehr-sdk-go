@@ -66,3 +66,7 @@ The public export shape (`template.Compile` / `template.Compiled`) is deferred u
 - **Negative (REQ-048 extension):** the emitted class set widens 125 → 139, so a caller that counted on 125 `KnownRMTypes()` entries breaks; and two questions stay open against the widened surface — [STRAND-12](../specifications/research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) (BMM-interface abstractness) and [STRAND-13](../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) (a property inherited from a primitive-mapped ancestor is dropped).
 - **Negative:** Two path resolution semantics, exact lookup (`NodeAt`) and tree walk (`Resolve`), both on the compiled template since [ADR 0035](0035-compile-step-reads-operational-template-model.md); the package doc states the difference.
 - **Negative:** Public API promotion requires a follow-up ADR amendment or supersession when `template.Compile` is exported.
+
+## Traceability
+
+- Applies: REQ-048, REQ-101, REQ-102

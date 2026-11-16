@@ -47,3 +47,8 @@ This **revises ADR 0005 §C2**: the re-export is `openehr/templatecompile.Compil
 - **Positive:** The introspection tree is fully navigable by downstream code (form generation, path discovery, custom mapping), and `Compiled`'s node-returning methods render real public types in the API docs.
 - **Negative:** Larger semver commitment — `CompiledNode` (~13 methods) and `CompiledAttribute` (~7) are now public contracts on an engine that is still young (reworked under REQ-104/105). Accepted by the owner; multi-language `Term` resolution is pre-flagged as the likely pre-1.0 change. Adding the types was non-breaking; future changes to them are breaking (pre-1.0 still permits them with a changelog note).
 - **Negative:** Two packages share the base name `templatecompile` (public `openehr/templatecompile`, internal `internal/templatecompile`). Files needing the engine-only helpers alias the internal one as `tcimpl`. The risk is cognitive only — type-alias identity means a mix-up cannot produce a type error.
+
+## Traceability
+
+- Amends: ADR-0005 (C2)
+- Applies: REQ-111

@@ -128,3 +128,7 @@ is no opt-in knob, and `WithRawErrorBodies` does not gate it.**
   leaf already returns (REQ-094 depends on that shape), and it would hand bytes back on the
   success path too, where they are redundant. The failure is the only occasion the bytes are
   needed, so the error is where they belong.
+
+## Traceability
+
+- Introduces: REQ-151

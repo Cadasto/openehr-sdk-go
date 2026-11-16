@@ -51,3 +51,8 @@ Go 1.27 ships `encoding/json/v2` and `encoding/json/jsontext` as ordinary standa
 - **`sonic`.** A JIT-assisted encoder with large throughput gains on x86-64. **Rejected:** a third-party dependency in the SDK's hottest correctness path, architecture-sensitive, and it addresses the performance axis while leaving every generated line in place. STRAND-04 keeps the two axes separate on purpose.
 - **`easyjson`.** Generated marshalers, which the SDK already has in its own generator. **Rejected:** it replaces one code-generation surface with another and adds a dependency to do it.
 - **A permanent split: migrate `openehr/rm` and leave `aom14` or the RM primitives on v1.** **Rejected:** [REQ-052](../specifications/wire.md#req-052) requires `openehr/aom/aom14` to classify decode failures "on the same terms as the canonical-JSON RM surface", and `transport.Decode` routes every 2xx body through `canjson.Unmarshal`. A permanent split leaves two decode-error taxonomies behind one sentinel set. Phasing the work across commits is fine; shipping the split is not.
+
+## Traceability
+
+- Resolves: STRAND-04 (the `encoding/json/v2` and default-codec sub-questions)
+- Amends: ADR-0002

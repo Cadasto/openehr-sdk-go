@@ -61,3 +61,8 @@ Two independent facts forced the decision now:
 - **Accept both *and* emit both.** Rejected: duplicate keys for one value invite divergence between them, double the surface every consumer must handle, and would make the codec non-idempotent unless the pair is always written in lockstep.
 - **Accept both on input, emit the reference's real paths.** Rejected: it is a breaking output change for existing consumers, and it contradicts the spec's own `ctx/` guidance. If parity on those keys is ever wanted, it belongs behind an explicit output-dialect option, not as a default flip.
 - **Prefer one spelling silently when both appear.** Rejected: a payload carrying two different languages is a defect in the payload, and guessing which is meant corrupts metadata invisibly.
+
+## Traceability
+
+- Amends: REQ-053
+- Applies: REQ-115, REQ-080

@@ -39,3 +39,7 @@ The lint is a pre-flight aid, not a conformance gate: **lint-clean does not impl
 - Spec fidelity and a clean rebase path are retained: a QUERY release bump re-imports `baseline/`, re-applies or drops each `SDK-AQL-NNN`, and re-runs `make aqlgen-check` (the ADR 0001 runbook spirit).
 - The Java toolchain runs only in Docker: it never enters `go build` or `go test`, and `make test` reaches it through the `antlr` image.
 - If a future need arises to drop the codegen container entirely, a pure-Go parser (participle) remains a documented fallback in the plan — at the cost of hand-maintaining the grammar.
+
+## Traceability
+
+- Applies: REQ-109

@@ -52,3 +52,8 @@ The Better camelCase variant and multi-version output are **not** produced (see 
 - **Support both references / multi-version output:** doubles the consumer-critical id surface and the conformance matrix for no current consumer demand — YAGNI. A second variant can be added additively if a consumer needs it.
 - **Invent our own id scheme:** defeats the purpose — FLAT-path interoperability with existing tooling requires mirroring a real implementation's ids; a bespoke scheme would be correct against nothing.
 - **Byte-exact parity with EHRbase:** rejected as the conformance bar — field ordering and optional-field presence are implementation incidentals; pinning them would make the SDK brittle to cosmetic reference changes without improving interop.
+
+## Traceability
+
+- Introduces: REQ-106
+- Applies: REQ-013, REQ-103, REQ-111

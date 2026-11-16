@@ -6,7 +6,7 @@ kind: guide
 
 Closed architecture decisions for `openehr-sdk-go`. Each ADR is a numbered Markdown file with the standard headings (Status, Context, Decision, Consequences). Its frontmatter (`id`, `title`, `status`, `date`) is the source of the index below, which `python3 scripts/sdd-check.py generate` writes. Status reaches **Accepted** before the ADR is considered closed.
 
-Open decisions (those that would be ADRs once resolved) live in this repo as **research strands** — [`docs/specifications/research-strands.md`](../specifications/research-strands.md). When a strand is resolved, an ADR lands here.
+Open decisions (those that would be ADRs once resolved) live in this repo as **research strands** — [`docs/specifications/research-strands.md`](../specifications/research-strands.md). When a strand is resolved, an ADR lands here, and the index's *Resolves / amends* column names the strand.
 
 <!-- sdd:generated adr-index -->
 
@@ -51,4 +51,4 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 
 <!-- /sdd:generated -->
 
-See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.
+The departures from the pinned REST contract that several of these ADRs decide are listed, each with the section that specifies it, in [wire.md § Keyed exceptions](../specifications/wire.md#keyed-exceptions).

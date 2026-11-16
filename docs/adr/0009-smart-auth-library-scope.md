@@ -100,3 +100,8 @@ Not evaluated in depth. `go-jose/v4` is the direct successor of `square/go-jose/
 - `auth.ScopeOfflineAccess` / `auth.ScopeOnlineAccess` are the canonical way to request a refresh token in authorization scope strings (REQ-063, `offline_access` / `online_access`).
 - The `FromOAuth2TokenSource` adapter and the issuer-matching multi-EHR helper remain open follow-ups with no blocking dependency.
 - STRAND-05 is closed.
+
+## Traceability
+
+- Resolves: STRAND-05
+- Amends: REQ-061, REQ-062, REQ-063, REQ-064

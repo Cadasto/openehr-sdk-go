@@ -35,3 +35,7 @@ The catalog records the Platform base URL and the OIDC issuer as two values. The
 - The resolver no longer refuses a document for naming another issuer, but by default it confirms that issuer against the issuer's own OIDC discovery document, at the cost of one extra fetch whenever the SMART document is fetched or a cached catalog is renewed on a `304`, when the two URLs differ; a fresh cache hit makes none ([auth.md § REQ-071](../specifications/auth.md#req-071)). A Platform whose authorization server publishes no `openid-configuration` (SMART App Launch does not require one) is refused until the caller turns the confirmation off.
 - The authorization request always carries `aud`. A source built without a catalog has to name its audience, which is a new construction error for callers that relied on omitting it.
 - Binding each authorization request to its issuer, which is what actually defends a multi-Platform client against mix-up, becomes possible with a stable issuer value; this decision does not deliver it.
+
+## Traceability
+
+- Amends: REQ-070, REQ-071, REQ-073, REQ-061, REQ-065

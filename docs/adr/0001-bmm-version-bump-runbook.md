@@ -53,3 +53,7 @@ The steps, roles and tooling are in [`resources/bmm/README.md` § Updating](../.
 - [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md) — normative conformance contract; § Schema → Go package set carries the version pins.
 - [`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml) — weekly drift bot implementation.
 - [`cmd/bmmdiff`](../../cmd/bmmdiff/) — semantic BMM diff CLI.
+
+## Traceability
+
+- Applies: REQ-041

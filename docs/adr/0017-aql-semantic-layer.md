@@ -96,3 +96,8 @@ contract unchanged.**
 - Later consumers (typed result columns, a template-derived FROM builder, per-engine capability
   profiles, the demographic overlay data) can build on the same relation without reopening this
   decision; each needs its own requirement before implementation.
+
+## Traceability
+
+- Introduces: REQ-160, REQ-161, REQ-162
+- Amends: REQ-109

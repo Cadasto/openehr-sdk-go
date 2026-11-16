@@ -113,3 +113,7 @@ The generator therefore reads a second pinned input beside `resources/bmm/`: the
 - [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md)
 - [`docs/architecture.md`](../architecture.md) — narrative companion
 - [`internal/bmmgen/`](../../internal/bmmgen/)
+
+## Traceability
+
+- Applies: REQ-041 (the mapping rules of retired REQ-043), REQ-056

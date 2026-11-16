@@ -46,3 +46,7 @@ The promise has a price. It constrains the codec: any encoder the SDK adopts mus
 - **Keep the profile as a requirement and satisfy it under any future codec.** Technically reachable: `json.Deterministic(true)` plus a `_type`-first emission gives it. **Rejected:** it preserves a promise no openEHR specification asks for, constrains every future codec choice, and leaves the probe suite testing encoder spelling instead of round-trip fidelity. `go doc encoding/json/v2.Deterministic` also warns that determinism holds "across different instances of identical binaries, but not across different builds of a program (such as different source or toolchain version, different GOOS/GOARCH, different build flags)", so the restated promise would be weaker than the one being withdrawn while reading identical.
 - **Keep the profile and publish a separate canonicalisation helper for consumers who hash.** **Rejected:** it is the withdrawn promise under a new name, and it puts the SDK in the business of defining a canonical form for a format whose specification defines none. RFC 8785 exists for consumers who need one.
 - **Downgrade the whole profile to a recommendation without touching the probes.** **Rejected:** the probes are where the promise is actually enforced. A recommendation that PROBE-030 still asserts byte-wise is a requirement with softer wording.
+
+## Traceability
+
+- Amends: REQ-052

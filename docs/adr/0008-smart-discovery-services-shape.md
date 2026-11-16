@@ -122,3 +122,8 @@ softened gate satisfies both camps: permissive by default, strict on demand.
   `spec_version: "1.0.3"`, which triggers the strict path.
 - The `acceptedVersionsLocked` sentinel is an implementation detail of
   `resolverConfig`; it is not exposed in the public API.
+
+## Traceability
+
+- Amends: REQ-072 (the version gate)
+- Applies: REQ-070

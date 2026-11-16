@@ -142,3 +142,8 @@ reduced set.
 - **Setters on `Locatable` itself** (single interface): silently removes value-type
   satisfaction of `Locatable` — a subtle behavioural break for existing code holding values;
   rejected in favour of the getter/setter split.
+
+## Traceability
+
+- Amends: REQ-031, REQ-040, REQ-043
+- Applies: REQ-013, REQ-014, REQ-024, REQ-042, REQ-044

@@ -59,3 +59,8 @@ which file a second implementation (or a reviewer) can treat as the recording.
   drift, and REQ-082 discards a recording whose provenance cannot be stated
   ([conformance.md § Cassette mode](../specifications/conformance.md#cassette-mode)).
   One artefact cannot lose its attestation.
+
+## Traceability
+
+- Resolves: STRAND-11
+- Amends: REQ-082

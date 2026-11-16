@@ -99,3 +99,8 @@ UTC is the one deterministic, reproducible choice, and the departure from the ov
 - [`resources/its-rest/definition-validation.openapi.yaml`](../../resources/its-rest/definition-validation.openapi.yaml) — the `TemplateMetadata` (`:509`, `:521-522`) and `StoredQuery` (`:3872`, `:3882-3884`) pin declarations.
 - [`resources/its-rest/overview-validation.openapi.yaml`](../../resources/its-rest/overview-validation.openapi.yaml) — the *Datetime format* note (`:675`).
 - [`openehr/client/definition/template.go`](../../openehr/client/definition/template.go), [`openehr/client/definition/stored_query.go`](../../openehr/client/definition/stored_query.go) — the two descriptors this decision reaches.
+
+## Traceability
+
+- Introduces: REQ-144
+- Amends: REQ-095 (retired into REQ-050)
