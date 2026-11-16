@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	mrand "math/rand/v2"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -16,12 +17,8 @@ const roundingSeeds = 40
 // optQuantityValue is an ELEMENT template whose value is a C_DV_QUANTITY
 // with the given list entries.
 func optQuantityValue(entries ...string) string {
-	body := ""
-	for _, e := range entries {
-		body += e
-	}
 	return optTemplate("ELEMENT", optSingle("value",
-		`<children xsi:type="C_DV_QUANTITY"><rm_type_name>DV_QUANTITY</rm_type_name><node_id></node_id>`+body+`</children>`))
+		`<children xsi:type="C_DV_QUANTITY"><rm_type_name>DV_QUANTITY</rm_type_name><node_id></node_id>`+strings.Join(entries, "")+`</children>`))
 }
 
 // quantityEntry is a C_DV_QUANTITY list entry in units whose magnitude
