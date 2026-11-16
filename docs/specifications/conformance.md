@@ -69,14 +69,17 @@ The `cadasto/` extras have no openEHR specification: their wire contract is the 
 - Probes borrow `transport`'s sentinel taxonomy (REQ-093) but **bypass** `transport.Client.Do` — no openEHR error-envelope decoding, no OTel spans, no retries. Use `openehr/client/admin` when those concerns matter.
 - **Bounded drain.** A probe drains the 2xx body `Live` and `Ready` discard, and any body that is not 2xx, so the connection can be reused. It **MUST** read at most a fixed number of bytes of that body, for at most a fixed time, before closing it: a body that never ends, streamed fast or trickled, **MUST NOT** hold a probe until its context ends. A `ReadyBody` 2xx body is read under *The readiness body* below instead.
 
-**The readiness body.** A readiness endpoint often answers with a small document that names the service and its version, and `Ready` discards it. `ReadyBody` sends the request `Ready` sends, takes the same options, and has `Ready`'s path guard and status mapping; on a 2xx it **MUST** return the response body instead of `nil`.
+##### The readiness body
+
+A readiness endpoint often answers with a small document that names the service and its version, and `Ready` discards it.
+`ReadyBody` sends the request `Ready` sends, takes the same options, and has `Ready`'s path guard and status mapping; on a 2xx it **MUST** return the response body instead of `nil`.
 
 - **Bounded read.** `ReadyBody` **MUST** cap the bytes it reads from the body. The default limit is `DefaultMaxReadyBody` (1 MiB). `WithMaxReadyBody(n)` overrides it with the values [§ REQ-093](transport.md#req-093--openehr-error-envelope-mapping) *Bounded response reads* gives `transport.WithMaxResponseBody`: `0` means the default, a positive value sets the limit, a negative value disables it. `Ready` reads no body it returns, so the option does not change it.
 - **Read failures.** A 2xx body longer than the limit **MUST** fail with an error that `errors.Is` matches to `transport.ErrResponseTooLarge` and whose text names the limit. Any other 2xx body that cannot be read **MUST** fail with an error that unwraps to the read failure, such as `io.ErrUnexpectedEOF` for a connection cut mid-body. Either failure **MUST** return no bytes: a partial body is not the document.
 - **Value-free text.** The text of these read-failure errors **MUST NOT** carry a body byte, a header value or the read failure's own text, which can quote bytes the server sent, as [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) *`Error()` stays value-free* holds for `transport.BodyReadError`. The limit is the caller's own setting, not a payload value.
 - **Non-2xx.** A status that is not 2xx returns no bytes, beside the error the status mapping gives `Ready`.
 
-**Acceptance.**
+#### Acceptance
 
 - A 2xx readiness response with the body `{"status":"UP","version":"1.2.3"}` makes `ReadyBody` return exactly those bytes; `ReadyBody` with `WithReadyPath("/ehrbase/rest/status")` sends its `GET` to that path at the origin, with no `Authorization` header.
 - A 2xx body of exactly `n` bytes under `WithMaxReadyBody(n)` is returned whole; one byte more returns no bytes and an error matching `transport.ErrResponseTooLarge` whose text names `n`. Without the option, a body over `DefaultMaxReadyBody` fails the same way.
