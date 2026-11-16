@@ -12,6 +12,7 @@ package simplified
 // itself, and the Web Template stays the reference's.
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -212,10 +213,18 @@ func emitSampleCount(out map[string]any, flatPath string, ev rm.IntervalEvent[rm
 
 // emitIntervalAttrs writes ev, an INTERVAL_EVENT at the abstract EVENT node or
 // the OBSERVATION node that folds it in, as node's [codecLeaf] spellings and
-// `|sample_count` under flatPath.
+// `|sample_count` under flatPath. Where a child of node has the id of one of
+// those leaves, the key is the child's, and decode reads it as the child, so
+// the attribute, which an INTERVAL_EVENT always holds, has no key: it is
+// refused, wrapping [ErrUnsupportedDatatype], rather than written where it
+// would be read as the child or dropped.
 func emitIntervalAttrs(out map[string]any, node *webtemplate.Node, flatPath string, ev rm.IntervalEvent[rm.ItemStructure], root rm.Locatable, rootAql string, sib *reusedSiblings) error {
 	emitSampleCount(out, flatPath, ev)
 	for _, id := range []string{mathFunctionSeg, widthSeg} {
+		if childByID(node, id) != nil {
+			return fmt.Errorf("%w: %q is the key of a child of its node, so the INTERVAL_EVENT's %s has no key there",
+				ErrUnsupportedDatatype, flatPath+"/"+id, id)
+		}
 		if err := emitNode(out, codecLeaf(node, id), flatPath, root, rootAql, sib); err != nil {
 			return err
 		}

@@ -10,14 +10,18 @@ import (
 	"bytes"
 	"errors"
 	"maps"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // The FLAT paths of the three positions, on the Vital signs CKM,
@@ -455,6 +459,48 @@ func TestREQ053ObservationWithEventNodeReadsNoIntervalAttributes(t *testing.T) {
 		_, err := simplified.UnmarshalFlat(mustJSON(t, spoBody(map[string]any{key: "PT1H"})), wt, simplified.WithStrict())
 		if !errors.Is(err, simplified.ErrUnknownPath) || !strings.Contains(err.Error(), "unmatched content") {
 			t.Errorf("UnmarshalFlat(%s, strict) = %v, want it refused as unmatched content", key, err)
+		}
+	}
+}
+
+// TestREQ053IntervalAttributeKeyTakenByAChildIsRefused — REQ-053. Where the
+// node an INTERVAL_EVENT's attributes are spelled at, here the OBSERVATION
+// that folds the event in, has a child whose id is `width`, the key is the
+// child's, and decode reads it as the child. Encode then has no key for the
+// event's width: it refuses the event with ErrUnsupportedDatatype naming the
+// key, rather than write the width where decode reads the child or drop it.
+// A POINT_EVENT, which has no width, encodes, and its child round-trips.
+func TestREQ053IntervalAttributeKeyTakenByAChildIsRefused(t *testing.T) {
+	raw, err := os.ReadFile(fixtures.TemplateOpt("clinical_notes.v0"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const story = `<items id="text">Story</items>`
+	if n := strings.Count(string(raw), story); n != 1 {
+		t.Fatalf("clinical_notes.v0 holds %q %d times, want once", story, n)
+	}
+	model, err := aom14.ReadOperationalTemplate(strings.NewReader(strings.Replace(string(raw), story, `<items id="text">Width</items>`, 1)))
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	wt, compiled := compileTemplate(t, "clinical_notes.v0", model)
+	body := cdrBody(map[string]any{storyObs + "/width:0": "Narrow", storyObs + "/time": "2026-10-26T09:00:00Z"})
+
+	point := decodeWith(t, wt, body, simplified.WithStrict(), simplified.WithTemplate(compiled))
+	back := decodeAs(t, "FLAT", mustJSON(t, flatOf(t, point, wt)), wt, simplified.WithStrict(), simplified.WithTemplate(compiled))
+	if !bytes.Equal(canonicalComposition(t, back), canonicalComposition(t, point)) {
+		t.Errorf("a POINT_EVENT beside the width child did not round-trip:\n%s\nwant\n%s", canonicalComposition(t, back), canonicalComposition(t, point))
+	}
+
+	body[storyObs+"|sample_count"] = 2
+	interval := decodeWith(t, wt, body, simplified.WithStrict(), simplified.WithTemplate(compiled))
+	intervalEvent(t, onlyEvent(t, wt, interval, "story_history"))
+	key := strconv.Quote(storyObs + "/width")
+	for name, marshal := range map[string]func(*rm.Composition, *webtemplate.WebTemplate) ([]byte, error){
+		"FLAT": simplified.MarshalFlat, "STRUCTURED": simplified.MarshalStructured,
+	} {
+		if _, err := marshal(interval, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) || !strings.Contains(err.Error(), key) {
+			t.Errorf("Marshal%s of an INTERVAL_EVENT whose width key a child takes = %v, want ErrUnsupportedDatatype naming %s", name, err, key)
 		}
 	}
 }

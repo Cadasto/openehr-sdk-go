@@ -126,7 +126,10 @@ Concretely:
   at the OBSERVATION, `<observation>/width`, `<observation>/math_function` and
   `<observation>|sample_count`, as the reference writes them, and read and written there as
   at an EVENT node (since 2026-11-16, issue 456); before, decode reported them as unmatched
-  content and encode dropped an INTERVAL_EVENT's three there. Each is
+  content and encode dropped an INTERVAL_EVENT's three there. Where the node has a child whose
+  id is `math_function` or `width`, the key is the child's, and decode reads it as the child:
+  encode then refuses an INTERVAL_EVENT there with `ErrUnsupportedDatatype` naming the key,
+  where it wrote the attribute at the child's key. Each is
   single-valued, so an index past `:0` on it is refused whatever follows it, and a segment
   below it is unmatched content, as below any leaf. Until
   then decode refused all four in every mode. Each other spelling of them
