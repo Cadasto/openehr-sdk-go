@@ -66,7 +66,7 @@ Rules:
 - `Token.Value` is opaque to `transport/`: transports **MUST** forward it as `Authorization: <Type> <Value>` without inspecting either half — there is no scheme allowlist, so a scheme this SDK has no provider for (`DPoP`, …) reaches the wire verbatim.
   When `Type` is empty, `transport/` **MUST** treat it as `Bearer`.
   A **zero** `Token` (no value and no type — `auth.Token.IsZero`) is the anonymous case and **MUST** suppress the `Authorization` header entirely rather than emit an empty scheme or an empty credential; `auth.AnonymousTokenSource` is the sanctioned way to ask for it, and it is `transport/`'s default token source.
-- A `TokenSource` **MAY** be stateful (caching, refresh) but **MUST** be safe for concurrent use (REQ-026).
+- A `TokenSource` **MAY** be stateful (caching, refresh) but **MUST** be safe for concurrent use ([idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026), which also says how the SDK's own sources coalesce a refresh).
 
 Printing or logging a value of the `auth/` packages, of `smart`, of `smart/discovery` or of `transport` that holds a credential **MUST NOT** show the credential, with any `fmt` verb (`%v`, `%+v`, `%#v`, `%s` and `%d` included) or any `log/slog` handler.
 This covers:
@@ -86,16 +86,12 @@ The other fields, such as the token type, expiry, scope, issuer, client ID and U
 A `smart.LaunchContext` or `smart.PrincipalIdentity` value copied out of its pointer prints as the pointer does, but the `log/slog` JSON handler encodes its fields, tokens included, so logging such a value through that handler is outside this rule too: log the pointer.
 The JSON encoding of these types is unchanged and carries the credential, so an application can store a token, a `TokenChange` or an `AuthorizationRequest` and read it back.
 
-The coalesced refresh in `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` is race-free: the goroutine that refreshes stores the token before it closes the channel the other callers wait on, so under the Go memory model every waiter reads the stored result.
-When a waiter tries again is [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026)'s rule.
-
 #### Credential-bearing requests
 
 The token, refresh and revocation requests of `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` carry a credential, and they **MUST NOT** be redirected, whatever `CheckRedirect` the injected `HTTPClient` has, so a 307 or 308 cannot carry a refresh token, a client secret or a client assertion to another URL.
 A 3xx response **MUST** fail like any other non-2xx answer, with an `*auth.ExchangeError` that carries the status code and matches `auth.ErrTokenExchangeFailed`, `auth.ErrRefreshFailed` or `auth.ErrRevocationFailed`, as the request's own class says.
 
-The SDK sends each of these requests with a copy of the injected client whose redirect policy returns a 3xx response instead of following it, and leaves the injected client as it is.
-The copy keeps the injected client's `Transport`, `Jar` and `Timeout`, so it stays within [REQ-021](idiom.md#http-client-injection-req-021).
+The SDK sends them through a copy of the injected client that returns a 3xx response instead of following it, one of the copies [idiom.md § REQ-021](idiom.md#http-client-injection-req-021) allows.
 
 #### Provider sub-packages
 
@@ -113,10 +109,7 @@ Further providers, such as plain OIDC or a session cookie, can be added as sub-p
 
 #### Per-request TokenSource
 
-A process that serves many users, such as an MCP server or a multi-tenant backend, gives each request a source for a token issued for the openEHR API on behalf of the user that request serves, for example by an OAuth 2.0 token exchange ([RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)) at the openEHR server's authorization server.
-An MCP server never passes on the token it received from its own MCP client: the MCP specification forbids it in [Authorization § Access Token Usage › Token Handling](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization) and in [Security Considerations § Access Token Privilege Restriction](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/security-considerations).
-
-Such a process attaches a per-request `TokenSource` rather than configuring one at client-construction time:
+A process that serves many users, such as an MCP server or a multi-tenant backend, attaches to each request a `TokenSource` for that request's user, rather than configuring one at client-construction time:
 
 ```go
 // package auth (sketch)
@@ -177,8 +170,9 @@ For a confidential client, `auth/smart` **MUST** send the PKCE `code_challenge` 
 The openEHR SMART specification's Flow Recommendations present the two as alternatives; this SDK follows HL7 SMART.
 
 The openEHR SMART specification names a "JWT Bearer Token Grant" as the preferred flow for backend services.
-HL7 SMART App Launch Backend Services, which that specification builds on, uses the `client_credentials` grant with an RFC 7523 §2.2 client assertion, and that is the flow `auth/clientcreds` with `WithClientAssertion` implements.
-The RFC 7523 §2.1 authorization grant in `auth/jwtbearer` is a separate flow for deployments that issue authorization assertions; it is not SMART Backend Services.
+HL7 SMART App Launch Backend Services, which that specification builds on, uses the `client_credentials` grant with an RFC 7523 §2.2 client assertion, a JWT that authenticates the client, and that is the flow `auth/clientcreds` with `WithClientAssertion` implements.
+The RFC 7523 §2.1 authorization grant in `auth/jwtbearer` (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`), whose JWT is the grant itself, is a separate flow for deployments that issue authorization assertions; it is not SMART Backend Services.
+Both flows sign with `jwtbearer.AssertionSource` and `jwtbearer.ClaimsSigner`.
 
 #### Client-assertion signing algorithms
 
@@ -194,7 +188,6 @@ The SDK's `auth/jwtbearer.ClaimsSigner` implements this baseline:
 
 `NewClaimsSigner` checks the key when it builds the signer and refuses with `auth.ErrInvalidConfig` a key whose type does not fit the algorithm, such as ES384 with an RSA key, and an RSA key under 1024 bits, which `crypto/rsa` refuses to sign with.
 An opaque `crypto.Signer`, such as a KMS or HSM handle, works for RSA and ECDSA alike.
-The SDK delegates the signing and its JOSE encoding, the ECDSA `r‖s` form included, to `github.com/go-jose/go-jose/v4`.
 
 #### Authorization Code with asymmetric client auth — `private_key_jwt`
 
@@ -229,20 +222,14 @@ A confidential client **MUST NOT** send `client_id` as a form field in the code 
 
 ##### Method cross-check against discovery
 
-When the authorization server advertises `token_endpoint_auth_methods_supported` (RFC 8414), `FromConfig` cross-checks the method implied by the configured credential against that list.
-If the list is non-empty and does **not** contain the resolved method (`private_key_jwt` when a signer is set; for a symmetric secret, `client_secret_basic` by default or `client_secret_post` when only the post method is advertised), construction fails fast with `auth.ErrInvalidConfig` rather than deferring the failure to a rejected token request.
-When the list is empty or absent, the check is skipped (the server has not constrained the method).
+`FromConfig` cross-checks the method the configured credential implies against the advertised `token_endpoint_auth_methods_supported` (RFC 8414): `private_key_jwt` when a signer is set; for a symmetric secret, `client_secret_basic` by default or `client_secret_post` when only the post method is advertised.
+A non-empty list that does **not** contain that method fails construction with `auth.ErrInvalidConfig`, rather than deferring the failure to a rejected token request.
+An empty or absent list skips the check, since the server has not constrained the method.
 
 #### Backend Services asymmetric client auth — `client_credentials` + `client_assertion`
 
-The HL7 SMART [Backend Services](https://hl7.org/fhir/smart-app-launch/backend-services.html) profile specifies that a backend service authenticates at the token endpoint with:
-
-- `grant_type=client_credentials`
-- `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`
-- A freshly signed `client_assertion` JWT (RFC 7523)
-- **No** HTTP Basic `Authorization` header and **no** `client_secret`
-
-`auth/clientcreds` implements this with `WithClientAssertion(src jwtbearer.AssertionSource)`: every token exchange asks `src` for a fresh assertion, adds the two `client_assertion*` form fields, and omits Basic auth and `client_secret`.
+`auth/clientcreds` implements the client authentication of HL7 SMART [Backend Services](https://hl7.org/fhir/smart-app-launch/backend-services.html) with `WithClientAssertion(src jwtbearer.AssertionSource)`.
+Every token exchange (`grant_type=client_credentials`) asks `src` for a fresh assertion, sends it as `client_assertion` with `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`, and sends no HTTP Basic `Authorization` header and no `client_secret`.
 A signing error fails the exchange with an error matching `auth.ErrTokenExchangeFailed`.
 
 `auth/jwtbearer` **MUST** provide `NewClientAssertion(clientID, tokenURL string, signer crypto.Signer, alg, kid string) (*ClaimsSigner, error)`, which builds the assertion source of the HL7 SMART asymmetric profile: `iss = sub = clientID`, `aud = tokenURL`, `typ: JWT`, a unique `jti`, and an `exp` five minutes after issue.
@@ -250,10 +237,6 @@ It **MUST** fail with `auth.ErrInvalidConfig`, never with a panic, when an argum
 For the signer, empty means nil, a nil RSA or ECDSA private key, or a signer whose `Public` method panics or reports no usable public key (nil, or an RSA or ECDSA public key without its modulus or curve).
 An RSA key under 1024 bits, the minimum `crypto/rsa` signs with, does not fit `RS256` or `RS384`; its size is read from the signer's public key, so an opaque signer is checked as a standard-library key is.
 `auth/smart` builds its own client assertion with it.
-
-**Distinction from `auth/jwtbearer`:** `auth/jwtbearer` implements the separate RFC 7523 _JWT Bearer Token Grant_ (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`) — the JWT is the _authorization grant_ itself.
-`auth/clientcreds` with `WithClientAssertion` uses `grant_type=client_credentials` — the JWT is the _client authentication credential_.
-Both use `jwtbearer.AssertionSource` / `jwtbearer.ClaimsSigner` for signing.
 
 **Configuration rules** (enforced at `FromConfig`):
 
@@ -266,7 +249,7 @@ Both use `jwtbearer.AssertionSource` / `jwtbearer.ClaimsSigner` for signing.
 
 ##### Backend Services from a resolved catalog
 
-`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, clientSecret, opts...)` for SMART Backend Services against a resolved catalog, configured as the **Configuration rules** table above says, which rejects with `auth.ErrInvalidConfig` a client secret given together with a client assertion, and a configuration with neither.
+`auth/clientcreds` **MUST** provide `NewFromCatalog(catalog, clientID, clientSecret, opts...)` for SMART Backend Services against a resolved catalog, configured as the **Configuration rules** table above says.
 It **MUST** fail with `auth.ErrInvalidConfig` when the catalog is nil or names no token endpoint, and otherwise post to the token endpoint in `catalog.Auth.TokenEndpoint` and record `catalog.Issuer` on the tokens it produces, unless the caller passes `WithIssuer`, whose issuer then wins.
 When the catalog advertises the corresponding list, construction **MUST** fail with `auth.ErrInvalidConfig` when:
 
@@ -278,11 +261,10 @@ When the catalog advertises the corresponding list, construction **MUST** fail w
 
 #### Advertised metadata lists
 
-Three checks compare the configuration with a list the authorization server advertises: the PKCE check of [§ REQ-061](#req-061--pkce-flow) (`code_challenge_methods_supported`), the signing-algorithm check of `WithClientAssertionKey` and the list checks of `NewFromCatalog` above.
+Several construction checks compare the configuration with a list the authorization server advertises; [§ Authorization-server metadata](#authorization-server-metadata) names the list each one reads.
 A list constrains construction only when it is present and not empty, since a hand-built catalog commonly omits these lists.
 The signing-algorithm list constrains only a client assertion that the SDK's own `jwtbearer.ClaimsSigner` produces, since the SDK cannot inspect the algorithm of any other `jwtbearer.AssertionSource`.
-For these three checks, an absent or empty list, and the signing-algorithm list for any other assertion source, **MUST NOT** fail construction.
-The `auth/smart` method cross-check ([§ Method cross-check against discovery](#method-cross-check-against-discovery)) reads its list the same way: it fails construction only on a non-empty list that lacks the resolved method.
+For the PKCE check of [§ REQ-061](#req-061--pkce-flow), the signing-algorithm check of `WithClientAssertionKey` and the list checks of `NewFromCatalog`, an absent or empty list, and the signing-algorithm list for any other assertion source, **MUST NOT** fail construction.
 The SDK **MUST NOT** choose a signing algorithm from a list: a `jwtbearer.ClaimsSigner` signs with the algorithm it was built with.
 
 #### Launch modes
@@ -293,7 +275,7 @@ The SDK supports three launch modes ([§ REQ-068](#req-068--flow-and-launch-mode
 |---|---|
 | **Standalone** | The SDK initiates the launch by redirecting the user to the authorization endpoint. No EHR-side launch parameter. |
 | **Embedded** (iFrame) | The SDK is launched from inside an EHR or portal that has already authenticated the user; the EHR provides a `launch` parameter that the SDK forwards to the authorization endpoint to obtain launch context. |
-| **Backend service** | No user interaction. Three confidential backend flows: `auth/clientcreds` with a client assertion (`client_credentials` + signed `client_assertion`, no Basic, no `client_secret` — SMART Backend Services), and, outside the SMART asymmetric profile, `auth/clientcreds` with a symmetric `client_secret` (HTTP Basic) and `auth/jwtbearer` (the RFC 7523 §2.1 JWT Bearer authorization grant, not a SMART flow). No launch context. |
+| **Backend service** | No user interaction and no launch context: the three backend flows of the table above, `auth/clientcreds` with a client assertion or a `client_secret`, and `auth/jwtbearer`. |
 
 The launch mode follows from the configuration at construction time.
 An application can also choose it per call, as an MCP server that accepts standalone and embedded launches from different transports does.
@@ -304,28 +286,20 @@ An application can also choose it per call, as an MCP server that accepts standa
 
 `auth/smart` **MUST** implement the SMART App Launch flow with PKCE (RFC 7636), adapted for openEHR-specific scope syntax and launch context.
 
-The flow (standalone launch, summarised):
+A launch runs through three calls of the source:
 
-1. **Discovery.** Fetch the SMART configuration document from the Platform base URL's well-known URL (see [§ Service discovery](#service-discovery)).
-   Extract `authorization_endpoint`, `token_endpoint`, `jwks_uri` and `scopes_supported`.
-2. **PKCE pair.** Generate a `code_verifier` (cryptographically random, 43–128 chars per RFC 7636) and derive `code_challenge` = `S256(code_verifier)`.
-3. **Authorization request.** Redirect the user to `authorization_endpoint` with `response_type=code`, `client_id`, `redirect_uri`, `scope` (for openEHR resources, the [REQ-165](#req-165--openehr-scope-syntax) shape `<compartment>/<resource>-<pattern>.<permissions>`, e.g. `patient/composition-*.rs`), `aud` (the Platform base URL, which is the `iss` of an embedded launch, or an explicit audience identifier), `state`, `code_challenge`, `code_challenge_method=S256`, plus SMART-specific `launch` parameter if EHR-launch.
-4. **Authorization response.** Receive the redirect at the redirect URI and complete it with `CompleteAuthorization` (§ Completing the authorization below), which checks `state`, the RFC 9207 `iss` and an error response before any token-endpoint call.
-5. **Token exchange.** POST to `token_endpoint` with `grant_type=authorization_code`, `code`, `redirect_uri`, `code_verifier`, and `client_id` for a public client (a confidential client authenticates instead; § REQ-068).
-   Receive `access_token`, `refresh_token` (if granted), `expires_in`, `scope`, plus SMART-specific `patient`, `encounter`, `id_token`, etc.
-6. **Launch context capture.** Surface the SMART launch parameters to the application via `smart/` (see § Launch context below).
-7. **Use.** Subsequent requests carry the access token as `Authorization: Bearer …`; the SDK's `TokenSource` implementation refreshes transparently (REQ-063).
+1. `BeginAuthorization` generates the PKCE pair, the `state` and, with `openid`, the nonce, and records them on the `AuthorizationRequest` it returns.
+2. `AuthorizeURL` builds the authorization-endpoint URL from that request.
+3. `CompleteAuthorization` checks the redirect and exchanges the code ([§ Completing the authorization](#completing-the-authorization)).
 
 The PKCE implementation **MUST**:
 
 - Use `S256` as the challenge method; `plain` is prohibited.
 - Generate cryptographically random verifiers.
 - **Generate or validate OAuth `state`.** When the application calls `BeginAuthorization` with an empty `state`, the SDK **MUST** generate a cryptographically random value (minimum 32 bytes before base64url encoding).
-  When exchanging the authorization code, the SDK **MUST** refuse a callback whose `state` differs from the value sent in step 3 with `ErrLaunchInvalidState`, **before** any token-endpoint call.
+  When exchanging the authorization code, the SDK **MUST** refuse a callback whose `state` differs from the request's `State` with `ErrLaunchInvalidState`, **before** any token-endpoint call.
 - **Refuse a server that cannot verify `S256`.** When the authorization server advertises `code_challenge_methods_supported` and the list does not contain `S256`, constructing the `auth/smart` source **MUST** fail with `auth.ErrInvalidConfig` (HL7 SMART App Launch requires servers to support `S256`; RFC 9700 §2.1.1 makes PKCE support detectable from this metadata).
   [§ Advertised metadata lists](#advertised-metadata-lists) covers an absent or empty list.
-
-The verifier comes from the RFC 7636 helper of `golang.org/x/oauth2`, and the state and the nonce from `crypto/rand`.
 
 The authorization request **MUST** carry `aud` (HL7 SMART App Launch lists it as required; the openEHR SMART specification does not define its value).
 A source built from a resolved catalog **MUST** default `aud` to the catalog's `BaseURL` when the caller sets no audience; constructing a source that has no audience at all **MUST** fail with `auth.ErrInvalidConfig`.
@@ -342,7 +316,7 @@ A request without `State` or a PKCE verifier **MUST** fail with `auth.ErrInvalid
 A callback that repeats `state`, `iss`, `code` or `error` **MUST** fail with `ErrAuthorizationRejected` (RFC 6749 §3.1 forbids a repeated response parameter).
 The checks **MUST** run in this order:
 
-1. The `state` check of the PKCE rules above: a mismatch fails with `ErrLaunchInvalidState`.
+1. The `state` check of the PKCE rules above.
 2. **The issuer (RFC 9207).** The issuer check applies when the callback carries a non-empty `iss` or the authorization server advertises `authorization_response_iss_parameter_supported: true`.
    An empty `iss` counts as absent, and without either the check **MUST NOT** run.
    When the check applies and the request's `Issuer` is empty, the call **MUST** fail with `auth.ErrInvalidConfig`, not `ErrLaunchIssuerMismatch`, because there is nothing to compare with.
@@ -359,24 +333,17 @@ Otherwise it **MUST** fail with `ErrLaunchIssuerNotAllowed` when `allow` is nil 
 
 ### REQ-062 — JWKS rotation
 
-#### Algorithm allowlists
-
-The SMART discovery resolver surfaces two algorithm-selection lists onto `AuthEndpoints` (REQ-070):
-
-- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`): the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`).
-  `auth/smart` and `auth/clientcreds.NewFromCatalog` check a client assertion's algorithm against it, as [§ REQ-068](#req-068--flow-and-launch-mode-coverage) and its [§ Advertised metadata lists](#advertised-metadata-lists) set out.
-- **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`): the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`).
-  ID-token verification (REQ-064) uses this list as its allowlist when present ([§ ID-token verification](#id-token-verification)).
-
 The SDK verifies ID tokens against the deployment's published JWKS, which it fetches on first use and caches.
 A lookup **MUST** fetch the set again once the cached one is older than a positive `JWKS.TTL`, and that TTL **SHOULD** default to five minutes, so a key the authorization server withdraws stops verifying tokens within that time.
 On a verification miss (a `kid` not in the cache, or a token without a `kid` whose signature the cached signing key does not verify), the SDK **MUST** refresh the JWKS once before reporting the verification as failed, which handles a silent rotation by the authorization server, unless it fetched the cached set less than `JWKS.MinRefreshInterval` ago.
-Within that interval the SDK **MUST NOT** fetch the set: it reports a `kid` miss as a failure, and verifies a token without a `kid` once more against the signing key the cache then holds, which another lookup's fetch may have replaced, so tokens that name unknown `kid`s, or carry signatures the cached key does not verify, cannot make it fetch the set for each of them.
+Within that interval the SDK **MUST NOT** fetch the set: it reports a `kid` miss as a failure, and verifies a token without a `kid` once more against the signing key the cache then holds, which another lookup's fetch may have replaced.
+So tokens that name unknown `kid`s, or carry signatures the cached key does not verify, cannot make it fetch the set for each of them.
 The interval **SHOULD** default to 30 seconds; zero or a negative value sets no minimum.
 A set older than a positive `JWKS.TTL` is fetched again whatever the interval.
 Concurrent refreshes share one fetch ([idiom.md § Concurrency](idiom.md#concurrency-req-026)).
 
-When an ID token's header carries no `kid`, the SDK **MUST** verify it with the set's only signing key, a key published without a `kid` included, when the set holds exactly one key whose `use`, if present, is `sig`, and **MUST** reject the token otherwise (OpenID Connect Core 1.0 §10.1 lets an issuer omit `kid` only when its set holds one signing key).
+When an ID token's header carries no `kid`, the SDK **MUST** verify it with the set's only signing key, a key published without a `kid` included, when the set holds exactly one key whose `use`, if present, is `sig`, and **MUST** reject the token otherwise.
+OpenID Connect Core 1.0 §10.1 lets an issuer omit `kid` only when its set holds one signing key.
 
 A key whose `use` is present and is not `sig` **MUST NOT** verify an ID token, also when the token's `kid` names it: the SDK looks a `kid` up only among the set's signing keys, so such a token is refused as a `kid` the set does not hold.
 A key that publishes an `alg` **MUST NOT** verify a token whose header names another `alg` (RFC 8725 §3.1).
@@ -386,7 +353,6 @@ Both refusals are decided on the token, so they match `auth.ErrJWKSValidationFai
 
 `auth/smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim rules.
 The code exchange and the refresh verify the ID token they receive with it (§ REQ-064), and the top-level `smart` package re-exports it together with `IDTokenClaims`.
-The SDK delegates signature verification and JWK parsing to `github.com/coreos/go-oidc/v3`, which uses `go-jose/v4`.
 
 - **Supported algorithms:** the SDK **MUST** support `RS256`, `RS384`, `ES256` and `ES384`, and **MUST NOT** treat any other algorithm as supported.
   RS384/ES384 are the HL7 SMART asymmetric baseline; RS256/ES256 cover the widely deployed remainder.
@@ -410,26 +376,19 @@ The SDK delegates signature verification and JWK parsing to `github.com/coreos/g
 
 ### REQ-063 — Token refresh
 
-**Requesting a refresh token.** The authorization server grants a `refresh_token` only when the authorization request includes the appropriate offline-access scope.
-Per HL7 FHIR SMART App Launch v2 "Scopes and Launch Context" ([https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/)):
-
-- Include `offline_access` in the scope list to request a refresh token that persists beyond the current browser session.
-- Include `online_access` to request a refresh token scoped to the current online session only.
-
-The SDK provides `auth.ScopeOfflineAccess` and `auth.ScopeOnlineAccess` constants for composing these scope strings via `auth.JoinScopes`.
-These constants are lexical only — whether the server honours the request depends on the deployment's policy.
+An application asks for a refresh token with the SMART scope `offline_access` or `online_access`, which `auth.ScopeOfflineAccess` and `auth.ScopeOnlineAccess` name for `auth.JoinScopes`; whether the server grants one is the deployment's policy.
 
 The `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` token sources **MUST** proactively renew an access token when its `ExpiresAt` is within the refresh threshold of `time.Now()`: `auth/smart` with its refresh token, the other two with a new exchange, as their grants issue no refresh token.
 `WithRefreshThreshold(d time.Duration)` configures it on each of them: a `d` of 0 **MUST** select the default, and a negative `d` **MUST** count as 0, so a token past its `ExpiresAt` is never served.
 The default **SHOULD** be 30 seconds, which leaves a request time to reach the resource server before its token expires.
 
-A token response whose `expires_in` is zero or below **MUST** give the access token a lifetime of zero seconds (RFC 6749 §5.1): its `ExpiresAt` is the time the response arrived, so the source hands that token to the call that obtained it and the next `Token` call renews it, or, for an `auth/smart` source that holds no refresh token, returns `auth.ErrReauthRequired` without a request.
-A response without `expires_in`, or with `null`, **MUST** leave `ExpiresAt` zero, so the token has no declared expiry, unless the source has a maximum token lifetime (below).
+A token response whose `expires_in` is zero or below **MUST** give the access token a lifetime of zero seconds (RFC 6749 §5.1): its `ExpiresAt` is the time the response arrived.
+The source hands that token to the call that obtained it, and the next `Token` call renews it, or, for an `auth/smart` source that holds no refresh token, returns `auth.ErrReauthRequired` without a request.
+A response without `expires_in`, or with `null`, **MUST** leave `ExpiresAt` zero, so the token has no declared expiry, unless the source has a maximum token lifetime ([§ A maximum token lifetime](#a-maximum-token-lifetime)).
 `auth/smart.TokenResponse.HasExpiresIn` tells a response without `expires_in` from one whose `expires_in` is 0.
 A zero-lifetime token is past its `ExpiresAt` at once, so the transient-failure backoff below never serves it in place of a failure: a `Token` call that finds it renews it, sharing a renewal already in flight, where the source can renew it, as for any token past its `ExpiresAt`, and no renewal is sent without a call.
 
-Wire-driven refresh — recovering from a `401 Unauthorized` that indicates an expired/invalid token — is **opt-in** rather than automatic inside the `TokenSource`: the transport layer exposes `transport.WithReauthOn401`, which on a 401 invokes the configured `auth.Reauther` (implemented by `*smart.Source.Reauth`) once and replays the request.
-Keeping it opt-in avoids surprising retries of non-idempotent writes ([§ Transport 401 hook](#transport-401-hook)).
+A token source does not react to a wire `401` on its own: the opt-in retry of [transport.md § Re-authentication retry](transport.md#re-authentication-retry) calls an `auth.Reauther` and sends the request again.
 
 Refresh uses the stored `refresh_token` against the deployment's `token_endpoint` (`grant_type=refresh_token`).
 A failed refresh is **terminal** when the token endpoint answered with a 4xx status and the OAuth2 error `invalid_grant`, `invalid_client` or `invalid_token`, which `auth.ExchangeError.Terminal()` reports, and **transient** otherwise (5xx, network, context, an unparsed response, an ID token the source refuses).
@@ -438,18 +397,19 @@ On refresh failure:
 - A terminal failure **MUST** surface to the consumer as the typed sentinel `auth.ErrReauthRequired` (wrapped in `*auth.ExchangeError`).
   The source then drops its access and refresh tokens, so later calls return `auth.ErrReauthRequired` without another request.
 - A transient failure keeps both tokens.
-  When a renewal that `Token` sends fails transiently while the held access token is not yet past its `ExpiresAt`, the `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` token sources **MUST** return that token from `Token` without an error, and **MUST NOT** send another renewal request until a backoff ends: one second after the first such failure, twice as long after each further failure in a row, and never later than that `ExpiresAt`.
+  When a renewal that `Token` sends fails transiently while the held access token is not yet past its `ExpiresAt`, the `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` token sources **MUST** return that token from `Token` without an error, and **MUST NOT** send another renewal request until a backoff ends.
+  The backoff ends one second after the first such failure, twice as long after each further failure in a row, and never later than that `ExpiresAt`.
   Until then `Token` returns the held token without a request.
   A successful renewal, or new tokens (a code exchange, `SetTokens`, `Revoke`, a new exchange), ends the backoff.
   Past `ExpiresAt`, a transient failure surfaces as `auth.ErrRefreshFailed` (`auth.ErrTokenExchangeFailed` in `auth/clientcreds` and `auth/jwtbearer`), so the consumer can retry.
-  In `auth/clientcreds` and `auth/jwtbearer`, an exchange that fails only because the context of the `Token` call that sent it ended returns that context's error and starts no backoff, as the call that started a refresh does in `auth/smart` (below).
+  In `auth/clientcreds` and `auth/jwtbearer`, an exchange that fails only because the context of the `Token` call that sent it ended returns that context's error and starts no backoff; [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026) says what the calls that joined it get.
   `Reauth` and `RefreshIfNeeded` do not wait for the backoff: they send their request at once and return its failure, and a token that `Reauth` marked for renewal is not served this way.
 - The expired token **MUST NOT** be used silently.
 - Concurrent `Token` calls on one source that find its token due for renewal **MUST** share one renewal request: with a rotating refresh token, a second request would present the refresh token the first already spent.
   The calls that share it get the same outcome, the held token included when a transient failure leaves it to be served.
 - In `auth/smart` the refresh request **MUST NOT** be ended by the context of the call that started it, so a refresh token the server has already rotated is installed and reported to the `WithTokenChange` hook even when that call gives up.
   The request runs for at most 30 seconds.
-  The call whose context ends first returns that context's error at once, and the calls waiting on the refresh get its own result.
+  A call whose context ends before the refresh answers returns that context's error at once, and the other calls get the refresh's own result; [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026) covers a panic in it.
   A refresh whose goroutine exits without an answer (`runtime.Goexit`) ends as a transient failure.
 
 If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return a typed error directing the consumer to restart the launch flow.
@@ -516,26 +476,6 @@ func (f ReautherFunc) Reauth(ctx context.Context) error { return f(ctx) }
 
 It lets a closure, such as a discovery-catalog refresh ([§ REQ-071](#req-071)), serve as a `Reauther` without `transport/` importing `smart/discovery`.
 
-#### Transport 401 hook
-
-`transport.WithReauthOn401(r auth.Reauther)` installs an opt-in safety net.
-When a wire `401` is received:
-
-1. If a `Reauther` is configured, this `Do` call has not yet reauthed, **and** the response's Bearer challenge permits it under [transport.md § REQ-166](transport.md#req-166--bearer-challenge-on-401-and-403), `transport/` **MUST** call `r.Reauth(ctx)` exactly once.
-2. If `Reauth` returns nil, the request **MUST** be retried once.
-   The retry acquires its token again, so it carries the refreshed credential.
-3. If the retry also returns `401`, or `Reauth` itself returns an error, the call **MUST** fail without another attempt: with `transport.ErrUnauthorized` in the first case, and with the `Reauth` error, wrapped, in the second.
-
-`Reauth` runs at most once per `Do` call, whatever the retry policy.
-Without `WithReauthOn401`, a wire `401` returns `transport.ErrUnauthorized` after one upstream call.
-
-This hook is a **complementary safety net** — proactive expiry-based refresh in `Source.Token()` before the request is issued remains the primary mechanism.
-The hook covers the residual window where a token expires between the proactive-refresh check and the wire round-trip.
-
-The retry **MUST** fire for **all HTTP methods**, including non-idempotent writes (`POST`/`PUT`), and repeat the request's method and body.
-This is safe because a `401` means the request was rejected at the authentication layer and therefore **not processed** by the resource — re-driving it once after refreshing the credential cannot double-apply a write; [REQ-166](transport.md#req-166--bearer-challenge-on-401-and-403) says which `401`s are re-driven.
-Deployments that signal authorization failures with `403` (reserving `401` for authentication/expiry) get the cleanest behaviour.
-
 ### REQ-167 — Token revocation
 
 `auth/smart` **MUST** provide `(*Source).Revoke(ctx)` for signing out (RFC 7009).
@@ -596,19 +536,24 @@ A code exchange whose response carries no `refresh_token` **MUST NOT** keep a re
 The verified claims **MUST** be returned on `TokenResponse.IDTokenClaims`, and `LaunchContextFromTokenResponse` **MUST** use them without validating again.
 Given an `id_token` without verified claims, it **MUST** validate that token itself as § REQ-062 describes, with the nonce, signing algorithms and trusted audiences its caller passes.
 
-A refresh response that carries an `id_token` **MUST** be validated the same way except for the nonce; when the source has verified an earlier ID token and has not been signed out with `Revoke` since (§ REQ-167), the new one **MUST** carry that token's `iss` and `sub` and list the same audiences in `aud`, in any order (OpenID Connect Core 1.0 §12.2; RFC 7519 gives `aud` no order).
+A refresh response that carries an `id_token` **MUST** be validated the same way except for the nonce.
+When the source has verified an earlier ID token and has not been signed out with `Revoke` since (§ REQ-167), the new one **MUST** carry that token's `iss` and `sub` and list the same audiences in `aud`, in any order (OpenID Connect Core 1.0 §12.2; RFC 7519 gives `aud` no order).
 A failure to verify that ID token **MUST** fail the refresh with an error that matches `auth.ErrRefreshFailed` and the failure's own § REQ-062 class: `auth.ErrJWKSValidationFailed` for a token refused on its own content, otherwise `auth.ErrInvalidConfig` or the key-set fetch error.
 The source **MUST** then keep its previous access and refresh tokens, including when the refresh was forced by `Reauth`.
 Such a failure is transient (§ REQ-063): it reaches `Token` only once the held access token is past its `ExpiresAt`, and reaches `Reauth` and `RefreshIfNeeded` at once.
 
 A refresh response can leave members out: OpenID Connect Core 1.0 §12.2 lets a server omit the `id_token`, SMART App Launch lets it omit launch context, and RFC 6749 §6 reads an omitted `scope` as the original grant.
-The source's last token response **MUST** keep the earlier value of each such member that a refresh response omits and take the new value of each it carries: the verified `IDTokenClaims`, kept when the response carries no `id_token`, so a `LaunchContext` rebuilt from `LastTokenResponse` keeps its `User` and `IDToken`; the launch-context parameters `patient`, `encounter`, `ehrId`, `episodeId`, `fhirContext`, `intent`, `need_patient_banner`, `smart_style_url` and `tenant`; and `scope`, whose earlier value, when the last token response has none, as after `SetTokens`, is the scope of the access token the source holds.
+The source's last token response **MUST** keep the earlier value of each such member that a refresh response omits and take the new value of each it carries:
+
+- the verified `IDTokenClaims`, kept when the response carries no `id_token`, so a `LaunchContext` rebuilt from `LastTokenResponse` keeps its `User` and `IDToken`;
+- the launch-context parameters `patient`, `encounter`, `ehrId`, `episodeId`, `fhirContext`, `intent`, `need_patient_banner`, `smart_style_url` and `tenant`;
+- `scope`, whose earlier value, when the last token response has none, as after `SetTokens`, is the scope of the access token the source holds.
+
 A launch-context parameter or `scope` that the response carries counts as carried even as an empty string or null.
 A refresh response that omits `scope` therefore gives an access token with the kept scope.
 
 `LaunchContext.User` **MUST** come from a verified ID token only: its `fhirUser` claim, else its `sub`, and empty without a verified ID token.
 A `fhirUser` member in the token-endpoint body is not an identity claim and never sets it, but `TokenResponse.FHIRUser` and `Raw` **MUST** still carry the member.
-Signature verification supports RS256/RS384/ES256/ES384 and is constrained by the deployment's advertised `id_token_signing_alg_values_supported` when supplied ([§ ID-token verification](#id-token-verification)).
 
 The `EHRID` and `EpisodeID` fields are populated from the `ehrId` and `episodeId` token claims defined in the canonical openEHR SMART App Launch specification.
 The SMART-compat extras (`Intent`, `SMARTStyleURL`, `NeedPatientBanner`, `Tenant`) are populated when present.
@@ -790,17 +735,17 @@ type AuthEndpoints struct {
     JWKSURI               *url.URL
     RegistrationEndpoint  *url.URL // optional
     // Optional endpoints — nil when absent; no error.
-    IntrospectionEndpoint *url.URL // RFC 7662; surfaced, not consumed
+    IntrospectionEndpoint *url.URL // RFC 7662
     RevocationEndpoint    *url.URL // RFC 7009
     ManagementEndpoint    *url.URL // SMART management endpoint
     ScopesSupported       []string
     ResponseTypesSupported []string
     CodeChallengeMethodsSupported []string
     GrantTypesSupported   []string
-    TokenEndpointAuthMethodsSupported          []string // auth/smart cross-check; NewFromCatalog method check (REQ-068)
-    TokenEndpointAuthSigningAlgValuesSupported []string // auth/smart and NewFromCatalog client-assertion alg check (REQ-068)
-    IDTokenSigningAlgValuesSupported           []string // ID-token verify allowlist, consumed by ValidateIDToken (REQ-062, REQ-064)
-    AuthorizationResponseIssParameterSupported bool     // RFC 9207 authorization_response_iss_parameter_supported (REQ-061)
+    TokenEndpointAuthMethodsSupported          []string
+    TokenEndpointAuthSigningAlgValuesSupported []string
+    IDTokenSigningAlgValuesSupported           []string
+    AuthorizationResponseIssParameterSupported bool
     Capabilities []string
 }
 ```
@@ -843,14 +788,33 @@ if err != nil {
 The `NewStaticCatalog` constructor **MUST NOT** require a network round trip; the resulting catalog has `ResolvedAt = time.Now()` and takes `ExpiresAt` from `StaticConfig.ExpiresAt`, so it has no TTL unless the caller sets one.
 `StaticConfig.BaseURL` is optional: when empty, the catalog's `BaseURL` **MUST** equal `StaticConfig.Issuer`.
 
+##### Authorization-server metadata
+
+The resolver surfaces the SMART authorization-server metadata below onto `AuthEndpoints`.
+Every member is optional: an absent one resolves to nil or empty, with no error.
+This table is the one place that says which check reads each member; [§ Advertised metadata lists](#advertised-metadata-lists) says when a list counts as advertised.
+
+| Wire field | `AuthEndpoints` field | Read by | REQ |
+|---|---|---|---|
+| `code_challenge_methods_supported` | `CodeChallengeMethodsSupported` | `auth/smart.FromConfig`, which refuses a non-empty list without `S256`, the only PKCE method the SDK sends | [REQ-061](#req-061--pkce-flow) |
+| `authorization_response_iss_parameter_supported` | `AuthorizationResponseIssParameterSupported` | `auth/smart.CompleteAuthorization`, which, when the member is true, refuses a redirect without `iss` (RFC 9207 §2.4) | [REQ-061](#completing-the-authorization) |
+| `grant_types_supported` | `GrantTypesSupported` | `auth/clientcreds.NewFromCatalog`, which refuses a non-empty list without `client_credentials` | [REQ-068](#backend-services-from-a-resolved-catalog) |
+| `token_endpoint_auth_methods_supported` | `TokenEndpointAuthMethodsSupported` | the method cross-check of `auth/smart.FromConfig`, and `auth/clientcreds.NewFromCatalog` for the configured method | [REQ-068](#method-cross-check-against-discovery) |
+| `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported` | `auth/smart.FromConfig` for the `WithClientAssertionKey` algorithm, and `auth/clientcreds.NewFromCatalog` for a client assertion the SDK's own `jwtbearer.ClaimsSigner` signs | [REQ-068](#advertised-metadata-lists) |
+| `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported` | the ID-token verifier's allowlist: `auth/smart` applies it at the code exchange and on refresh, and a caller of `smart.ValidateIDToken` passes it with `smart.WithIDTokenSigningAlgs` | [REQ-062](#id-token-verification), [REQ-064](#req-064--launch-context) |
+| `revocation_endpoint` | `RevocationEndpoint` | `(*auth/smart.Source).Revoke`, which signs out there (RFC 7009) | [REQ-167](#req-167--token-revocation) |
+| `introspection_endpoint` | `IntrospectionEndpoint` | nothing: introspection (RFC 7662) is a resource-server operation, outside the SDK's client scope | |
+| `management_endpoint` | `ManagementEndpoint` | nothing: the SDK has no management client | |
+
+The `smart/discovery` package also exports openEHR SMART capability string constants (`CapabilityContextOpenEHREHR`, `CapabilityContextOpenEHREpisode`, `CapabilityOpenEHRPermissionV1`, `CapabilityLaunchBase64JSON`) for consumers that need to branch on the `capabilities` array.
+
 ### Resolution flow
 
 The full flow when discovery is in play:
 
 1. **Resolve.** On an explicit `(*discovery.Resolver).Resolve(ctx, baseURL)` (the transport only stores the catalog it is given), fetch the SMART configuration document at the Platform base URL's well-known URL, **`<base URL>/.well-known/smart-configuration`**, the well-known path appended to the base URL's own path.
    Parse it; validate the members REQ-072 requires and the openEHR-REST service catalog.
-2. **Cache.** Store the resolved `ServiceCatalog`.
-   The cache **MAY** be in-process (default), file-backed, or an injected `Cache` interface (for distributed deployments).
+2. **Cache.** Store the resolved `ServiceCatalog` in the cache ([§ REQ-071](#req-071)).
 3. **Validate.** Confirm every service the client intends to use is advertised: `org.openehr.rest` for openEHR-REST consumers, the Cadasto-extra services for Cadasto clients ([§ REQ-072](#req-072)).
    Spec-version compatibility is checked **here**, not after the first request.
 4. **Route.** Each typed client resolves its base URL from the catalog by service ID at request time.
@@ -869,10 +833,9 @@ The discovery cache **MUST**:
   The declared TTL follows [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html): it is 0 when `Cache-Control` carries `no-store` or `no-cache`, else the `Cache-Control` `max-age` in seconds, else the time from `Date`, or from receipt without one, to `Expires`, where a past or invalid `Expires` declares 0; a TTL of 0 leaves the entry stale at once.
   When the response declares none, a default TTL applies, which **SHOULD** be 15 minutes, so a change a Platform makes to its document reaches its clients within that time.
 - Honour `ETag` / `If-None-Match` for conditional refresh: a `304 Not Modified` to a conditional request renews the cached entry's TTL from the TTL the `304` declares, or the default when it declares none, without replacing the body, and a `304 Not Modified` to a request without `If-None-Match` is a failed fetch ([§ Refresh API](#refresh-api)).
-- Coalesce concurrent resolution attempts (REQ-026): one caller fetches and the others wait.
+- Coalesce concurrent resolution attempts as [idiom.md § Concurrency (REQ-026)](idiom.md#concurrency-req-026) says: one caller fetches and the others wait.
   A caller **MUST** get an error that `errors.Is` matches to its own context's error when that context ends while it waits on a fetch another caller started, or when its context's end alone fails the fetch it started.
-  Such a failure of the starting caller's context, or a panic in the fetch or in the `Cache` call that records its result, **MUST NOT** fail the callers that joined the fetch, nor make the resolver write or drop the cached entry, since it says nothing about the Platform: each joined caller whose own context is still live fetches again.
-  The panic **MUST** reach the caller that started the fetch unchanged and leave no caller for that base URL waiting.
+  A failure that only the starting caller's context caused, or a panic in the fetch or in the `Cache` call that records its result, each part of the attempt REQ-026 names, **MUST NOT** make the resolver write or drop the cached entry, since it says nothing about the Platform.
 - Key every entry by the Platform base URL the caller resolved, never by the document's `issuer` ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).
   A cached catalog whose `BaseURL` is not the base URL it is found under **MUST** be treated as absent: the resolver fetches with a plain request, as on a miss, and the result replaces the entry.
 - Return a fresh cached catalog only once it passes the calling resolver's REQ-072 checks and those REQ-073 checks that send no request (the issuer, the Platform base URL and the auth endpoints' `https` scheme), because one `Cache` may serve resolvers built with different options.
@@ -893,7 +856,7 @@ transport.WithReauthOn401(auth.ReautherFunc(func(ctx context.Context) error {
 }))
 ```
 
-The transport then calls the closure at most once per `Do` call and retries the request once; on a second `401` it surfaces `transport.ErrUnauthorized` ([§ REQ-063](#req-063--token-refresh)).
+[transport.md § Re-authentication retry](transport.md#re-authentication-retry) says when the transport calls it and how often it retries.
 
 Cache implementation:
 
@@ -919,12 +882,13 @@ catalog, err := resolver.Refresh(ctx, baseURL) // baseURL is the Platform base U
 A refresh **MUST**:
 
 - Send a conditional request (`If-None-Match`) when the cached entry carries an `ETag`, and a plain request when it carries none, keeping that entry in place meanwhile.
-- On a `304 Not Modified` to a conditional request, re-run the REQ-072 checks and the REQ-073 trust checks, the OIDC cross-check included, on the cached document, and renew the cached entry's TTL without replacing its document (REQ-071); on a `200`, re-run the resolve / validate / cache pipeline and replace the entry; on a failure, invalidate the entry, except a failure that only the caller's own cancelled or expired context caused, and a panic (REQ-071).
-  A `304 Not Modified` to a plain request is a failed fetch: no document came back.
+- On a `304 Not Modified` to a conditional request, re-run the REQ-072 checks and the REQ-073 trust checks, the OIDC cross-check included, on the cached document, and renew the entry as [§ REQ-071](#req-071) says.
+- On a `200`, re-run the resolve / validate / cache pipeline and replace the entry.
+- On a failure, invalidate the entry, except a failure that only the caller's own cancelled or expired context caused, and a panic (REQ-071).
 - Return the current catalog (or an error if resolution fails).
 
 A refresh does not hold up other requests beyond the coalescing window: they continue with the cached catalog until the refresh completes or fails.
-After a failed refresh the next request fetches again and reports the discovery error if that fetch fails too, unless only the refreshing caller's own context ended the refresh, or it panicked; neither of those makes the resolver write or drop the cached entry.
+After a refresh that invalidated the entry, the next request fetches again and reports the discovery error if that fetch fails too.
 
 ### Validation
 
@@ -1009,42 +973,12 @@ The plaintext warnings are not repeated on a hit either: they are logged when th
 
 The resolver does not require `jwks_uri` to share the issuer's host; the `https` scheme is the floor.
 
-### Surfaced authorization-server metadata
-
-The resolver parses and surfaces the following SMART authorization-server metadata fields onto `AuthEndpoints` (REQ-070).
-All fields are optional — absent fields resolve to nil/empty with no error.
-
-| Wire field | `AuthEndpoints` field | Notes |
-|---|---|---|
-| `introspection_endpoint` | `IntrospectionEndpoint *url.URL` | RFC 7662 token introspection, a resource-server operation; surfaced only |
-| `revocation_endpoint` | `RevocationEndpoint *url.URL` | RFC 7009 token revocation; `auth/smart.Source.Revoke` posts to it (REQ-167) |
-| `management_endpoint` | `ManagementEndpoint *url.URL` | SMART management endpoint |
-| `token_endpoint_auth_methods_supported` | `TokenEndpointAuthMethodsSupported []string` | Client-auth method list; feeds the `auth/smart` method cross-check and the `auth/clientcreds.NewFromCatalog` check (REQ-068) |
-| `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported []string` | Client-assertion (client-auth) JWS alg list; checked by `auth/smart` and `auth/clientcreds.NewFromCatalog` (REQ-068) |
-| `authorization_response_iss_parameter_supported` | `AuthorizationResponseIssParameterSupported bool` | RFC 9207 §3; when true, `CompleteAuthorization` refuses a callback without `iss` (REQ-061) |
-| `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported []string` | Selects the **ID-token verify allowlist**: `auth/smart` applies it at the code exchange and on refresh, and a caller of `smart.ValidateIDToken` passes it through `smart.WithIDTokenSigningAlgs`, so verification constrains accepted signature algorithms (RS256/RS384/ES256/ES384); see [§ REQ-062](#req-062--jwks-rotation) and REQ-064 |
-
-These fields are **consumed**, not merely surfaced:
-
-- `id_token_signing_alg_values_supported` → the ID-token verifier's accepted-algorithm allowlist, which `auth/smart` applies itself.
-- `code_challenge_methods_supported` → `auth/smart.FromConfig` refuses a server whose non-empty list leaves out `S256`, the only PKCE method the SDK sends.
-- `grant_types_supported` → `auth/clientcreds.NewFromCatalog` refuses a server whose non-empty list leaves out `client_credentials`.
-- `token_endpoint_auth_methods_supported` → `auth/smart.FromConfig` cross-checks it against the configured credential's implied method (a mismatch is rejected with `auth.ErrInvalidConfig`), and `auth/clientcreds.NewFromCatalog` against the configured client-auth method ([§ Backend Services from a resolved catalog](#backend-services-from-a-resolved-catalog), REQ-068).
-- `authorization_response_iss_parameter_supported` → when true, `auth/smart.CompleteAuthorization` refuses a redirect without `iss` ([§ REQ-061](#req-061--pkce-flow), RFC 9207 §2.4).
-- `token_endpoint_auth_signing_alg_values_supported` → `auth/smart.FromConfig` checks the configured client-assertion algorithm against it ([§ REQ-068](#req-068--flow-and-launch-mode-coverage)), and `auth/clientcreds.NewFromCatalog` checks client assertions against it ([§ Backend Services from a resolved catalog](#backend-services-from-a-resolved-catalog), REQ-068).
-- `revocation_endpoint` → `auth/smart.Source.Revoke` signs out there (RFC 7009; REQ-167).
-
-The rest remain **surface-only** (populated but with no consuming logic wired): `management_endpoint` (no management client yet) and `introspection_endpoint` (introspection is a resource-server operation outside the SDK's client scope).
-
-The `smart/discovery` package also exports openEHR SMART capability string constants (`CapabilityContextOpenEHREHR`, `CapabilityContextOpenEHREpisode`, `CapabilityOpenEHRPermissionV1`, `CapabilityLaunchBase64JSON`) for consumers that need to branch on the `capabilities` array.
-
 ## What is NOT in scope here
 
 - **OAuth2 dynamic client registration** — the SDK consumes a pre-registered client.
-  Dynamic registration could be added as a helper in `smart/` later.
 - **App-side credential storage** — token storage (encrypted at rest, OS keychain, browser cookie) is application-side.
 - **Revocation policy** — when tokens expire or are revoked on the server is the deployment's decision; the SDK reacts to the resulting wire errors and offers only the client's own sign-out revocation (REQ-167).
-- **MTLS, FAPI, JAR / PAR** — out of v1 scope; future provider sub-packages could address them.
+- **MTLS, FAPI, JAR / PAR** — out of scope; a future provider sub-package could address them.
 - **Token introspection (RFC 7662)** — a resource-server operation, and the SDK is a client of authorization servers.
   Discovery still surfaces `introspection_endpoint` (REQ-070), but the SDK ships no introspection client.
 - **Service registration.** The SDK consumes discovery output; it does not publish or maintain the discovery document.

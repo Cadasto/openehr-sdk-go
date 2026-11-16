@@ -89,10 +89,10 @@ The SDK **MUST NOT** silently override or relax the consumer's `*http.Client` TL
 
 ### No downgrade with a credential
 
-A request that `Client.Do` sends and that carries a credential header, `Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`, **MUST NOT** follow a redirect from an `https` URL to a URL whose scheme is not `https`: `Client.Do` **MUST** fail with an error that `errors.Is` matches to `transport.ErrInsecureRedirect`, without sending the request to the redirect target, and the retry policy does not send it again ([REQ-091](#req-091--retry-policy)).
-A request sent without any of these headers, and every redirect other than that downgrade, **MUST** follow the injected client's own redirect policy (its `CheckRedirect`, or net/http's limit of 10 redirects when it has none), and the transport leaves the injected client unmodified ([REQ-021](idiom.md#http-client-injection-req-021)), so a change the caller makes to it later reaches the next request.
-The transport does this with a shallow copy of the injected client, taken for each request, whose redirect policy refuses that redirect and otherwise defers to the injected client's own.
-[REQ-021](idiom.md#http-client-injection-req-021) names this copy as an exception to its rule that the SDK does not allocate its own client.
+A request that `Client.Do` sends and that carries a credential header, `Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`, **MUST NOT** follow a redirect from an `https` URL to a URL whose scheme is not `https`.
+`Client.Do` **MUST** fail with an error that `errors.Is` matches to `transport.ErrInsecureRedirect`, without sending the request to the redirect target, and the retry policy does not send it again ([REQ-091](#req-091--retry-policy)).
+A request sent without any of these headers, and every redirect other than that downgrade, **MUST** follow the injected client's own redirect policy (its `CheckRedirect`, or net/http's limit of 10 redirects when it has none) as it stands when the request is sent, so a change the caller makes to the client later reaches the next request.
+The transport refuses the downgrade through the per-request copy of the injected client that [idiom.md § REQ-021](idiom.md#http-client-injection-req-021) allows.
 
 net/http forwards these four headers to a redirect target on the same host, or a subdomain of it, whatever the target's scheme, and drops them only for another domain, so without this rule a 3xx to `http://` on the same host would carry a token or a session cookie unencrypted.
 A cookie the injected client's `Jar` adds is the jar's to scope, by its `Secure` attribute.
@@ -122,10 +122,17 @@ The SDK **MUST**:
 
 - Decode this envelope on every non-2xx response (best-effort, member by member; missing fields default to zero values).
   Its coded entries go to `OpenEHRErrorDetail.CodedText`: first those of a `coded_text` list, kept for servers that send one, then those of the pin's `errors` list, each a `DV_CODED_TEXT` whose `defining_code` gives the item's terminology and code string and whose `value` gives the item's `Value`.
-  A member or entry of the wrong JSON type is left empty or skipped without failing the envelope: a `message` that is not a string is left empty; a `validationErrors` entry that is not a string is skipped; a `coded_text` or `errors` entry that is not an object, whose terminology or code string is not a string, or (in `errors`) that has no `defining_code` is skipped; and a `coded_text`, `errors` or `validationErrors` member that is not a list is skipped.
+  A member or entry of the wrong JSON type is left empty or skipped without failing the envelope:
+  - a `message` that is not a string is left empty;
+  - a `validationErrors` entry that is not a string is skipped;
+  - a `coded_text` or `errors` entry that is not an object, whose terminology or code string is not a string, or (in `errors`) that has no `defining_code` is skipped;
+  - a `coded_text`, `errors` or `validationErrors` member that is not a list is skipped.
+
   A coded entry whose `value` is not a string keeps its terminology and code string, with an empty `Value`.
   Member names match exactly, so a case variant such as `MESSAGE` is ignored like any other unknown member, and a body that repeats a member name, in the envelope or in any value inside it, leaves the envelope undecoded.
-- Accept the envelope's `code` as a JSON string or a JSON number (the overview's own example is `"code": 90000`), keeping the text form (`"90000"`) in `OpenEHRErrorDetail.Code`, and decode the `validationErrors` list the ITS-REST `Error` schema (the `400` bodies) defines beside `message`, so neither a numeric `code` nor a body that carries `validationErrors` with no `code` or no `message` leaves the envelope undecoded.
+- Accept the envelope's `code` as a JSON string or a JSON number (the overview's own example is `"code": 90000`), keeping the text form (`"90000"`) in `OpenEHRErrorDetail.Code`.
+  Decode too the `validationErrors` list the ITS-REST `Error` schema (the `400` bodies) defines beside `message`.
+  Neither a numeric `code` nor a body that carries `validationErrors` with no `code` or no `message` leaves the envelope undecoded.
 - Attach the parsed envelope to `transport.WireError` as `OpenEHRErrorDetail{Message, Code, CodedText, ValidationErrors}`.
 - Map the HTTP status to typed sentinels per [idiom.md § Errors](idiom.md#errors-req-025): `ErrNotFound` (404), `ErrUnauthorized` (401), `ErrForbidden` (403), `ErrVersionConflict` (409), `ErrPreconditionFailed` (412), `ErrUnprocessable` (422), `ErrPreconditionRequired` (428).
   The status set follows the openEHR contract: a **422** signals a well-formed-but-semantically-invalid request (validation / template failure — the ITS-REST overview, § *HTTP status codes*; used on EHR and demographic writes) and **MUST** map to `ErrUnprocessable`.
@@ -239,7 +246,7 @@ Encoding without validation leaves every caller owning a class of request-URI mu
 
 Before issuing an HTTP request, the transport **MUST** validate the decoded `Request.Path` (not the service base URL).
 The path is split on `/`; the leading empty segment of an absolute path is ignored.
-A `Request.Path` of exactly `"/"` — the service root, the System API's only operation (`OPTIONS /`, sent by the landed `system.Capabilities` / `Version` / `Health`) — carries no segments and **MUST** pass.
+A `Request.Path` of exactly `"/"` — the service root, the System API's only operation (`OPTIONS /`, sent by `system.Capabilities`, `Version` and `Health`) — carries no segments and **MUST** pass.
 Every remaining segment of any other path **MUST** be non-empty and **MUST NOT**:
 
 - be `.` or `..`;
@@ -261,8 +268,6 @@ The SDK **MUST** export the same checks as package functions so a caller constru
 
 - `ValidatePathSegment(s string) error`: one interpolated identifier (a `/` in `s` is a violation);
 - `ValidateRequestPath(path string) error`: the whole decoded `Request.Path`, the same check the transport runs.
-
-(The `Validate*`-returns-`error` spelling follows the repo's own precedent, `Compiled.ValidatePath` and `aql.ValidateIdentifier`, where `Valid*` names return `bool`, as in `rm.TimeDefinitions.ValidDay`.)
 
 `ValidateRequestPath` splits on `/`, so an interpolated parameter that *contains* `/` produces well-formed segments that segment inspection alone cannot catch.
 When `Request.Route` is set, the transport **MUST** therefore also refuse a decoded `Request.Path` whose segment count differs from the route template's: a smuggled separator changes the count and moves the request onto a different route.
@@ -400,8 +405,29 @@ type BearerChallenge struct {
   The parser **MUST** ignore empty list elements (RFC 9110 §5.6.1.2).
 - The work spent on a challenge **MUST** stay bounded: a `WWW-Authenticate` field line whose value is longer than the parser's limit, 8 KiB, is treated as unparseable without being parsed, while the other lines are still read (RFC 9110 §5.4 lets a recipient ignore a field line it does not wish to process; real Bearer challenges are far shorter).
 - `WireError.Error()` **MUST NOT** include challenge values; they stay reachable through `errors.As`, under the same discipline as the openEHR error envelope (REQ-093): `Error`, `Scope`, `Realm`, `ErrorURI` and `Params` are always populated, while `ErrorDescription`, free text from the server, **MUST** be populated only when the client is built with `WithRawErrorBodies(true)`.
-- The opt-in 401 safety net (REQ-063) **MUST** call `Reauth` only for a 401 whose challenge is absent, carries no `error`, or carries `error="invalid_token"` (RFC 6750 §3.1: the token is expired, revoked or malformed, and a new one may succeed).
-  A 401 whose challenge names any other error, `insufficient_scope` included, **MUST** be surfaced without calling `Reauth`, since a fresh token with the same grant cannot fix it.
+
+### Re-authentication retry
+
+`transport.WithReauthOn401(r auth.Reauther)` installs an opt-in retry for a wire `401`; without it, a `401` returns `transport.ErrUnauthorized` after one upstream call.
+It backs up the proactive renewal of a token source ([auth.md § REQ-063](auth.md#req-063--token-refresh)), for a token that expires between that check and the wire round trip.
+`auth.Reauther`, `auth.ReautherFunc` and the providers that implement them are auth.md's ([§ Forced refresh](auth.md#forced-refresh)).
+
+When a `401` arrives:
+
+1. If a `Reauther` is configured, this `Do` call has not yet called it, **and** the response's challenge permits it (below), `transport/` **MUST** call `r.Reauth(ctx)` exactly once.
+2. If `Reauth` returns nil, the request **MUST** be retried once.
+   The retry acquires its token again, so it carries the refreshed credential.
+3. If the retry also returns `401`, or `Reauth` itself returns an error, the call **MUST** fail without another attempt: with `transport.ErrUnauthorized` in the first case, and with the `Reauth` error, wrapped, in the second.
+
+`Reauth` runs at most once per `Do` call, whatever the retry policy.
+
+The challenge decides whether a new token can help:
+
+- `transport/` **MUST** call `Reauth` only for a 401 whose challenge is absent, carries no `error`, or carries `error="invalid_token"` (RFC 6750 §3.1: the token is expired, revoked or malformed, and a new one may succeed).
+- A 401 whose challenge names any other error, `insufficient_scope` included, **MUST** be surfaced without calling `Reauth`, since a fresh token with the same grant cannot fix it.
+
+The retry **MUST** fire for all HTTP methods, including `POST` and `PUT`, and repeat the request's method and body.
+This deliberately differs from [§ REQ-091](#req-091--retry-policy), which never sends a write again without `RetryNonIdempotent`: a `401` means the request was refused at the authentication layer and not processed, so sending it once more cannot apply a write twice.
 
 ---
 
