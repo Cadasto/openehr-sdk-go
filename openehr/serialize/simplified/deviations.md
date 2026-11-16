@@ -766,22 +766,22 @@ bare uri *and* RM-mandatory `|mediatype` / `|size`, and chose the `"|"` member, 
 implementation's template examples write `|value`, and another CDR writes `""`. Encode now
 writes `|value`, the reference's spelling ([ADR 0014](../../../docs/adr/0014-webtemplate-reference-implementation-lock.md)),
 and keeps `"|"` in two places: beside a `|value` of the leaf's own, so two values never share
-a member, and for a null bare value, which OPT-free conversion carries as written. Decode reads
-`|value`, `"|"` and `""` as the bare value at every datatype that has one, and refuses two
-that disagree. OPT-free FLAT → STRUCTURED keeps `"|"` in a third place, since 2026-11-16:
-beside a suffix no datatype with a bare value reads, such as `|code` or `|magnitude`, where the
-leaf has no bare value and a `|value` would change what the body means. Before, a bare text
-beside `|code` and `|terminology` came back as a coded text's `|value`, and a bare DV_QUANTITY
-beside null suffixes was dropped by a default decode, where FLAT refuses both. A bare value
-beside suffixes some datatype with a bare value also reads, or beside no suffix, still converts
-to `|value`. OPT-free STRUCTURED → FLAT writes `|value` as `x|value`, which the FLAT decode
-reads as the bare value of every datatype that has one and as the own `|value` of
-DV_CODED_TEXT, DV_ORDINAL and DV_SCALE, so the template decides at decode what the conversion
-cannot. A leaf carrying nothing but a bare value stays a bare scalar. Pinned in
-`structured_bare_value_test.go` against the `Test_dv_parsable_open_constraint` and
-`Test_dv_multimedia_open_constraint` corpus templates, in `bare_value_internal_test.go` at
-every datatype with a bare value, and round-tripped both ways in `structured_test.go`
-(`TestBareLeafBesideMembersThroughStructured`, `TestBareStructuredMemberIsTheValueSuffix`).
+a member, and for a null bare value. Decode reads `|value`, `"|"` and `""` as the bare value
+at every datatype that has one, and refuses two that disagree. OPT-free FLAT → STRUCTURED
+keeps `"|"` for every bare value beside its leaf's members: without a template it cannot tell
+whether the leaf's datatype has a bare value, and a `|value` where it has none changes what
+the body means. A bare DV_QUANTITY beside a null `|normal_status`, refused in FLAT, would
+come back as a `|value` a default decode sets aside, dropping the quantity, and a bare text
+beside a coded text's `|code` as that coded text's `|value`. OPT-free STRUCTURED → FLAT writes
+`"|"` and `""` as the bare key and `|value` as `x|value`, which the FLAT decode reads as the
+bare value of every datatype that has one and as the own `|value` of DV_CODED_TEXT,
+DV_ORDINAL and DV_SCALE. So both OPT-free round trips give a bare value back as written, and
+every document encode writes comes back exactly. A leaf carrying nothing but a bare value
+stays a bare scalar. Pinned in `structured_bare_value_test.go` against the
+`Test_dv_parsable_open_constraint` and `Test_dv_multimedia_open_constraint` corpus templates,
+in `bare_value_internal_test.go` at every datatype with a bare value and beside every suffix,
+and round-tripped both ways in `structured_test.go`
+(`TestBareLeafBesideMembersThroughStructured`, `TestBareStructuredMemberIsThePipe`).
 wire.md § REQ-053 states it normatively.
 
 **DV_SCALE takes the DV_ORDINAL suffix set — CLOSED 2026-08-06 (PR #89 review).** DV_SCALE

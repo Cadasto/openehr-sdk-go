@@ -4,7 +4,6 @@ package simplified_test
 import (
 	"bytes"
 	"encoding/json"
-	"maps"
 	"reflect"
 	"strings"
 	"testing"
@@ -396,12 +395,12 @@ func TestMappingsThroughStructured(t *testing.T) {
 // bodies (`…/dv_count` = 7 beside `…/dv_count/_normal_range/lower`) that predates
 // the underscore families, since C0's `_uid` collided identically.
 //
-// The bare value now takes the `|value` member on that object, the reference's
-// spelling, which OPT-free STRUCTURED → FLAT writes as `x|value`, the spelling
-// the FLAT decode reads as the bare value of every datatype that has one. Each
-// shape that forced the collision is round-tripped in both directions here:
-// FLAT → STRUCTURED → FLAT gives the bare key back as its `|value` spelling, and
-// STRUCTURED → FLAT → STRUCTURED gives the document back exactly.
+// OPT-free conversion now keeps the bare value as the `"|"` member on that
+// object, the FLAT key's own spelling, which STRUCTURED → FLAT writes back as
+// the bare key. Each shape that forced the collision is round-tripped in both
+// directions here, and both are exact: FLAT → STRUCTURED → FLAT gives the bare
+// key back as written, and STRUCTURED → FLAT → STRUCTURED gives the document
+// back.
 func TestBareLeafBesideMembersThroughStructured(t *testing.T) {
 	for name, flat := range map[string]map[string]any{
 		// The scalar families carry the interconversion's explicit `:0` (every
@@ -425,8 +424,8 @@ func TestBareLeafBesideMembersThroughStructured(t *testing.T) {
 			if err := json.Unmarshal(back, &got); err != nil {
 				t.Fatal(err)
 			}
-			if want := bareAsValueSuffix(flat, "t/e:0"); !reflect.DeepEqual(got, want) {
-				t.Errorf("FLAT -> STRUCTURED -> FLAT mismatch:\n got  %#v\n want %#v\n via  %s", got, want, s)
+			if !reflect.DeepEqual(got, flat) {
+				t.Errorf("FLAT -> STRUCTURED -> FLAT mismatch:\n got  %#v\n want %#v\n via  %s", got, flat, s)
 			}
 			again, err := simplified.FlatToStructured(back)
 			if err != nil {
@@ -439,24 +438,13 @@ func TestBareLeafBesideMembersThroughStructured(t *testing.T) {
 	}
 }
 
-// bareAsValueSuffix is flat with each of the bare keys spelled as its `|value`,
-// as OPT-free FLAT → STRUCTURED → FLAT gives back a bare value that sits beside
-// its leaf's members.
-func bareAsValueSuffix(flat map[string]any, bare ...string) map[string]any {
-	out := maps.Clone(flat)
-	for _, k := range bare {
-		out[k+"|value"] = out[k]
-		delete(out, k)
-	}
-	return out
-}
-
-// TestBareStructuredMemberIsTheValueSuffix — REQ-053. The bare value's STRUCTURED
-// member is exactly `|value`, and the element it sits on is an object only where
-// the collision forced one: a leaf carrying nothing but a bare value stays a bare
-// scalar, which is what every STRUCTURED body this codec emitted before Phase C3
-// looks like.
-func TestBareStructuredMemberIsTheValueSuffix(t *testing.T) {
+// TestBareStructuredMemberIsThePipe — REQ-053. The bare value's STRUCTURED
+// member, as OPT-free FLAT → STRUCTURED writes it, is exactly `"|"`, and the
+// element it sits on is an object only where the collision forced one: a leaf
+// carrying nothing but a bare value stays a bare scalar, which is what every
+// STRUCTURED body this codec emitted before Phase C3 looks like. Encode writes
+// `|value` instead (TestREQ053StructuredBareValueIsTheValueMember).
+func TestBareStructuredMemberIsThePipe(t *testing.T) {
 	plain, err := simplified.FlatToStructured(mustJSON(t, map[string]any{"t/e:0": "v"}))
 	if err != nil {
 		t.Fatalf("FlatToStructured: %v", err)
@@ -468,8 +456,8 @@ func TestBareStructuredMemberIsTheValueSuffix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FlatToStructured: %v", err)
 	}
-	if got := string(mixed); got != `{"t":{"e":[{"|formatting":"markdown","|value":"v"}]}}` {
-		t.Errorf("a bare value beside a suffix = %s, want the |value member", got)
+	if got := string(mixed); got != `{"t":{"e":[{"|":"v","|formatting":"markdown"}]}}` {
+		t.Errorf("a bare value beside a suffix = %s, want the \"|\" member", got)
 	}
 }
 
@@ -733,13 +721,13 @@ func TestFeederAuditThroughStructured(t *testing.T) {
 	if !ok || len(ids) != 2 {
 		t.Fatalf("originating_system_item_id = %#v, want a 2-element array", audit["originating_system_item_id"])
 	}
-	// The bare `original_content` sits beside its `|formalism` as the |value member.
+	// The bare `original_content` sits beside its `|formalism` as the "|" member.
 	content, ok := audit["original_content"].([]any)
 	if !ok || len(content) != 1 {
 		t.Fatalf("original_content = %#v, want a 1-element array", audit["original_content"])
 	}
-	if el, _ := content[0].(map[string]any); el["|value"] != "Hello world!" || el["|formalism"] != "text/plain" {
-		t.Errorf("original_content[0] = %#v, want the |value member beside |formalism", content[0])
+	if el, _ := content[0].(map[string]any); el["|"] != "Hello world!" || el["|formalism"] != "text/plain" {
+		t.Errorf("original_content[0] = %#v, want the \"|\" member beside |formalism", content[0])
 	}
 	// Three levels of nesting, each an array of objects.
 	osa, _ := audit["originating_system_audit"].([]any)[0].(map[string]any)
@@ -760,12 +748,11 @@ func TestFeederAuditThroughStructured(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Every *segment* comes back with the interconversion's explicit `:index`,
-	// and the bare `original_content` as its `|value` spelling.
+	// and the bare `original_content` as the bare key it was written as.
 	want := map[string]any{}
 	for k, v := range flat {
 		want[indexEverySegment(k)] = v
 	}
-	want = bareAsValueSuffix(want, indexEverySegment("t/obs/_feeder_audit/original_content"))
 	if !reflect.DeepEqual(back, want) {
 		t.Errorf("FLAT -> STRUCTURED -> FLAT:\n got  %#v\n want %#v", back, want)
 	}
@@ -801,8 +788,8 @@ func TestMultimediaLeafThroughStructured(t *testing.T) {
 		t.Fatalf("unmarshal structured: %v", err)
 	}
 	mm, _ := s["t"].(map[string]any)["obs"].([]any)[0].(map[string]any)["mm"].([]any)[0].(map[string]any)
-	if mm["|value"] != "http://med.tube.com/sample" || mm["|mediatype"] != "video/H261" {
-		t.Errorf("mm[0] = %#v, want the uri under |value beside |mediatype", mm)
+	if mm["|"] != "http://med.tube.com/sample" || mm["|mediatype"] != "video/H261" {
+		t.Errorf("mm[0] = %#v, want the uri under \"|\" beside |mediatype", mm)
 	}
 	if _, ok := mm["_thumbnail"].([]any); !ok {
 		t.Fatalf("_thumbnail = %#v, want an array", mm["_thumbnail"])
@@ -815,8 +802,8 @@ func TestMultimediaLeafThroughStructured(t *testing.T) {
 	if err := json.Unmarshal(fb, &back); err != nil {
 		t.Fatal(err)
 	}
-	if want := bareAsValueSuffix(flat, "t/obs:0/mm:0"); !reflect.DeepEqual(back, want) {
-		t.Errorf("FLAT -> STRUCTURED -> FLAT:\n got  %#v\n want %#v", back, want)
+	if !reflect.DeepEqual(back, flat) {
+		t.Errorf("FLAT -> STRUCTURED -> FLAT:\n got  %#v\n want %#v", back, flat)
 	}
 	again, err := simplified.FlatToStructured(fb)
 	if err != nil {

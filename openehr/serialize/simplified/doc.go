@@ -180,11 +180,13 @@
 // datatype that has one. [StructuredToFlat] writes a "|value" member as that
 // key and the "|" and "" members as the bare key, so the decode, which knows
 // each leaf's datatype, reads them, and the conversion needs no template.
-// [FlatToStructured] writes a bare value beside its leaf's members as the
-// "|value" member, except beside a suffix that no datatype with a bare value
-// reads, such as "|code" or "|magnitude": there it keeps "|", so a bare value
-// the leaf's datatype has no place for is not read as that datatype's own
-// "|value".
+// [FlatToStructured] has no template either, so it cannot tell whether a
+// leaf's datatype has a bare value: it keeps a bare value beside its leaf's
+// members as the "|" member, the FLAT key's own spelling, and never writes
+// "|value" for it. Each conversion then gives the other's output back as
+// written, and a bare value the leaf's datatype has no place for stays one
+// the decode refuses, in STRUCTURED as in FLAT. For the "|value" spelling,
+// encode the composition with [MarshalStructured].
 //
 // # Unmatched content
 //

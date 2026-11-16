@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -391,66 +392,6 @@ func withoutKeys(body map[string]any, keys ...string) map[string]any {
 	return out
 }
 
-// TestREQ053BareValueBesideAnotherDatatypesSuffixKeepsThePipe — REQ-053:
-// FLAT → STRUCTURED keeps a bare value as the `"|"` member where its element
-// holds a suffix no datatype with a bare value reads, so the conversion does
-// not change what the body means. A bare value at a DV_CODED_TEXT leaf beside
-// `|code` and `|terminology`, and one at a DV_QUANTITY leaf beside null
-// suffixes, are refused in FLAT; their STRUCTURED form is refused alike,
-// rather than read as the coded text's `|value` or dropped, and it converts
-// back to the bare key.
-func TestREQ053BareValueBesideAnotherDatatypesSuffixKeepsThePipe(t *testing.T) {
-	wt, _ := conformanceWT(t)
-	for name, tc := range map[string]struct {
-		leaf string
-		keys map[string]any
-	}{
-		"DV_CODED_TEXT beside |code": {
-			leaf: rmattrCodedText,
-			keys: map[string]any{rmattrCodedText: "Bare words", rmattrCodedText + "|code": "at0007", rmattrCodedText + "|terminology": "local"},
-		},
-		"DV_QUANTITY beside null suffixes": {
-			leaf: rmattrElement,
-			keys: map[string]any{rmattrElement: 5.0, rmattrElement + "|magnitude": nil, rmattrElement + "|unit": nil},
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			body := mustJSON(t, rmattrBody(tc.keys))
-			doc, err := FlatToStructured(body)
-			if err != nil {
-				t.Fatalf("FlatToStructured = %v", err)
-			}
-			for mode, opts := range map[string][]Option{"default": nil, "strict": {WithStrict()}} {
-				_, flatErr := UnmarshalFlat(body, wt, opts...)
-				_, structuredErr := UnmarshalStructured(doc, wt, opts...)
-				if flatErr == nil || structuredErr == nil {
-					t.Fatalf("%s decode: FLAT = %v, STRUCTURED = %v; want both refused", mode, flatErr, structuredErr)
-				}
-				for _, sentinel := range []error{ErrUnknownPath, ErrUnsupportedDatatype} {
-					if errors.Is(flatErr, sentinel) != errors.Is(structuredErr, sentinel) {
-						t.Errorf("%s decode: STRUCTURED refusal %v, want it to wrap what the FLAT refusal %v wraps", mode, structuredErr, flatErr)
-					}
-				}
-			}
-			back, err := StructuredToFlat(doc)
-			if err != nil {
-				t.Fatalf("StructuredToFlat = %v", err)
-			}
-			var flat map[string]any
-			if err := json.Unmarshal(back, &flat); err != nil {
-				t.Fatal(err)
-			}
-			key := indexedKey(tc.leaf)
-			if _, kept := flat[key]; !kept {
-				t.Errorf("FLAT → STRUCTURED → FLAT = %s, want the bare key %s back", back, key)
-			}
-			if _, spelled := flat[key+"|"+bareValueSuffix]; spelled {
-				t.Errorf("FLAT → STRUCTURED → FLAT = %s, wrote the bare value as |value", back)
-			}
-		})
-	}
-}
-
 // indexedKey is key with `:0` on every segment that carries no index, the
 // spelling OPT-free STRUCTURED → FLAT conversion writes, the template root's
 // segment aside.
@@ -464,63 +405,116 @@ func indexedKey(key string) string {
 	return strings.Join(segs, "/")
 }
 
-// TestREQ053BareValueMemberFollowsTheSuffixesBesideIt — REQ-053: FLAT →
-// STRUCTURED moves a bare value to `|value` beside suffixes that some datatype
-// with a bare value reads, and keeps `"|"` beside any other, each suffix
-// judged off the suffix sets decode reads, so a datatype that gains a suffix
-// moves with it. A suffix only datatypes with no bare value read, such as a
-// coded text's `|code` or a quantity's `|magnitude`, keeps `"|"`.
-func TestREQ053BareValueMemberFollowsTheSuffixesBesideIt(t *testing.T) {
-	read := map[string]bool{}
-	other := map[string]bool{}
-	for rmType, set := range allowedSuffixes {
+// TestREQ053BareValueMemberFollowsTheConversion — REQ-053: OPT-free FLAT →
+// STRUCTURED keeps a bare value beside its leaf's members as the `"|"` member,
+// beside every suffix any datatype reads, and STRUCTURED → FLAT gives the FLAT
+// body back exactly. Encode's restructuring writes the bare value as the
+// `|value` member, the reference's spelling, except beside a `|value` of the
+// leaf's own, so two values never share one member, and for a null bare
+// value: both keep `"|"`. A leaf carrying nothing but a bare value stays a
+// bare scalar either way.
+func TestREQ053BareValueMemberFollowsTheConversion(t *testing.T) {
+	suffixes := map[string]bool{}
+	for _, set := range allowedSuffixes {
 		for suffix := range set {
-			if suffix == "" || suffix == bareValueSuffix {
-				continue
-			}
-			if readsBareValue(rmType) {
-				read[suffix] = true
-			} else {
-				other[suffix] = true
+			if suffix != "" && suffix != bareValueSuffix {
+				suffixes[suffix] = true
 			}
 		}
 	}
-	for _, suffix := range []string{"code", "magnitude", "unit", "terminology", "ordinal"} {
-		if read[suffix] || !other[suffix] {
-			t.Errorf("fixture: |%s is read by a datatype with a bare value, or by none without one", suffix)
+	for _, suffix := range []string{"code", "magnitude", "normal_status", "formatting", "mediatype"} {
+		if !suffixes[suffix] {
+			t.Errorf("fixture: no datatype reads |%s", suffix)
 		}
 	}
-	for _, suffix := range slices.Sorted(maps.Keys(other)) {
-		if read[suffix] {
-			continue
-		}
+	for _, suffix := range slices.Sorted(maps.Keys(suffixes)) {
 		t.Run("|"+suffix, func(t *testing.T) {
-			assertBareMember(t, suffix, bareStructuredKey)
+			assertBareSpelling(t, map[string]any{"t/x:0": "v", "t/x:0|" + suffix: "s"},
+				`{"t":{"x":[{"|":"v","|`+suffix+`":"s"}]}}`,
+				`{"t":{"x":[{"|value":"v","|`+suffix+`":"s"}]}}`)
 		})
 	}
-	for _, suffix := range slices.Sorted(maps.Keys(read)) {
-		t.Run("|"+suffix, func(t *testing.T) {
-			assertBareMember(t, suffix, bareValueMember)
+	for name, tc := range map[string]struct {
+		flat            map[string]any
+		convert, encode string
+	}{
+		"beside a child": {
+			flat:    map[string]any{"t/x:0": "v", "t/x:0/y:0": 1.0},
+			convert: `{"t":{"x":[{"|":"v","y":[1]}]}}`,
+			encode:  `{"t":{"x":[{"|value":"v","y":[1]}]}}`,
+		},
+		"beside a family": {
+			flat:    map[string]any{"t/x:0": "v", "t/x:0/_uid:0": "u"},
+			convert: `{"t":{"x":[{"|":"v","_uid":["u"]}]}}`,
+			encode:  `{"t":{"x":[{"|value":"v","_uid":["u"]}]}}`,
+		},
+		"beside its own |value, values differ": {
+			flat:    map[string]any{"t/e:0": "bare", "t/e:0|code": "c", "t/e:0|value": "rubric"},
+			convert: `{"t":{"e":[{"|":"bare","|code":"c","|value":"rubric"}]}}`,
+			encode:  `{"t":{"e":[{"|":"bare","|code":"c","|value":"rubric"}]}}`,
+		},
+		"beside its own |value, values agree": {
+			flat:    map[string]any{"t/e:0": "same", "t/e:0|value": "same"},
+			convert: `{"t":{"e":[{"|":"same","|value":"same"}]}}`,
+			encode:  `{"t":{"e":[{"|":"same","|value":"same"}]}}`,
+		},
+		"null beside a suffix": {
+			flat:    map[string]any{"t/x:0": nil, "t/x:0|unit": "mg"},
+			convert: `{"t":{"x":[{"|":null,"|unit":"mg"}]}}`,
+			encode:  `{"t":{"x":[{"|":null,"|unit":"mg"}]}}`,
+		},
+		"alone": {
+			flat:    map[string]any{"t/x:0": "v"},
+			convert: `{"t":{"x":["v"]}}`,
+			encode:  `{"t":{"x":["v"]}}`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assertBareSpelling(t, tc.flat, tc.convert, tc.encode)
 		})
 	}
 }
 
-// assertBareMember converts a FLAT leaf holding a bare value beside suffix to
-// STRUCTURED and asserts that the bare value is its element's member want.
-func assertBareMember(t *testing.T, suffix, want string) {
+// assertBareSpelling asserts that FlatToStructured of flat, a FLAT body whose
+// every segment carries its :index, writes convert, and that STRUCTURED →
+// FLAT gives flat back exactly; and that encode's restructuring of flat
+// writes encode.
+func assertBareSpelling(t *testing.T, flat map[string]any, convert, encode string) {
 	t.Helper()
-	doc, err := FlatToStructured(mustJSON(t, map[string]any{"t/x": "v", "t/x|" + suffix: "s"}))
+	doc, err := FlatToStructured(mustJSON(t, flat))
 	if err != nil {
 		t.Fatalf("FlatToStructured = %v", err)
 	}
-	var root map[string]map[string][]map[string]any
-	if err := json.Unmarshal(doc, &root); err != nil {
-		t.Fatalf("FlatToStructured = %s: %v", doc, err)
+	if !sameJSON(t, doc, convert) {
+		t.Errorf("FlatToStructured(%s) = %s, want %s", mustJSON(t, flat), doc, convert)
 	}
-	el := root["t"]["x"][0]
-	if el[want] != "v" {
-		t.Errorf("FlatToStructured beside |%s = %s, want the bare value as the %q member", suffix, doc, want)
+	back, err := StructuredToFlat(doc)
+	if err != nil {
+		t.Fatalf("StructuredToFlat = %v", err)
 	}
+	if !sameJSON(t, back, string(mustJSON(t, flat))) {
+		t.Errorf("FLAT → STRUCTURED → FLAT = %s, want %s", back, mustJSON(t, flat))
+	}
+	encoded, err := flatToStructured(maps.Clone(flat), bareAsValue)
+	if err != nil {
+		t.Fatalf("flatToStructured(bareAsValue) = %v", err)
+	}
+	if got := mustJSON(t, encoded); !sameJSON(t, got, encode) {
+		t.Errorf("flatToStructured(%s, bareAsValue) = %s, want %s", mustJSON(t, flat), got, encode)
+	}
+}
+
+// sameJSON reports whether got and want are the same JSON value.
+func sameJSON(t *testing.T, got []byte, want string) bool {
+	t.Helper()
+	var g, w any
+	if err := json.Unmarshal(got, &g); err != nil {
+		t.Fatalf("unmarshal %s: %v", got, err)
+	}
+	if err := json.Unmarshal([]byte(want), &w); err != nil {
+		t.Fatalf("unmarshal %s: %v", want, err)
+	}
+	return reflect.DeepEqual(g, w)
 }
 
 // TestREQ053FlatToStructuredKeepsTheBareKey — REQ-053: OPT-free FLAT →

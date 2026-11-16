@@ -26,7 +26,7 @@ func MarshalStructured(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	s, err := flatToStructured(flat)
+	s, err := flatToStructured(flat, bareAsValue)
 	if err != nil {
 		return nil, err
 	}
@@ -67,12 +67,20 @@ func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate, opts ...Optio
 }
 
 // FlatToStructured restructures FLAT JSON into STRUCTURED JSON (no OPT needed).
+//
+// Without a template the restructuring cannot tell which datatype a leaf has,
+// so a bare value beside the leaf's suffixes or members stays the "|" member,
+// the spelling of the FLAT key itself, and [StructuredToFlat] gives that key
+// back as written. Decode reads the "|" member as the bare value, as it reads
+// the "|value" member. For the reference implementation's "|value" spelling,
+// encode the composition with [MarshalStructured], which knows each leaf's
+// datatype.
 func FlatToStructured(data []byte) ([]byte, error) {
 	flat, err := unmarshalObject(data)
 	if err != nil {
 		return nil, err
 	}
-	s, err := flatToStructured(flat)
+	s, err := flatToStructured(flat, bareAsKey)
 	if err != nil {
 		return nil, err
 	}
@@ -97,8 +105,9 @@ func StructuredToFlat(data []byte) ([]byte, error) {
 // are processed in sorted order — output must not depend on Go map iteration
 // (determinism is a hard requirement) — and a key whose placement conflicts
 // with another key's (scalar vs object at one slot) is an error, never a
-// last-write-wins overwrite.
-func flatToStructured(flat map[string]any) (map[string]any, error) {
+// last-write-wins overwrite. spelling is the member a bare value beside its
+// leaf's members takes.
+func flatToStructured(flat map[string]any, spelling bareSpelling) (map[string]any, error) {
 	// A key that is no path in the FLAT grammar has no STRUCTURED member to
 	// become: refused, as decode refuses it (REQ-170).
 	if err := checkFlatKeys(flat); err != nil {
@@ -115,7 +124,8 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 	budget := &allocBudget{limit: maxTotalNodes}
 	var ctxObj map[string]any
 	// bares holds the element objects a bare value was placed on, for
-	// [spellBareValues] once every key is placed.
+	// [spellBareValues] to respell once every key is placed, where spelling
+	// asks for it.
 	var bares []map[string]any
 	for _, key := range slices.Sorted(maps.Keys(flat)) {
 		val := flat[key]
@@ -197,14 +207,33 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 			return nil, fmt.Errorf("simplified: structured %q: %w", key, err)
 		}
 	}
-	spellBareValues(bares)
+	if spelling == bareAsValue {
+		spellBareValues(bares)
+	}
 	return root, nil
 }
 
-// bareValueMember is the STRUCTURED member a leaf's **bare** FLAT value takes
-// when that leaf also carries |suffixes or nested `_` attributes, so the array
-// element has to be an object: `|value`, the reference implementation's spelling
-// (ADR 0014).
+// bareSpelling is the STRUCTURED member [flatToStructured] gives a bare value
+// that sits beside its leaf's suffixes or members.
+type bareSpelling bool
+
+const (
+	// bareAsKey keeps the bare value as [bareStructuredKey], the FLAT key's
+	// own spelling. OPT-free conversion writes it: without a template it
+	// cannot tell whether the leaf's datatype has a bare value, so it gives
+	// the key back as written, and FLAT → STRUCTURED → FLAT and STRUCTURED →
+	// FLAT → STRUCTURED are both exact (REQ-053).
+	bareAsKey bareSpelling = false
+	// bareAsValue respells the bare value as [bareValueMember], the
+	// reference implementation's spelling ([spellBareValues]). Encode writes
+	// it, since encode writes a bare value only at a datatype that has one.
+	bareAsValue bareSpelling = true
+)
+
+// bareValueMember is the STRUCTURED member encode gives a leaf's **bare** FLAT
+// value when that leaf also carries |suffixes or nested `_` attributes, so the
+// array element has to be an object: `|value`, the reference implementation's
+// spelling (ADR 0014).
 //
 // A leaf carrying *only* a bare value stays a bare scalar in the array, which is
 // what every STRUCTURED body this codec has ever emitted looks like; the member
@@ -218,17 +247,19 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 // reads as the bare value of every datatype that has one ([readsBareValue]), and
 // as the own `|value` of DV_CODED_TEXT, DV_ORDINAL and DV_SCALE, which have no
 // bare value: the Web Template decides at decode what the conversion cannot.
+// OPT-free FLAT → STRUCTURED writes no such member for a bare key: it keeps
+// [bareStructuredKey] ([bareAsKey]).
 const bareValueMember = "|" + bareValueSuffix
 
 // bareStructuredKey is the STRUCTURED member, `"|"`, that a bare value keeps
 // where its element also holds a `|value` suffix of its own: the `"|"+suffix`
 // convention with the empty suffix the FLAT key itself spells. The two values
 // then never share one member, and OPT-free conversion gives each back as
-// written. FLAT → STRUCTURED places every bare value here first, and
-// [spellBareValues] moves it to [bareValueMember] once every key is placed,
-// except a null one and one beside a suffix no datatype with a bare value
-// reads. A ctx/ field keeps it too, since ctx/setting has a `|value` of its
-// own.
+// written. FLAT → STRUCTURED places every bare value here. OPT-free
+// conversion keeps it there ([bareAsKey]); encode moves it to
+// [bareValueMember] once every key is placed ([spellBareValues]), except a
+// null one and one beside a `|value` of its own. A ctx/ field keeps it too,
+// since ctx/setting has a `|value` of its own.
 const bareStructuredKey = "|"
 
 // emptyBareMember is the STRUCTURED member `""`, another spelling of a bare
@@ -243,50 +274,23 @@ func isBareMember(name string) bool {
 }
 
 // spellBareValues moves the bare value of each element object in bares, which
-// holds it as [bareStructuredKey], to [bareValueMember]. An element that also
-// holds a |value suffix keeps [bareStructuredKey], so two values never share
-// one member. So does a null bare value, which carries nothing: OPT-free
-// conversion gives it back as the key it was written as, absent wherever that
-// key resolves (REQ-053), where a `|value` would be a suffix a position with
-// no bare value does not read. So does an element holding a suffix no
-// datatype with a bare value reads ([readByBareValueDatatype]), such as a
-// coded text's |code or a quantity's |magnitude: its leaf has no bare value,
-// so a `|value` would be read as the leaf's own or not at all, where the bare
-// key is refused, as it is in FLAT. Encode writes no such element, since it
-// writes a bare value only where the datatype has one.
+// holds it as [bareStructuredKey], to [bareValueMember], as encode writes it.
+// An element that also holds a |value suffix keeps [bareStructuredKey], so two
+// values never share one member. So does a null bare value, which carries
+// nothing and is absent wherever its key resolves (REQ-053), where a `|value`
+// would be a suffix a position with no bare value does not read. Encode
+// writes a bare value only at a datatype that has one, so the respelling
+// never turns a bare value into a datatype's own `|value`; OPT-free
+// conversion, which cannot tell the datatype, does not respell ([bareAsKey]).
 func spellBareValues(bares []map[string]any) {
 	for _, el := range bares {
 		v, held := el[bareStructuredKey]
-		if _, own := el[bareValueMember]; !held || own || v == nil || holdsSuffixNoBareValueReads(el) {
+		if _, own := el[bareValueMember]; !held || own || v == nil {
 			continue
 		}
 		delete(el, bareStructuredKey)
 		el[bareValueMember] = v
 	}
-}
-
-// holdsSuffixNoBareValueReads reports whether el, an element object, holds a
-// |suffix member that no datatype with a bare value reads.
-func holdsSuffixNoBareValueReads(el map[string]any) bool {
-	for name := range el {
-		if suffix, piped := strings.CutPrefix(name, "|"); piped && suffix != "" && !readByBareValueDatatype(suffix) {
-			return true
-		}
-	}
-	return false
-}
-
-// readByBareValueDatatype reports whether some datatype with a bare value
-// reads suffix ([readsBareValue], [readsSuffix]), judged off
-// [allowedSuffixes], so a datatype that gains a suffix or a bare value moves
-// the judgement with it.
-func readByBareValueDatatype(suffix string) bool {
-	for rmType := range allowedSuffixes {
-		if readsBareValue(rmType) && readsSuffix(rmType, suffix) {
-			return true
-		}
-	}
-	return false
 }
 
 // heldNull marks an array slot that a bare FLAT value of JSON null was placed

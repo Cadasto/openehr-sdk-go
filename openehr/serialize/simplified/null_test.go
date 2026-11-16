@@ -296,10 +296,17 @@ func TestREQ053InterconversionCarriesNull(t *testing.T) {
 // holding null in every shape: a lone bare value as a null array element, a
 // suffix as a null `|suffix` member, and a bare value beside the leaf's
 // suffixes or children as the null `"|"` member, so it comes back as the bare
-// key it was written as, where a bare value that is not null takes the
-// `|value` member. A slot no key fills, before a higher :index, gains no
-// member.
+// key it was written as, as a bare value that is not null does. Encode's
+// restructuring writes the same document, except that a bare value beside the
+// leaf's members that is not null takes the `|value` member (encode, where it
+// differs); a null one keeps `"|"` there too. A slot no key fills, before a
+// higher :index, gains no member.
 func TestREQ053FlatToStructuredCarriesNull(t *testing.T) {
+	const encodedBesideAChild = `{"t":{"x":[{"|value":"a","y":[1]}]}}`
+	encodes := map[string]string{
+		"two spellings beside a child, the null first":  encodedBesideAChild,
+		"two spellings beside a child, the null second": encodedBesideAChild,
+	}
 	for name, tc := range map[string]struct{ flat, want string }{
 		"lone bare value":         {`{"t/x": null}`, `{"t":{"x":[null]}}`},
 		"suffix":                  {`{"t/x|unit": null}`, `{"t":{"x":[{"|unit":null}]}}`},
@@ -311,10 +318,10 @@ func TestREQ053FlatToStructuredCarriesNull(t *testing.T) {
 		// first: the sorted key order decides only which one is placed first.
 		"two spellings, the null second": {`{"t/x": "a", "t/x:0": null}`, `{"t":{"x":["a"]}}`},
 		"two spellings beside a child, the null first": {
-			`{"t/x": null, "t/x/y": 1, "t/x:0": "a"}`, `{"t":{"x":[{"|value":"a","y":[1]}]}}`,
+			`{"t/x": null, "t/x/y": 1, "t/x:0": "a"}`, `{"t":{"x":[{"|":"a","y":[1]}]}}`,
 		},
 		"two spellings beside a child, the null second": {
-			`{"t/x": "a", "t/x/y": 1, "t/x:0": null}`, `{"t":{"x":[{"|value":"a","y":[1]}]}}`,
+			`{"t/x": "a", "t/x/y": 1, "t/x:0": null}`, `{"t":{"x":[{"|":"a","y":[1]}]}}`,
 		},
 		"two spellings of a suffix, the null first":       {`{"t/x:0|unit": null, "t/x|unit": "mg"}`, `{"t":{"x":[{"|unit":"mg"}]}}`},
 		"two spellings of a suffix, the null second":      {`{"t/x:0|unit": "mg", "t/x|unit": null}`, `{"t":{"x":[{"|unit":"mg"}]}}`},
@@ -344,6 +351,28 @@ func TestREQ053FlatToStructuredCarriesNull(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf("FlatToStructured(%s) = %s, want %s", tc.flat, out, tc.want)
+			}
+			encode, differs := encodes[name]
+			if !differs {
+				encode = tc.want
+			}
+			var flat map[string]any
+			if err := json.Unmarshal([]byte(tc.flat), &flat); err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := flatToStructured(flat, bareAsValue)
+			if err != nil {
+				t.Fatalf("flatToStructured(%s, bareAsValue) = %v", tc.flat, err)
+			}
+			out = mustJSON(t, encoded)
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal([]byte(encode), &want); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("flatToStructured(%s, bareAsValue) = %s, want %s", tc.flat, out, encode)
 			}
 		})
 	}
@@ -409,12 +438,12 @@ func TestREQ053DvFromSuffixesReadsNullAsAbsent(t *testing.T) {
 // the datatype reads, and malformed alone. Null suffixes are absent, so a bare
 // value beside nothing else is alone, and refused as a value missing every
 // required suffix, rather than set aside while the null suffixes vanish: a
-// DV_QUANTITY's, in FLAT and as the `"|"` or the `""` member in STRUCTURED (a
-// `|value` member is a suffix, and a DV_QUANTITY has no bare value and no
-// `|value`, so FLAT → STRUCTURED keeps `"|"` beside its `|magnitude`). A
-// DV_PROPORTION's bare value, its magnitude, is read in every spelling, so
-// beside a null numerator and denominator it is alone too, and refused as the
-// proportion missing its numerator.
+// DV_QUANTITY's, in FLAT and as the `"|"` member FLAT → STRUCTURED keeps or
+// the `""` member in STRUCTURED (a `|value` member is a suffix, and a
+// DV_QUANTITY has no bare value and no `|value`). A DV_PROPORTION's bare
+// value, its magnitude, is read in every spelling, so beside a null numerator
+// and denominator it is alone too, and refused as the proportion missing its
+// numerator.
 func TestREQ053BareValueBesideOnlyNullSuffixesIsAlone(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	// spellings decodes body, whose leaf's bare value is 1.5, in FLAT and in
@@ -425,12 +454,9 @@ func TestREQ053BareValueBesideOnlyNullSuffixesIsAlone(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FlatToStructured: %v", err)
 		}
-		held := []byte(strconv.Quote(bareValueMember) + `:1.5`)
+		held := []byte(strconv.Quote(bareStructuredKey) + `:1.5`)
 		if !bytes.Contains(doc, held) {
-			held = []byte(strconv.Quote(bareStructuredKey) + `:1.5`)
-		}
-		if !bytes.Contains(doc, held) {
-			t.Fatalf("fixture: no bare value member holding 1.5 in %s", doc)
+			t.Fatalf("FlatToStructured = %s, want the bare value 1.5 as the %q member", doc, bareStructuredKey)
 		}
 		out := map[string]error{"FLAT": refusedInEveryMode(t, wt, body)}
 		for _, member := range members {

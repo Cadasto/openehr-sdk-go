@@ -75,19 +75,20 @@ func spoBody(extra map[string]any) map[string]any {
 	return body
 }
 
-// respelledMember is the STRUCTURED form of body with its member `"|value":v`
-// renamed member, where v is the JSON text of the value.
+// respelledMember is the STRUCTURED form of body with its member `"|":v`, the
+// bare value FlatToStructured keeps beside the leaf's suffixes, renamed
+// member, where v is the JSON text of the value.
 func respelledMember(t *testing.T, body map[string]any, v, member string) []byte {
 	t.Helper()
 	doc, err := simplified.FlatToStructured(mustJSON(t, body))
 	if err != nil {
 		t.Fatalf("FlatToStructured: %v", err)
 	}
-	out := bytes.Replace(doc, []byte(`"|value":`+v), []byte(strconv.Quote(member)+`:`+v), 1)
-	if bytes.Equal(out, doc) {
-		t.Fatalf("fixture: no |value member holding %s in %s", v, doc)
+	held := []byte(`"|":` + v)
+	if !bytes.Contains(doc, held) {
+		t.Fatalf("fixture: no \"|\" member holding %s in %s", v, doc)
 	}
-	return out
+	return bytes.Replace(doc, held, []byte(strconv.Quote(member)+`:`+v), 1)
 }
 
 // TestREQ053BareProportionValueIsItsMagnitude — REQ-053, issue 456. The
@@ -124,7 +125,7 @@ func TestREQ053BareProportionValueIsItsMagnitude(t *testing.T) {
 					}
 				}
 			}
-			for _, member := range []string{"|", ""} {
+			for _, member := range []string{"|value", "|", ""} {
 				got, err := simplified.UnmarshalStructured(respelledMember(t, spoBody(map[string]any{spoKey: 0.5}), "0.5", member), wt, mode.opts...)
 				if err != nil {
 					t.Errorf("STRUCTURED %q member: decode = %v", member, err)

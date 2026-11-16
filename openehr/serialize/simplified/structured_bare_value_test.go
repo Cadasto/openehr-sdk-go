@@ -2,14 +2,16 @@ package simplified_test
 
 // REQ-053 / REQ-170 — the STRUCTURED spelling of a bare value that sits beside
 // its leaf's suffixes: encode writes the `|value` member, the reference's
-// spelling (ADR 0014), and decode reads `|value`, `"|"` and `""` as that bare
-// value, refusing two spellings of it that disagree.
+// spelling (ADR 0014), OPT-free FLAT → STRUCTURED keeps the `"|"` member, and
+// decode reads `|value`, `"|"` and `""` as that bare value, refusing two
+// spellings of it that disagree.
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -165,9 +167,13 @@ func canonicalOf(t *testing.T, comp *rm.Composition) []byte {
 }
 
 // TestREQ053StructuredBareValueIsTheValueMember — REQ-053: a bare value beside
-// its leaf's suffixes is the element's `|value` member, as the reference
-// writes it, and neither `"|"` nor `""`. MarshalStructured and the OPT-free
-// FlatToStructured write the same document.
+// its leaf's suffixes is the element's `|value` member where MarshalStructured
+// writes it, as the reference writes it, and neither `"|"` nor `""`. The
+// OPT-free FlatToStructured of the same composition's FLAT writes the same
+// document with the bare value as the `"|"` member alone, the FLAT key's own
+// spelling. Each conversion gives the other's input back exactly: STRUCTURED →
+// FLAT → STRUCTURED from MarshalStructured's document, and FLAT → STRUCTURED →
+// FLAT from MarshalFlat's body.
 func TestREQ053StructuredBareValueIsTheValueMember(t *testing.T) {
 	for _, id := range bareValueTemplates {
 		t.Run(id, func(t *testing.T) {
@@ -176,26 +182,76 @@ func TestREQ053StructuredBareValueIsTheValueMember(t *testing.T) {
 			if err != nil {
 				t.Fatalf("FlatToStructured: %v", err)
 			}
-			for name, doc := range map[string][]byte{"MarshalStructured": target.doc, "FlatToStructured": converted} {
+			for name, tc := range map[string]struct {
+				doc  []byte
+				want string
+			}{
+				"MarshalStructured": {target.doc, "|value"},
+				"FlatToStructured":  {converted, "|"},
+			} {
 				var root map[string]any
-				if err := json.Unmarshal(doc, &root); err != nil {
+				if err := json.Unmarshal(tc.doc, &root); err != nil {
 					t.Fatalf("%s: unmarshal: %v", name, err)
 				}
 				els := leafElements(root, bareValueLeaf)
 				if len(els) == 0 {
-					t.Fatalf("%s: no %q element in %s", name, bareValueLeaf, doc)
+					t.Fatalf("%s: no %q element in %s", name, bareValueLeaf, tc.doc)
 				}
 				for _, el := range els {
-					_, value := el["|value"]
-					_, pipe := el["|"]
-					_, empty := el[""]
-					if !value || pipe || empty {
-						t.Errorf("%s: element %v, want the bare value under |value alone", name, el)
+					var held []string
+					for _, spelling := range bareValueSpellings {
+						if _, ok := el[spelling]; ok {
+							held = append(held, spelling)
+						}
+					}
+					if len(held) != 1 || held[0] != tc.want {
+						t.Errorf("%s: element %v holds the bare value as %q, want %q alone", name, el, held, tc.want)
 					}
 				}
 			}
-			if !bytes.Equal(converted, target.doc) {
-				t.Errorf("FlatToStructured = %s\nwant what MarshalStructured writes, %s", converted, target.doc)
+			var got, want any
+			if err := json.Unmarshal(respell(t, converted, []string{"|value"}, []any{nil}), &got); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(target.doc, &want); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("FlatToStructured with its \"|\" members named |value = %s\nwant what MarshalStructured writes, %s", converted, target.doc)
+			}
+
+			flat, err := simplified.StructuredToFlat(target.doc)
+			if err != nil {
+				t.Fatalf("StructuredToFlat(MarshalStructured) = %v", err)
+			}
+			again, err := simplified.FlatToStructured(flat)
+			if err != nil {
+				t.Fatalf("FlatToStructured(StructuredToFlat(MarshalStructured)) = %v", err)
+			}
+			if !bytes.Equal(again, target.doc) {
+				t.Errorf("STRUCTURED → FLAT → STRUCTURED = %s\nwant what MarshalStructured writes, %s", again, target.doc)
+			}
+			back, err := simplified.StructuredToFlat(converted)
+			if err != nil {
+				t.Fatalf("StructuredToFlat(FlatToStructured) = %v", err)
+			}
+			var gotFlat, sent map[string]any
+			if err := json.Unmarshal(back, &gotFlat); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(target.flat, &sent); err != nil {
+				t.Fatal(err)
+			}
+			// The conversion writes every segment's :index, ctx/ fields aside.
+			wantFlat := make(map[string]any, len(sent))
+			for k, v := range sent {
+				if !strings.HasPrefix(k, "ctx/") {
+					k = indexEverySegment(k)
+				}
+				wantFlat[k] = v
+			}
+			if !reflect.DeepEqual(gotFlat, wantFlat) {
+				t.Errorf("FLAT → STRUCTURED → FLAT = %s\nwant MarshalFlat's body, %s", back, target.flat)
 			}
 		})
 	}
