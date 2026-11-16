@@ -1328,7 +1328,10 @@ The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill`
 
 - `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue`, a single representative value, byte-identical across calls for one OPT.
 - `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls.
-  A `DV_DURATION`'s `value` under a `C_DURATION` is a duration that is not zero: a count from 1 to 12 of one designator the constraint accepts it in, drawn, such as `P3Y` or `PT7H`; else the count 1 of the first designator, in written order, it accepts; and else its `ExampleValue`.
+  A `DV_DURATION`'s `value` under a `C_DURATION` is a duration that is not zero: a count of one designator the constraint accepts it in, drawn, such as `P3Y` or `PT7H`.
+  Where the constraint has no range, the count is from 1 to 12; where it has one, it is drawn among the counts of that designator inside the range, between its bounds or twelve from its one bound, a designator a bound is written in tried first.
+  Else the value is the count 1 of the first designator, in written order, the constraint accepts, and else its `ExampleValue`.
+  A `DV_DURATION` whose `value` the OPT leaves unconstrained, naming none or a `C_PRIMITIVE_OBJECT` with no item, is drawn as one under an empty `C_DURATION`.
   It rounds what it draws where a precision applies, and keeps a draw unrounded where the rounded one would leave the constraint:
   - a `DV_QUANTITY`'s `magnitude`: to as many decimals as its precision allows where that is 0 or 1, so to none where the precision admits 0 alone, and to two otherwise.
     Its precision is the upper bound of the precision range of the `C_DV_QUANTITY` entry it is drawn in, or the `precision` the walk wrote where the OPT builds the quantity attribute by attribute.

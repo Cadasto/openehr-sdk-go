@@ -52,18 +52,19 @@ var errNoNormalValue = errors.New("the OPT admits no value the generator can der
 // wrapping ErrConstraintUnsatisfiable that names the RM type, the attribute
 // and the OPT path, and no value.
 //
-// It reads the pairs orderIntervalBounds orders, with the comparisons it
-// orders them by: a DV_COUNT by magnitude; a DV_QUANTITY by magnitude where
-// the bounds of its range share its units; a DV_PROPORTION by ratio where
-// they share its type; a DV_ORDINAL by value; and a DV_DATE, DV_TIME or
-// DV_DATE_TIME where its bounds compare with it (temporalCompare). Any
-// other value, such as a DV_SCALE or a DV_DURATION, one that a bound of its
-// range does not compare with, and one whose range is open on both sides,
-// which has no bound to pair it with, is left as generated. It runs once
-// the value and its range are final: the walk has written the range, with
-// its bounds in order
-// (orderIntervalBounds) and its flags settled (settleIntervalEndpoints), and
-// finishNode has settled a DV_PROPORTION's kind (settleProportion). The OPT
+// It reads these pairs, which orderIntervalBounds orders too, with the
+// comparisons it orders them by: a DV_COUNT by magnitude; a DV_QUANTITY by
+// magnitude where the bounds of its range share its units; a DV_PROPORTION
+// by ratio where they share its type; a DV_ORDINAL by value; and a DV_DATE,
+// DV_TIME or DV_DATE_TIME where its bounds compare with it
+// (temporalCompare). Any other value is left as generated: a DV_SCALE; a
+// DV_DURATION whatever its normal_range, though orderIntervalBounds orders
+// two of them; one that a bound of its range does not compare with; and one
+// whose range is open on both sides, which has no bound to pair it with.
+// It runs once the value and its range are final: the walk has written the
+// range, with its bounds in order (orderIntervalBounds) and its flags
+// settled (settleIntervalEndpoints), and finishNode has settled a
+// DV_PROPORTION's kind (settleProportion). The OPT
 // constrains a DV_ORDINAL here through a C_INTEGER on its value: a
 // C_DV_ORDINAL makes the ordinal a primitive leaf, which carries no
 // normal_range. opt is the OPT node of v.
