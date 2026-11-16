@@ -2,6 +2,7 @@ package instance
 
 import (
 	"fmt"
+	"math"
 	mrand "math/rand/v2"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -150,13 +151,20 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 
 	case constraints.DvQuantity:
 		if len(c.Units) == 0 {
-			return nil
+			// Any magnitude in the example's units: the units of the
+			// property, or 1.
+			q, ok := c.ExampleValue().(constraints.QuantityValue)
+			if !ok {
+				return nil
+			}
+			q.Magnitude = s.quantityMagnitude(constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}, constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true})
+			return q
 		}
 		u, ok := quantityUnitEntry(c, s.quantityUnit)
 		if !ok {
 			u = c.Units[s.intN(len(c.Units))]
 		}
-		mag := sampleMagnitude(u.Magnitude, s)
+		mag := s.quantityMagnitude(u.Magnitude, u.Precision)
 		return constraints.QuantityValue{Magnitude: mag, Units: u.Units, Precision: -1}
 
 	case constraints.CDate:
@@ -204,13 +212,89 @@ func quantityUnitEntry(c constraints.DvQuantity, name string) (constraints.Quant
 	return constraints.QuantityUnit{}, false
 }
 
-// sampleMagnitude draws an in-range magnitude for a quantity unit,
-// falling back to the example magnitude for an unbounded range.
-func sampleMagnitude(r constraints.NumericRange, s sampler) float64 {
-	if lo, hi, ok := floatSampleBounds(r); ok {
-		return s.between(lo, hi)
+// quantityDraws is how many times quantityMagnitude draws before it falls
+// back to the middle of its window.
+const quantityDraws = 4
+
+// quantityMagnitude draws a magnitude for a quantity entry whose magnitude
+// range is r and whose precision range is precision. It draws from the
+// range's window (quantityWindow), inset by a tenth of the window's width
+// from each side the range bounds, and rounds the draw to the decimals
+// precision gives (quantityDecimals). A rounded draw that lands on 0, on a
+// bound of the range or outside it is drawn again, up to quantityDraws
+// times, and then the middle of the window, rounded, is tried. Where
+// neither suits, the last draw is kept unrounded, which the window keeps
+// inside the range; sampleValue then checks it against the constraint.
+func (s sampler) quantityMagnitude(r, precision constraints.NumericRange) float64 {
+	lo, hi := quantityWindow(r)
+	inset := float64(hi-lo) / 10
+	if !r.LowerUnbounded {
+		lo += inset
 	}
-	return exampleMagnitudeFallback(r)
+	if !r.UpperUnbounded {
+		hi -= inset
+	}
+	decimals := quantityDecimals(precision)
+	suits := func(v float64) bool {
+		return v != 0 && r.Contains(v) &&
+			(r.LowerUnbounded || v != r.Lower) && (r.UpperUnbounded || v != r.Upper)
+	}
+	var drawn float64
+	for range quantityDraws {
+		drawn = s.between(lo, hi)
+		if v := roundTo(drawn, decimals); suits(v) {
+			return v
+		}
+	}
+	if v := roundTo(float64(lo+hi)/2, decimals); suits(v) {
+		return v
+	}
+	return drawn
+}
+
+// quantityWindow returns the window a quantity magnitude is drawn from:
+// the range itself where it is bounded on both sides, sampleWindow from
+// its bound where it is bounded on one, and 1 to 100 where it is open.
+func quantityWindow(r constraints.NumericRange) (lo, hi float64) {
+	switch {
+	case !r.LowerUnbounded && !r.UpperUnbounded:
+		return r.Lower, r.Upper
+	case !r.LowerUnbounded:
+		return r.Lower, r.Lower + sampleWindow
+	case !r.UpperUnbounded:
+		return r.Upper - sampleWindow, r.Upper
+	}
+	return 1, sampleWindow
+}
+
+// maxQuantityDecimals is how many decimals a drawn magnitude keeps where
+// the template's precision does not ask for fewer.
+const maxQuantityDecimals = 2
+
+// quantityDecimals returns how many decimals a magnitude drawn under the
+// precision range precision keeps: the range's upper bound where it has
+// one below maxQuantityDecimals, so none where it admits 0 alone and one
+// where it admits up to 1, and maxQuantityDecimals otherwise. A precision
+// of -1 means no limit, so an upper bound below 0 asks for no fewer.
+func quantityDecimals(precision constraints.NumericRange) int {
+	if precision.UpperUnbounded {
+		return maxQuantityDecimals
+	}
+	upper := int(math.Floor(precision.Upper))
+	if !precision.UpperInclusive && float64(upper) == precision.Upper {
+		upper--
+	}
+	if upper < 0 || upper > maxQuantityDecimals {
+		return maxQuantityDecimals
+	}
+	return upper
+}
+
+// roundTo rounds v to decimals decimal places. The scale is a power of
+// ten, so a whole number comes back exact.
+func roundTo(v float64, decimals int) float64 {
+	scale := math.Pow10(decimals)
+	return math.Round(v*scale) / scale
 }
 
 // sampleWindow is how far from its bounded side the sampler draws from a
@@ -274,18 +358,6 @@ func floatSampleBounds(r constraints.NumericRange) (lo, hi float64, ok bool) {
 		return 0, 0, false
 	}
 	return lo, hi, true
-}
-
-// exampleMagnitudeFallback mirrors the constraints package's
-// example-magnitude rule for an unbounded quantity range.
-func exampleMagnitudeFallback(r constraints.NumericRange) float64 {
-	if !r.LowerUnbounded {
-		return r.Lower
-	}
-	if !r.UpperUnbounded {
-		return r.Upper
-	}
-	return 0
 }
 
 func filterInts(list []int64, r constraints.NumericRange) []int64 {
