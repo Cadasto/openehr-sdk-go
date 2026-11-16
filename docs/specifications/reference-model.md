@@ -6,7 +6,7 @@ kind: specification
 
 **Status:** Draft
 
-Rules for representing the openEHR Reference Model (RM) and the other BMM-derived models in Go: the shape of the generated types, the openEHR terminology vocabulary (REQ-034) and the type registry (REQ-040); the pinned BMM sources, the loader and the generator's mapping (REQ-041, REQ-045, REQ-048); and the RM's behavioural functions (REQ-120, REQ-121, REQ-123). The retired REQ-030 to REQ-033 are [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go); the retired REQ-042, The retired REQ-043, REQ-044, REQ-046 and REQ-047 are part of REQ-041, the retired REQ-049 is part of REQ-048, and the retired REQ-122 is part of REQ-120.
+Rules for representing the openEHR Reference Model (RM) and the other BMM-derived models in Go: the shape of the generated types, the openEHR terminology vocabulary (REQ-034) and the type registry (REQ-040); the pinned BMM sources, the loader and the generator's mapping (REQ-041, REQ-045, REQ-048); and the RM's behavioural functions (REQ-120, REQ-121, REQ-123). The retired REQ-030 to REQ-033 are [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go); the retired REQ-042, REQ-043, REQ-044, REQ-046 and REQ-047 are part of REQ-041, the retired REQ-049 is part of REQ-048, and the retired REQ-122 is part of REQ-120.
 
 The RM types in `openehr/rm/` are **generated** from the SDK-authored RM root over the pinned BMM schemas in [`../resources/bmm/`](../../resources/bmm); the rules below state the *shape* the generator emits. Generator semantics (mapping rules per P_BMM construct, primitive types, file conventions) are [§ BMM sources and the generator](#bmm-sources-and-the-generator).
 
@@ -79,7 +79,7 @@ Because ADR 0002 D4 flattens the `LOCATABLE` fields into every concrete descenda
 ## What is NOT in scope here
 
 - **Template-specific generated structs.** A typed Go struct for a specific OPT (e.g. a vital-signs template) is **not** part of `openehr/rm/` — that belongs in the consuming project (see [scope.md § Out of scope](scope.md#out-of-scope-v1)).
-- **The full RM type list.** The dictionary of types lives in `openehr/rm/` once implemented; this spec defines the *rules*, not the inventory.
+- **The full RM type list.** The dictionary of types lives in `openehr/rm/`; this spec defines the *rules*, not the inventory.
 
 ## Codec interaction
 
@@ -322,28 +322,28 @@ LOCATABLE concrete descendants additionally receive the generated identity surfa
 | `P_BMM_SINGLE_PROPERTY` + `is_mandatory: true` | `T` (the mapped type) |
 | `P_BMM_SINGLE_PROPERTY` + `is_mandatory: false` or absent | `*T` (pointer to express optionality) |
 | `P_BMM_SINGLE_PROPERTY_OPEN` | `T` where `T` is the open generic parameter |
-| `P_BMM_CONTAINER_PROPERTY` | `[]T` for `List` / `Array`; `[]T` (with a documented uniqueness invariant) for `Set`; `map[string]V` for `Hash` — see § Container mapping |
+| `P_BMM_CONTAINER_PROPERTY` | `[]T` for `List`, `Array` and `Set`; `map[string]V` for `Hash` — see § Container mapping |
 | `P_BMM_GENERIC_PROPERTY` | The generic instantiation, e.g. `*DVInterval[DVQuantity]` for `DV_INTERVAL<DV_QUANTITY>` |
 
 Three cases depart from the single-property rows. A non-mandatory property whose type the generator emits as a Go interface (an abstract class, or a concrete class with subtypes, emitted as a narrow `…Like` interface) stays `T`, because an interface field is already nilable. A mandatory property that closes a cycle of mandatory struct-typed properties, such as `ARCHETYPE.ontology` and `ARCHETYPE_ONTOLOGY.parent_archetype` in the pinned `openehr_am_1.4.0`, becomes `*T`, because Go cannot declare a struct that contains itself by value. A non-mandatory property whose BMM type is `Any` **MUST** be emitted as `*any`, because `Any` is a primitive and not a class the interface exception covers. The pinned `openehr_am_1.4.0` emits five, each an `assumed_value` it declares on `C_DEFINED_OBJECT` or `C_PRIMITIVE`; the AOM 1.4 root drops it from `C_COMPLEX_OBJECT` and `C_PRIMITIVE_OBJECT` and gives it, on the other classes that have one, the type the AM Release-1.4 schema gives it ([clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)), so the generated types hold none. A mandatory `Any` property **MUST** be emitted as `any`.
 
-JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitzero` on a non-mandatory single or generic property held as a pointer (`*T`, `*DVInterval[DVQuantity]`, `*[]T`, `*map[string]V`), so that only a nil pointer is omitted, and `omitempty` on a non-mandatory one that is not a pointer (a Go interface, or a `P_BMM_SINGLE_PROPERTY_OPEN` typed by the open generic parameter). A mandatory property whose Go field can hold no value carries an omit option, so that an absent one is left out of canonical JSON ([REQ-052](wire.md#req-052) § An absent mandatory member): `omitzero` on a list, map or `any` field and on one held as a pointer, a pointer that breaks a cycle included, so that only a nil value is left out and a present empty list or map is still written; and `omitempty` on a Go interface or on a field typed by its class's own generic parameter (a `P_BMM_SINGLE_PROPERTY_OPEN`, or a `P_BMM_SINGLE_PROPERTY` naming that parameter), so that a typed-nil pointer, which encodes as `null`, is left out too. Any other mandatory property, a struct held by value or a primitive, carries no omit option. A `P_BMM_CONTAINER_PROPERTY` field (`[]T`) carries `omitzero` when its cardinality lower bound is 1 or more, and `omitempty` when it is 0 or absent, with one exception: the item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` carry `omitzero`, so a present empty one is written as `[]` and only a nil one is left out. An archetype can make these lists mandatory by existence (an AOM 1.4 `C_MULTIPLE_ATTRIBUTE`'s `existence` says whether the list is there, its `cardinality` how many members it holds), a CDR refuses a structure that leaves its list out, and no RM invariant keeps them non-empty, so `[]` is RM-valid. Every other optional container keeps `omitempty`; one an invariant keeps non-empty, as `Mappings_valid` keeps `DV_TEXT.mappings`, could not take the exception, since `[]` would be RM-invalid. The generator reads the three from one list, `internal/rmlists`, which a test pins to the vendored BMM. A `P_BMM_GENERIC_PROPERTY` over `Hash` or `List` follows the single-property rule: a mandatory one is `map[string]V` or `[]T` with `omitzero`, and an optional one is `*map[string]V` or `*[]T` with `omitzero`. Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md). The example below is **conceptual** — it shows the BMM property → Go field mapping and the `DV_AMOUNT` ancestor relationship:
+JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitzero` on a non-mandatory single or generic property held as a pointer (`*T`, `*DVInterval[DVQuantity]`, `*[]T`, `*map[string]V`), so that only a nil pointer is omitted, and `omitempty` on a non-mandatory one that is not a pointer (a Go interface, or a `P_BMM_SINGLE_PROPERTY_OPEN` typed by the open generic parameter). A mandatory property whose Go field can hold no value carries an omit option, so that an absent one is left out of canonical JSON ([REQ-052](wire.md#req-052) § An absent mandatory member): `omitzero` on a list, map or `any` field and on one held as a pointer, a pointer that breaks a cycle included, so that only a nil value is left out and a present empty list or map is still written; and `omitempty` on a Go interface or on a field typed by its class's own generic parameter (a `P_BMM_SINGLE_PROPERTY_OPEN`, or a `P_BMM_SINGLE_PROPERTY` naming that parameter), so that a typed-nil pointer, which encodes as `null`, is left out too. Any other mandatory property, a struct held by value or a primitive, carries no omit option. A `P_BMM_CONTAINER_PROPERTY` field (`[]T`) carries `omitzero` when its cardinality lower bound is 1 or more, and `omitempty` when it is 0 or absent, with one exception: the item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` carry `omitzero`, so a present empty one is written as `[]` and only a nil one is left out. An archetype can make these lists mandatory by existence (an AOM 1.4 `C_MULTIPLE_ATTRIBUTE`'s `existence` says whether the list is there, its `cardinality` how many members it holds), a CDR refuses a structure that leaves its list out, and no RM invariant keeps them non-empty, so `[]` is RM-valid. Every other optional container keeps `omitempty`; one an invariant keeps non-empty, as `Mappings_valid` keeps `DV_TEXT.mappings`, could not take the exception, since `[]` would be RM-invalid. The generator reads the three from one list, `internal/rmlists`, which a test pins to the vendored BMM. A `P_BMM_GENERIC_PROPERTY` over `Hash` or `List` follows the single-property rule: a mandatory one is `map[string]V` or `[]T` with `omitzero`, and an optional one is `*map[string]V` or `*[]T` with `omitzero`. Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md). The generated `DVQuantity`, its doc comments left out, shows the rules: its abstract ancestors' fields (`Accuracy`, `MagnitudeStatus`, `NormalRange`, …) flattened in with no embedded ancestor, mandatory properties by value, optional single properties as pointers with `omitzero`, and an optional list with `omitempty`:
 
 ```go
-// Conceptual mapping only — not the generated struct shape.
 type DVQuantity struct {
-    DVAmount                            // conceptual ancestor; flattened by generator (ADR 0002 D4)
-    Magnitude            rm.Real        `json:"magnitude"`   // BMM Real → rm.Real per REQ-041 / ADR 0004
-    Units                string         `json:"units"`
-    Precision            *rm.Integer    `json:"precision,omitzero"`
-    NormalRange          *DVInterval[DVQuantity] `json:"normal_range,omitzero"`
-    OtherReferenceRanges []ReferenceRange[DVQuantity] `json:"other_reference_ranges,omitempty"`
-    UnitsSystem          *string        `json:"units_system,omitzero"`
-    UnitsDisplayName     *string        `json:"units_display_name,omitzero"`
+	Accuracy             *Real                        `json:"accuracy,omitzero"`
+	AccuracyIsPercent    *bool                        `json:"accuracy_is_percent,omitzero"`
+	Magnitude            Real                         `json:"magnitude"`
+	MagnitudeStatus      *string                      `json:"magnitude_status,omitzero"`
+	NormalRange          *DVInterval[DVQuantity]      `json:"normal_range,omitzero"`
+	NormalStatus         *CodePhrase                  `json:"normal_status,omitzero"`
+	OtherReferenceRanges []ReferenceRange[DVQuantity] `json:"other_reference_ranges,omitempty"`
+	Precision            *Integer                     `json:"precision,omitzero"`
+	Units                string                       `json:"units"`
+	UnitsDisplayName     *string                      `json:"units_display_name,omitzero"`
+	UnitsSystem          *string                      `json:"units_system,omitzero"`
 }
 ```
-
-**Generator output diverges from this example for abstract ancestors.** Per [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, the generator renders non-generic abstract classes as Go marker interfaces and **flattens their properties** into every concrete descendant struct. So the real `openehr/rm/data_types_quantity_gen.go` carries `DVQuantity` with `DVAmount`'s fields (`Accuracy`, `AccuracyIsPercent`, `MagnitudeStatus`, …) inlined and **no `DVAmount` embed**. Only concrete ancestors and whitelisted abstract-generic ancestors (e.g. `EVENT` per ADR 0003) appear as Go-level embeds.
 
 #### Type → Go type expression
 
@@ -359,7 +359,7 @@ type DVQuantity struct {
 |---|---|---|
 | `List` | `[]T` | Order matters; duplicates allowed |
 | `Array` | `[]T` | Same as List in Go; the distinction is historical |
-| `Set` | `[]T` | With a generated `Set` invariant check in `Validate()` if validation hooks exist. Go has no native set; modelling as `map[T]struct{}` complicates JSON. |
+| `Set` | `[]T` | No uniqueness check is generated. Go has no native set, and modelling one as `map[T]struct{}` complicates JSON. |
 | `Hash` | `map[string]V` | Keys are `String` |
 
 The wire format JSON does not distinguish List/Set/Array — they all serialise as arrays. Modelling them all as `[]T` keeps round-tripping exact; the Set / Array semantics surface in validators and AQL path-resolution rather than in the type itself.
@@ -394,14 +394,14 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | `Character` | `rm.Character` | canonical JSON single-character **string**, not a number; hand-written named type, like `Integer`/`Real` |
 | `String` | `string` | |
 | `Octet` | `byte` | |
-| `Uri` | `string` | Validated at codec boundary; not `net/url.URL` to preserve round-trip exact representation |
+| `Uri` | `string` | Not `net/url.URL`, so the text round-trips exactly as written |
 | `Any` | `any` | Optional properties differ: § [Property → Go field](#property--go-field). |
-| `Iso8601_date` | `string` (validated) | See § ISO 8601 types below |
-| `Iso8601_time` | `string` (validated) | |
-| `Iso8601_date_time` | `string` (validated) | |
-| `Iso8601_duration` | `string` (validated) | |
-| `Iso8601_type` | `string` (validated) | Abstract — supertype of the four above |
-| `Temporal` | `string` (validated) | Abstract |
+| `Iso8601_date` | `string` | See § ISO 8601 types below |
+| `Iso8601_time` | `string` | |
+| `Iso8601_date_time` | `string` | |
+| `Iso8601_duration` | `string` | |
+| `Iso8601_type` | `string` | Abstract — supertype of the four above |
+| `Temporal` | `string` | Abstract |
 | `Numeric` | (abstract; not directly used) | |
 | `Ordered` | (abstract; not directly used) | |
 | `Ordered_Numeric` | (abstract; not directly used) | |
@@ -534,7 +534,7 @@ The SDK **MUST** expose read, inspection, comparison, and conversion helpers for
 
 - **Component access** — each type **MUST** expose the components of its parsed form: `DV_DATE` → `year`/`month`/`day`; `DV_TIME` → `hour`/`minute`/`second`/`fractional_second`; `DV_DATE_TIME` → their union; all with `timezone` where present; `DV_DURATION` → `years`/`months`/`weeks`/`days`/`hours`/`minutes`/`seconds`/`fractional_seconds`.
 - **Partial-form inspection** — `DV_DATE`/`DV_DATE_TIME`/`DV_TIME` **MUST** report partial forms (`is_partial`, and for dates `month_unknown`/`day_unknown`), since openEHR admits `"2024"` / `"2024-03"` approximate values that Go's `time.Time` cannot represent.
-- **Magnitude & comparison** — each type **MUST** expose `magnitude()` (days for `DV_DATE`; seconds for `DV_TIME`/`DV_DATE_TIME`/`DV_DURATION`, a duration's being its length in seconds within the precision of the result, computed without an intermediate integer overflow; a `DV_TIME`'s counting the seconds from the start of its day as written, its time zone not applied; a `DV_DATE_TIME`'s counting the seconds from `0001-01-01T00:00:00Z`, as the RM defines it, a value with a time zone normalised to UTC and a value without one counting its clock time) and a total ordering consistent with the spec's `less_than` / `is_strictly_comparable_to`; the package-level `Compare` helper **MAY** implement the shared ordering logic for idiomatic Go callers.
+- **Magnitude & comparison** — each type **MUST** expose `magnitude()` (days for `DV_DATE`; seconds for `DV_TIME`/`DV_DATE_TIME`/`DV_DURATION`, a duration's being its length in seconds within the precision of the result, computed without an intermediate integer overflow; a `DV_TIME`'s counting the seconds from the start of its day as written, its time zone not applied; a `DV_DATE_TIME`'s counting the seconds from `0001-01-01T00:00:00Z`, as the RM defines it, a value with a time zone normalised to UTC and a value without one counting its clock time) and a total ordering consistent with the spec's `less_than` / `is_strictly_comparable_to`, which each type's `Compare` method also gives as -1, 0 or +1.
 - **Go bridge** — each type **SHOULD** offer idiomatic conversion (`DV_DATE`/`DV_TIME`/`DV_DATE_TIME` → `time.Time`; `DV_DURATION` → `time.Duration`), because a Go caller computes with those types; a value that cannot map cleanly gets an error, as below.
 
 These helpers **MUST NOT** panic on any value or receiver, and **MUST** answer a value they cannot use as follows:
