@@ -141,7 +141,7 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ rather
 ## Mapping to specs
 
 - [REQ-115, reserved](../specifications/REQ.md#numbering-policy) — the requirement this plan implements (registry row: [REQ.md](../specifications/REQ.md))
-- [clinical-modeling.md § REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) — the lint/issue-model precedent this mirrors
+- [aql.md § REQ-109](../specifications/aql.md#req-109--aql-static-lint) — the lint/issue-model precedent this mirrors
 - [wire.md § REQ-053](../specifications/wire.md#req-053) — FLAT codec (decode path; the linter is pre-decode)
 - [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) — path-enumeration source
 - [scope.md § Synthetic data seeder](../specifications/scope.md#synthetic-data-seeder) — FLAT-emit validation

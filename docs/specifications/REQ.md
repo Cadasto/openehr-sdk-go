@@ -98,15 +98,15 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-106 | WebTemplate JSON export | [clinical-modeling.md](clinical-modeling.md#req-106--webtemplate-json-export) | draft | landed |
 | REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | draft | landed |
 | REQ-108 | Untrusted document bounds | [clinical-modeling.md](clinical-modeling.md#req-108--untrusted-document-bounds) | draft | landed |
-| REQ-109 | AQL static lint | [clinical-modeling.md](clinical-modeling.md#req-109--aql-static-lint) | draft | landed |
+| REQ-109 | AQL static lint | [aql.md](aql.md#req-109--aql-static-lint) | draft | landed |
 | REQ-110 | Template-driven validation beyond COMPOSITION (retired) | [retired-requirements.md](retired-requirements.md#req-110--template-driven-validation-beyond-composition) | deprecated | retired |
 | REQ-111 | Public compiled-template bridge | [clinical-modeling.md](clinical-modeling.md#req-111--public-compiled-template-bridge) | draft | landed |
 | REQ-112 | Template-less Reference Model validation floor | [clinical-modeling.md](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) | draft | partial |
-| REQ-113 | Execution-oriented parsed AQL AST | [clinical-modeling.md](clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) | draft | landed |
+| REQ-113 | Execution-oriented parsed AQL AST | [aql.md](aql.md#req-113--execution-oriented-parsed-aql-ast) | draft | landed |
 | REQ-116 | Template-level node naming and name-predicated paths (retired) | [retired-requirements.md](retired-requirements.md#req-116--template-level-node-naming-and-name-predicated-paths) | deprecated | retired |
 | REQ-117 | AQL expression-catalogue completion (retired) | [retired-requirements.md](retired-requirements.md#req-117--aql-expression-catalogue-completion) | deprecated | retired |
 | REQ-118 | Deprecated `SELECT TOP` clause and literal source text (retired) | [retired-requirements.md](retired-requirements.md#req-118--deprecated-select-top-clause-and-literal-source-text) | deprecated | retired |
-| REQ-119 | Re-parseable canonical AQL emission | [clinical-modeling.md](clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) | draft | landed |
+| REQ-119 | Re-parseable canonical AQL emission | [aql.md](aql.md#req-119--re-parseable-canonical-aql-emission) | draft | landed |
 | REQ-120 | RM identifier parsing and derivation | [reference-model.md](reference-model.md#req-120--rm-identifier-parsing-and-derivation) | draft | landed |
 | REQ-121 | Locatable path read access | [reference-model.md](reference-model.md#req-121--locatable-path-read-access) | draft | landed |
 | REQ-122 | Version-control derived helpers (retired) | [retired-requirements.md](retired-requirements.md#req-122--version-control-derived-helpers) | deprecated | retired |
@@ -118,10 +118,10 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-144 | Definition metadata decoding | [wire.md](wire.md#req-144--definition-metadata-decoding) | draft | landed |
 | REQ-150 | Path-parameter segment validation | [transport.md](transport.md#req-150--path-parameter-segment-validation) | draft | landed |
 | REQ-151 | Typed 2xx decode failure | [transport.md](transport.md#req-151--typed-2xx-decode-failure) | draft | landed |
-| REQ-160 | AQL containment admissibility relation | [clinical-modeling.md](clinical-modeling.md#req-160--aql-containment-admissibility-relation) | draft | landed |
-| REQ-161 | AQL semantic and portability lint | [clinical-modeling.md](clinical-modeling.md#req-161--aql-semantic-and-portability-lint) | draft | landed |
+| REQ-160 | AQL containment admissibility relation | [aql.md](aql.md#req-160--aql-containment-admissibility-relation) | draft | landed |
+| REQ-161 | AQL semantic and portability lint | [aql.md](aql.md#req-161--aql-semantic-and-portability-lint) | draft | landed |
 | REQ-162 | Builder containment verification (retired) | [retired-requirements.md](retired-requirements.md#req-162--builder-containment-verification) | deprecated | retired |
-| REQ-163 | AQL write-side expressivity parity | [clinical-modeling.md](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) | draft | landed |
+| REQ-163 | AQL write-side expressivity parity | [aql.md](aql.md#req-163--aql-write-side-expressivity-parity) | draft | landed |
 | REQ-164 | AQL path-shape and paging lint (retired) | [retired-requirements.md](retired-requirements.md#req-164--aql-path-shape-and-paging-lint) | deprecated | retired |
 | REQ-165 | openEHR scope syntax | [auth.md](auth.md#req-165--openehr-scope-syntax) | draft | landed |
 | REQ-166 | Bearer challenge on 401 and 403 | [transport.md](transport.md#req-166--bearer-challenge-on-401-and-403) | draft | landed |

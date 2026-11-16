@@ -151,7 +151,7 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ. The t
 ## Mapping to specs
 
 - [REQ-114, reserved](../specifications/REQ.md#numbering-policy) — the requirement this plan implements (registry row: [REQ.md](../specifications/REQ.md))
-- [clinical-modeling.md § REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) — the lint/issue-model precedent this mirrors
+- [aql.md § REQ-109](../specifications/aql.md#req-109--aql-static-lint) — the lint/issue-model precedent this mirrors
 - [clinical-modeling.md § REQ-176](../specifications/clinical-modeling.md#req-176--adl-14-operational-template-model) and [§ REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) *Reading the model* — read and compile foundation
 - [clinical-modeling.md § REQ-104](../specifications/retired-requirements.md#req-104--slot-assertion-grammar) — slot-assertion reuse
 - [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) — flat-impact analysis source

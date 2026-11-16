@@ -12,7 +12,7 @@ date: 2026-08-22
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** —
-- **Introduces:** [REQ-160](../specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation) / [REQ-161](../specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint) / [REQ-162](../specifications/retired-requirements.md#req-162--builder-containment-verification). **Amends:** [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) (Layer 2 gains the REQ-161 check groups; the out-of-scope list narrows to version-predicate *value* semantics — predicate presence is REQ-161's).
+- **Introduces:** [REQ-160](../specifications/aql.md#req-160--aql-containment-admissibility-relation) / [REQ-161](../specifications/aql.md#req-161--aql-semantic-and-portability-lint) / [REQ-162](../specifications/retired-requirements.md#req-162--builder-containment-verification). **Amends:** [REQ-109](../specifications/aql.md#req-109--aql-static-lint) (Layer 2 gains the REQ-161 check groups; the out-of-scope list narrows to version-predicate *value* semantics — predicate presence is REQ-161's).
 - **Landed in:** [PR 125](https://github.com/Cadasto/openehr-sdk-go/pull/125) (REQ-160) and [PR 126](https://github.com/Cadasto/openehr-sdk-go/pull/126) (REQ-161, REQ-162).
 - **Related:** [ADR 0007](0007-aql-antlr-grammar-profile.md) (the permissive grammar profile this layer sits above); [REQ-048](../specifications/reference-model.md#req-048--rm-meta-model-introspection-surface) (the `rminfo` class graph it consumes); [REQ-120](../specifications/reference-model.md#req-120--rm-identifier-parsing-and-derivation) (the canonical HRID parser it delegates to).
 
@@ -54,7 +54,7 @@ contract unchanged.**
   dialect safeguard); the default relation expresses the openEHR RM and specifications only,
   never one vendor's storage model. The authoritative edge table, the payload-family rule, and
   the citation carried by each row live in
-  [REQ-160 § Overlay edges](../specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation).
+  [REQ-160 § Overlay edges](../specifications/aql.md#req-160--aql-containment-admissibility-relation).
 - **Three diagnostic categories, three forces** (REQ-161): RM-impossible, provable from the
   pinned BMM → **Error**; spec-gap portability hazard, citing the open specification question or community
   source where one exists → **Warning**; engine-capability difference → out of scope for the default checks, deferred to

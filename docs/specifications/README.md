@@ -111,7 +111,8 @@ Identifiers are stable once published — they are referenced from outside the f
 | [transport.md](transport.md) | Transport layer — OTel hooks, retry, TLS posture, error-envelope mapping, `Prefer` negotiation, the request observer, path-segment validation, typed 2xx failures, bearer challenges, caller attribution |
 | [auth.md](auth.md) | `auth.TokenSource` contract, the SMART-on-openEHR provider flow and the other providers, and service discovery (REQ-070 to REQ-073) |
 | [wire.md](wire.md) | openEHR REST 1.1.0 pin and its OpenAPI files, the openEHR headers, canonical JSON / XML, FLAT / STRUCTURED, AQL wire, the REST leaf operations and the Admin client |
-| [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — the operational template model, the compiled template and its paths, primitive constraints, validation, the instance generator and composition builder, the Web Template export, AQL parse, lint, containment and builders |
+| [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — the operational template model, the compiled template and its paths, primitive constraints, validation, the instance generator and composition builder, the Web Template export |
+| [aql.md](aql.md) | AQL above the wire boundary — the parsed query tree, canonical emission, the builder's write-side parity, the static lint, the containment relation and the semantic lint |
 | [conformance.md](conformance.md) | openEHR wire-conformance probe catalog |
 | [research-strands.md](research-strands.md) | Open strands awaiting resolution (each becomes an ADR) |
 | [retired-requirements.md](retired-requirements.md) | Lookup of retired `REQ-NNN`: where each rule went (binds nothing, so the gate's keyword rules skip it) |

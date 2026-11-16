@@ -1779,7 +1779,7 @@ requirements:
 
   - id: REQ-109
     title: AQL static lint
-    canonical: docs/specifications/clinical-modeling.md#req-109--aql-static-lint
+    canonical: docs/specifications/aql.md#req-109--aql-static-lint
     status: draft
     implementation: landed
     packages:
@@ -2006,7 +2006,7 @@ requirements:
 
   - id: REQ-113
     title: Execution-oriented parsed AQL AST
-    canonical: docs/specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast
+    canonical: docs/specifications/aql.md#req-113--execution-oriented-parsed-aql-ast
     status: draft
     implementation: landed
     packages:
@@ -2056,7 +2056,7 @@ requirements:
 
   - id: REQ-119
     title: Re-parseable canonical AQL emission
-    canonical: docs/specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission
+    canonical: docs/specifications/aql.md#req-119--re-parseable-canonical-aql-emission
     status: draft
     implementation: landed
     packages:
@@ -2311,7 +2311,7 @@ requirements:
 
   - id: REQ-160
     title: AQL containment admissibility relation
-    canonical: docs/specifications/clinical-modeling.md#req-160--aql-containment-admissibility-relation
+    canonical: docs/specifications/aql.md#req-160--aql-containment-admissibility-relation
     status: draft
     implementation: landed
     packages:
@@ -2339,7 +2339,7 @@ requirements:
 
   - id: REQ-161
     title: AQL semantic and portability lint
-    canonical: docs/specifications/clinical-modeling.md#req-161--aql-semantic-and-portability-lint
+    canonical: docs/specifications/aql.md#req-161--aql-semantic-and-portability-lint
     status: draft
     implementation: landed
     packages:
@@ -2388,7 +2388,7 @@ requirements:
 
   - id: REQ-163
     title: AQL write-side expressivity parity
-    canonical: docs/specifications/clinical-modeling.md#req-163--aql-write-side-expressivity-parity
+    canonical: docs/specifications/aql.md#req-163--aql-write-side-expressivity-parity
     status: draft
     implementation: landed
     packages:
