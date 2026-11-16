@@ -522,3 +522,78 @@ func assertBareMember(t *testing.T, suffix, want string) {
 		t.Errorf("FlatToStructured beside |%s = %s, want the bare value as the %q member", suffix, doc, want)
 	}
 }
+
+// TestREQ053FlatToStructuredKeepsTheBareKey — REQ-053: OPT-free FLAT →
+// STRUCTURED keeps a bare value beside its leaf's members as the `"|"`
+// member, whatever suffixes stand beside it, so the conversion never changes
+// what a body means. A bare value at a leaf whose datatype has none is
+// refused in FLAT, and its STRUCTURED form is refused alike in every mode,
+// wrapping what the FLAT refusal wraps, rather than read as the datatype's
+// own `|value` or set aside as unmatched while the value is lost: a
+// DV_QUANTITY beside a null `|normal_status`, a suffix a DV_COUNT also reads;
+// a DV_QUANTITY beside null `|magnitude` and `|unit`; and a DV_CODED_TEXT
+// beside `|code` and `|terminology`. STRUCTURED → FLAT gives the bare key
+// back, never `|value`.
+func TestREQ053FlatToStructuredKeepsTheBareKey(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, tc := range map[string]struct {
+		leaf string
+		body map[string]any
+	}{
+		"DV_QUANTITY beside a null |normal_status": {
+			leaf: rmattrElement,
+			body: map[string]any{
+				"ctx/language": "en", "ctx/territory": "US", "ctx/time": "2021-12-21T14:19:31.649613+01:00",
+				rmattrElement: 5, rmattrElement + "|normal_status": nil,
+			},
+		},
+		"DV_QUANTITY beside null |magnitude and |unit": {
+			leaf: rmattrElement,
+			body: rmattrBody(map[string]any{rmattrElement: 5.0, rmattrElement + "|magnitude": nil, rmattrElement + "|unit": nil}),
+		},
+		"DV_CODED_TEXT beside |code and |terminology": {
+			leaf: rmattrCodedText,
+			body: rmattrBody(map[string]any{rmattrCodedText: "Bare words", rmattrCodedText + "|code": "at0007", rmattrCodedText + "|terminology": "local"}),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			body := mustJSON(t, tc.body)
+			doc, err := FlatToStructured(body)
+			if err != nil {
+				t.Fatalf("FlatToStructured = %v", err)
+			}
+			for mode, opts := range map[string][]Option{
+				"default":       nil,
+				"WithUnmatched": {WithUnmatched(func(string) {})},
+				"WithStrict":    {WithStrict()},
+			} {
+				_, flatErr := UnmarshalFlat(body, wt, opts...)
+				_, structuredErr := UnmarshalStructured(doc, wt, opts...)
+				if flatErr == nil || structuredErr == nil {
+					t.Errorf("%s decode: FLAT = %v, STRUCTURED = %v; want both refused", mode, flatErr, structuredErr)
+					continue
+				}
+				for _, sentinel := range []error{ErrUnknownPath, ErrUnsupportedDatatype} {
+					if errors.Is(flatErr, sentinel) != errors.Is(structuredErr, sentinel) {
+						t.Errorf("%s decode: STRUCTURED refusal %v, want it to wrap what the FLAT refusal %v wraps", mode, structuredErr, flatErr)
+					}
+				}
+			}
+			back, err := StructuredToFlat(doc)
+			if err != nil {
+				t.Fatalf("StructuredToFlat = %v", err)
+			}
+			var flat map[string]any
+			if err := json.Unmarshal(back, &flat); err != nil {
+				t.Fatal(err)
+			}
+			key := indexedKey(tc.leaf)
+			if _, kept := flat[key]; !kept {
+				t.Errorf("FLAT → STRUCTURED → FLAT = %s, want the bare key %s back", back, key)
+			}
+			if _, spelled := flat[key+"|"+bareValueSuffix]; spelled {
+				t.Errorf("FLAT → STRUCTURED → FLAT = %s, wrote the bare value as |value", back)
+			}
+		})
+	}
+}
