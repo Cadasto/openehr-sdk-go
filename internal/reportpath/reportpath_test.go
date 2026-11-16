@@ -232,7 +232,7 @@ func TestNodeStringAllocatesOnce(t *testing.T) {
 		{name: "tokens", node: root.Token("content").Token("data").Token("events").Token("archetype_node_id")},
 		{name: "escaped tokens", node: root.Token("details").Token("en/GB").Token("a~b/c~/").Token("value")},
 		{name: "names", node: root.Name("description").Name("details").Name("purpose").Name("x-note")},
-		{name: "indexes", node: root.Token("items").Index(0).Index(12345).Index(7).Index(1000000).Index(42).Index(99)},
+		{name: "indexes", node: root.Token("items").Index(0).Index(12345).Index(7).Index(1000000).Index(42).Index(99).Index(123456)},
 		{name: "elements", node: composition.Element("content", 2).Element("data", 1).Element("events", 10)},
 		{name: "attribute", node: composition.Element("language", 1).Element("terminology_id", 1).Attr("lang")},
 		{name: "text", node: composition.Element("name", 1).Element("value", 1).Text()},
