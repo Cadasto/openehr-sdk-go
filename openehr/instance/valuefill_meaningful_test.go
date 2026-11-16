@@ -183,3 +183,91 @@ func TestREQ107_ParsableContentFitsItsFormalism(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ107_IdentifierHasAnIDShapeAndAnIssuer is the REQ-107 Leaf values
+// check on a DV_IDENTIFIER: under both value fills, where the template
+// leaves its id open the id is ID-0001, and where the template allows an
+// issuer it carries one, Example issuer where the template leaves the
+// issuer open. A C_STRING with a list or a pattern gives its own example,
+// which wins, for an issuer the policy does not visit too; an issuer the
+// template prohibits is left out. The RM floor and the template validator
+// pass.
+func TestREQ107_IdentifierHasAnIDShapeAndAnIssuer(t *testing.T) {
+	identifier := func(attrs ...string) string {
+		return optTemplate("ELEMENT", optSingle("value", optNode("DV_IDENTIFIER", "", attrs...)))
+	}
+	// An optional issuer whose child is optional too, so Required does not
+	// visit it.
+	optionalIssuer := func(body string) string {
+		return optOptionalSingleOver("issuer", optPrimitiveOccurring(0, 1, "STRING", "C_STRING", body))
+	}
+	issuer := func(s string) *string { return &s }
+	cases := []struct {
+		name   string
+		opt    string
+		id     func(fill instance.ValueFill, got string) bool
+		issuer *string
+	}{
+		{
+			name:   "silent",
+			opt:    identifier(),
+			id:     func(_ instance.ValueFill, got string) bool { return got == "ID-0001" },
+			issuer: issuer("Example issuer"),
+		},
+		{
+			name:   "id under a C_STRING with neither a list nor a pattern",
+			opt:    identifier(stringAttr("id", "")),
+			id:     func(_ instance.ValueFill, got string) bool { return got == "ID-0001" },
+			issuer: issuer("Example issuer"),
+		},
+		{
+			name: "id under a C_STRING with a list",
+			opt:  identifier(stringAttr("id", "<list>A123</list><list>B456</list>")),
+			id: func(fill instance.ValueFill, got string) bool {
+				return got == "A123" || (fill == instance.RandomFill && got == "B456")
+			},
+			issuer: issuer("Example issuer"),
+		},
+		{
+			name:   "id under a C_STRING with a pattern",
+			opt:    identifier(stringAttr("id", "<pattern>[0-9]{3}</pattern>")),
+			id:     func(_ instance.ValueFill, got string) bool { return len(got) == 3 },
+			issuer: issuer("Example issuer"),
+		},
+		{
+			name:   "issuer under a C_STRING with neither a list nor a pattern",
+			opt:    identifier(optionalIssuer("")),
+			id:     func(_ instance.ValueFill, got string) bool { return got == "ID-0001" },
+			issuer: issuer("Example issuer"),
+		},
+		{
+			name:   "optional issuer under a C_STRING with a list",
+			opt:    identifier(optionalIssuer("<list>NHS</list>")),
+			id:     func(_ instance.ValueFill, got string) bool { return got == "ID-0001" },
+			issuer: issuer("NHS"),
+		},
+		{
+			name: "issuer prohibited",
+			opt:  identifier(optProhibitedSingle("issuer")),
+			id:   func(_ instance.ValueFill, got string) bool { return got == "ID-0001" },
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			eachSetting(t, tc.opt, func(t *testing.T, opts instance.Options, out any) {
+				got := rootElementValue[*rm.DVIdentifier](t, out)
+				if !tc.id(opts.ValueFill, got.ID) {
+					t.Errorf("DV_IDENTIFIER.id = %q, not the id this case wants", got.ID)
+				}
+				switch {
+				case tc.issuer == nil && got.Issuer != nil:
+					t.Errorf("DV_IDENTIFIER.issuer = %q, want none", *got.Issuer)
+				case tc.issuer != nil && got.Issuer == nil:
+					t.Errorf("DV_IDENTIFIER.issuer absent, want %q", *tc.issuer)
+				case tc.issuer != nil && *got.Issuer != *tc.issuer:
+					t.Errorf("DV_IDENTIFIER.issuer = %q, want %q", *got.Issuer, *tc.issuer)
+				}
+			})
+		})
+	}
+}

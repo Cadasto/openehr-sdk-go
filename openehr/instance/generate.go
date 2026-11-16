@@ -1625,7 +1625,8 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	case *rm.DVEHRURI:
 		v.Value = ehrURIPlaceholder
 	case *rm.DVIdentifier:
-		v.ID = "example"
+		v.ID = identifierExample
+		v.Issuer = new(issuerExample)
 	case *rm.DVParsable:
 		v.Value = "example"
 		v.Formalism = "text/plain"
@@ -1663,6 +1664,65 @@ func (g *generator) textDefault() string {
 // and has no pattern, so it gives no example of its own.
 func openString(cs constraints.CString) bool {
 	return len(cs.List) == 0 && cs.Pattern == ""
+}
+
+// identifierExample is the id a DV_IDENTIFIER takes where the template
+// leaves it open: a fixed identifier of a recognisable shape, a prefix and
+// a zero-padded number, the same under both value fills.
+const identifierExample = "ID-0001"
+
+// issuerExample is the issuer a DV_IDENTIFIER takes where the template
+// allows one and leaves it open.
+const issuerExample = "Example issuer"
+
+// openStringDefault returns the value attr of rmValue takes where the
+// template leaves it open, and whether it has one of its own rather than
+// the open-string example: a plain DV_TEXT's value (textDefault), and a
+// DV_IDENTIFIER's id and issuer. attr is "" for a C_STRING on the value
+// itself, which constrains its main string attribute (mainStringAttr).
+func (g *generator) openStringDefault(rmValue any, attr string) (string, bool) {
+	if attr == "" {
+		attr = mainStringAttr(rmValue)
+	}
+	switch rmValue.(type) {
+	case *rm.DVText:
+		if attr == "value" {
+			return g.textDefault(), true
+		}
+	case *rm.DVIdentifier:
+		switch attr {
+		case "id":
+			return identifierExample, true
+		case "issuer":
+			return issuerExample, true
+		}
+	}
+	return "", false
+}
+
+// settleIssuer keeps the issuer of id, a DV_IDENTIFIER whose OPT node is
+// opt, within the OPT: populatePrimitiveDefault gives every DV_IDENTIFIER
+// issuerExample, and the walk replaces it where it visits a C_STRING on
+// the issuer. An issuer the OPT prohibits is left out. One the OPT's
+// C_STRING rejects, as where the policy does not visit an optional issuer
+// the OPT lists values for, takes the C_STRING's own example
+// (stringForConstraint), and is left out where the C_STRING admits no
+// string the generator can build.
+func settleIssuer(opt *tcimpl.CompiledNode, id *rm.DVIdentifier) {
+	if prohibited(opt, "issuer") {
+		id.Issuer = nil
+		return
+	}
+	cs, ok := primitiveOf(bindingChild(opt, "issuer")).(constraints.CString)
+	if !ok || id.Issuer == nil || len(cs.Validate(*id.Issuer)) == 0 {
+		return
+	}
+	s, err := stringForConstraint(cs, cs.ExampleValue())
+	if err != nil {
+		id.Issuer = nil
+		return
+	}
+	id.Issuer = &s
 }
 
 // dateTimeDefault is the ISO 8601 form Options.Now contributes to
@@ -2907,10 +2967,11 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		ex = sampleValue(pc, g.valueSampler)
 	}
 	if cs, ok := pc.(constraints.CString); ok {
-		if _, plain := rmValue.(*rm.DVText); plain && (attr == "" || attr == "value") && openString(cs) {
-			// A C_STRING that gives no example of its own leaves the text
-			// open, so it takes the text populatePrimitiveDefault gives.
-			ex = g.textDefault()
+		if def, ok := g.openStringDefault(rmValue, attr); ok && openString(cs) {
+			// A C_STRING that gives no example of its own leaves the
+			// string open, so it takes the value populatePrimitiveDefault
+			// gives.
+			ex = def
 		}
 		return applyStringLeaf(leaf, rmValue, attr, cs, ex)
 	}
@@ -3654,6 +3715,8 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 // which it settles after them (settleMultimedia).
 func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	switch v := rmValue.(type) {
+	case *rm.DVIdentifier:
+		settleIssuer(opt, v)
 	case *rm.DVParsable:
 		settleParsable(opt, v)
 	case *rm.DVPeriodicTimeSpecification:
