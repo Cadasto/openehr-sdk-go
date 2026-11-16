@@ -4,8 +4,8 @@ kind: plan
 
 # Plan: developer onboarding and example readability, the parts still open
 
-**Date:** 2026-10-06, refreshed 2026-11-07.
-**Status:** Draft. Carried forward from a read-only developer-experience audit of 2026-10-04. The refresh of 2026-11-07 delivered the small tasks and removed them from this plan. Tests now hold the two documented failing runs and the `validate-composition` fixture claim, the SMART stub checks the PKCE proof, `canonical_json` takes an optional path, and `ehr_create`, `contribution-build` and the quick-start REST snippets set deadlines. In the docs, the README's catalogue claim is true, the learning order is one list, prose uses one flag spelling, the homepage's first action runs an offline example, and the package map links examples. The per-example Definition of Done lives in [ai-workflow.md § Examples](../ai-workflow.md#examples). What follows is still open.
+**Date:** 2026-10-06.
+**Status:** Draft.
 **Covers:** no requirement. This is documentation and example work, on the maintenance lane ([two lanes](../development-process.md#two-lanes)), unless a step changes a public behaviour or a normative statement. A step that does goes through `/sdd-specify` first.
 **Defers:** an example for every public function, which was never the aim; anything that needs a new requirement.
 

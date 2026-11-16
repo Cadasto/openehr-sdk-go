@@ -47,7 +47,8 @@ The kinds this repository uses:
 
 ## Source of truth
 
-When code and a spec disagree, the spec wins, unless the maintainer's instruction says otherwise ([AGENTS.md § Source of truth](../../AGENTS.md#source-of-truth)). Which changes owe spec edits, and in what order, is [development-process.md § Two lanes](../development-process.md#two-lanes) and [§ The ladder](../development-process.md#the-ladder-full-lane).
+What wins when code, a request or the maintainer disagrees with a spec is [AGENTS.md § Source of truth](../../AGENTS.md#source-of-truth).
+Which changes owe spec edits, and in what order, is [development-process.md § Two lanes](../development-process.md#two-lanes) and [§ The ladder](../development-process.md#the-ladder-full-lane).
 
 ## Status header
 
@@ -78,10 +79,9 @@ docs/specifications/traceability.yaml (the index: packages, probes, tests, statu
 
 Cite identifiers when crossing the chain:
 
-- Every test that exercises a normative requirement cites the REQ-ID and (if applicable) PROBE-ID in a comment; that citation is what lists the test under its REQ in `traceability.yaml`. Maintainer comments may cite them too; godoc on exported API does not (it is written for SDK users; see [AGENTS.md](../../AGENTS.md#spec-driven-workflow-agents)).
+- A test cites the REQ-ID, and the PROBE-ID if any, that it pins; that citation lists it under its REQ ([development-process.md § The ladder](../development-process.md#the-ladder-full-lane)). Godoc on exported API cites none ([AGENTS.md § Spec-driven workflow](../../AGENTS.md#spec-driven-workflow-agents)).
 - Every ADR in `docs/adr/` cites the STRAND-ID it resolves (from `research-strands.md`) and any REQ-IDs it amends.
 - The map lists no ADRs: an ADR names its REQs in its header, and `make spec-context` finds it from there. Plans are not part of the chain.
-- When landing code or probes, update the packages and probes in [`traceability.yaml`](traceability.yaml) and run `make spec-generate`, which writes the tests lists.
 
 `make spec-check` catches the drift a machine can see: a cited path, probe or anchor that does not exist, a landed requirement with no packages or tests, and a generated block that no longer matches its source.
 
@@ -94,7 +94,7 @@ Cite identifiers when crossing the chain:
 | `STRAND-NN` | Open research strand | `research-strands.md` |
 | `ADR-NNN` | Resolved architectural decision | [`../adr/`](../adr/) |
 
-Identifiers are stable once published — they are referenced from outside the file (commit messages, PR titles, code comments, test names). Renumbering and reuse are prohibited ([REQ.md § Numbering policy](REQ.md#numbering-policy)).
+Identifiers are stable once published ([REQ.md § Numbering policy](REQ.md#numbering-policy)).
 
 ## Index
 

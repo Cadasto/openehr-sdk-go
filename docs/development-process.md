@@ -4,9 +4,9 @@ kind: guide
 
 # Development process
 
-How a change moves through this repository. The specification records the contract and the maintainer's instruction outranks a sentence ([AGENTS.md § Source of truth](../AGENTS.md#source-of-truth)). This page owns the two lanes and the ladder; the conformance probe harness is [probe-harness.md](probe-harness.md). The conventions they use (document kinds, RFC-2119 force, status headers, identifiers, the traceability chain) live once, in [specifications/README.md](specifications/README.md); the agent loop is in [ai-workflow.md § The loop](ai-workflow.md#the-loop).
-
-The machine-readable side (identifier style, paths, build targets, the `PROBE`/`STRAND` toggles, the ground-truth source) is [`.sdd.yaml`](.sdd.yaml). The `sdd-*` skills read it first.
+How a change moves through this repository: the two lanes and the ladder, in short for a contributor without the sdd plugin, which defines both, and with this repository's own rules.
+The conventions they use (document kinds, RFC-2119 force, status headers, identifiers, the traceability chain) live once, in [specifications/README.md](specifications/README.md).
+The agent loop is [ai-workflow.md § The loop](ai-workflow.md#the-loop), the machine-readable side is [`.sdd.yaml`](.sdd.yaml), which the `sdd-*` skills read first, and the conformance probe harness is [probe-harness.md](probe-harness.md).
 
 ## Two lanes
 
@@ -26,21 +26,12 @@ A bug fix that shows a spec sentence was wrong carries the corrected sentence in
 
 ## The ladder (full lane)
 
-```
-REQ  (capability + acceptance)                  [gate: worth doing]
- └─ SPEC §  (RFC-2119, Status: Draft)            [gate: single canonical home]
-     └─ ADR  (only if an irreversible fork)      [gate: Accepted before code]
-         └─ CODE + TESTS  (tests cite REQ/PROBE)   [gate: Definition of Ready, then tests green]
-             └─ traceability.yaml + make spec-generate  [gate: Definition of Done, same PR]
-```
-
-For new capability the spec leads (spec-first).
+A full-lane change climbs, in one PR: the REQ and its acceptance, its spec section, an ADR only for an irreversible fork, then, once the [Definition of Ready](#definition-of-ready) holds, code and tests, and last the map, which the [Definition of Done](#definition-of-done) closes.
+For a new capability the spec leads (spec-first).
 
 - The registry in [REQ.md](specifications/REQ.md) is generated (`make spec-generate`); `make spec-check` fails when it is stale. Edit its source, never the table.
 - Each `traceability.yaml` row's `tests:` list is generated too: `make spec-generate` writes the sorted list of test files that cite the row's REQ, and `make spec-check` fails when a list is stale. A test file is a `*_test.go` file or a probe implementation under `testkit/probes/`; it cites `REQ-NNN` when that token appears with no letter, digit or underscore right before or after it, so a hyphen or a dot is a boundary and `pre-REQ-161` counts. So cite the REQ in the test that pins it, and never edit the list by hand.
 - A plan in [`plans/`](plans/) is optional, for work that spans several PRs: a working note outside this ladder that no gate or reviewer reads, deleted once its work is served ([plans/README.md](plans/README.md)).
-
-There is no `SDK-GAP` identifier. `REQ`/`PROBE` is the feature register, and a newly found gap is worked under a REQ with a `PROBE` for wire conformance ([ADR 0012](adr/0012-retire-sdk-gap-identifier.md)).
 
 ### Definition of Ready
 
@@ -57,7 +48,7 @@ Implementation may start when:
 All in the implementing PR:
 
 - Code and tests land; tests cite the `REQ-` / `PROBE-` they pin.
-- The canonical spec text is current, and `traceability.yaml` lists the landed packages and probes (`make spec-generate` writes its tests lists from the tests' REQ citations).
+- The canonical spec text is current, and `traceability.yaml` lists the landed packages and probes (`make spec-generate` writes its tests lists).
 - `docs/roadmap.md` is updated when the change lands a roadmap row or opens new tracked work ([roadmap.md § Updating this page](roadmap.md#updating-this-page)).
 - `make ci` passes (it includes `make spec-check`).
 
@@ -69,8 +60,6 @@ The superpowers skills own the build, verify and branch loop (brainstorming, pla
 |---|---|
 | `brainstorming` design doc | narrative input; its normative statements go into a topic spec in [specifications/](specifications/) via `sdd-specify`, its narrative into [architecture.md](architecture.md) if anywhere |
 | `writing-plans` plan | [`docs/plans/YYYY-MM-DD-<slug>.md`](plans/), started from the template |
-
-Never settle an open question silently in a PR: raise a [STRAND](specifications/research-strands.md), land an [ADR](adr/), or ask.
 
 ## Conformance probes
 
