@@ -981,7 +981,8 @@ Under every policy, a primitive leaf the generator writes for an OPT primitive c
 
 Under either `ValueFill`, where the OPT leaves one of these values open, with no constraint of its own or a `C_STRING` that has neither a list nor a pattern, the generator writes a value that carries a meaning:
 
-- a plain `DV_TEXT`'s `value`: the name the generator writes for its nearest enclosing locatable, such as the ELEMENT it is the value of, or `example` outside any locatable or where that name is only the RM type of a node the OPT gives no term; a `DV_CODED_TEXT` keeps the text the bullet above gives it;
+- the `value` of a plain `DV_TEXT` that is an ELEMENT's `value`: the name the generator writes for that ELEMENT, or `example` where that name is only the RM type of an ELEMENT the OPT gives no term;
+- the `value` of any other plain `DV_TEXT`, such as a PARTICIPATION's `function`, an ISM_TRANSITION's `reason` or a REFERENCE_RANGE's `meaning`: `example`; a `DV_CODED_TEXT` keeps the text the third bullet of the list above gives it;
 - a `DV_PARSABLE`'s `value`: `<example/>` where its `formalism` is an XML media type (`text/xml`, `application/xml` or one with the `+xml` suffix), `{}` where it is a JSON one (`application/json`, `text/json` or one with the `+json` suffix), and `example` otherwise;
 - a `DV_IDENTIFIER`'s `id`: `ID-0001`, a fixed identifier of a recognisable shape;
 - a `DV_IDENTIFIER`'s `issuer`, wherever the OPT does not prohibit it: `Example issuer`, or, where the OPT's `C_STRING` on the issuer rejects that, the example that `C_STRING` gives.

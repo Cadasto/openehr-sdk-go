@@ -169,9 +169,10 @@
 // denominator are rounded the same way. Where the template leaves a text
 // open, with no constraint of its own or a string constraint with neither
 // a list nor a pattern, both fills write a value that means something: a
-// plain DV_TEXT takes the name of its nearest enclosing locatable, such as
-// the ELEMENT it is the value of, or example where that name is only an
-// RM type; a DV_PARSABLE takes <example/> for an XML formalism, {} for a
+// plain DV_TEXT that is an ELEMENT's value takes the name of that ELEMENT,
+// or example where that name is only an RM type, and any other plain
+// DV_TEXT, such as a participation's function, takes example; a
+// DV_PARSABLE takes <example/> for an XML formalism, {} for a
 // JSON one and example for any other; and a DV_IDENTIFIER takes the id
 // ID-0001 and, where the template allows an issuer, the issuer Example
 // issuer. A coded text never takes such a value: its text is its code's,

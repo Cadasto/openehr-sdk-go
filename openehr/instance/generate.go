@@ -173,12 +173,15 @@ type generator struct {
 	// use; "" until then.
 	nowText string
 	// enclosing is the locatable the walk is in, the nearest one that
-	// encloses whatever it builds now, or nil outside any; its name is the
-	// text a plain DV_TEXT takes (textDefault). enclosingType is the RM
-	// type its OPT node names, the name setLocatableIdentity falls back to
-	// where the OPT gives the node no term.
+	// encloses whatever it builds now, or nil outside any. enclosingType is
+	// the RM type its OPT node names, the name setLocatableIdentity falls
+	// back to where the OPT gives the node no term. elementValue is the
+	// value the walk built as the value of enclosing, where that is an
+	// ELEMENT, or nil before it builds one: a plain DV_TEXT that is this
+	// value takes the ELEMENT's name (textDefault).
 	enclosing     rm.Locatable
 	enclosingType string
+	elementValue  any
 	// undescribed holds, per template node, whether it needs content the
 	// template does not describe (needsUndescribed), locatableTypes, per
 	// RM type, whether the value built for it is a LOCATABLE
@@ -208,9 +211,9 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		return nil
 	}
 	if l, ok := rmValue.(rm.Locatable); ok && !rm.IsTypedNil(rmValue) {
-		saved, savedType := g.enclosing, g.enclosingType
-		g.enclosing, g.enclosingType = l, strings.TrimSpace(optNode.RMTypeName())
-		defer func() { g.enclosing, g.enclosingType = saved, savedType }()
+		saved, savedType, savedValue := g.enclosing, g.enclosingType, g.elementValue
+		g.enclosing, g.enclosingType, g.elementValue = l, strings.TrimSpace(optNode.RMTypeName()), nil
+		defer func() { g.enclosing, g.enclosingType, g.elementValue = saved, savedType, savedValue }()
 	}
 	// Slots are leaf fill-points: the slot body is not in this OPT, and
 	// the caller composes it via REQ-101 builder Set calls. A slot the
@@ -1365,6 +1368,9 @@ func (g *generator) materialiseImplicitSingle(
 		return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
 			ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
 	}
+	if _, ok := parentRM.(*rm.Element); ok && attr.Name() == "value" {
+		g.elementValue = rmChild
+	}
 	// Stamp documented sentinel values on DV primitives so the
 	// validator's "required attribute absent" check passes for
 	// BMM-mandatory implicit attrs the OPT did not constrain.
@@ -1585,7 +1591,7 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	}
 	switch v := rmValue.(type) {
 	case *rm.DVText:
-		v.Value = g.textDefault()
+		v.Value = g.textDefault(v)
 	case *rm.DVCodedText:
 		v.Value = "example"
 		v.DefiningCode = rm.CodePhrase{
@@ -1637,15 +1643,16 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 // string a meaning: the open-string example of a C_STRING.
 const exampleText = "example"
 
-// textDefault is the text a plain DV_TEXT takes where the template leaves
-// its value open: the name of its nearest enclosing locatable, as an
-// ELEMENT's value takes the ELEMENT's name, or exampleText where it has
-// none, as a DV_TEXT outside any locatable has. A name that is only the
-// RM type setLocatableIdentity falls back to, where the OPT gives the
-// locatable no term, names no concept, so it counts as none. A
-// DV_CODED_TEXT never takes it: its text is its code's (useCodedText).
-func (g *generator) textDefault() string {
-	if g.enclosing == nil {
+// textDefault is the text v, a plain DV_TEXT, takes where the template
+// leaves its value open: the name of the ELEMENT the walk is in where v is
+// that ELEMENT's value (elementValue), and exampleText otherwise, as a
+// PARTICIPATION's function, an ISM_TRANSITION's reason or a
+// REFERENCE_RANGE's meaning has. A name that is only the RM type
+// setLocatableIdentity falls back to, where the OPT gives the ELEMENT no
+// term, names no concept, so it gives exampleText too. A DV_CODED_TEXT
+// never takes it: its text is its code's (useCodedText).
+func (g *generator) textDefault(v *rm.DVText) string {
+	if g.enclosing == nil || g.elementValue != any(v) {
 		return exampleText
 	}
 	name := g.enclosing.GetName()
@@ -1684,10 +1691,10 @@ func (g *generator) openStringDefault(rmValue any, attr string) (string, bool) {
 	if attr == "" {
 		attr = mainStringAttr(rmValue)
 	}
-	switch rmValue.(type) {
+	switch v := rmValue.(type) {
 	case *rm.DVText:
 		if attr == "value" {
-			return g.textDefault(), true
+			return g.textDefault(v), true
 		}
 	case *rm.DVIdentifier:
 		switch attr {
@@ -2523,6 +2530,9 @@ func (g *generator) buildChild(child *tcimpl.CompiledNode) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if valuesElement(child) {
+		g.elementValue = rmChild
+	}
 	g.populatePrimitiveDefault(rmChild)
 	if child.IsSlot() && !g.stampSlotFill(rmChild, child) {
 		return nil, fmt.Errorf("%w: %s", ErrSlotFillUnsupported, child.AQLPath())
@@ -2531,6 +2541,18 @@ func (g *generator) buildChild(child *tcimpl.CompiledNode) (any, error) {
 		return nil, err
 	}
 	return rmChild, nil
+}
+
+// valuesElement reports whether child is an alternative of the value
+// attribute of an ELEMENT, so that the value built from it is the value of
+// the ELEMENT the walk is in.
+func valuesElement(child *tcimpl.CompiledNode) bool {
+	parent := child.Parent()
+	if parent == nil || builtRMType(parent) != "ELEMENT" {
+		return false
+	}
+	value := parent.Attribute("value")
+	return value != nil && slices.Contains(value.Children(), child)
 }
 
 // stampSlotFill overrides the archetype_node_id and archetype_details

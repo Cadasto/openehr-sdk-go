@@ -56,11 +56,12 @@ func eachSetting(t *testing.T, opt string, check func(t *testing.T, opts instanc
 }
 
 // TestREQ107_PlainTextTakesTheNameOfItsLocatable is the REQ-107 Leaf
-// values check on a plain DV_TEXT whose template leaves its value open:
-// under both value fills it takes the name of its nearest enclosing
-// locatable, an ELEMENT's name, rather than the open-string example, which
-// it takes where that name is only the RM type of an ELEMENT the OPT gives
-// no term. A C_STRING with a list or a pattern gives its own example,
+// values check on a plain DV_TEXT that is an ELEMENT's value and whose
+// template leaves its value open: under both value fills it takes the
+// ELEMENT's name rather than the open-string example, which it takes where
+// that name is only the RM type of an ELEMENT the OPT gives no term. A
+// value attribute the template names with no child is built as such a
+// DV_TEXT too. A C_STRING with a list or a pattern gives its own example,
 // which wins; a C_STRING with neither leaves the value open. A
 // DV_CODED_TEXT keeps the text its code gives. The RM floor and the
 // template validator pass.
@@ -78,6 +79,12 @@ func TestREQ107_PlainTextTakesTheNameOfItsLocatable(t *testing.T) {
 		{
 			name:  "value left silent",
 			value: text(),
+			want:  func(_ instance.ValueFill, got string) bool { return got == "Comment" },
+			about: "the ELEMENT's name Comment",
+		},
+		{
+			name:  "value attribute with no child",
+			value: "",
 			want:  func(_ instance.ValueFill, got string) bool { return got == "Comment" },
 			about: "the ELEMENT's name Comment",
 		},
@@ -135,6 +142,86 @@ func TestREQ107_PlainTextTakesTheNameOfItsLocatable(t *testing.T) {
 			}
 		})
 	})
+}
+
+// TestREQ107_OtherPlainTextKeepsTheExample is the REQ-107 Leaf values
+// check that only a plain DV_TEXT that is an ELEMENT's value takes the
+// name of a locatable: a plain DV_TEXT elsewhere, whose template leaves its
+// value open, keeps the open-string example under both value fills, though
+// a locatable with a name of its own encloses it. Here that is a
+// PARTICIPATION's function in an OBSERVATION, an ISM_TRANSITION's reason in
+// an ACTION, and a REFERENCE_RANGE's meaning on the value of an ELEMENT.
+func TestREQ107_OtherPlainTextKeepsTheExample(t *testing.T) {
+	rootTerm := `<term_definitions code="at0000"><items id="text">Pulse</items></term_definitions>`
+	text := optNode("DV_TEXT", "")
+	cases := []struct {
+		name string
+		opt  string
+		got  func(t *testing.T, out any) any
+	}{
+		{
+			name: "PARTICIPATION.function in a named OBSERVATION",
+			opt:  optTemplate("OBSERVATION", rootTerm, optMultiple("other_participations", optParticipation(optSingle("function", text)))),
+			got: func(t *testing.T, out any) any {
+				obs, ok := out.(*rm.Observation)
+				if !ok || len(obs.OtherParticipations) != 1 {
+					t.Fatalf("generated root is %T, want an OBSERVATION with one other participation", out)
+				}
+				return obs.OtherParticipations[0].Function
+			},
+		},
+		{
+			name: "ISM_TRANSITION.reason in a named ACTION",
+			opt: optTemplate("ACTION", rootTerm, optSingle("language"), optSingle("encoding"), optSingle("subject"),
+				optSingle("ism_transition", optNode("ISM_TRANSITION", "", optMultiple("reason", text))),
+				optSingle("description", emptyTree)),
+			got: func(t *testing.T, out any) any {
+				action, ok := out.(*rm.Action)
+				if !ok || len(action.IsmTransition.Reason) != 1 {
+					t.Fatalf("generated root is %T, want an ACTION whose transition has one reason", out)
+				}
+				return action.IsmTransition.Reason[0]
+			},
+		},
+		{
+			name: "REFERENCE_RANGE.meaning on the value of a named ELEMENT",
+			opt: optCommentValue(countValue("3", optMultiple("other_reference_ranges", optNode("REFERENCE_RANGE", "",
+				optSingle("meaning", text),
+				optSingle("range", ordInterval("DV_COUNT", countValue("1"), countValue("5"))))))),
+			got: func(t *testing.T, out any) any {
+				count := commentValue[*rm.DVCount](t, out)
+				if len(count.OtherReferenceRanges) != 1 {
+					t.Fatalf("DV_COUNT has %d other reference ranges, want 1", len(count.OtherReferenceRanges))
+				}
+				return count.OtherReferenceRanges[0].Meaning
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, tc.opt, true)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%v/%v", opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					var got string
+					switch v := tc.got(t, out).(type) {
+					case *rm.DVText:
+						got = v.Value
+					case rm.DVText:
+						got = v.Value
+					default:
+						t.Fatalf("value is %T, want a plain DV_TEXT", v)
+					}
+					if got != "example" {
+						t.Errorf("DV_TEXT.value = %q, want example, not the name of the locatable that encloses it", got)
+					}
+				})
+			}
+		})
+	}
 }
 
 // optParsableValue is an ELEMENT template whose value is a DV_PARSABLE
