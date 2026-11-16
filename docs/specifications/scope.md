@@ -113,7 +113,7 @@ Fan-out over multiple openEHR backends with per-node spec pinning, partial-failu
 |---|---|
 | Per-node SDK client with independent base URL, issuer, spec version | Federation policy (which node is authoritative; merge vs first-wins) |
 | Conformance probes per node (each node verified against the same probe set) | Partial-failure aggregation (degraded vs failed; SLO accounting) |
-| Independent `*http.Client` per node (REQ-021) | Identity reconciliation across nodes — see MPI research strand |
+| Independent `*http.Client` per node (REQ-021) | Identity reconciliation across nodes, a Cadasto MPI research track outside this SDK |
 | `context.Context` propagation across goroutines | Routing decisions (which subset of nodes to call) |
 
 Federation policy is the subject of a separate research track once MPI lands. The SDK provides the *primitives*; the policy is bespoke.

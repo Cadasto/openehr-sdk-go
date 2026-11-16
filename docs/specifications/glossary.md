@@ -58,20 +58,24 @@ A path-keyed, value-flat serialization optimised for end-user input forms — ke
 A nested-JSON serialization that preserves RM structure but omits `_type` discriminators where the path is unambiguous. Intermediate between canonical JSON and FLAT.
 
 **ITS-REST**
-"Implementation Technology Specification — REST" — the openEHR REST API specification family. The SDK targets the `1.1.0` release line; the term "REST" without further qualification in these specs refers to ITS-REST. The per-endpoint **OpenAPI YAML** files at `github.com/openEHR/specifications-ITS-REST` are the authoritative source for paths, parameters, and status codes (REQ-050).
+"Implementation Technology Specification — REST" — the openEHR REST API specification family.
+The SDK targets the `1.1.0` release line; the term "REST" without further qualification in these specs refers to ITS-REST.
+Its per-endpoint **OpenAPI YAML** files are the openEHR Foundation's machine-readable form of the REST contract; [wire.md § REQ-050](wire.md#the-openapi-files-are-authoritative) says which copy binds the SDK.
 
 **ItemTags / `openehr-item-tag`**
 A small key-value annotation surface attached to versioned resources, introduced in openEHR REST 1.1.0. The SDK exposes it under `openehr/client/ehr/itemtags/` and carries the `openehr-item-tag` header (REQ-059) on the relevant operations.
 
 **openEHR custom header family (`openehr-*`)**
-The set of openEHR-specific HTTP headers defined by ITS-REST 1.1.0: `openehr-version`, `openehr-audit-details`, `openehr-template-id`, `openehr-uri`, `openehr-item-tag`. The SDK exposes them as typed per-call options, never as raw strings (REQ-059).
+The openEHR-specific HTTP headers ITS-REST 1.1.0 defines, such as `openehr-version`, `openehr-audit-details` and `openehr-template-id`.
+[wire.md § REQ-059](wire.md#req-059) lists them and says how the SDK sends them.
 
 **`openehr-audit-details`**
 A request-side header carrying the commit-time audit envelope (committer, change type, system id, optional `description`) on versioned writes.
 The SDK builds it from a typed `*rm.AuditDetails` and writes it in the openEHR dotted-attribute grammar, not as JSON ([wire.md § REQ-059](wire.md#req-059)).
 
 **`Prefer: return=…`**
-Standard HTTP header used by openEHR REST 1.1.0 to negotiate the response body on write paths: `minimal`, `identifier`, or `representation`. The SDK exposes a typed `transport.Prefer` enum and a per-call option `WithPrefer(Prefer)`. Defaults: `minimal` for writes, none for reads (REQ-094).
+Standard HTTP header used by openEHR REST 1.1.0 to negotiate the response body on write paths: `minimal`, `identifier`, or `representation`.
+The SDK's typed form is `transport.Prefer`; its per-call option and defaults are [transport.md § REQ-094](transport.md#req-094--prefer-response-shape-negotiation).
 
 **Error envelope (openEHR REST)**
 The structured `{message, code, errors[], coded_text[]}` JSON body returned on non-2xx responses: `errors[]` is the ITS-REST pin's `DV_CODED_TEXT` list, `coded_text[]` the list some servers send. Decoded by the SDK into `transport.OpenEHRErrorDetail` attached to a `transport.WireError`; consumers detect class via `errors.Is`, inspect detail via `errors.As` (REQ-093).
@@ -108,7 +112,8 @@ OAuth2 grant (RFC 7523) where the client presents a signed JWT assertion and exc
 ## Discovery
 
 **ServiceCatalog**
-The SDK's first-class representation of a SMART-on-openEHR deployment's service base URLs (`org.openehr.rest`, Cadasto-specific service identifiers, etc.). Defined in `smart/discovery`. SDK constructors take a `ServiceCatalog`, never a single base URL (REQ-070).
+The SDK's first-class representation of a SMART-on-openEHR deployment's service base URLs (`org.openehr.rest`, Cadasto-specific service identifiers, etc.).
+Defined in `smart/discovery`; how SDK constructors take it is [auth.md § REQ-070](auth.md#req-070).
 
 **Discovery document**
 The SMART-on-openEHR configuration document advertised by the deployment — typically at a well-known URL — that declares the authorization endpoint, token endpoint, registration endpoint, JWKS URI, and the service catalog.
@@ -148,17 +153,14 @@ A Cadasto-specific REST surface that complements openEHR REST — convenience ag
 A Cadasto-specific payload format for reading and writing clinical and demographic data (compositions, demographic parties, EHR status) without building Reference Model instances. It has no openEHR spec: its wire contract is the Cadasto platform API ([REQ-083](conformance.md#req-083--cadasto-platform-api-conformance)). The SDK targets **Datamap V2**; older versions are out of scope. `cadasto/datamap` is reserved for its codec, which [REQ-058](module-layout.md#req-058--datamap-v2) specifies for compositions and parties.
 
 **MPI (Master Patient Index)**
-Identity resolution and patient-merging across deployments. `cadasto/mpi/` is reserved for a preview search surface and holds no code yet; the full design is the subject of a separate research strand.
+Identity resolution and patient-merging across deployments.
+`cadasto/mpi/` is reserved for a preview search surface and holds no code yet; the full design is a Cadasto research track outside this SDK ([scope.md § Out of scope (v1)](scope.md#out-of-scope-v1)).
 
 **Care aggregates**
 Cadasto's opinionated application-level aggregates over EHR + Demographic resources — `Patient`, `User`, `CaseLoad`, `CareTeam`, `Episode`. Reserved for `cadasto/care/`, which holds no code yet.
 
 **Federator**
 A consumer pattern: multiple SDK clients pointed at multiple openEHR backends, with per-node spec pinning, partial-failure semantics, and a merge / authority policy. The SDK provides the per-node primitives; the federation policy is bespoke per deployment.
-
----
-
-## Conformance and sources
 
 ---
 
