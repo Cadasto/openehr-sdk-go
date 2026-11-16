@@ -6,7 +6,8 @@ kind: specification
 
 **Status:** Draft
 
-Authoritative module identity, package taxonomy, dependency rules, and versioning policy for `github.com/cadasto/openehr-sdk-go`. Covers REQ-001, REQ-004, REQ-013 and REQ-058; the rules of the retired REQ-005, REQ-010, REQ-011, REQ-012 and REQ-014 are [§ The `internal/` boundary](#the-internal-boundary) and [§ Boundary rules](#boundary-rules).
+Authoritative module identity, package taxonomy, dependency rules, and versioning policy for `github.com/cadasto/openehr-sdk-go`.
+Covers REQ-001, REQ-004, REQ-013 and REQ-058; the rules of the retired REQ-005, REQ-010, REQ-011, REQ-012 and REQ-014 are [§ The `internal/` boundary](#the-internal-boundary) and [§ Boundary rules](#boundary-rules).
 
 ## Module identity
 
@@ -28,7 +29,8 @@ The SDK is divided into two top-level layers — **openEHR core** and **Cadasto 
 
 ### openEHR core
 
-Generic openEHR primitives. No application-specific healthcare models live here.
+Generic openEHR primitives.
+No application-specific healthcare models live here.
 
 | Package | Scope |
 |---|---|
@@ -80,7 +82,8 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 
 ### Cadasto extras
 
-Application-specific layer. Shipped in the same module for adoption convenience; the `cadasto/` subtree is a single cut line for later conditional extraction (STRAND-08).
+Application-specific layer.
+Shipped in the same module for adoption convenience; the `cadasto/` subtree is a single cut line for later conditional extraction (STRAND-08).
 
 The `cadasto/` extras have no openEHR specification: their wire contract is the Cadasto platform API, its OpenAPI document where one exists, and otherwise fixture documents captured from a reference Cadasto deployment.
 Their probes and tests check the SDK's wire shape against that contract, not against another SDK.
@@ -149,11 +152,18 @@ testkit/  -. helpers for .-→ all of the above
 **Key invariants:**
 
 - `transport/` depends on `auth/`, never the reverse.
-- `openehr/client/*` depends on `transport/`, `openehr/rm/`, `openehr/serialize/`, never on `cadasto/…`. `openehr/client/ehr/composition` also depends on `openehr/template/webtemplate/`, which its FLAT and STRUCTURED formats serialise against ([wire.md § REQ-173](wire.md#req-173--composition-representation-formats)); the template-side blocks never import a client ([§ REQ-013](#req-013--building-block-independence)), so the edge points down.
-- `openehr/rm/`'s generated marshal files import `openehr/serialize/canxml/` and `openehr/internal/xmlunmatched/`. That edge does not cycle: `canxml` imports only `openehr/rm/typereg/`, `openehr/serialize/internal/poly`, `openehr/internal/xmlunmatched/`, `internal/reportpath/`, `openehr/internal/xmlschema/`, which imports `typereg` and `xmlunmatched`, and `openehr/internal/decodeopts/` from this module, `xmlunmatched` imports only the standard library, `openehr/rm/typereg/` and `internal/reportpath/`, which imports only the standard library, whose imports reach neither `openehr/rm/` nor `canxml`, and `decodeopts` only the standard library ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D9).
-- `openehr/rm/typereg/` imports `openehr/template/constraints/`, for the `Redacted` type that `DecodeError.Value` holds ([§ REQ-052 *Value-free decode errors*](wire.md#req-052)), and `openehr/internal/refused/`, which carries a literal an RM primitive codec refused to the codecs' entry points. `openehr/rm/` (its `Real`, `Integer` and `Character` codecs) imports `openehr/internal/refused/` to hand the literal over, and `openehr/serialize/canjson/` imports both packages to read it into `Value`. `refused` imports only the standard library, and `constraints` only the standard library and `internal/iso8601`, which itself imports only the standard library, so none of these edges cycles back into the RM or the codecs. An import-guard test in each package holds its edges.
-- `openehr/serialize/canjson/` reaches the RM's attribute tables through `internal/rmjsonwalk/`, which imports `openehr/rm/rminfo/` and `internal/rmjsonwalk/polyreg/`, never `openehr/rm/`; `openehr/rm/`'s generated init registers its interface table into `polyreg`, which imports only the standard library. An import-guard test holds this.
-- `cadasto/<X>` may depend on `openehr/client/*`, `transport/`, `openehr/rm/`, etc. — but never on another `cadasto/<Y>`. `cadasto/datamap` is the exception on the wire side: REQ-058 keeps it off `transport/` and `auth/`.
+- `openehr/client/*` depends on `transport/`, `openehr/rm/`, `openehr/serialize/`, never on `cadasto/…`.
+  `openehr/client/ehr/composition` also depends on `openehr/template/webtemplate/`, which its FLAT and STRUCTURED formats serialise against ([wire.md § REQ-173](wire.md#req-173--composition-representation-formats)); the template-side blocks never import a client ([§ REQ-013](#req-013--building-block-independence)), so the edge points down.
+- `openehr/rm/`'s generated marshal files import `openehr/serialize/canxml/` and `openehr/internal/xmlunmatched/`.
+  That edge does not cycle: `canxml` imports only `openehr/rm/typereg/`, `openehr/serialize/internal/poly`, `openehr/internal/xmlunmatched/`, `internal/reportpath/`, `openehr/internal/xmlschema/`, which imports `typereg` and `xmlunmatched`, and `openehr/internal/decodeopts/` from this module, `xmlunmatched` imports only the standard library, `openehr/rm/typereg/` and `internal/reportpath/`, which imports only the standard library, whose imports reach neither `openehr/rm/` nor `canxml`, and `decodeopts` only the standard library ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D9).
+- `openehr/rm/typereg/` imports `openehr/template/constraints/`, for the `Redacted` type that `DecodeError.Value` holds ([§ REQ-052 *Value-free decode errors*](wire.md#req-052)), and `openehr/internal/refused/`, which carries a literal an RM primitive codec refused to the codecs' entry points.
+  `openehr/rm/` (its `Real`, `Integer` and `Character` codecs) imports `openehr/internal/refused/` to hand the literal over, and `openehr/serialize/canjson/` imports both packages to read it into `Value`.
+  `refused` imports only the standard library, and `constraints` only the standard library and `internal/iso8601`, which itself imports only the standard library, so none of these edges cycles back into the RM or the codecs.
+  An import-guard test in each package holds its edges.
+- `openehr/serialize/canjson/` reaches the RM's attribute tables through `internal/rmjsonwalk/`, which imports `openehr/rm/rminfo/` and `internal/rmjsonwalk/polyreg/`, never `openehr/rm/`; `openehr/rm/`'s generated init registers its interface table into `polyreg`, which imports only the standard library.
+  An import-guard test holds this.
+- `cadasto/<X>` may depend on `openehr/client/*`, `transport/`, `openehr/rm/`, etc. — but never on another `cadasto/<Y>`.
+  `cadasto/datamap` is the exception on the wire side: REQ-058 keeps it off `transport/` and `auth/`.
 - `openehr/bmm/` depends on no `transport/`, `auth/` or HTTP package; the rule is [REQ-045](reference-model.md#req-045--bmm-loader-is-a-building-block)'s, and its import rule is in the table of [§ REQ-013](#req-013--building-block-independence).
 - `internal/bmmgen` depends on `openehr/bmm/`, standard-library packages (`go/format`, `encoding/json/v2`, `encoding/xml` among them) and `internal/rmlists`, a list with no imports that it shares with the runtime — no other SDK runtime package.
 - `openehr/terminology/` imports only the standard library (the table of [§ REQ-013](#req-013--building-block-independence)); it sits *below* `openehr/rm`, so `openehr/rm` can import it later without a cycle.
@@ -163,7 +173,11 @@ testkit/  -. helpers for .-→ all of the above
 
 Each building block in the table below **MUST** be importable and useful without an authenticated client: no package in its import closure, the packages of this module it imports directly or indirectly, is `transport/`, `auth/` or `openehr/client/*`.
 
-The table is the one home of each block's own import rule beside that closure rule. A closure rule holds for the block and every package of this module it imports, directly or indirectly. An own-files rule holds for the block's own non-test files, whatever their build tags, except a file marked `//go:build ignore`. The template-side blocks and the AQL blocks keep `openehr/serialize/` out of their own files rather than their closure, because the generated marshal code of `openehr/rm` and `openehr/aom/aom14` imports `openehr/serialize/canxml`, so the closure of every block that uses either reaches it; a caller that wants wire bytes imports a codec itself.
+The table is the one home of each block's own import rule beside that closure rule.
+A closure rule holds for the block and every package of this module it imports, directly or indirectly.
+An own-files rule holds for the block's own non-test files, whatever their build tags, except a file marked `//go:build ignore`.
+The template-side blocks and the AQL blocks keep `openehr/serialize/` out of their own files rather than their closure, because the generated marshal code of `openehr/rm` and `openehr/aom/aom14` imports `openehr/serialize/canxml`, so the closure of every block that uses either reaches it.
+A caller that wants wire bytes imports a codec itself.
 
 | Building block | Its own import rule |
 |---|---|
@@ -185,35 +199,50 @@ The table is the one home of each block's own import rule beside that closure ru
 | `openehr/aql/lint` | Its own files import no package under `openehr/serialize/`, and no package in its closure is `openehr/validation` ([aql.md § REQ-109](aql.md#req-109--aql-static-lint)). |
 | `openehr/aql/contain` | Its own files import only `openehr/rm`, `openehr/rm/rminfo` and the standard library, so it sits below both `openehr/aql` and `openehr/aql/lint` ([aql.md § REQ-160](aql.md#req-160--aql-containment-admissibility-relation)). |
 
-The closure and own-files rules of each row are held by that package's import-guard test, which walks the block's in-module import closure for a closure rule and reads its own imports for an own-files rule. The note on `openehr/aql/parse`'s one third-party import describes the dependency; no guard checks it.
+The closure and own-files rules of each row are held by that package's import-guard test, which walks the block's in-module import closure for a closure rule and reads its own imports for an own-files rule.
+The note on `openehr/aql/parse`'s one third-party import describes the dependency; no guard checks it.
 
 See [scope.md § Building-block use cases](scope.md#building-block-use-cases).
 
 ## REQ-058 — Datamap V2
 
-`cadasto/datamap/` **MUST** implement version 2 of Datamap, the Cadasto payload format for reading and writing clinical and demographic data without building Reference Model instances ([glossary.md](glossary.md)). Earlier Datamap versions are out of scope. The format (its keys, value shapes and coded-value forms) is the Cadasto platform's, and [§ Cadasto extras](#cadasto-extras) names the authority the package conforms to.
+`cadasto/datamap/` **MUST** implement version 2 of Datamap, the Cadasto payload format for reading and writing clinical and demographic data without building Reference Model instances ([glossary.md](glossary.md)).
+Earlier Datamap versions are out of scope.
+The format (its keys, value shapes and coded-value forms) is the Cadasto platform's, and [§ Cadasto extras](#cadasto-extras) names the authority the package conforms to.
 
-The package is a codec between Datamap V2 and openEHR canonical JSON, driven by the operational template that governs the data. It has two profiles, chosen by the template's root type:
+The package is a codec between Datamap V2 and openEHR canonical JSON, driven by the operational template that governs the data.
+It has two profiles, chosen by the template's root type:
 
 - **Composition profile:** a template rooted on `COMPOSITION`.
 - **Party profile:** a template rooted on `PERSON`, `ORGANISATION`, `GROUP`, `AGENT` or `ROLE`, or on one of the archetypeable demographic components `ADDRESS`, `CONTACT`, `PARTY_IDENTITY` or `PARTY_RELATIONSHIP`.
 
 Every other root is out of scope, including `EHR_STATUS`, which the format also covers.
 
-- For each profile the package **MUST** convert in both directions. A conversion for one profile **MUST** refuse a template of the other, and every operation **MUST** refuse a template outside both profiles.
+- For each profile the package **MUST** convert in both directions.
+  A conversion for one profile **MUST** refuse a template of the other, and every operation **MUST** refuse a template outside both profiles.
 - A conversion that refuses its template, or meets a value it cannot map to its template node (a value of the wrong shape, a malformed coded value), **MUST** fail with an error and **MUST NOT** return a converted document alongside it.
-- Conversion walks the template and takes only the keys it defines: a payload key the template does not define **MUST NOT** reach the converted document. Validation is the operation that refuses such a key.
-- For a template of either profile the package **MUST** provide an empty payload skeleton, a JSON Schema of the payload, and a validation of a payload against the template. Validation **MUST** report every key the template does not define, every required key that is missing, and every value that breaks a constraint the template states itself. A payload that validation accepts **MUST** convert without error.
-- The canonical JSON a conversion returns **MUST** decode as the template root's RM type and pass template validation ([REQ-102](clinical-modeling.md#req-102--composition-validation)). The Datamap payload a conversion returns **MUST** pass the package's own validation.
-- The codec **MUST** be usable without a client, like the building blocks in [REQ-013](#req-013--building-block-independence): it takes the template and the payload as values, performs no network I/O, and imports neither `transport/` nor `auth/`. Its entry points read untrusted input, so the bounds of [REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds) apply to them.
+- Conversion walks the template and takes only the keys it defines: a payload key the template does not define **MUST NOT** reach the converted document.
+  Validation is the operation that refuses such a key.
+- For a template of either profile the package **MUST** provide an empty payload skeleton, a JSON Schema of the payload, and a validation of a payload against the template.
+  Validation **MUST** report every key the template does not define, every required key that is missing, and every value that breaks a constraint the template states itself.
+  A payload that validation accepts **MUST** convert without error.
+- The canonical JSON a conversion returns **MUST** decode as the template root's RM type and pass template validation ([REQ-102](clinical-modeling.md#req-102--composition-validation)).
+  The Datamap payload a conversion returns **MUST** pass the package's own validation.
+- The codec **MUST** be usable without a client, like the building blocks in [REQ-013](#req-013--building-block-independence): it takes the template and the payload as values, performs no network I/O, and imports neither `transport/` nor `auth/`.
+  Its entry points read untrusted input, so the bounds of [REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds) apply to them.
 
 ## Boundary rules
 
-These rules keep the cut lines open: breaking one forfeits an option they preserve, such as extracting `cadasto/` later. Import-guard tests hold them where such a test exists.
+These rules keep the cut lines open: breaking one forfeits an option they preserve, such as extracting `cadasto/` later.
+Import-guard tests hold them where such a test exists.
 
-1. **The `cadasto/` cut line.** Nothing outside `cadasto/…` imports from it: no package under `openehr/`, `auth/`, `smart/`, `transport/`, `sandbox/` or `testkit/` does. Only the consuming application, in `cmd/` and downstream repositories, imports a `cadasto/<X>` package; another `cadasto/<Y>` reaches it only through openEHR-core types or interface contracts (rule 2). The `cadasto/` subtree is the single cut line for an optional later extraction (STRAND-08).
-2. **No sideways imports inside `cadasto/`.** No `cadasto/<X>` package imports another `cadasto/<Y>` package directly. Types they share live in openEHR-core packages (under `openehr/…`, `auth/…`, `smart/…` or `transport/…`), or are interfaces both consume.
-3. **Layered `auth/`.** `auth/` defines the generic `TokenSource` abstraction. Each provider (`auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, `auth/basic`, …) is a sub-package, and none appears in the public surface of `auth/` itself.
+1. **The `cadasto/` cut line.** Nothing outside `cadasto/…` imports from it: no package under `openehr/`, `auth/`, `smart/`, `transport/`, `sandbox/` or `testkit/` does.
+   Only the consuming application, in `cmd/` and downstream repositories, imports a `cadasto/<X>` package; another `cadasto/<Y>` reaches it only through openEHR-core types or interface contracts (rule 2).
+   The `cadasto/` subtree is the single cut line for an optional later extraction (STRAND-08).
+2. **No sideways imports inside `cadasto/`.** No `cadasto/<X>` package imports another `cadasto/<Y>` package directly.
+   Types they share live in openEHR-core packages (under `openehr/…`, `auth/…`, `smart/…` or `transport/…`), or are interfaces both consume.
+3. **Layered `auth/`.** `auth/` defines the generic `TokenSource` abstraction.
+   Each provider (`auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, `auth/basic`, …) is a sub-package, and none appears in the public surface of `auth/` itself.
 4. **Building-block independence** — [REQ-013](#req-013--building-block-independence).
 5. **Downward dependency direction.** Imports between SDK packages flow strictly downward through the graph in [§ Dependency direction](#dependency-direction), never upward and never in a cycle.
 6. **Service discovery is first-class** — [REQ-070](auth.md#req-070): constructors take a `smart/discovery.ServiceCatalog`, not a single base URL.
@@ -226,13 +255,15 @@ When adding to `internal/`:
 
 - Document the rationale in [docs/architecture.md](../architecture.md) — "why is this not on the public surface?".
 - Prefer placing helpers in the package that needs them, not in `internal/`, unless reuse across ≥2 packages or a need for cross-package encapsulation justifies the move.
-- `internal/` is not a dumping ground for "I don't want to commit to this name yet". If a package is real, name it and place it; if not, do not export it yet.
+- `internal/` is not a dumping ground for "I don't want to commit to this name yet".
+  If a package is real, name it and place it; if not, do not export it yet.
 
 ## Versioning
 
 ### REQ-004 — Semantic versioning
 
-The SDK **MUST** follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Major versions `v2` and beyond **MUST** use Go's semantic-import-versioning convention (`…/v2/`).
+The SDK **MUST** follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
+Major versions `v2` and beyond **MUST** use Go's semantic-import-versioning convention (`…/v2/`).
 
 A release **MUST** take the highest bump that any of its changes maps to in the table below.
 While on `v0.x`, a change the table maps to major takes a minor bump instead, and the release notes name it ([releases.md § CHANGELOG](../releases.md#changelog)).

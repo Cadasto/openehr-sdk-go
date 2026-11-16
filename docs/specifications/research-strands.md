@@ -6,16 +6,19 @@ kind: specification
 
 **Status:** Draft
 
-Open architectural questions that are **not yet decided** but are scoped, named, and tracked. Each strand resolves into an ADR (under `../adr/`) and amends one or more REQs in [REQ.md](REQ.md).
+Open architectural questions that are **not yet decided** but are scoped, named, and tracked.
+Each strand resolves into an ADR (under `../adr/`) and amends one or more REQs in [REQ.md](REQ.md).
 
-A strand is not a `Draft` REQ — it is an open question whose answer cannot be predicted by reading the spec. Resolving a strand happens by:
+A strand is not a `Draft` REQ — it is an open question whose answer cannot be predicted by reading the spec.
+Resolving a strand happens by:
 
 1. Producing evidence (a spike, a benchmark, a fit-gap analysis).
 2. Writing an ADR proposing the resolution.
 3. Amending the affected REQs in this tree.
 4. Closing the strand here with a backlink to the ADR.
 
-Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
+Strand IDs (`STRAND-NN`) are stable.
+Renumbering is prohibited.
 
 ---
 
@@ -61,16 +64,19 @@ Resolved by [ADR 0009](../adr/0009-smart-auth-library-scope.md); codified in [au
 
 ## STRAND-06 — Concurrency and transport hygiene
 
-**Question:** The federator constructs multiple SDK clients. Do they share a single `*http.Transport` (for connection-pool efficiency across nodes) or own independent transports (for cleaner failure isolation per node)?
+**Question:** The federator constructs multiple SDK clients.
+Do they share a single `*http.Transport` (for connection-pool efficiency across nodes) or own independent transports (for cleaner failure isolation per node)?
 
-**Why it's open:** REQ-021 says "inject your `*http.Client`" — but it does not prescribe sharing. Both approaches are defensible; the trade-off is connection-pool reuse vs blast-radius isolation.
+**Why it's open:** REQ-021 says "inject your `*http.Client`" — but it does not prescribe sharing.
+Both approaches are defensible; the trade-off is connection-pool reuse vs blast-radius isolation.
 
 **Evidence needed:**
 
 - A federator-style spike running 4+ clients with both shared and independent transports.
 - Measure: connection-establishment latency (cold), pool-exhaustion behaviour under load, failure isolation when one node is slow / unreachable.
 
-**Resolution form:** ADR-NNN documenting the recommendation and the override path. Amends REQ-021 if the default guidance becomes opinionated.
+**Resolution form:** ADR-NNN documenting the recommendation and the override path.
+Amends REQ-021 if the default guidance becomes opinionated.
 
 **Implementation gate:** a federator implementation makes this decision real.
 
@@ -84,9 +90,12 @@ Resolved without an ADR; codified in [module-layout.md § REQ-001](module-layout
 
 ## STRAND-08 — Cadasto extras: boundary, criteria, conditional extraction
 
-**Question:** Will `cadasto/…` ever be extracted into a sibling Go module? If so, when, and what triggers the decision?
+**Question:** Will `cadasto/…` ever be extracted into a sibling Go module?
+If so, when, and what triggers the decision?
 
-**Why it's open:** the openEHR-core part of this SDK could in principle be vendor-neutral (target EHRbase, other openEHR backends). The Cadasto extras are platform-specific. Whether keeping them in one module or splitting them is right depends on adoption, governance, and cross-backend demand.
+**Why it's open:** the openEHR-core part of this SDK could in principle be vendor-neutral (target EHRbase, other openEHR backends).
+The Cadasto extras are platform-specific.
+Whether keeping them in one module or splitting them is right depends on adoption, governance, and cross-backend demand.
 
 **Criteria** (none decisive on its own; jointly assessed):
 
@@ -101,9 +110,11 @@ Resolved without an ADR; codified in [module-layout.md § REQ-001](module-layout
 - Adoption data once the Cadasto extras ship.
 - A concrete consumer asking for an EHRbase-compatible build.
 
-**Resolution form:** ADR-NNN either confirming "keep together" or extracting. If extracting: package moves, module path for the sibling, semver implications for both modules.
+**Resolution form:** ADR-NNN either confirming "keep together" or extracting.
+If extracting: package moves, module path for the sibling, semver implications for both modules.
 
-**Open until:** v1 is in production for at least one minor release. Premature resolution is worse than no resolution.
+**Open until:** v1 is in production for at least one minor release.
+Premature resolution is worse than no resolution.
 
 **Boundary held in v1** (regardless of resolution): the [module-layout.md § Boundary rules](module-layout.md#boundary-rules) hold the cut line so an extraction would be mechanical, not a rewrite.
 
@@ -120,13 +131,14 @@ Resolved by the REST probes PROBE-062, PROBE-102, PROBE-103 and PROBE-104, and b
 **Question:** does `rmpath.ItemAtPath` need to tell *attribute unknown to the navigator* from *attribute known but unpopulated*, instead of returning `ErrPathNotFound` for both?
 
 **Why it's open:** the FLAT encoder treats resolution failure as an absent optional (`skipNotFound`), which is correct for the unpopulated case and silent data loss for the unknown-attribute case, the defect class PROBE-086 surfaced.
-Because the encoder cannot tell the two conditions apart, the coverage rule in [reference-model.md § REQ-121](reference-model.md#req-121--locatable-path-read-access) is enforced by a hand-kept guard test and exemption list rather than derived from the API.
+Because the encoder cannot tell the two conditions apart, the coverage rule in [wire.md § Web Template leaf coverage](wire.md#web-template-leaf-coverage) is enforced by a hand-kept guard test and exemption list rather than derived from the API.
 
-**Resolution options:** a distinct sentinel (e.g. `ErrUnknownAttribute`) letting `skipNotFound` fail loudly on unmodelled attributes and retiring the exemption list; or keeping the single sentinel and the guard-test enforcement. The first adds an exported error to a landed surface ([idiom.md § API conventions](idiom.md#api-conventions) compatibility question); the second keeps the hazard class alive but contained.
+**Resolution options:** a distinct sentinel (e.g. `ErrUnknownAttribute`) letting `skipNotFound` fail loudly on unmodelled attributes and retiring the exemption list; or keeping the single sentinel and the guard-test enforcement.
+The first adds an exported error to a landed surface ([idiom.md § API conventions](idiom.md#api-conventions) compatibility question); the second keeps the hazard class alive but contained.
 
 **Evidence needed:** whether the exemption list churns (each churn is an argument for the sentinel, and it has churned once); whether any consumer outside the encoder needs the distinction.
 
-**Resolution form:** ADR-NNN; the REQ-121 open-question paragraph and the guard-test exemption mechanism are updated together with it.
+**Resolution form:** ADR-NNN; [wire.md § Web Template leaf coverage](wire.md#web-template-leaf-coverage) and the guard-test exemption mechanism are updated together with it.
 
 ---
 
@@ -141,18 +153,26 @@ Resolved by [ADR 0020](../adr/0020-cassette-recording-har.md); codified in [conf
 **Question:** is the RM meta-model introspection surface ([REQ-048](reference-model.md#req-048--rm-meta-model-introspection-surface)) right to report a `P_BMM_INTERFACE` class as abstract, even though the pinned BMM sets no `is_abstract` flag on it?
 And is the missing flag an upstream BMM defect for this SDK to raise under [REQ-041](reference-model.md#req-041--pinned-bmm-sources)?
 
-**Why it's open:** six classes in REQ-048's universe carry no `is_abstract` flag: `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS`, and — the sharp cases — `CODE_SET_ACCESS` and `TERMINOLOGY_ACCESS`, which are `P_BMM_INTERFACE` declarations the generator renders as Go **interfaces**. Nothing can instantiate a Go interface, so the surface reports "not abstract" for a class that is unquestionably not instantiable, and a concrete-descendant expansion hands it back. REQ-041 settles the immediate behaviour — the BMM wins, the SDK reports the flag verbatim, and REQ-048 says so normatively — but it does not settle whether the *question* is the right one.
+**Why it's open:** six classes in REQ-048's universe carry no `is_abstract` flag: `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS`, and — the sharp cases — `CODE_SET_ACCESS` and `TERMINOLOGY_ACCESS`, which are `P_BMM_INTERFACE` declarations the generator renders as Go **interfaces**.
+Nothing can instantiate a Go interface, so the surface reports "not abstract" for a class that is unquestionably not instantiable, and a concrete-descendant expansion hands it back.
+REQ-041 settles the immediate behaviour — the BMM wins, the SDK reports the flag verbatim, and REQ-048 says so normatively — but it does not settle whether the *question* is the right one.
 
 **The trade-off:**
 
-- **Report the flag only** (today's behaviour). One rule, one source, no local model of instantiability; a caller needing the decodable set uses the [REQ-040 registry](reference-model.md#type-registry-req-040), which is the authority for what Go can construct. Against it: a caller who reads "not abstract" as "instantiable" is misled on six classes, and the surface offers no way to notice.
-- **Widen abstractness to cover BMM interfaces** — report `is_abstract || _type == P_BMM_INTERFACE`. Matches what the generator actually emits and what a caller means. Against it: it is the SDK second-guessing the BMM, which REQ-041 forbids as a general practice precisely because local corrections diverge silently from every other openEHR implementation reading the same file.
-- **Raise it upstream and keep reporting the flag** until the schema changes. Correct in the long run and costs nothing locally; the timescale is not ours to set.
+- **Report the flag only** (today's behaviour).
+  One rule, one source, no local model of instantiability; a caller needing the decodable set uses the [REQ-040 registry](reference-model.md#type-registry-req-040), which is the authority for what Go can construct.
+  Against it: a caller who reads "not abstract" as "instantiable" is misled on six classes, and the surface offers no way to notice.
+- **Widen abstractness to cover BMM interfaces** — report `is_abstract || _type == P_BMM_INTERFACE`.
+  Matches what the generator actually emits and what a caller means.
+  Against it: it is the SDK second-guessing the BMM, which REQ-041 forbids as a general practice precisely because local corrections diverge silently from every other openEHR implementation reading the same file.
+- **Raise it upstream and keep reporting the flag** until the schema changes.
+  Correct in the long run and costs nothing locally; the timescale is not ours to set.
 
 **Evidence needed:** whether the openEHR BMM treats a missing `is_abstract` on `P_BMM_INTERFACE` as implicit (in which case every consumer infers it, and inferring is not second-guessing) or as an oversight in these six declarations.
 That is a question for the openEHR specifications repository, not for this tree.
 
-**Resolution form:** an upstream issue first; then either an ADR widening the abstractness question, or a documented acceptance that the flag is the whole answer. Until then the interim rule is REQ-048's — its § *Abstract is the BMM's flag, not a storability verdict* forbids pre-empting this strand in code.
+**Resolution form:** an upstream issue first; then either an ADR widening the abstractness question, or a documented acceptance that the flag is the whole answer.
+Until then the interim rule is REQ-048's — its § *Abstract is the BMM's flag, not a storability verdict* forbids pre-empting this strand in code.
 
 **Affects:** REQ-048, and REQ-041's divergence-reporting duty.
 
@@ -169,9 +189,14 @@ The type cannot hold its own value.
 
 **The trade-off:**
 
-- **Fold it into both surfaces** — `rm.ISO8601Timezone` gains a `Value string` field and `rminfo` reports the attribute. Faithful to the BMM, and the type becomes able to hold the value it is defined by. Against it: it changes a generated public struct, and the same rule would then apply to every primitive-mapped ancestor, whose blast radius across the base schema is unmeasured.
-- **Fold it into `rminfo` only** — the tables become BMM-faithful while the struct stays empty. Against it: `rminfo` would then describe an attribute no Go type can hold, and the REQ-112 validation floor would demand a field that does not exist. Strictly worse than either consistent option.
-- **Leave both as they are** and treat these classes as deliberately value-less in Go, on the grounds that the four ISO 8601 value types are already mapped to `string` and this one is reached through them. Against it: it leaves a mandatory BMM attribute unrepresentable and undocumented outside a test pin.
+- **Fold it into both surfaces** — `rm.ISO8601Timezone` gains a `Value string` field and `rminfo` reports the attribute.
+  Faithful to the BMM, and the type becomes able to hold the value it is defined by.
+  Against it: it changes a generated public struct, and the same rule would then apply to every primitive-mapped ancestor, whose blast radius across the base schema is unmeasured.
+- **Fold it into `rminfo` only** — the tables become BMM-faithful while the struct stays empty.
+  Against it: `rminfo` would then describe an attribute no Go type can hold, and the REQ-112 validation floor would demand a field that does not exist.
+  Strictly worse than either consistent option.
+- **Leave both as they are** and treat these classes as deliberately value-less in Go, on the grounds that the four ISO 8601 value types are already mapped to `string` and this one is reached through them.
+  Against it: it leaves a mandatory BMM attribute unrepresentable and undocumented outside a test pin.
 
 **Evidence:** a census test in the generator walks every `class_definitions` class of every vendored schema root and finds exactly one property reachable only through a primitive-mapped ancestor, `Iso8601_timezone.value`; the test pins that set, so growth is loud.
 The four DV temporal types also descend from `Iso8601_type` but redeclare `value` on the class, so the generated structs carry it.
@@ -198,16 +223,19 @@ Resolved by [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)
 The presence half is resolved by [ADR 0033](../adr/0033-missing-members-reported-by-decoders.md): each codec reports the members a document leaves out ([wire.md § REQ-175](wire.md#req-175--missing-members-on-decode)), and the validators read that report ([clinical-modeling.md § REQ-112 *Value-typed mandatory presence*](clinical-modeling.md#value-typed-mandatory-presence)).
 The capture question below stays open.
 
-**Question:** do the generated RM types capture, at decode, the members the decoder matched to nothing? And if they do, are those kept on the value so a read, modify and write round trip is lossless, or discarded once reported?
+**Question:** do the generated RM types capture, at decode, the members the decoder matched to nothing?
+And if they do, are those kept on the value so a read, modify and write round trip is lossless, or discarded once reported?
 
-**Why it is open:** [REQ-170](wire.md#req-170--unmatched-content-on-decode)'s report and strict options for canonical JSON read the bytes again after the decode to compare each member name with the class's attribute list, in one pass when every object's `_type` is its first member and otherwise in two, the first to find every `_type`.
+**Why it's open:** [REQ-170](wire.md#req-170--unmatched-content-on-decode)'s report and strict options for canonical JSON read the bytes again after the decode to compare each member name with the class's attribute list, in one pass when every object's `_type` is its first member and otherwise in two, the first to find every `_type`.
 That name pass links the RM attribute tables into every program that imports `canjson`.
 The standard library can do it in one pass: `encoding/json/v2`'s embedded fallback (the `embed` option on a `jsontext.Value` or `map[string]T` field) receives every member the struct does not match.
 
 **The trade-off:**
 
-- **Capture and discard.** The report option reads the fallback instead of the bytes, the second and third read go, and the value stays as REQ-170 defines it: no unmatched content anywhere in it. Against it: a producer's extension members are still lost on a round trip, which is the interoperability case the capture could serve.
-- **Capture and keep.** The value carries the captured members and the encoder writes them back, so a read, modify and write is lossless. Against it: it reverses REQ-170's rule that a decoded value holds no unmatched content, touches [REQ-052](wire.md#req-052)'s expected form, and puts one more field on every generated class that the validators, the builder and the generator then have to leave alone.
+- **Capture and discard.** The report option reads the fallback instead of the bytes, the second and third read go, and the value stays as REQ-170 defines it: no unmatched content anywhere in it.
+  Against it: a producer's extension members are still lost on a round trip, which is the interoperability case the capture could serve.
+- **Capture and keep.** The value carries the captured members and the encoder writes them back, so a read, modify and write is lossless.
+  Against it: it reverses REQ-170's rule that a decoded value holds no unmatched content, touches [REQ-052](wire.md#req-052)'s expected form, and puts one more field on every generated class that the validators, the builder and the generator then have to leave alone.
 - **The other codecs.** FLAT and STRUCTURED resolve keys against a Web Template, and a mistyped key there is indistinguishable from an extension and vanishes before any validator sees the value.
   On a write path the report is therefore needed beside the validation result whatever the answer here.
 
@@ -219,7 +247,9 @@ A capture on the generated types would feed the missing-member report in place o
 FLAT resolves its keys against a Web Template and stays outside it.
 The `canjson` decode benchmarks with the fallback field present are held to the codec performance budget of [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md).
 
-**A larger option, for later:** generated token-level JSON decoders, like the generated decoders canonical XML already streams through, would validate while reading, with presence and unmatched members known at no extra cost and no reliance on the library's hooks. It is the largest step, and it is weighed only after an analysis note that sizes the generated code, measures a prototype on the `canjson` benchmarks against the fallback-field result, and recommends it or not. No requirement and no code come before that note.
+**A larger option, for later:** generated token-level JSON decoders, like the generated decoders canonical XML already streams through, would validate while reading, with presence and unmatched members known at no extra cost and no reliance on the library's hooks.
+It is the largest step, and it is weighed only after an analysis note that sizes the generated code, measures a prototype on the `canjson` benchmarks against the fallback-field result, and recommends it or not.
+No requirement and no code come before that note.
 
 **Resolution form:** an ADR amending REQ-170 and REQ-052, and a new requirement for the capture contract, allocated when that ADR lands.
 
@@ -233,11 +263,19 @@ The `canjson` decode benchmarks with the fallback field present are held to the 
 
 Three candidates are named and none is built:
 
-1. **Descent under refused content.** Since REQ-171's *One walk* binds, content the template does not admit is reported once and not entered. An authoring tool that shows a form in progress may want the full detail under a refused node anyway. The default is to stop; whether an option may ask for the descent, and whether its findings carry a mark that tells them from a normal result, is open.
-2. **A severity policy per rule.** A server that applies a policy to template findings (warn) and another to RM findings (reject) can do so from the `Layer` each finding carries. Whether that is enough, or whether a policy per rule inside the SDK (this rule warns, that one rejects) is wanted so the result's `OK` already reflects it, is open. RM validation stays on whatever the answer: the policy chooses what to do with a finding, never whether to look.
-3. **A partial-instance mode.** A form in progress holds values on some nodes and nothing yet on others. An option that keeps every value check and suppresses the presence and lower-bound count findings of both layers would serve that case without any switch that turns the RM rules off, which [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md) refuses. It is additive; what it means for `Result.OK` and `Coverage` is the open part.
+1. **Descent under refused content.** Since REQ-171's *One walk* binds, content the template does not admit is reported once and not entered.
+   An authoring tool that shows a form in progress may want the full detail under a refused node anyway.
+   The default is to stop; whether an option may ask for the descent, and whether its findings carry a mark that tells them from a normal result, is open.
+2. **A severity policy per rule.** A server that applies a policy to template findings (warn) and another to RM findings (reject) can do so from the `Layer` each finding carries.
+   Whether that is enough, or whether a policy per rule inside the SDK (this rule warns, that one rejects) is wanted so the result's `OK` already reflects it, is open.
+   RM validation stays on whatever the answer: the policy chooses what to do with a finding, never whether to look.
+3. **A partial-instance mode.** A form in progress holds values on some nodes and nothing yet on others.
+   An option that keeps every value check and suppresses the presence and lower-bound count findings of both layers would serve that case without any switch that turns the RM rules off, which [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md) refuses.
+   It is additive; what it means for `Result.OK` and `Coverage` is the open part.
 
-**Why it is open:** each candidate is additive on REQ-171's options and cheap to add, and each changes what a `Result` means to the caller who reads it. None has a consumer asking for it yet except the warn-or-reject policy, which a server that validates on commit needs in some form. Adding an option nobody uses is the second kind of waste ADR 0025 named.
+**Why it's open:** each candidate is additive on REQ-171's options and cheap to add, and each changes what a `Result` means to the caller who reads it.
+None has a consumer asking for it yet except the warn-or-reject policy, which a server that validates on commit needs in some form.
+Adding an option nobody uses is the second kind of waste ADR 0025 named.
 
 **Evidence needed:** a consumer for each candidate, with the result shape it needs; for the partial mode, whether the generator's `Large` skeleton and the composition builder's intermediate states are the instances it would serve.
 
@@ -271,6 +309,6 @@ Resolved by [ADR 0035](../adr/0035-compile-step-reads-operational-template-model
 | [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-041, REQ-048 |
 | [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-041, REQ-048 |
 | [STRAND-14](#strand-14) | Template-driven validation and the RM floor | Resolved | REQ-102, REQ-112 |
-| [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Partly resolved | REQ-040, REQ-052, REQ-112, REQ-170, REQ-175 |
+| [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Partially resolved | REQ-040, REQ-052, REQ-112, REQ-170, REQ-175 |
 | [STRAND-16](#strand-16--validator-policy-beyond-the-limits) | Validator policy beyond the limits | Open | REQ-102, REQ-171 |
 | [STRAND-17](#strand-17--the-opt-parser-and-the-generated-operational-template-model) | The OPT parser and the generated OPT model | Resolved | REQ-013, REQ-100, REQ-103, REQ-107, REQ-108, REQ-111, REQ-176 |

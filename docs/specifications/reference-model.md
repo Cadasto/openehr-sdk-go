@@ -6,16 +6,22 @@ kind: specification
 
 **Status:** Draft
 
-Rules for representing the openEHR Reference Model (RM) and the other BMM-derived models in Go: the shape of the generated types, the openEHR terminology vocabulary (REQ-034) and the type registry (REQ-040); the pinned BMM sources, the loader and the generator's mapping (REQ-041, REQ-045, REQ-048); and the RM's behavioural functions (REQ-120, REQ-121, REQ-123). The retired REQ-030 to REQ-033 are [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go); the retired REQ-042, REQ-043, REQ-044, REQ-046 and REQ-047 are part of REQ-041, the retired REQ-049 is part of REQ-048, and the retired REQ-122 is part of REQ-120.
+Rules for representing the openEHR Reference Model (RM) and the other BMM-derived models in Go: the shape of the generated types, the openEHR terminology vocabulary (REQ-034) and the type registry (REQ-040); the pinned BMM sources, the loader and the generator's mapping (REQ-041, REQ-045, REQ-048); and the RM's behavioural functions (REQ-120, REQ-121, REQ-123).
+The retired REQ-030 to REQ-033 are [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go); the retired REQ-042, REQ-043, REQ-044, REQ-046 and REQ-047 are part of REQ-041, the retired REQ-049 is part of REQ-048, and the retired REQ-122 is part of REQ-120.
 
-The RM types in `openehr/rm/` are **generated** from the SDK-authored RM root over the pinned BMM schemas in [`../resources/bmm/`](../../resources/bmm); the rules below state the *shape* the generator emits. Generator semantics (mapping rules per P_BMM construct, primitive types, file conventions) are [§ BMM sources and the generator](#bmm-sources-and-the-generator).
+The RM types in `openehr/rm/` are **generated** from the SDK-authored RM root over the pinned BMM schemas in [`../resources/bmm/`](../../resources/bmm); the rules below state the *shape* the generator emits.
+Generator semantics (mapping rules per P_BMM construct, primitive types, file conventions) are [§ BMM sources and the generator](#bmm-sources-and-the-generator).
 
 ## The shape of the RM in Go
 
-The RM has deep polymorphism: `LOCATABLE → ENTRY → COMPOSITION`; `DATA_VALUE → DV_QUANTITY → DV_DURATION`. Go's type system does not have inheritance, and emulating it leads to runtime-tag confusion, reflection-heavy decoders and runtime errors that belong at compile time. The generator's output rule is [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4; in brief:
+The RM has deep polymorphism: `LOCATABLE → ENTRY → COMPOSITION`; `DATA_VALUE → DV_QUANTITY → DV_DURATION`.
+Go's type system does not have inheritance, and emulating it leads to runtime-tag confusion, reflection-heavy decoders and runtime errors that belong at compile time.
+The generator's output rule is [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4; in brief:
 
-- **Concrete structs.** Every concrete RM class is a concrete Go struct (`Composition`, `Observation`, `DVQuantity`, …). There is no runtime base struct that types inherit from, no single RM struct with a `Type` discriminator field, and no `interface{}`-typed payload with a `Kind` enum.
-- **Flattened ancestors.** An abstract non-generic ancestor's properties are flattened into every concrete descendant: the generated `Composition` carries `Name`, `ArchetypeNodeID`, `UID` and the other `LOCATABLE` fields as its own. Only concrete ancestors and whitelisted abstract-generic ancestors (such as `EVENT`, [ADR 0003](../adr/0003-rm-event-polymorphism.md)) appear as embedded structs.
+- **Concrete structs.** Every concrete RM class is a concrete Go struct (`Composition`, `Observation`, `DVQuantity`, …).
+  There is no runtime base struct that types inherit from, no single RM struct with a `Type` discriminator field, and no `interface{}`-typed payload with a `Kind` enum.
+- **Flattened ancestors.** An abstract non-generic ancestor's properties are flattened into every concrete descendant: the generated `Composition` carries `Name`, `ArchetypeNodeID`, `UID` and the other `LOCATABLE` fields as its own.
+  Only concrete ancestors and whitelisted abstract-generic ancestors (such as `EVENT`, [ADR 0003](../adr/0003-rm-event-polymorphism.md)) appear as embedded structs.
 - **Marker interfaces for abstract categories.** An abstract RM category (`DATA_VALUE`, `ITEM_STRUCTURE`, `ENTRY`, …) is a Go interface with an unexported marker method (`isDataValue()`), which keeps a type outside the package from satisfying it by accident; a concrete type satisfies it through its method set, with no registration.
 - **The type registry for `_type`.** The `_type` discriminator maps onto a concrete Go type only through the type registry ([§ Type registry (REQ-040)](#type-registry-req-040)): no tag-magic dispatch on a peeked `_type`, and no generic "RM node" that holds any kind of RM value indistinguishably.
 
@@ -141,10 +147,16 @@ func (r *Registry) Decode(data []byte) (any, error)
 
 Rules:
 
-- The registry **MUST** decode the `_type` of every concrete RM type the SDK generates; the `rm` package's `init()` registers each one. A `_type` the registry does not know **MUST** fail with an error that carries `typereg.ErrUnknownType`. A missing `_type` **MUST** fail with an error that carries `typereg.ErrMissingType` where no declared type fixes the value, at the top level (`Registry.Decode`) and at an abstract slot; a narrow-interface slot whose declared parent is concrete reads it as that parent type ([wire.md § Polymorphic substitution](wire.md#polymorphic-substitution)). Neither case decodes as a guessed type.
-- The registry is append-only at runtime. Calling `Register` twice for the same `_type` with different constructors **MUST** panic — a name collision is a programmer error, not a recoverable condition. Consumers do not register types unless they extend the RM, which the SDK does not actively support but does not prevent either.
+- The registry **MUST** decode the `_type` of every concrete RM type the SDK generates; the `rm` package's `init()` registers each one.
+  A `_type` the registry does not know **MUST** fail with an error that carries `typereg.ErrUnknownType`.
+  A missing `_type` **MUST** fail with an error that carries `typereg.ErrMissingType` where no declared type fixes the value, at the top level (`Registry.Decode`) and at an abstract slot; a narrow-interface slot whose declared parent is concrete reads it as that parent type ([wire.md § Polymorphic substitution](wire.md#polymorphic-substitution)).
+  Neither case decodes as a guessed type.
+- The registry is append-only at runtime.
+  Calling `Register` twice for the same `_type` with different constructors **MUST** panic — a name collision is a programmer error, not a recoverable condition.
+  Consumers do not register types unless they extend the RM, which the SDK does not actively support but does not prevent either.
 - The constructor closure is the only mechanism that instantiates a type: the registry uses no reflection ([idiom.md § Generics and reflection](idiom.md#generics-and-reflection)).
-- A decoded value of static type `any` is type-asserted at the call site. The SDK provides generic helpers (`typereg.DecodeAs[T any](data)`) where useful.
+- A decoded value of static type `any` is type-asserted at the call site.
+  The SDK provides generic helpers (`typereg.DecodeAs[T any](data)`) where useful.
 
 The registry is also **reversible** ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)):
 
@@ -170,7 +182,8 @@ The registry does not depend on the codecs, so its contract holds whatever JSON 
 
 ## BMM sources and the generator
 
-The SDK's domain types (Reference Model, Archetype Object Model, base + language + terminology types) are **derived from openEHR BMM schemas** pinned in [`../resources/bmm/`](../../resources/bmm). This document is the normative contract between those BMM inputs and the Go code in `openehr/rm/`, `openehr/aom/aom14/`, and related packages.
+The SDK's domain types (Reference Model, Archetype Object Model, base + language + terminology types) are **derived from openEHR BMM schemas** pinned in [`../resources/bmm/`](../../resources/bmm).
+This document is the normative contract between those BMM inputs and the Go code in `openehr/rm/`, `openehr/aom/aom14/`, and related packages.
 
 ### The BMM substrate
 
@@ -193,18 +206,27 @@ Pinned schemas live in [`../resources/bmm/`](../../resources/bmm), and this tabl
 
 ### REQ-041 — Pinned BMM sources
 
-The BMM files in `resources/bmm/`, the pinned schemas and the SDK-authored roots over them, are the source of truth for the openEHR domain model. The generated RM and AOM 1.4 types, their primitive mappings and their type registry entries **MUST** correspond to the classes and properties of the pinned BMM files as the SDK-authored root schemas include and amend them ([§ SDK-authored root schemas](#sdk-authored-root-schemas)), mapped by [§ Mapping rules](#mapping-rules) and [§ Primitive type mapping](#primitive-type-mapping); hand-written Go code embeds no out-of-band information about openEHR types: what the pinned schemas lack or get wrong is declared in a root schema, never in a Go table.
+The BMM files in `resources/bmm/`, the pinned schemas and the SDK-authored roots over them, are the source of truth for the openEHR domain model.
+The generated RM and AOM 1.4 types, their primitive mappings and their type registry entries **MUST** correspond to the classes and properties of the pinned BMM files as the SDK-authored root schemas include and amend them ([§ SDK-authored root schemas](#sdk-authored-root-schemas)), mapped by [§ Mapping rules](#mapping-rules) and [§ Primitive type mapping](#primitive-type-mapping).
+Hand-written Go code embeds no out-of-band information about openEHR types: what the pinned schemas lack or get wrong is declared in a root schema, never in a Go table.
 
 How the SDK keeps that correspondence:
 
-- **Generated, reproducibly.** An in-tree generator (`internal/bmmgen`, run by `cmd/bmmgen`) generates `openehr/rm/` (the type registrations included), `openehr/rm/rminfo/` and `openehr/aom/aom14/` from the **primary** BMM files in the table above. It is reproducible: two runs over the same inputs give byte-identical output.
+- **Generated, reproducibly.** An in-tree generator (`internal/bmmgen`, run by `cmd/bmmgen`) generates `openehr/rm/` (the type registrations included), `openehr/rm/rminfo/` and `openehr/aom/aom14/` from the **primary** BMM files in the table above.
+  It is reproducible: two runs over the same inputs give byte-identical output.
 - **Drift-checked.** The build gate re-runs the generator and fails when the working tree differs from its output, which is the mechanical guarantee against a hand edit silently diverging from the BMM.
 - **Scope.** The generator skips the BMM package `org.openehr.rm.ehr_extract` and its sub-packages, EHR Extract being a separate exchange surface; the deferred files of the table above are not its inputs.
 - **Generated and hand-written files stay apart.** A generated file carries the standard generated-code header ([§ Generator output conventions](#generator-output-conventions)) and is never edited by hand.
   Hand-written code in a BMM-derived package lives in files the generator does not write ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D6); it consumes the generated types, never redefines a generated type or method, and never weakens or overrides an invariant the BMM declares.
   A hand-written package can also hold generated files, which the drift check covers like any other output ([architecture.md § Code generation](../architecture.md#code-generation)).
-- **Primitive types.** Each openEHR primitive type **MUST** map to the Go type the table in [§ Primitive type mapping](#primitive-type-mapping) gives it. The mapping is fixed; an alternative widening, such as `Real` to `float32`, is not permitted. `Character` is the one primitive whose canonical JSON spelling (a one-character string) disagrees with a numeric Go `rune`, so it maps to a named type carrying its own codec.
-- **The BMM wins.** Where a BMM file declares a class, property or cardinality that contradicts a statement elsewhere in the openEHR specifications, the SDK follows the BMM. The BMM is the computable form the openEHR ecosystem uses for validation, AQL path typing and tooling, so diverging from it would make archetype validation disagree with templates compiled from it, and it is the form the openEHR Foundation actively maintains while spec prose lags. A suspected bug in a BMM file is raised upstream, in the openEHR specifications repository, and until the corrected schema is pinned the target's root schema carries the correction ([§ SDK-authored root schemas](#sdk-authored-root-schemas)); it is never worked around in Go. Where an ITS-XML schema and the BMM disagree on the wire form of an ADL 1.4 artefact, the schema is what the documents follow, and the root schema declares the schema's form. A deviation from the mapping rules takes an ADR and an update to [§ Mapping rules](#mapping-rules).
+- **Primitive types.** Each openEHR primitive type **MUST** map to the Go type the table in [§ Primitive type mapping](#primitive-type-mapping) gives it.
+  The mapping is fixed; an alternative widening, such as `Real` to `float32`, is not permitted.
+  `Character` is the one primitive whose canonical JSON spelling (a one-character string) disagrees with a numeric Go `rune`, so it maps to a named type carrying its own codec.
+- **The BMM wins.** Where a BMM file declares a class, property or cardinality that contradicts a statement elsewhere in the openEHR specifications, the SDK follows the BMM.
+  The BMM is the computable form the openEHR ecosystem uses for validation, AQL path typing and tooling, so diverging from it would make archetype validation disagree with templates compiled from it, and it is the form the openEHR Foundation actively maintains while spec prose lags.
+  A suspected bug in a BMM file is raised upstream, in the openEHR specifications repository, and until the corrected schema is pinned the target's root schema carries the correction ([§ SDK-authored root schemas](#sdk-authored-root-schemas)); it is never worked around in Go.
+  Where an ITS-XML schema and the BMM disagree on the wire form of an ADL 1.4 artefact, the schema is what the documents follow, and the root schema declares the schema's form.
+  A deviation from the mapping rules takes an ADR and an update to [§ Mapping rules](#mapping-rules).
 
 The openEHR Terminology vocabulary is pinned the same way under `resources/terminology/` ([§ REQ-034](#openehr-terminology-vocabulary-req-034)).
 
@@ -212,7 +234,9 @@ The openEHR Terminology vocabulary is pinned the same way under `resources/termi
 
 <a id="sdk-authored-root-schemas"></a>
 
-The schema a generation target loads is not a pinned file but a root schema the SDK authors, under `resources/bmm/sdk/`, which includes the pinned schema and declares only what the pinned ones lack or get wrong ([ADR 0034](../adr/0034-sdk-authored-root-schemas.md)). The loader's include merge ([§ REQ-045](#req-045--bmm-loader-is-a-building-block)) lets a root's class shadow an include's class of the same name ([ADR 0002 D2](../adr/0002-bmm-codegen-decisions.md#d2--descendant-shadows-ancestor-bmm-include-merge)), so a root amends a pinned class by declaring it again, whole. A pinned file is never edited.
+The schema a generation target loads is not a pinned file but a root schema the SDK authors, under `resources/bmm/sdk/`, which includes the pinned schema and declares only what the pinned ones lack or get wrong ([ADR 0034](../adr/0034-sdk-authored-root-schemas.md)).
+The loader's include merge ([§ REQ-045](#req-045--bmm-loader-is-a-building-block)) lets a root's class shadow an include's class of the same name ([ADR 0002 D2](../adr/0002-bmm-codegen-decisions.md#d2--descendant-shadows-ancestor-bmm-include-merge)), so a root amends a pinned class by declaring it again, whole.
+A pinned file is never edited.
 
 - **What a root declares.** A class no pinned schema defines, or a pinned class in a corrected form.
   What P_BMM has no construct for, a root says in SDK extension keys of its JSON, one key per kind, which the generator reads and the loader of § REQ-045 leaves aside.
@@ -226,7 +250,8 @@ The schema a generation target loads is not a pinned file but a root schema the 
   `AUTHORED_RESOURCE` takes the form of the RM `common.resource` package in place of the BASE form the pinned AOM 1.4 schema inherits ([ADR 0034](../adr/0034-sdk-authored-root-schemas.md) gives the reason): the merge's rule for an include diamond gives the root the RM form of each class BASE and RM both declare.
   Where the schema names a class otherwise than the BMM (`C_CODE_PHRASE`, `C_DV_ORDINAL` and `C_DV_QUANTITY` for `C_CODED_TEXT`, `C_ORDINAL` and `C_QUANTITY`), the root declares the schema's name and the target leaves the BMM's class out, so each generated type, its `_type` and its `xsi:type` carry one name.
 - **The RM root**, under an id of its own, includes `openehr_rm_1.2.0`, keeps its `rm_release`, and corrects `TRANSLATION_DETAILS.accreditation`, the spelling the openEHR ITS-XML schemas and ITS-JSON use and the RM schema misspells, until the RM schema is re-pinned with the upstream fix.
-- **Observable.** A generated type **MUST** carry the names its root declares, in Go, canonical JSON and canonical XML alike, `rm.TranslationDetails.Accreditation` and `aom14.CCodePhrase` among them. A document that writes a property in the pinned schema's spelling instead is unmatched content ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)); one that names a class by the pinned schema's name in `_type` or `xsi:type` names an unknown type and fails in every mode, as REQ-170 says.
+- **Observable.** A generated type **MUST** carry the names its root declares, in Go, canonical JSON and canonical XML alike, `rm.TranslationDetails.Accreditation` and `aom14.CCodePhrase` among them.
+  A document that writes a property in the pinned schema's spelling instead is unmatched content ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)); one that names a class by the pinned schema's name in `_type` or `xsi:type` names an unknown type and fails in every mode, as REQ-170 says.
 - **Gate.** The build gate runs the root check on every root with its includes, and the check fails unless:
   - every type name resolves after the merge;
   - every class, property and extension entry a root declares carries its reason and upstream reference;
@@ -331,17 +356,21 @@ type DVQuantity struct {
 | `Set` | `[]T` | No uniqueness check is generated. Go has no native set, and modelling one as `map[T]struct{}` complicates JSON. |
 | `Hash` | `map[string]V` | Keys are `String` |
 
-The wire format JSON does not distinguish List/Set/Array — they all serialise as arrays. Modelling them all as `[]T` keeps round-tripping exact; the Set / Array semantics surface in validators and AQL path-resolution rather than in the type itself.
+The wire format JSON does not distinguish List/Set/Array — they all serialise as arrays.
+Modelling them all as `[]T` keeps round-tripping exact; the Set / Array semantics surface in validators and AQL path-resolution rather than in the type itself.
 
 ##### Cardinality
 
-`P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) reaches the SDK through the generated attribute metadata in `openehr/rm/rminfo`: `AttrMeta.Container` marks a container property, and `AttrMeta.Required` is true when `cardinality.lower` is 1 or more, which the validation floor checks ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). The upper bound is not kept: no container in the pinned RM and BASE BMMs has a finite one.
+`P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) reaches the SDK through the generated attribute metadata in `openehr/rm/rminfo`: `AttrMeta.Container` marks a container property, and `AttrMeta.Required` is true when `cardinality.lower` is 1 or more, which the validation floor checks ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)).
+The upper bound is not kept: no container in the pinned RM and BASE BMMs has a finite one.
 
 ##### Functions
 
-`P_BMM_*` function definitions on classes (e.g. `DV_QUANTITY.add`, `DV_QUANTITY.less_than`) carry pre/post-conditions and operator aliases. The SDK's posture:
+`P_BMM_*` function definitions on classes (e.g. `DV_QUANTITY.add`, `DV_QUANTITY.less_than`) carry pre/post-conditions and operator aliases.
+The SDK's posture:
 
-- The generator emits **method stubs** for class functions, with the documented `pre_conditions` / `post_conditions` as `// Pre:` / `// Post:` comments. A `P_BMM_INTERFACE`'s functions are the exception: no stub is emitted for them (Class → Go type above, [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4).
+- The generator emits **method stubs** for class functions, with the documented `pre_conditions` / `post_conditions` as `// Pre:` / `// Post:` comments.
+  A `P_BMM_INTERFACE`'s functions are the exception: no stub is emitted for them (Class → Go type above, [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4).
 - The generator does **not** emit the function body — implementations are hand-written in non-generated files ([REQ-041](#req-041--pinned-bmm-sources)) where they are needed.
 - Functions that have not been hand-implemented **SHOULD** panic with a clear message (e.g. `panic("not implemented: DV_QUANTITY.add — implement in a non-generated file")`); this is one of the rare allowed panics in SDK code, justified by the fact that the function is documented in the BMM but not yet wired in.
 
@@ -403,7 +432,9 @@ The storage type is the wire-equivalent `string`; conversion to `time.Time` and 
 
 #### Documentation propagation
 
-The generator carries the BMM `documentation` field on classes, properties, and functions into the Go doc comments of the generated types, fields and methods. The transformation is verbatim — no rewording, no abbreviation. Markdown-style cross-refs (`_units_`, `\`magnitude\``) are converted to Go-doc-friendly equivalents.
+The generator carries the BMM `documentation` field on classes, properties, and functions into the Go doc comments of the generated types, fields and methods.
+The transformation is verbatim — no rewording, no abbreviation.
+Markdown-style cross-refs (`_units_`, `\`magnitude\``) are converted to Go-doc-friendly equivalents.
 
 ### REQ-045 — BMM loader is a building block
 
@@ -429,7 +460,12 @@ type Resolver interface {
 
 Schema, Class, Property, Type, FunctionParameter are the in-memory equivalents of the `P_BMM_*` persistence types — abstract over the four property variants and three type variants (see § Mapping rules).
 
-`LoadAll` merges each include into the schema that includes it. A class the including schema declares shadows an included class of the same name ([ADR 0002 D2](../adr/0002-bmm-codegen-decisions.md#d2--descendant-shadows-ancestor-bmm-include-merge)). When one class reaches a schema through its includes in differing forms, the form whose schema descends, through its includes, from the schema of every other form wins, whatever the order of the includes; where several schemas bring one identical form, a differing form wins only when its schema descends from each of them: a root that includes AOM 1.4, which includes BASE, and RM, which includes BASE too, gets the RM form of each class RM and BASE both declare. Two differing forms neither of whose schemas descends from the other's give way to the form of a third schema that descends from both and declares the class again. When no form's schema descends from the schema of every other form, the load fails with `ErrSchemaConflict`.
+`LoadAll` merges each include into the schema that includes it.
+A class the including schema declares shadows an included class of the same name ([ADR 0002 D2](../adr/0002-bmm-codegen-decisions.md#d2--descendant-shadows-ancestor-bmm-include-merge)).
+When one class reaches a schema through its includes in differing forms, the form whose schema descends, through its includes, from the schema of every other form wins, whatever the order of the includes.
+Where several schemas bring one identical form, a differing form wins only when its schema descends from each of them: a root that includes AOM 1.4, which includes BASE, and RM, which includes BASE too, gets the RM form of each class RM and BASE both declare.
+Two differing forms neither of whose schemas descends from the other's give way to the form of a third schema that descends from both and declares the class again.
+When no form's schema descends from the schema of every other form, the load fails with `ErrSchemaConflict`.
 
 ### REQ-048 — RM meta-model introspection surface
 
@@ -440,27 +476,39 @@ Its package, `openehr/rm/rminfo`, keeps to the import rule [module-layout.md § 
 
 #### The class universe
 
-The surface's **class universe** **MUST** be the classes the **RM generation target** emits from the BMM's `class_definitions` — which spans the primary RM schema *and* the BASE classes it includes, since the target emits both into `openehr/rm/` — minus enumerations and minus the foundation typing classes that target skips as typing constraints rather than data. Deriving the universe from the generation target rather than from a list written here is deliberate: a hand-kept list would rot against the pinned schemas, and the equality is exactly what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) checks.
+The surface's **class universe** **MUST** be the classes the **RM generation target** emits from the BMM's `class_definitions` — which spans the primary RM schema *and* the BASE classes it includes, since the target emits both into `openehr/rm/` — minus enumerations and minus the foundation typing classes that target skips as typing constraints rather than data.
+Deriving the universe from the generation target rather than from a list written here is deliberate: a hand-kept list would rot against the pinned schemas, and the equality is exactly what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) checks.
 
 Two exclusions sit *outside* that rule rather than inside it, and conflating them with it would misdescribe the surface:
 
 - The `org.openehr.rm.ehr_extract` package never reaches emission at all ([REQ-041](#req-041--pinned-bmm-sources)), so it is excluded upstream of the universe.
-- The `primitive_types` entries of [§ Primitive type mapping](#primitive-type-mapping) are not in the universe, **even where the target does emit a Go type for them** — `Cardinality`, `Interval`, `Multiplicity_interval`, `Terminology_code` and `Terminology_term` are emitted as Go values, and are still out. They are values the RM *uses*, not RM classes to reason *about*. "Not in the universe" therefore means *this surface does not model the class*, which is **not** the same as *no Go type exists for it*.
+- The `primitive_types` entries of [§ Primitive type mapping](#primitive-type-mapping) are not in the universe, **even where the target does emit a Go type for them** — `Cardinality`, `Interval`, `Multiplicity_interval`, `Terminology_code` and `Terminology_term` are emitted as Go values, and are still out.
+  They are values the RM *uses*, not RM classes to reason *about*.
+  "Not in the universe" therefore means *this surface does not model the class*, which is **not** the same as *no Go type exists for it*.
 
 The universe therefore includes the classes that carry no attributes of their own or inherited, and so appear in no attribute table — the abstract bases `DATA_VALUE` and `PATHABLE`, the `support` terminology/measurement access and service classes, and the definition-constant holders.
 
 The **class-graph** answers — immediate parents, transitive ancestors, conformance, concrete descendants — **MUST** be closed over that universe without losing an RM edge: every class name they return is itself in it, a BMM ancestor outside it is never reported, and a class whose every BMM ancestor lies outside it is a **root**.
 
-The **attribute declaration site** is deliberately **not** closed, because it belongs to the attribute layer rather than to the graph. It **MUST** name the BMM class that actually declares the attribute, and that class can lie outside the universe when the attribute is inherited from an excluded `primitive_types` entry. On the pinned RM the only such site is `Interval`, which declares the bounds attributes `DV_INTERVAL`, `Point_interval` and `Proper_interval` carry; clamping those to the carrying class would report six attributes as locally declared by three classes that declare none of them, which is the very loss this question exists to prevent. The flattened attribute lookup already behaves this way — it reports primitives and generic parameters (`String`, `Integer`, `T`) as attribute types — so the split is consistent: **the attribute layer is faithful to the BMM, the class graph is navigable.** A caller handed an out-of-universe site can tell, because every class-graph question about that name reports not-known.
+The **attribute declaration site** is deliberately **not** closed, because it belongs to the attribute layer rather than to the graph.
+It **MUST** name the BMM class that actually declares the attribute, and that class can lie outside the universe when the attribute is inherited from an excluded `primitive_types` entry.
+On the pinned RM the only such site is `Interval`, which declares the bounds attributes `DV_INTERVAL`, `Point_interval` and `Proper_interval` carry; clamping those to the carrying class would report six attributes as locally declared by three classes that declare none of them, which is the very loss this question exists to prevent.
+The flattened attribute lookup already behaves this way — it reports primitives and generic parameters (`String`, `Integer`, `T`) as attribute types — so the split is consistent: **the attribute layer is faithful to the BMM, the class graph is navigable.**
+A caller handed an out-of-universe site can tell, because every class-graph question about that name reports not-known.
 
-What the closing filter removes is exactly the excluded kinds, not RM structure: the [§ Primitive type mapping](#primitive-type-mapping) entries that appear as BMM ancestors — `Any`, `Ordered`, `Interval`, `Iso8601_type` and the four `Iso8601_*` value types — plus the `PROPORTION_KIND` enumeration. The two lists are the same list, which is why the universe rule and the filter cannot drift apart. Every class that names one of those also names an RM ancestor beside it, and that is asserted rather than assumed, since an RM edge lost to the filter would silently shrink every descendant expansion above it. Four classes have no in-universe ancestor left and are therefore roots — `PATHABLE` (its only ancestor is `Any`), `Point_interval` and `Proper_interval` (`Interval`), and `Iso8601_timezone` (`Iso8601_type`). Each loses a foundation edge, none an RM information-model edge; a fifth would be a defect rather than a new root, since it would mean an RM class had lost its RM parent.
+What the closing filter removes is exactly the excluded kinds, not RM structure: the [§ Primitive type mapping](#primitive-type-mapping) entries that appear as BMM ancestors — `Any`, `Ordered`, `Interval`, `Iso8601_type` and the four `Iso8601_*` value types — plus the `PROPORTION_KIND` enumeration.
+The two lists are the same list, which is why the universe rule and the filter cannot drift apart.
+Every class that names one of those also names an RM ancestor beside it, and that is asserted rather than assumed, since an RM edge lost to the filter would silently shrink every descendant expansion above it.
+Four classes have no in-universe ancestor left and are therefore roots — `PATHABLE` (its only ancestor is `Any`), `Point_interval` and `Proper_interval` (`Interval`), and `Iso8601_timezone` (`Iso8601_type`).
+Each loses a foundation edge, none an RM information-model edge; a fifth would be a defect rather than a new root, since it would mean an RM class had lost its RM parent.
 
 #### The questions the surface answers
 
 For a class in the universe, the surface **MUST** answer:
 
 - **Abstractness** — the pinned BMM's own `is_abstract` flag, so a caller can tell that naming the class denotes its concrete descendants rather than one instantiable class; see [§ Abstract is the BMM's flag, not a storability verdict](#abstract-is-the-bmms-flag-not-a-storability-verdict) below for what it therefore does *not* answer.
-- **Immediate parents**, in BMM declaration order — the faithful edge set. A transitive closure erases it, and a re-serialiser or schema differ cannot recover it.
+- **Immediate parents**, in BMM declaration order — the faithful edge set.
+  A transitive closure erases it, and a re-serialiser or schema differ cannot recover it.
 - **Transitive ancestors** — every ancestor class, deterministically ordered.
 - **Conformance** — whether one class is, or descends from, another.
 - **Concrete descendants** — every class the BMM does not mark abstract that naming this class denotes: itself when not abstract, plus every non-abstract strict descendant, deterministically ordered.
@@ -475,20 +523,28 @@ The tables **MUST** stay flattened, and the declaration site agree with the fold
 
 - the class named is that class or one of its BMM ancestors — the **unfiltered** ancestor chain, since the site may lie outside the universe (§ The class universe above);
 - the named class's own BMM declaration carries the attribute;
-- when the named class is **in** the universe, the attribute's reported type, required flag, and container flag equal the ones that class reports. When it is outside, no such row exists and the BMM declaration itself is the reference.
+- when the named class is **in** the universe, the attribute's reported type, required flag, and container flag equal the ones that class reports.
+  When it is outside, no such row exists and the BMM declaration itself is the reference.
 
 Two answers to "where does this attribute come from" would be the same defect as the erasure this recovers from.
 
 #### The attribute tables are complete against the BMM
 
-Per class, the shipped attribute-name set **MUST** equal the effective property set — own plus inherited — of the same class in the pinned BMM: an attribute the generator silently declines to translate is a defect, not a gap to be discovered later. A known drop is admissible only as a **named exemption pin**, which cites an open research strand, and the pinned drop is not folded in ahead of that strand's resolution. Exactly one exemption exists — `Iso8601_timezone.value`, the emission gap open as [STRAND-13](research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped). The equality, and the pin list held two-sidedly (an unpinned drop fails; a stale pin whose drop has since been fixed fails too), are what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) arm (d) asserts.
+Per class, the shipped attribute-name set **MUST** equal the effective property set — own plus inherited — of the same class in the pinned BMM: an attribute the generator silently declines to translate is a defect, not a gap to be discovered later.
+A known drop is admissible only as a **named exemption pin**, which cites an open research strand, and the pinned drop is not folded in ahead of that strand's resolution.
+Exactly one exemption exists — `Iso8601_timezone.value`, the emission gap open as [STRAND-13](research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped).
+The equality, and the pin list held two-sidedly (an unpinned drop fails; a stale pin whose drop has since been fixed fails too), are what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) arm (d) asserts.
 
 #### Abstract is the BMM's flag, not a storability verdict
 
-`is_abstract` in the pinned BMM answers "does the model forbid instantiating this class". It is **not** the same question as "can a stored instance carry this name as `_type`", and this surface does not conflate them:
+`is_abstract` in the pinned BMM answers "does the model forbid instantiating this class".
+It is **not** the same question as "can a stored instance carry this name as `_type`", and this surface does not conflate them:
 
-- The surface **MUST** report the BMM's flag verbatim, even where the BMM's answer looks wrong. Six classes the universe admits — `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `CODE_SET_ACCESS`, `TERMINOLOGY_ACCESS`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS` — carry no `is_abstract` flag and are reported non-abstract, two of them despite being `P_BMM_INTERFACE` declarations the generator renders as Go interfaces. The BMM wins over a locally derived answer, whether or not the local answer is better ([REQ-041](#req-041--pinned-bmm-sources)).
-- The set of `_type` values the SDK can actually decode is the question of the [REQ-040 type registry](#type-registry-req-040), which a caller asks instead. This surface answers the model's shape; the registry answers what is instantiable in Go.
+- The surface **MUST** report the BMM's flag verbatim, even where the BMM's answer looks wrong.
+  Six classes the universe admits — `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `CODE_SET_ACCESS`, `TERMINOLOGY_ACCESS`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS` — carry no `is_abstract` flag and are reported non-abstract, two of them despite being `P_BMM_INTERFACE` declarations the generator renders as Go interfaces.
+  The BMM wins over a locally derived answer, whether or not the local answer is better ([REQ-041](#req-041--pinned-bmm-sources)).
+- The set of `_type` values the SDK can actually decode is the question of the [REQ-040 type registry](#type-registry-req-040), which a caller asks instead.
+  This surface answers the model's shape; the registry answers what is instantiable in Go.
 
 Whether abstractness ought to report BMM-interface-ness as well — and whether the missing flags are an upstream BMM defect to raise — is open as [STRAND-12](research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag), and code leaves it open until that strand resolves.
 
@@ -502,13 +558,16 @@ An introspection answer **MUST** keep these states distinct, because a caller re
 | **in the universe, abstract, with concrete descendants** | naming it denotes those descendants |
 | **in the universe, abstract, with none** | a dead end: it denotes nothing instantiable |
 
-An empty ancestor answer on a class **in** the universe means *root*; an empty concrete-descendant answer on a class in the universe means *dead-end abstract*; neither is the answer for a name the universe does not contain. A question for the declaration site of an attribute the class does not carry **MUST** report not-found rather than a guessed class.
+An empty ancestor answer on a class **in** the universe means *root*; an empty concrete-descendant answer on a class in the universe means *dead-end abstract*; neither is the answer for a name the universe does not contain.
+A question for the declaration site of an attribute the class does not carry **MUST** report not-found rather than a guessed class.
 
 The *out-of-universe* state itself has structure: why a given name is not in the universe is an answerable question, which [§ Absence reasons](#absence-reasons) answers.
 
 #### Absence reasons
 
-The universe answers "does this surface model the class?" with membership. The negative space behind a "no" has structure the generator already computes: a name can be undeclared by the pinned schemas, declared but in a package the target skips wholesale, declared but in the generator's named-class exclusion set, a `primitive_types` value rather than a modelled class ([§ Primitive type mapping](#primitive-type-mapping)), or a BMM enumeration. The surface keeps these apart, for the reason [§ Three answers, never conflated](#three-answers-never-conflated) keeps the in-universe states apart.
+The universe answers "does this surface model the class?" with membership.
+The negative space behind a "no" has structure the generator already computes: a name can be undeclared by the pinned schemas, declared but in a package the target skips wholesale, declared but in the generator's named-class exclusion set, a `primitive_types` value rather than a modelled class ([§ Primitive type mapping](#primitive-type-mapping)), or a BMM enumeration.
+The surface keeps these apart, for the reason [§ Three answers, never conflated](#three-answers-never-conflated) keeps the in-universe states apart.
 
 The surface **MUST** answer the reason question with exactly one reason from the closed set below for a name **not** in the class universe, and with a distinguished *none* answer for a name the universe **does** contain.
 *None* is the reason type's zero value and equals no absence reason, so the accessor cannot be misread as a membership test with inverted sense.
@@ -532,11 +591,18 @@ A name that more than one rule matches **MUST** report the reason ranked first i
 
 The generator's named-class exclusion list deliberately restates several primitive-mapped names as belt-and-braces, and the precedence keeps the reported reason independent of that redundancy.
 
-An out-of-universe name that no absence entry backs, the empty string included, **MUST** report *undeclared*: *undeclared* is computed from the table's silence, never stored. The generated table is produced by the run that generates the universe and never names a universe member. It accounts for every name the RM generation target's pinned schemas declare (`class_definitions` and `primitive_types`) that the universe omits, with a reason that is neither *undeclared* nor *none*; a declared name no rule accounts for fails generation rather than being emitted, which keeps a future widening of a package skip from silently reclassifying a real openEHR class as undeclared.
+An out-of-universe name that no absence entry backs, the empty string included, **MUST** report *undeclared*: *undeclared* is computed from the table's silence, never stored.
+The generated table is produced by the run that generates the universe and never names a universe member.
+It accounts for every name the RM generation target's pinned schemas declare (`class_definitions` and `primitive_types`) that the universe omits, with a reason that is neither *undeclared* nor *none*.
+A declared name no rule accounts for fails generation rather than being emitted, which keeps a future widening of a package skip from silently reclassifying a real openEHR class as undeclared.
 
-The reason set is **closed and exhaustive-switchable**. Adding a member is an additive change to the public surface: which bump it warrants is [module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)'s question, not this taxonomy's, and what a caller does with a member it does not recognise is the caller's (§ Out of scope below). The reason's string form **MUST** name the kind only.
+The reason set is **closed and exhaustive-switchable**.
+Adding a member is an additive change to the public surface: which bump it warrants is [module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)'s question, not this taxonomy's, and what a caller does with a member it does not recognise is the caller's (§ Out of scope below).
+The reason's string form **MUST** name the kind only.
 
-The question sits on its own optional capability interface, discovered by runtime type assertion, rather than on `Lookup` or `Hierarchy`, so every existing interface, constructor signature and answer stays as it was ([module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)); `Default` implements it. It is reachable with synthetic data through a constructor that admits an absence table beside the class data, and a `Lookup` built without one reports *undeclared* for every out-of-universe name, as that constructor's documentation says. A caller-supplied absence table **MUST NOT** contradict the universe: where it and the class data name the same class, the universe wins, and an entry whose value is the *none* reason counts as no entry, so the name reports *undeclared*.
+The question sits on its own optional capability interface, discovered by runtime type assertion, rather than on `Lookup` or `Hierarchy`, so every existing interface, constructor signature and answer stays as it was ([module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)); `Default` implements it.
+It is reachable with synthetic data through a constructor that admits an absence table beside the class data, and a `Lookup` built without one reports *undeclared* for every out-of-universe name, as that constructor's documentation says.
+A caller-supplied absence table **MUST NOT** contradict the universe: where it and the class data name the same class, the universe wins, and an entry whose value is the *none* reason counts as no entry, so the name reports *undeclared*.
 
 A name reporting an absence reason **MUST** report not-known on every `Lookup` and `Hierarchy` question, and a name reporting *none* is in `KnownRMTypes()`: the two surfaces answer the same membership question and never disagree.
 
@@ -544,49 +610,80 @@ A name reporting an absence reason **MUST** report not-known on every `Lookup` a
 
 - Answers **MUST** be deterministic across runs and processes, every returned ordering fixed (BMM declaration order for immediate parents, sorted otherwise), and a returned collection **MUST NOT** alias package state a caller could mutate.
 - The surface uses no reflection beyond the exceptions of [idiom.md § Generics and reflection](idiom.md#generics-and-reflection), and keeps to the building-block rules of [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence); that is what makes it importable from any building block.
-- Its class-graph questions sit on an **optional capability interface** discovered by assertion, rather than on the existing attribute-lookup interface, so an external implementer of that interface does not break ([module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)), following the precedent already set for attribute enumeration. Each question is reachable through the same seam that admits synthetic model data, so the negative space above is testable without the pinned RM.
+- Its class-graph questions sit on an **optional capability interface** discovered by assertion, rather than on the existing attribute-lookup interface, so an external implementer of that interface does not break ([module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)), following the precedent already set for attribute enumeration.
+  Each question is reachable through the same seam that admits synthetic model data, so the negative space above is testable without the pinned RM.
 
-**Acceptance:** the compiled-in answers equal an independent reduction of the pinned BMM (class universe, abstractness, immediate parents, transitive ancestors, per-attribute declaring class) — the equivalence [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) asserts. `ENTRY` reports abstract and expands to exactly the concrete entry classes; a concrete class expands to itself; a dead-end abstract class expands to nothing while still reporting as known. `LOCATABLE`-inherited attributes report `LOCATABLE` (or the redefining descendant) as their declaration site while the flattened lookup keeps answering unchanged. A name outside the universe is distinguishable from every in-universe answer on every question. The compiled-in absence table equals an independent reduction of the pinned BMM, in both directions, under the fixed precedence, with the negative-space consistency held on every out-of-universe name it exercises — what [PROBE-098](conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) asserts. Hand-editing a generated hierarchy field fails the drift check.
+**Acceptance:** the compiled-in answers equal an independent reduction of the pinned BMM (class universe, abstractness, immediate parents, transitive ancestors, per-attribute declaring class) — the equivalence [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) asserts.
+`ENTRY` reports abstract and expands to exactly the concrete entry classes; a concrete class expands to itself; a dead-end abstract class expands to nothing while still reporting as known.
+`LOCATABLE`-inherited attributes report `LOCATABLE` (or the redefining descendant) as their declaration site while the flattened lookup keeps answering unchanged.
+A name outside the universe is distinguishable from every in-universe answer on every question.
+The compiled-in absence table equals an independent reduction of the pinned BMM, in both directions, under the fixed precedence, with the negative-space consistency held on every out-of-universe name it exercises — what [PROBE-098](conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) asserts.
+Hand-editing a generated hierarchy field fails the drift check.
 
-**Out of scope:** runtime BMM loading (ruled out above, not deferred); AOM/AM class hierarchies; generic-parameter resolution beyond the root-type reduction the attribute tables already apply; selecting among multiple pinned schemas at run time; deriving *instantiability* beyond the BMM's own abstractness flag (an RM invariant that forbids a value is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this surface's); shipping any excluded model (the exclusions are pinned intent — PROBE-094 — and the absence reasons make them legible, not reversible); naming the *skipped package* for an excluded-package name (deferred until a consumer needs it); and policy — what a caller does with a reason is the caller's, not this surface's.
+**Out of scope:**
+
+- runtime BMM loading (ruled out above, not deferred);
+- AOM/AM class hierarchies;
+- generic-parameter resolution beyond the root-type reduction the attribute tables already apply;
+- selecting among multiple pinned schemas at run time;
+- deriving *instantiability* beyond the BMM's own abstractness flag (an RM invariant that forbids a value is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this surface's);
+- shipping any excluded model (the exclusions are pinned intent — PROBE-094 — and the absence reasons make them legible, not reversible);
+- naming the *skipped package* for an excluded-package name (deferred until a consumer needs it);
+- policy — what a caller does with a reason is the caller's, not this surface's.
 
 ## RM behavioural functions
 
 Normative contract for the **derived / behavioural functions** the openEHR Reference Model defines on its identifier, URI, `PATHABLE`/`LOCATABLE`, version-control, and temporal data-value classes — the operations that `bmmgen` emits as signatures from the pinned BMM but cannot implement from a schema (they carry algorithm, not just shape).
 
-The structural rules above say how the types are generated and shaped; this part governs the **runtime behaviour** of the functions on those types. Identifier lexical forms are authoritative in the openEHR BASE *Identification* package and the RM *Common* package; agents look them up there ([base_types identification](https://specifications.openehr.org/releases/BASE/development/base_types.html#_identification_package), [RM common](https://specifications.openehr.org/releases/RM/development/common.html)) rather than guess.
+The structural rules above say how the types are generated and shaped; this part governs the **runtime behaviour** of the functions on those types.
+Identifier lexical forms are authoritative in the openEHR BASE *Identification* package and the RM *Common* package; agents look them up there ([base_types identification](https://specifications.openehr.org/releases/BASE/development/base_types.html#_identification_package), [RM common](https://specifications.openehr.org/releases/RM/development/common.html)) rather than guess.
 
 Surface and fallibility decisions: [ADR 0011](../adr/0011-rm-behavioural-functions-surface.md).
 
 ### Surface and fallibility (applies to all REQs here)
 
-[ADR 0011](../adr/0011-rm-behavioural-functions-surface.md) sets the surface. A concrete-typed derivation (identifier components, `is_branch`) is a method on the RM type, written by hand beside the generated code, at the generator's documented "implement in a non-generated file" extension point. A fallible parse (input may be malformed) also offers an error-returning entry point: a package-level `Parse…` function for the identifier forms, and the `ToTime` / `ToDuration` conversions for the temporal forms. The BMM-signature derivation methods are **best-effort**: they return a zero value on malformed input, and the package-level error-returning function is the validity check (there is no per-method `ok` boolean). Where a derivation method needs no validation beyond decomposition (e.g. `VersionTreeID.is_branch`), it stays purely lexical, and only the `Parse…` path speaks to well-formedness.
+[ADR 0011](../adr/0011-rm-behavioural-functions-surface.md) sets the surface.
+A concrete-typed derivation (identifier components, `is_branch`) is a method on the RM type, written by hand beside the generated code, at the generator's documented "implement in a non-generated file" extension point.
+A fallible parse (input may be malformed) also offers an error-returning entry point: a package-level `Parse…` function for the identifier forms, and the `ToTime` / `ToDuration` conversions for the temporal forms.
+The BMM-signature derivation methods are **best-effort**: they return a zero value on malformed input, and the package-level error-returning function is the validity check (there is no per-method `ok` boolean).
+Where a derivation method needs no validation beyond decomposition (e.g. `VersionTreeID.is_branch`), it stays purely lexical, and only the `Parse…` path speaks to well-formedness.
 
-None of these functions panics on a malformed identifier string, on resolving an absent path, or on a typed-nil node in the object tree: the no-panic rule is [idiom.md § Errors (REQ-025)](idiom.md#errors-req-025)'s. Navigation uses no reflection ([idiom.md § Generics and reflection](idiom.md#generics-and-reflection)).
+None of these functions panics on a malformed identifier string, on resolving an absent path, or on a typed-nil node in the object tree: the no-panic rule is [idiom.md § Errors (REQ-025)](idiom.md#errors-req-025)'s.
+Navigation uses no reflection ([idiom.md § Generics and reflection](idiom.md#generics-and-reflection)).
 
 ### REQ-120 — RM identifier parsing and derivation
 
 The SDK **MUST** expose the derived components of the openEHR identifier types, and of `DV_URI`, from their normative lexical forms, on the corresponding `openehr/rm` types:
 
-- `UID_BASED_ID` (lexical form `root '::' extension`): `root`, `extension`, and `has_extension`. `HIER_OBJECT_ID` and `OBJECT_VERSION_ID` inherit these; an `OBJECT_VERSION_ID`'s `object_id` is its `root`.
+- `UID_BASED_ID` (lexical form `root '::' extension`): `root`, `extension`, and `has_extension`.
+  `HIER_OBJECT_ID` and `OBJECT_VERSION_ID` inherit these; an `OBJECT_VERSION_ID`'s `object_id` is its `root`.
 - `OBJECT_VERSION_ID` (lexical form `object_id '::' creating_system_id '::' version_tree_id`): `object_id`, `creating_system_id`, `version_tree_id`, and `is_branch`.
 - `VERSION_TREE_ID` (lexical form `trunk_version [ '.' branch_number '.' branch_version ]`, 1 or 3 dot-separated parts): `trunk_version`, `branch_number`, `branch_version`, `is_branch` (true iff the 3-part branch form is present), and `is_first` (true iff the trunk version is `1`).
 - `ARCHETYPE_ID` (lexical form `rm_originator '-' rm_name '-' rm_entity '.' concept { '-' specialisation }* '.v' version_id`): `rm_originator`, `rm_name`, `rm_entity`, `qualified_rm_entity`, `domain_concept`, `specialisation`, and `version_id`.
 - `TERMINOLOGY_ID` (lexical form `name [ '(' version ')' ]`): `name` and `version_id`.
-- `DV_URI` (an RFC 3986 URI reference, `[ scheme ':' ] hier-part [ '?' query ] [ '#' fragment ]`): `scheme`, `path`, `query` and `fragment_id`, which `DV_EHR_URI` inherits. Each is the RFC 3986 component as written, not percent-decoded, or empty when the reference has none. A relative reference has no scheme, and the path leaves out the authority (the `//system_id` of an `ehr://` URI). The RM admits plain text as a `DV_URI` value, so these functions split any text: the text before the first colon is the scheme only when RFC 3986 § 3.1 admits it as one (a letter, then letters, digits, `+`, `-` or `.`), and the rest splits as RFC 3986 appendix B reads a reference. A nil `DV_URI` or `DV_EHR_URI` answers empty for each, and the malformed-string rule below does not apply to them.
+- `DV_URI` (an RFC 3986 URI reference, `[ scheme ':' ] hier-part [ '?' query ] [ '#' fragment ]`): `scheme`, `path`, `query` and `fragment_id`, which `DV_EHR_URI` inherits.
+  Each is the RFC 3986 component as written, not percent-decoded, or empty when the reference has none.
+  A relative reference has no scheme, and the path leaves out the authority (the `//system_id` of an `ehr://` URI).
+  The RM admits plain text as a `DV_URI` value, so these functions split any text: the text before the first colon is the scheme only when RFC 3986 § 3.1 admits it as one (a letter, then letters, digits, `+`, `-` or `.`), and the rest splits as RFC 3986 appendix B reads a reference.
+  A nil `DV_URI` or `DV_EHR_URI` answers empty for each, and the malformed-string rule below does not apply to them.
 
 `LOCATABLE_REF` **SHOULD** provide `as_uri()`, the `ehr:`-scheme URI built from `namespace` + `id.value` + `path`, because callers otherwise rebuild it from the fields by hand.
 
-Each fallible identifier form has one error-returning parser in `openehr/rm` (`ParseObjectVersionID`, `ParseVersionTreeID`, `ParseArchetypeID`, `ParseTerminologyID`), and client-side helpers such as the version-uid splitter in `openehr/client/ehr` delegate to it rather than re-parse. `HIER_OBJECT_ID` / `UID_BASED_ID` decomposition is best-effort only, with no `Parse…` entry point.
+Each fallible identifier form has one error-returning parser in `openehr/rm` (`ParseObjectVersionID`, `ParseVersionTreeID`, `ParseArchetypeID`, `ParseTerminologyID`), and client-side helpers such as the version-uid splitter in `openehr/client/ehr` delegate to it rather than re-parse.
+`HIER_OBJECT_ID` / `UID_BASED_ID` decomposition is best-effort only, with no `Parse…` entry point.
 
 `ParseObjectVersionID` and `ParseVersionTreeID` check each part of their form and **MUST** return an error when one fails:
 
-- `ParseObjectVersionID`: `object_id` and `creating_system_id` are each a `UID`, that is a UUID, an ISO OID or an `INTERNET_ID`. An `INTERNET_ID` is read as dot-separated labels of ASCII letters, digits, `-` and `_`, none empty: wider than RFC 1034's label syntax, since creating systems send ids such as `EMR_APP`, yet refusing white space, control characters and other punctuation.
+- `ParseObjectVersionID`: `object_id` and `creating_system_id` are each a `UID`, that is a UUID, an ISO OID or an `INTERNET_ID`.
+  An `INTERNET_ID` is read as dot-separated labels of ASCII letters, digits, `-` and `_`, none empty: wider than RFC 1034's label syntax, since creating systems send ids such as `EMR_APP`, yet refusing white space, control characters and other punctuation.
 - `ParseVersionTreeID`: each part is a decimal integer of at least 1 that fits in a signed 64-bit integer on every platform, written without a sign or a leading zero, so that one version has one spelling where ids are compared as strings (`If-Match`, ETags, URL paths).
 
-For a malformed identifier string, the `Parse…` function **MUST** return a non-nil error and the best-effort derivation methods **MUST** return a zero value; neither panics. `DV_URI`'s functions are not identifier derivations in this sense: they split any text, as its bullet above says.
+For a malformed identifier string, the `Parse…` function **MUST** return a non-nil error and the best-effort derivation methods **MUST** return a zero value; neither panics.
+`DV_URI`'s functions are not identifier derivations in this sense: they split any text, as its bullet above says.
 
-**Acceptance:** for canonical and malformed sample strings of each identifier form, `Parse…`, where the form has one, round-trips the input and derived components equal the spec's lexical decomposition; malformed input yields an error from `Parse…` (no panic); best-effort methods never panic; the client version-uid helper produces identical results to the canonical parser. `ParseObjectVersionID` refuses an `object_id` or `creating_system_id` that is blank or holds white space, a control character or other punctuation, and accepts one with `_`; `ParseVersionTreeID` refuses a part with a sign, a leading zero or a value past the signed 64-bit range, and accepts `3000000000`. The `DV_URI` functions split sample references with and without each component, a `DV_EHR_URI` decoded from a `LINK` target answers them without a panic, and a nil `DV_URI` or `DV_EHR_URI` answers empty.
+**Acceptance:** for canonical and malformed sample strings of each identifier form, `Parse…`, where the form has one, round-trips the input and derived components equal the spec's lexical decomposition; malformed input yields an error from `Parse…` (no panic); best-effort methods never panic; the client version-uid helper produces identical results to the canonical parser.
+`ParseObjectVersionID` refuses an `object_id` or `creating_system_id` that is blank or holds white space, a control character or other punctuation, and accepts one with `_`; `ParseVersionTreeID` refuses a part with a sign, a leading zero or a value past the signed 64-bit range, and accepts `3000000000`.
+The `DV_URI` functions split sample references with and without each component, a `DV_EHR_URI` decoded from a `LINK` target answers them without a panic, and a nil `DV_URI` or `DV_EHR_URI` answers empty.
 
 **Out of scope:** checking a `UID` part beyond the reading above, such as RFC 1034 label syntax or a UUID's version bits; generation of new identifiers (covered for instance synthesis by REQ-107).
 Convenience accessors for the reference and identity components of `OBJECT_REF`, `PARTY_REF` and the `PARTY_PROXY` family are deferred; the underlying fields are already directly accessible on the generated structs.
@@ -608,16 +705,22 @@ The SDK provides read navigation of an in-memory RM instance by an openEHR path,
 - `items_at_path(path)` **MUST** return all items matching a **non-unique** path (empty when none match).
 - `path_exists(path)` **MUST** report whether the path resolves to at least one item; `path_unique(path)` **MUST** report whether it resolves to exactly one.
 
-The accepted path grammar **MUST** follow the openEHR path syntax — `/`-separated RM attribute-name segments with optional `[archetype_node_id]` and/or `[name]` predicates — consistent with the archetype paths `template.ParsePath` reads ([clinical-modeling.md § REQ-111](clinical-modeling.md#path-lookup) *Path lookup*) and the AQL paths of [§ REQ-109](aql.md#req-109--aql-static-lint). An `ISM_TRANSITION` is `PATHABLE` but not `LOCATABLE`, so it carries no `archetype_node_id`; a node-id predicate on `ism_transition` **MUST** therefore match the transition whose `careflow_step` is coded with that id in the `local` terminology. That is the ADL 1.4 convention by which an ACTION archetype's `ism_transition[atNNNN]` constrains `careflow_step` to `local::atNNNN`. A careflow step whose terminology is blank counts as `local`, the reading FLAT decode gives a careflow step that names none ([wire.md § REQ-053](wire.md#req-053)). A transition with no careflow step, another code, or the node id in another terminology **MUST NOT** match the predicate.
+The accepted path grammar **MUST** follow the openEHR path syntax — `/`-separated RM attribute-name segments with optional `[archetype_node_id]` and/or `[name]` predicates — consistent with the archetype paths `template.ParsePath` reads ([clinical-modeling.md § REQ-111](clinical-modeling.md#path-lookup) *Path lookup*) and the AQL paths of [§ REQ-109](aql.md#req-109--aql-static-lint).
+An `ISM_TRANSITION` is `PATHABLE` but not `LOCATABLE`, so it carries no `archetype_node_id`; a node-id predicate on `ism_transition` **MUST** therefore match the transition whose `careflow_step` is coded with that id in the `local` terminology.
+That is the ADL 1.4 convention by which an ACTION archetype's `ism_transition[atNNNN]` constrains `careflow_step` to `local::atNNNN`.
+A careflow step whose terminology is blank counts as `local`, the reading FLAT decode gives a careflow step that names none ([wire.md § REQ-053](wire.md#req-053)).
+A transition with no careflow step, another code, or the node id in another terminology **MUST NOT** match the predicate.
 
 The read operations are the package functions of `openehr/rm/rmpath`, whose import closure holds neither `transport/` nor `auth/`.
 The generated `LOCATABLE.{item_at_path,items_at_path,path_exists,path_unique}` stubs are not emitted, since a method delegating to that package would form an import cycle ([ADR 0011](../adr/0011-rm-behavioural-functions-surface.md) decision refinement 2).
 
 Path navigation is the resolution step the FLAT encoder runs before leaf mapping; the leaves it is held to reach, and what an unresolved one costs on encode, are [wire.md § Web Template leaf coverage](wire.md#web-template-leaf-coverage).
 
-**Acceptance:** against a representative composition (the blood-pressure / vital-signs shape, with real archetype-node-id and name predicates), a known unique leaf path resolves via `item_at_path` to the expected value; a non-unique path returns the expected item count via `items_at_path`; an absent path reports `path_exists = false`; a multi-match path reports `path_unique = false` and `item_at_path` errors. A typed-nil node anywhere in the tree (including the root) yields no match rather than a panic.
+**Acceptance:** against a representative composition (the blood-pressure / vital-signs shape, with real archetype-node-id and name predicates), a known unique leaf path resolves via `item_at_path` to the expected value; a non-unique path returns the expected item count via `items_at_path`; an absent path reports `path_exists = false`; a multi-match path reports `path_unique = false` and `item_at_path` errors.
+A typed-nil node anywhere in the tree (including the root) yields no match rather than a panic.
 
-**Out of scope:** `parent` and `path_of_item` (the inverse: object → its path). These require parent back-pointers the concrete RM structs do not carry and identity-based tree search; they remain documented, fail-loud panic stubs until a consumer need is established.
+**Out of scope:** `parent` and `path_of_item` (the inverse: object → its path).
+These require parent back-pointers the concrete RM structs do not carry and identity-based tree search; they remain documented, fail-loud panic stubs until a consumer need is established.
 
 ### REQ-123 — Temporal data-value helpers
 
@@ -638,8 +741,18 @@ These helpers **MUST NOT** panic on any value or receiver, and **MUST** answer a
 - `ToTime` and `ToDuration` return a non-nil error for a malformed, partial or calendar-nominal (`Y`/`M` duration components) value, for a definite duration too long for `time.Duration` (never a value wrapped around by overflow), and for a nil receiver;
 - for a leap second (second `60`) on a `DV_TIME` or `DV_DATE_TIME`, `ToTime`'s error wraps `rm.ErrTemporalConversion`: a Go `time.Time` cannot hold it, and normalising it into the next minute would change the instant the value names.
 
-The leap second is still a valid ISO 8601 value: the accessors and `is_partial` read it as written. A duration component too large for a Go `int` is unparseable input.
+The leap second is still a valid ISO 8601 value: the accessors and `is_partial` read it as written.
+A duration component too large for a Go `int` is unparseable input.
 
-**Acceptance:** for canonical, partial and basic-layout sample strings of each type, with comma fractions, each zone form and the two SDK deviations (`10:30:00+0530`, a `DV_DATE_TIME` of `2024`), the component accessors and `is_partial` match the ISO 8601 decomposition; `magnitude()` and comparison order a known sequence correctly, and the `DV_DATE_TIME` `2026-01-01T10:00:00+05:00`, which is `05:00Z`, compares below `2026-01-01T08:00:00Z`; the Go-bridge conversion succeeds for full values and errors for partial/nominal ones; malformed samples (an illegal day such as `2024-04-31`, a repeated or misordered duration designator such as `P1Y2Y`) return an error from `ToTime`/`ToDuration`; `23:59:60` and `2016-12-31T23:59:60Z` return an error wrapping `rm.ErrTemporalConversion` from `ToTime`; and malformed samples give zero components and no partial flag, and never panic. A nil receiver never panics and answers as an unparseable value does. `ToDuration` errors for `PT9999999999999H` and `P400000D`, and for a length whose intermediate sum or product would wrap back into range, such as `PT18446744074S`; `PT1.9999999999S` converts to 2 s, its fraction rounded to the nearest nanosecond. `magnitude()` of `PT9999999999999999H` is that duration's length in seconds within the precision of the result, and `PT9999999999999999999H`, whose hours do not fit an `int`, answers as an unparseable value does.
+**Acceptance:** for canonical, partial and basic-layout sample strings of each type, with comma fractions, each zone form and the two SDK deviations (`10:30:00+0530`, a `DV_DATE_TIME` of `2024`), the component accessors and `is_partial` match the ISO 8601 decomposition.
+`magnitude()` and comparison order a known sequence correctly, and the `DV_DATE_TIME` `2026-01-01T10:00:00+05:00`, which is `05:00Z`, compares below `2026-01-01T08:00:00Z`.
+The Go-bridge conversion succeeds for full values and errors for partial/nominal ones.
+Malformed samples (an illegal day such as `2024-04-31`, a repeated or misordered duration designator such as `P1Y2Y`) return an error from `ToTime`/`ToDuration`.
+`23:59:60` and `2016-12-31T23:59:60Z` return an error wrapping `rm.ErrTemporalConversion` from `ToTime`.
+Malformed samples give zero components and no partial flag, and never panic.
+A nil receiver never panics and answers as an unparseable value does.
+`ToDuration` errors for `PT9999999999999H` and `P400000D`, and for a length whose intermediate sum or product would wrap back into range, such as `PT18446744074S`; `PT1.9999999999S` converts to 2 s, its fraction rounded to the nearest nanosecond.
+`magnitude()` of `PT9999999999999999H` is that duration's length in seconds within the precision of the result, and `PT9999999999999999999H`, whose hours do not fit an `int`, answers as an unparseable value does.
 
-**Out of scope:** temporal **arithmetic** — `add`/`subtract`/`diff` against `DV_DURATION`, `DV_DURATION.multiply`/`negative`, and the calendar-aware `add_nominal`/`subtract_nominal` (leap-year / short-month semantics). Deferred to a follow-up REQ; the generated arithmetic methods remain documented stubs.
+**Out of scope:** temporal **arithmetic** — `add`/`subtract`/`diff` against `DV_DURATION`, `DV_DURATION.multiply`/`negative`, and the calendar-aware `add_nominal`/`subtract_nominal` (leap-year / short-month semantics).
+Deferred to a follow-up REQ; the generated arithmetic methods remain documented stubs.

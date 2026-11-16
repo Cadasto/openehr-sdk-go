@@ -4,9 +4,12 @@ kind: guide
 
 # Specifications
 
-Normative, addressable specifications for `github.com/cadasto/openehr-sdk-go`. This tree is **the source of truth** for the SDK's contract: requirements, idioms, wire format, auth flow, conformance. It is **self-contained** — implementing or reviewing the SDK does not require access to the Cadasto architecture sources.
+Normative, addressable specifications for `github.com/cadasto/openehr-sdk-go`.
+This tree is **the source of truth** for the SDK's contract: requirements, idioms, wire format, auth flow, conformance.
+It is **self-contained** — implementing or reviewing the SDK does not require access to the Cadasto architecture sources.
 
-`docs/architecture.md` carries the structural / design *narrative* (mermaid diagram, package map, "why it's shaped this way"). This `docs/specifications/` tree carries the *normative* statements every plan, PR, code change, and test is measured against.
+`docs/architecture.md` carries the structural / design *narrative* (mermaid diagram, package map, "why it's shaped this way").
+This `docs/specifications/` tree carries the *normative* statements every plan, PR, code change, and test is measured against.
 
 ## How to read these specs
 
@@ -20,7 +23,8 @@ Each file uses **RFC 2119 keywords** to mark normative statements:
 | `SHOULD NOT` / `NOT RECOMMENDED` | strong discouragement |
 | `MAY` / `OPTIONAL` | truly optional — no conformance impact |
 
-Statements without these keywords are **informative** — context, rationale, examples. Do not implement informative text as a requirement; do not relax normative text as a suggestion.
+Statements without these keywords are **informative** — context, rationale, examples.
+Do not implement informative text as a requirement; do not relax normative text as a suggestion.
 
 ## Document kinds
 
@@ -40,7 +44,9 @@ The kinds this repository uses:
 
 - **Topic specs** carry RFC 2119 prose only — no checkbox task lists, no implementation file paths, no PR-style summaries (use a plan for those).
 - **`REQ.md`** is registry-only — one row per REQ-NNN, generated from `traceability.yaml` by `make spec-generate` — canonical prose lives in the topic spec linked from each row.
-- **`traceability.yaml`** is an index only: ids, links and paths, with no notes or comments (`make spec-check` refuses them). Its `tests:` lists are generated from the tests' REQ citations ([development-process.md § The ladder](../development-process.md#the-ladder-full-lane)). A fact worth keeping goes in its canonical spec; history stays in git, plans and ADRs.
+- **`traceability.yaml`** is an index only: ids, links and paths, with no notes or comments (`make spec-check` refuses them).
+  Its `tests:` lists are generated from the tests' REQ citations ([development-process.md § The ladder](../development-process.md#the-ladder-full-lane)).
+  A fact worth keeping goes in its canonical spec; history stays in git, plans and ADRs.
 - **Plans** are working notes outside the traceability chain: no rule here binds them and no gate reads them ([plans/README.md](../plans/README.md)).
 - **ADRs** cover one decision each — long flows or invariants stay in the topic spec; ADRs cite the STRAND-NN they resolve plus any REQ-NNN they amend.
 - **Guides** describe how we work — they're informative, not normative; when a guide disagrees with a spec, the spec wins and the guide is updated.
@@ -60,7 +66,10 @@ Every spec file starts with a `Status:` line:
 | **Stable** | frozen contract; changes go through a deprecation cycle |
 | **Deprecated** | scheduled for removal; new code does not depend on it |
 
-**`Draft` is binding, not provisional.** Pre-v1.0, every topic spec is `Draft` — that marks the *stability promise* (the text may still change), **not** the authority. A `Draft` REQ is normative **right now**; it is not "planned" or "optional." Whether it is *built* is the separate `Impl.` column in [REQ.md](REQ.md) / `implementation:` in [traceability.yaml](traceability.yaml). Promotion `Draft → Stable` happens at v1.
+**`Draft` is binding, not provisional.** Pre-v1.0, every topic spec is `Draft` — that marks the *stability promise* (the text may still change), **not** the authority.
+A `Draft` REQ is normative **right now**; it is not "planned" or "optional."
+Whether it is *built* is the separate `Impl.` column in [REQ.md](REQ.md) / `implementation:` in [traceability.yaml](traceability.yaml).
+Promotion `Draft → Stable` happens at v1.
 
 ## Traceability
 
@@ -75,13 +84,16 @@ docs/specifications/traceability.yaml (the index: packages, probes, tests, statu
                                     └─→ docs/specifications/conformance.md (PROBE-NNN)
 ```
 
-**Single canonical home:** normative `MUST`/`SHALL` prose lives in exactly one topic spec per REQ (see [REQ.md](REQ.md) registry `Canonical` column). REQ.md is an index only — do not duplicate requirement bodies there.
+**Single canonical home:** normative `MUST`/`SHALL` prose lives in exactly one topic spec per REQ (see [REQ.md](REQ.md) registry `Canonical` column).
+REQ.md is an index only — do not duplicate requirement bodies there.
 
 Cite identifiers when crossing the chain:
 
-- A test cites the REQ-ID, and the PROBE-ID if any, that it pins; that citation lists it under its REQ ([development-process.md § The ladder](../development-process.md#the-ladder-full-lane)). Godoc on exported API cites none ([AGENTS.md § Spec-driven workflow](../../AGENTS.md#spec-driven-workflow-agents)).
+- A test cites the REQ-ID, and the PROBE-ID if any, that it pins; that citation lists it under its REQ ([development-process.md § The ladder](../development-process.md#the-ladder-full-lane)).
+  Godoc on exported API cites none ([AGENTS.md § Spec-driven workflow](../../AGENTS.md#spec-driven-workflow-agents)).
 - Every ADR in `docs/adr/` cites the STRAND-ID it resolves (from `research-strands.md`) and any REQ-IDs it amends.
-- The map lists no ADRs: an ADR names its REQs in its header, and `make spec-context` finds it from there. Plans are not part of the chain.
+- The map lists no ADRs: an ADR names its REQs in its header, and `make spec-context` finds it from there.
+  Plans are not part of the chain.
 
 `make spec-check` catches the drift a machine can see: a cited path, probe or anchor that does not exist, a landed requirement with no packages or tests, and a generated block that no longer matches its source.
 
@@ -122,9 +134,20 @@ Identifiers are stable once published ([REQ.md § Numbering policy](REQ.md#numbe
 ## Editing rules
 
 - New normative statements get a new `REQ-NNN`/`PROBE-NNN` — take the next free number ([REQ.md § Numbering policy](REQ.md#numbering-policy)); do not silently re-letter existing ones.
-- A spec section states the current contract. When and how it got there belongs in git, the plan or an ADR, not in the spec.
-- A status transition (`Draft` → `Stable`) is recorded where that status lives: a requirement's in its [`traceability.yaml`](traceability.yaml) `status:`, a spec file's in its [Status header](#status-header). The PR that makes it names it in its body, and the CHANGELOG follows the rule in [AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions).
-- Removing a normative statement from a `Stable` spec goes through a documented cycle: mark it `Status: Deprecated` first, then remove it in the next major version. A `Draft` spec has no such cycle ([§ Status header](#status-header)): a retired requirement moves its entry to [retired-requirements.md](retired-requirements.md), which points to where its rule went, and its identifier is never reused.
-- **Where a keyword goes.** An RFC 2119 keyword binds only behaviour a caller can observe and would break on: the public API, wire and file formats, the error contract, the refusals a caller sees, and security invariants. A default or a recommended path is a `SHOULD`, with its reason in the same sentence. How the code does it — algorithms, visit and precedence orders, internal structure, dependency choices, examples — is prose with no keyword, so the code can change it without an amendment. Specs carry no paths into the code, no test names, no PR numbers and no phase labels. Probe entries and Acceptance lists carry no keywords: they state what a test checks. A lower-case-modal warning from the gate (`make sdd-check` shows it) is fixed by rephrasing ("is", "does", "never", "only"), not by capitalising the modal.
-- **Layout for reading in parts.** In a specification that uses it, starting with [clinical-modeling.md](clinical-modeling.md), each sentence of prose stands on its own line, which renders as one paragraph, so a search hit or a `file:line` names one sentence; and a named rule inside a section is a heading, so it has an anchor and `make spec-context REQ=NNN RULE=<name>` prints it alone (`OUTLINE=1` lists a requirement's rules). An edit keeps that layout, and a sentence over about 60 words that it touches is split ([AGENTS.md § Spec-driven workflow](../../AGENTS.md#spec-driven-workflow-agents)).
-- The specifications source-of-truth is **this tree**. Cadasto architecture sources may inform it, but a divergence between this tree and any external source is resolved by editing this tree, not by handwaving "see external".
+- A spec section states the current contract.
+  When and how it got there belongs in git, the plan or an ADR, not in the spec.
+- A status transition (`Draft` → `Stable`) is recorded where that status lives: a requirement's in its [`traceability.yaml`](traceability.yaml) `status:`, a spec file's in its [Status header](#status-header).
+  The PR that makes it names it in its body, and the CHANGELOG follows the rule in [AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions).
+- Removing a normative statement from a `Stable` spec goes through a documented cycle: mark it `Status: Deprecated` first, then remove it in the next major version.
+  A `Draft` spec has no such cycle ([§ Status header](#status-header)): a retired requirement moves its entry to [retired-requirements.md](retired-requirements.md), which points to where its rule went, and its identifier is never reused.
+- **Where a keyword goes.** An RFC 2119 keyword binds only behaviour a caller can observe and would break on: the public API, wire and file formats, the error contract, the refusals a caller sees, and security invariants.
+  A default or a recommended path is a `SHOULD`, with its reason in the same sentence.
+  How the code does it — algorithms, visit and precedence orders, internal structure, dependency choices, examples — is prose with no keyword, so the code can change it without an amendment.
+  Specs carry no paths into the code, no test names, no PR numbers and no phase labels.
+  Probe entries and Acceptance lists carry no keywords: they state what a test checks.
+  A lower-case-modal warning from the gate (`make sdd-check` shows it) is fixed by rephrasing ("is", "does", "never", "only"), not by capitalising the modal.
+- **Layout for reading in parts.** In every specification here, each sentence of prose stands on its own line, which renders as one paragraph, so a search hit or a `file:line` names one sentence.
+  A named rule long enough to read alone is a heading, so it has an anchor and `make spec-context REQ=NNN RULE=<name>` prints it alone (`OUTLINE=1` lists a requirement's rules); a short one may stay a bold bullet.
+  An edit keeps that layout, and a sentence over about 60 words that it touches is split ([AGENTS.md § Spec-driven workflow](../../AGENTS.md#spec-driven-workflow-agents)).
+- The specifications source-of-truth is **this tree**.
+  Cadasto architecture sources may inform it, but a divergence between this tree and any external source is resolved by editing this tree, not by handwaving "see external".

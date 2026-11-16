@@ -4,9 +4,12 @@ kind: reference
 
 # Retired requirements
 
-A requirement is retired when its rule is withdrawn, or moves into another requirement or into plain prose. Its identifier is never reused: it keeps its `deprecated` / `retired` row in [traceability.yaml](traceability.yaml), and that row's canonical link opens its entry below, which says where the rule lives now.
+A requirement is retired when its rule is withdrawn, or moves into another requirement or into plain prose.
+Its identifier is never reused: it keeps its `deprecated` / `retired` row in [traceability.yaml](traceability.yaml), and that row's canonical link opens its entry below, which says where the rule lives now.
 
-Nothing on this page binds. The rules are in the topic specs listed in [README.md § Index](README.md#index). Numbers that were reserved and released without becoming a requirement are listed in [REQ.md § Numbering policy](REQ.md#numbering-policy).
+Nothing on this page binds.
+The rules are in the topic specs listed in [README.md § Index](README.md#index).
+Numbers that were reserved and released without becoming a requirement are listed in [REQ.md § Numbering policy](REQ.md#numbering-policy).
 
 ## REQ-002 — Go version
 
