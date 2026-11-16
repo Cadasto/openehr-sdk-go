@@ -177,8 +177,6 @@ The SDK's domain types (Reference Model, Archetype Object Model, base + language
 openEHR distributes its information and meta-models as **BMM schemas**, Basic Meta-Model files in the `P_BMM` JSON persistence format.
 Every class, property, generic parameter, function signature, primitive type, cardinality and documentation string the SDK needs is in those files.
 
-<a id="v1-scope-summary"></a>
-
 Pinned schemas live in [`../resources/bmm/`](../../resources/bmm), and this table is the one statement of which ones the generator reads:
 
 | File | Schema ID | Status | Role |

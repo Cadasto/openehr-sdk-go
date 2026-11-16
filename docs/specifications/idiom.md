@@ -140,12 +140,6 @@ A check defined over **bytes** — a wire-format guard, a byte-exact scanner —
 - **Unexported names:** `camelCase` with leading lowercase.
 - **Constructor names:** `New<Thing>` returns `*Thing` or `Thing`; `New<Thing>(opts ...Option)` returns `(*Thing, error)` when configuration validation can fail.
 
-<a id="substitution-slots-and-the-like-interfaces"></a>
-
-### Substitution slots
-
-How the generated RM types surface substitution slots, the `*Like` interfaces and the abstract categories, is [reference-model.md § Substitution slots and the `*Like` interfaces](reference-model.md#substitution-slots-and-the-like-interfaces).
-
 ## Errors (REQ-025)
 
 ### Wrapping
