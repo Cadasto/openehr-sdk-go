@@ -357,8 +357,9 @@ func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue 
 // or its value where the OPT prohibits the null_flavour and allows the
 // value, a PARTY_IDENTIFIED's or PARTY_RELATED's name when it has no name,
 // identifiers or external_ref, and a DV_MULTIMEDIA's uri when it has no
-// uri and the OPT prohibits its data, which it then never gets (RM
-// Not_empty). finishNode then gives each the RM default it gives a visited
+// uri and gets no data (takesURI): the OPT prohibits its data, which RM
+// Not_empty then needs the uri for, or its media type is not a text one.
+// finishNode then gives each the RM default it gives a visited
 // one, and builds one with no allowed OPT child from its BMM type; a uri
 // with none takes the default settleMultimedia writes. A HISTORY with
 // neither events nor a summary gets one of them (writeEventOrSummary):
@@ -372,7 +373,13 @@ func (g *generator) writeRMNeeded(optNode *tcimpl.CompiledNode, rmValue any) err
 		}
 		return g.writeEventOrSummary(optNode, v)
 	case *rm.DVMultimedia:
-		if (v.URI != nil && !rm.IsTypedNil(v.URI)) || len(v.Data) > 0 || !prohibited(optNode, "data") {
+		if (v.URI != nil && !rm.IsTypedNil(v.URI)) || len(v.Data) > 0 {
+			return nil
+		}
+		// The media type decides between inline data and a uri, so it is
+		// settled first; finishNode settles it again, which keeps it.
+		g.settleCoded(optNode, v)
+		if !takesURI(optNode, v) {
 			return nil
 		}
 		return g.visitNeeded(optNode, "uri", v)
@@ -1527,8 +1534,9 @@ func (g *generator) settleBuilt(v any, attr string) {
 	case *rm.IsmTransition:
 		g.settleCoded(nil, b)
 	case *rm.DVMultimedia:
-		settleMultimedia(nil, b)
+		// The media type decides between inline data and a uri.
 		g.settleCoded(nil, b)
+		settleMultimedia(nil, b)
 	case *rm.PartyIdentified:
 		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
 	case *rm.PartyRelated:
@@ -3633,15 +3641,19 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	// a group or a code set of the openEHR terminology is settled there,
 	// the RM default included, where the OPT's constraint admits a member.
 	g.settleCoded(opt, rmValue)
+	// After the media type is settled, which decides between inline data
+	// and a uri.
+	if m, ok := rmValue.(*rm.DVMultimedia); ok {
+		settleMultimedia(opt, m)
+	}
 }
 
 // finishValue fills the RM-mandatory fields of rmValue, whose OPT node is
 // opt, that the OPT walk left empty, but for its coded attributes, which
-// finishNode settles next (settleCoded).
+// finishNode settles next (settleCoded), and a DV_MULTIMEDIA's content,
+// which it settles after them (settleMultimedia).
 func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	switch v := rmValue.(type) {
-	case *rm.DVMultimedia:
-		settleMultimedia(opt, v)
 	case *rm.DVPeriodicTimeSpecification:
 		fillPeriodicFormalism(opt, v)
 	case *rm.DVQuantity:
@@ -3754,33 +3766,65 @@ func openehrCoded(group *terminology.Group, code string) rm.DVCodedText {
 }
 
 // multimediaExample is the inline data the generator gives a
-// DV_MULTIMEDIA: the seven bytes of the text "example", which suits the
-// text/plain media type it defaults to. It is fixed, so the data is the
-// same under both value fills.
+// DV_MULTIMEDIA of a text media type: the seven bytes of the text
+// "example", which suits the text/plain media type it defaults to. It is
+// fixed, so the data is the same under both value fills.
 const multimediaExample = "example"
 
-// settleMultimedia gives a DV_MULTIMEDIA the RM defaults the OPT left it
-// without, where the OPT's own constraint admits them, but for its coded
-// attributes, its media type among them, which settleCoded settles. A
-// value with no data gets multimediaExample as its data, unless the OPT
-// prohibits data, and a value with data takes the number of its bytes as
-// its size, the size of the data before any encoding, as the RM defines
-// it, unless the OPT's constraint on size rejects that number, where the
-// size the walk wrote stays. A value with neither uri nor data, because the OPT
-// prohibits data and names no allowed child for uri to build it from
-// (writeRMNeeded), gets the uri http://example.com, so RM Not_empty holds,
-// where the OPT prohibits uri too: the RM rule wins over the prohibition.
-// opt is the OPT node of m, or nil for one built from the BMM alone, such
-// as a thumbnail the OPT names with no child.
+// multimediaURI is the uri the generator gives a DV_MULTIMEDIA that gets
+// no inline data and whose OPT names no allowed child for its uri: the RM
+// default http://example.com.
+const multimediaURI = "http://example.com"
+
+// multimediaURISize is the size the generator gives a DV_MULTIMEDIA that
+// carries a uri and no inline data: a fixed positive byte count, since the
+// content at the uri has none the generator can read.
+const multimediaURISize = 1024
+
+// textMediaType reports whether mt, a DV_MULTIMEDIA's media type, is a
+// text one, of the IANA top-level type text, or is empty, as before
+// settleCoded gives it its default, text/plain.
+func textMediaType(mt rm.CodePhrase) bool {
+	code := strings.ToLower(mt.CodeString)
+	return code == "" || strings.HasPrefix(code, "text/")
+}
+
+// takesURI reports whether m, a DV_MULTIMEDIA whose OPT node is opt, gets a
+// uri rather than inline data: its OPT prohibits the data, or its media
+// type is not a text one and its OPT does not prohibit the uri. opt is nil
+// for one built from the BMM alone.
+func takesURI(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) bool {
+	return prohibited(opt, "data") || (!textMediaType(m.MediaType) && !prohibited(opt, "uri"))
+}
+
+// settleMultimedia gives a DV_MULTIMEDIA the content the OPT left it
+// without, where the OPT's own constraint admits it, once settleCoded has
+// settled its coded attributes, its media type among them. A value of a
+// text media type gets multimediaExample as its data, and so does one of
+// another media type whose OPT prohibits the uri, unless the OPT prohibits
+// data. Any other value with no uri, of another media type or whose OPT
+// prohibits data, gets the uri multimediaURI, where the walk built none
+// from the uri's OPT child (writeRMNeeded); RM Not_empty wins over a
+// prohibition of the uri too. A value with data takes the number of its
+// bytes as its size, the size of the data before any encoding, as the RM
+// defines it, and one with a uri alone multimediaURISize; the size the walk
+// wrote stays where the OPT's constraint on size rejects that number. opt
+// is the OPT node of m, or nil for one built from the BMM alone, such as a
+// thumbnail the OPT names with no child.
 func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
-	if len(m.Data) == 0 && !prohibited(opt, "data") {
+	hasURI := m.URI != nil && !rm.IsTypedNil(m.URI)
+	if len(m.Data) == 0 && !takesURI(opt, m) {
 		m.Data = []byte(multimediaExample)
 	}
-	if size := int64(len(m.Data)); size > 0 && componentFits(bindingChild(opt, "size"), size) {
-		m.Size = rm.Integer(size)
+	if !hasURI && len(m.Data) == 0 {
+		m.URI = &rm.DVURI{Value: multimediaURI}
 	}
-	if (m.URI == nil || rm.IsTypedNil(m.URI)) && len(m.Data) == 0 {
-		m.URI = &rm.DVURI{Value: "http://example.com"}
+	size := int64(len(m.Data))
+	if size == 0 {
+		size = multimediaURISize
+	}
+	if componentFits(bindingChild(opt, "size"), size) {
+		m.Size = rm.Integer(size)
 	}
 }
 
