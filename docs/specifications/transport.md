@@ -6,9 +6,12 @@ kind: specification
 
 **Status:** Draft
 
-Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094, REQ-098, REQ-150 (path-parameter segment validation), REQ-151 (typed 2xx failures), REQ-166 (Bearer challenge on 401 and 403) and REQ-066 (caller attribution). REQ-096, REQ-097 and REQ-172 are retired.
+Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages.
+Covers REQ-090 through REQ-094, REQ-098, REQ-150 (path-parameter segment validation), REQ-151 (typed 2xx failures), REQ-166 (Bearer challenge on 401 and 403) and REQ-066 (caller attribution).
+REQ-096, REQ-097 and REQ-172 are retired.
 
-openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.md](wire.md). Service catalog resolution lives in [auth.md](auth.md).
+openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.md](wire.md).
+Service catalog resolution lives in [auth.md](auth.md).
 
 ---
 
@@ -16,7 +19,9 @@ openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.m
 
 `transport/` **MUST** expose OpenTelemetry hooks:
 
-- **Spans.** Every outgoing request opens an OTel span named `<METHOD> <route_template>` (e.g. `GET /ehr/{ehr_id}`). The span **SHOULD** carry as attributes the HTTP method, the URL, the status code, the response size and `openehr.spec_version`, so a trace says what the request was without its body. The URL on the span **MUST** be sanitised: it carries no token and none of the request URL's userinfo (a user name or password).
+- **Spans.** Every outgoing request opens an OTel span named `<METHOD> <route_template>` (e.g. `GET /ehr/{ehr_id}`).
+  The span **SHOULD** carry as attributes the HTTP method, the URL, the status code, the response size and `openehr.spec_version`, so a trace says what the request was without its body.
+  The URL on the span **MUST** be sanitised: it carries no token and none of the request URL's userinfo (a user name or password).
 - **Propagation.** Trace context **MUST** be propagated outbound via the standard W3C `traceparent` / `tracestate` headers (using the OTel `propagation` API).
 - **No-op safety.** With no tracer provider given to `transport.WithTracerProvider` and none set globally, tracing **MUST** be a silent no-op: the SDK works with no OTel setup.
 
@@ -42,7 +47,18 @@ client, err := transport.New(catalog,
 )
 ```
 
-**Disabling retries.** `transport.RetryPolicy` **MUST** tell "no retries" apart from "use the package default", so a consumer can turn retries off at construction without reading the implementation, as a benchmark that measures server-observed latency does:
+Rules:
+
+- Retries **MUST NOT** be applied to a write, `POST`, `PATCH`, `PUT` or `DELETE`, unless the policy sets `RetryNonIdempotent`; without it only `GET`, `HEAD` and `OPTIONS` are retried.
+  `POST` and `PATCH` are not idempotent (RFC 9110 §9.2.2), and an openEHR `PUT` or `DELETE` names the version it changes (`If-Match`, a version uid), so a retry after a `502`, `503` or `504` that hid a committed write would answer `412` or `409` for a write that succeeded.
+  The SDK checks the method before it looks at the error or the status, so a token or network failure on such a request is not retried either.
+- Retries **MUST** respect `ctx` cancellation: no attempt starts once `ctx` has ended.
+- The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
+- Two requests **MUST NOT** be sent again, since every attempt would fail the same way: a request `Client.Do` refuses with `transport.ErrInsecureRedirect` ([§ REQ-092](#req-092--tls-posture) *No downgrade with a credential*), and a request that cannot be built (`http.NewRequestWithContext` refuses it).
+
+### Disabling retries
+
+`transport.RetryPolicy` **MUST** tell "no retries" apart from "use the package default", so a consumer can turn retries off at construction without reading the implementation, as a benchmark that measures server-observed latency does:
 
 | `RetryPolicy` value | Behaviour |
 |---|---|
@@ -53,34 +69,40 @@ client, err := transport.New(catalog,
 | `RetryPolicy{MaxAttempts: 1, ...}` | Exactly one attempt. |
 | `RetryPolicy{MaxAttempts: N, ...}` for N ≥ 2 | Up to N attempts in all. |
 
-Rules:
+### Retrying after a body read failure
 
-- Retries **MUST NOT** be applied to a write, `POST`, `PATCH`, `PUT` or `DELETE`, unless the policy sets `RetryNonIdempotent`; without it only `GET`, `HEAD` and `OPTIONS` are retried. `POST` and `PATCH` are not idempotent (RFC 9110 §9.2.2), and an openEHR `PUT` or `DELETE` names the version it changes (`If-Match`, a version uid), so a retry after a `502`, `503` or `504` that hid a committed write would answer `412` or `409` for a write that succeeded. The SDK checks the method before it looks at the error or the status, so a token or network failure on such a request is not retried either.
-- Retries **MUST** respect `ctx` cancellation: no attempt starts once `ctx` has ended.
-- The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
-- Two requests **MUST NOT** be sent again, since every attempt would fail the same way: a request `Client.Do` refuses with `transport.ErrInsecureRedirect` ([§ REQ-092](#req-092--tls-posture) *No downgrade with a credential*), and a request that cannot be built (`http.NewRequestWithContext` refuses it).
+A request whose 2xx body could not be read ([§ REQ-151](#req-151--typed-2xx-decode-failure) *A body that cannot be read*) **MUST NOT** be sent again unless its method is `GET`, `HEAD` or `OPTIONS`, which RFC 9110 §9.2.1 defines as safe, even when `RetryNonIdempotent` is set: the server has acted on it, and a second `PUT` carrying the same `If-Match` would fail as a stale precondition and hide the version the first one made.
+The non-2xx arm is retried by its status, as any `*WireError` is.
+A request whose body could not be read, on either arm, **MUST NOT** be sent again once its context has ended, and when the context ends during the wait before a retry, `Client.Do` **MUST** still return that arm's error and `*Response`, with the context's error wrapped beside it.
 
-**Retrying after a body read failure.** A request whose 2xx body could not be read ([§ REQ-151](#req-151--typed-2xx-decode-failure) *A body that cannot be read*) **MUST NOT** be sent again unless its method is `GET`, `HEAD` or `OPTIONS`, which RFC 9110 §9.2.1 defines as safe, even when `RetryNonIdempotent` is set: the server has acted on it, and a second `PUT` carrying the same `If-Match` would fail as a stale precondition and hide the version the first one made. The non-2xx arm is retried by its status, as any `*WireError` is. A request whose body could not be read, on either arm, **MUST NOT** be sent again once its context has ended, and when the context ends during the wait before a retry, `Client.Do` **MUST** still return that arm's error and `*Response`, with the context's error wrapped beside it.
-
-**Acceptance (body read failures).** With retries enabled, a `GET` whose 2xx body is cut is sent again. A `PUT`, a `DELETE`, and a `POST` under `RetryNonIdempotent`, each with its 2xx body cut, are sent once.
+**Acceptance (body read failures).** With retries enabled, a `GET` whose 2xx body is cut is sent again.
+A `PUT`, a `DELETE`, and a `POST` under `RetryNonIdempotent`, each with its 2xx body cut, are sent once.
 
 ---
 
 ## REQ-092 — TLS posture
 
-The SDK does not allocate its own `*http.Client` (REQ-021), so TLS configuration is the consumer's responsibility. The discovery resolver's refusal of plaintext URLs, its `WithAllowInsecure()` opt-out and the warnings it logs for plaintext URLs are [auth.md § REQ-073](auth.md#req-073--discovery-trust-posture)'s.
+The SDK does not allocate its own `*http.Client` (REQ-021), so TLS configuration is the consumer's responsibility.
+The discovery resolver's refusal of plaintext URLs, its `WithAllowInsecure()` opt-out and the warnings it logs for plaintext URLs are [auth.md § REQ-073](auth.md#req-073--discovery-trust-posture)'s.
 
 The SDK **MUST NOT** silently override or relax the consumer's `*http.Client` TLS config.
 
-**No downgrade with a credential.** A request that `Client.Do` sends and that carries a credential header, `Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`, **MUST NOT** follow a redirect from an `https` URL to a URL whose scheme is not `https`: `Client.Do` **MUST** fail with an error that `errors.Is` matches to `transport.ErrInsecureRedirect`, without sending the request to the redirect target, and the retry policy does not send it again ([REQ-091](#req-091--retry-policy)). A request sent without any of these headers, and every redirect other than that downgrade, **MUST** follow the injected client's own redirect policy (its `CheckRedirect`, or net/http's limit of 10 redirects when it has none), and the transport leaves the injected client unmodified ([REQ-021](idiom.md#http-client-injection-req-021)), so a change the caller makes to it later reaches the next request. The transport does this with a shallow copy of the injected client, taken for each request, whose redirect policy refuses that redirect and otherwise defers to the injected client's own. [REQ-021](idiom.md#http-client-injection-req-021) names this copy as an exception to its rule that the SDK does not allocate its own client.
+### No downgrade with a credential
 
-net/http forwards these four headers to a redirect target on the same host, or a subdomain of it, whatever the target's scheme, and drops them only for another domain, so without this rule a 3xx to `http://` on the same host would carry a token or a session cookie unencrypted. A cookie the injected client's `Jar` adds is the jar's to scope, by its `Secure` attribute.
+A request that `Client.Do` sends and that carries a credential header, `Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`, **MUST NOT** follow a redirect from an `https` URL to a URL whose scheme is not `https`: `Client.Do` **MUST** fail with an error that `errors.Is` matches to `transport.ErrInsecureRedirect`, without sending the request to the redirect target, and the retry policy does not send it again ([REQ-091](#req-091--retry-policy)).
+A request sent without any of these headers, and every redirect other than that downgrade, **MUST** follow the injected client's own redirect policy (its `CheckRedirect`, or net/http's limit of 10 redirects when it has none), and the transport leaves the injected client unmodified ([REQ-021](idiom.md#http-client-injection-req-021)), so a change the caller makes to it later reaches the next request.
+The transport does this with a shallow copy of the injected client, taken for each request, whose redirect policy refuses that redirect and otherwise defers to the injected client's own.
+[REQ-021](idiom.md#http-client-injection-req-021) names this copy as an exception to its rule that the SDK does not allocate its own client.
+
+net/http forwards these four headers to a redirect target on the same host, or a subdomain of it, whatever the target's scheme, and drops them only for another domain, so without this rule a 3xx to `http://` on the same host would carry a token or a session cookie unencrypted.
+A cookie the injected client's `Jar` adds is the jar's to scope, by its `Secure` attribute.
 
 ---
 
 ## REQ-093 — openEHR error envelope mapping
 
-openEHR REST 1.1.0 returns a structured JSON body on non-2xx responses. The pin's only error example (the ITS-REST overview, § *HTTP status codes*) has this shape, shortened here to one coded entry:
+openEHR REST 1.1.0 returns a structured JSON body on non-2xx responses.
+The pin's only error example (the ITS-REST overview, § *HTTP status codes*) has this shape, shortened here to one coded entry:
 
 ```json
 {
@@ -98,21 +120,49 @@ openEHR REST 1.1.0 returns a structured JSON body on non-2xx responses. The pin'
 
 The SDK **MUST**:
 
-- Decode this envelope on every non-2xx response (best-effort, member by member; missing fields default to zero values). Its coded entries go to `OpenEHRErrorDetail.CodedText`: first those of a `coded_text` list, kept for servers that send one, then those of the pin's `errors` list, each a `DV_CODED_TEXT` whose `defining_code` gives the item's terminology and code string and whose `value` gives the item's `Value`. A member or entry of the wrong JSON type is left empty or skipped without failing the envelope: a `message` that is not a string is left empty; a `validationErrors` entry that is not a string is skipped; a `coded_text` or `errors` entry that is not an object, whose terminology or code string is not a string, or (in `errors`) that has no `defining_code` is skipped; and a `coded_text`, `errors` or `validationErrors` member that is not a list is skipped. A coded entry whose `value` is not a string keeps its terminology and code string, with an empty `Value`. Member names match exactly, so a case variant such as `MESSAGE` is ignored like any other unknown member, and a body that repeats a member name, in the envelope or in any value inside it, leaves the envelope undecoded.
+- Decode this envelope on every non-2xx response (best-effort, member by member; missing fields default to zero values).
+  Its coded entries go to `OpenEHRErrorDetail.CodedText`: first those of a `coded_text` list, kept for servers that send one, then those of the pin's `errors` list, each a `DV_CODED_TEXT` whose `defining_code` gives the item's terminology and code string and whose `value` gives the item's `Value`.
+  A member or entry of the wrong JSON type is left empty or skipped without failing the envelope: a `message` that is not a string is left empty; a `validationErrors` entry that is not a string is skipped; a `coded_text` or `errors` entry that is not an object, whose terminology or code string is not a string, or (in `errors`) that has no `defining_code` is skipped; and a `coded_text`, `errors` or `validationErrors` member that is not a list is skipped.
+  A coded entry whose `value` is not a string keeps its terminology and code string, with an empty `Value`.
+  Member names match exactly, so a case variant such as `MESSAGE` is ignored like any other unknown member, and a body that repeats a member name, in the envelope or in any value inside it, leaves the envelope undecoded.
 - Accept the envelope's `code` as a JSON string or a JSON number (the overview's own example is `"code": 90000`), keeping the text form (`"90000"`) in `OpenEHRErrorDetail.Code`, and decode the `validationErrors` list the ITS-REST `Error` schema (the `400` bodies) defines beside `message`, so neither a numeric `code` nor a body that carries `validationErrors` with no `code` or no `message` leaves the envelope undecoded.
 - Attach the parsed envelope to `transport.WireError` as `OpenEHRErrorDetail{Message, Code, CodedText, ValidationErrors}`.
-- Map the HTTP status to typed sentinels per [idiom.md § Errors](idiom.md#errors-req-025): `ErrNotFound` (404), `ErrUnauthorized` (401), `ErrForbidden` (403), `ErrVersionConflict` (409), `ErrPreconditionFailed` (412), `ErrUnprocessable` (422), `ErrPreconditionRequired` (428). The status set follows the openEHR contract: a **422** signals a well-formed-but-semantically-invalid request (validation / template failure — the ITS-REST overview, § *HTTP status codes*; used on EHR and demographic writes) and **MUST** map to `ErrUnprocessable`. A **409** spans a conflict with the resource's current state (the Composition delete of a version that is not the latest) and a resource-already-exists collision; the openEHR error `code` on `OpenEHRErrorDetail` disambiguates and `ErrVersionConflict` remains the sentinel for both. openEHR signals a stale `If-Match` as **412** and a missing-but-expected `If-Match` as **400** (the ITS-REST overview, § *If-Match and accidental overwrites*) — **not** 428; `ErrPreconditionRequired` (428) is retained only as a defensive mapping for non-conformant servers and is **not** an openEHR-canonical status. A **400** with no more specific sentinel surfaces as a bare `WireError` whose openEHR `code` remains reachable via `errors.As`.
-- **PHI-safe error surfaces by default.** openEHR error bodies routinely carry patient identifiers and clinical detail. `WireError.Error()` **MUST NOT** interpolate `OpenEHR.Message`, a `CodedText` item's `Value` or the raw response bytes. It **MUST** carry HTTP status, route template, and the openEHR error *code* (codes are not PHI). Callers that need the full server payload for diagnostics **MUST** opt in via `transport.WithRawErrorBodies(true)`; only then are `OpenEHR.Message`, `OpenEHR.ValidationErrors`, each `OpenEHR.CodedText` item's `Value` (free text, like the message) and `WireError.RawBody` populated. `OpenEHR.Code` and each `OpenEHR.CodedText` item's terminology and code string remain available via `errors.As` regardless of the opt-in (structured codes, not free-text clinical narrative).
-- **Unrouted requests render a placeholder.** Where a diagnostic string names the request's route, it **MUST** carry the caller's route template, or — when the request carried none — the stable placeholder `(unrouted)`; it **MUST NOT** fall back to the expanded request path or the resolved URL, either of which may hold a caller-supplied identifier. The placeholder's exact text is part of this contract, not an implementation detail: a caller may match on it. The obligation reaches inside a wrapped error: where a network failure arrives as a net/http `*url.Error`, whose own text prints the resolved URL, the SDK **MUST** substitute the same route slot for that URL and leave the error's type, its `Op` and its cause as they were, so `errors.AsType[*url.Error]`, `Timeout()`, `Temporary()` and `errors.Is` against the cause all answer as before. The telemetry surfaces resolve the route their own way (REQ-090 span naming and the `http.route` attribute, REQ-098 `Observation.Route`) and this clause does not bind them.
-- **Bounded response reads.** Every `Client.Do` **MUST** cap how many bytes are read from the response body. The default limit is `transport.DefaultMaxResponseBody` (64 MiB). `transport.WithMaxResponseBody(n)` overrides the cap: `0` means default, a positive value sets an explicit limit, a negative value disables the cap (documented escape hatch for trusted backends). Exceeding the limit **MUST** fail the request with an error that `errors.Is` matches to `transport.ErrResponseTooLarge` and that names the limit, never with an unbounded `io.ReadAll`. What that failure returns beside the error is [§ REQ-151](#req-151--typed-2xx-decode-failure)'s.
+- Map the HTTP status to typed sentinels per [idiom.md § Errors](idiom.md#errors-req-025): `ErrNotFound` (404), `ErrUnauthorized` (401), `ErrForbidden` (403), `ErrVersionConflict` (409), `ErrPreconditionFailed` (412), `ErrUnprocessable` (422), `ErrPreconditionRequired` (428).
+  The status set follows the openEHR contract: a **422** signals a well-formed-but-semantically-invalid request (validation / template failure — the ITS-REST overview, § *HTTP status codes*; used on EHR and demographic writes) and **MUST** map to `ErrUnprocessable`.
+  A **409** spans a conflict with the resource's current state (the Composition delete of a version that is not the latest) and a resource-already-exists collision; the openEHR error `code` on `OpenEHRErrorDetail` disambiguates and `ErrVersionConflict` remains the sentinel for both. openEHR signals a stale `If-Match` as **412** and a missing-but-expected `If-Match` as **400** (the ITS-REST overview, § *If-Match and accidental overwrites*) — **not** 428; `ErrPreconditionRequired` (428) is retained only as a defensive mapping for non-conformant servers and is **not** an openEHR-canonical status.
+  A **400** with no more specific sentinel surfaces as a bare `WireError` whose openEHR `code` remains reachable via `errors.As`.
+
+### PHI-safe error surfaces by default
+
+openEHR error bodies routinely carry patient identifiers and clinical detail.
+`WireError.Error()` **MUST NOT** interpolate `OpenEHR.Message`, a `CodedText` item's `Value` or the raw response bytes.
+It **MUST** carry HTTP status, route template, and the openEHR error *code* (codes are not PHI).
+Callers that need the full server payload for diagnostics **MUST** opt in via `transport.WithRawErrorBodies(true)`; only then are `OpenEHR.Message`, `OpenEHR.ValidationErrors`, each `OpenEHR.CodedText` item's `Value` (free text, like the message) and `WireError.RawBody` populated.
+`OpenEHR.Code` and each `OpenEHR.CodedText` item's terminology and code string remain available via `errors.As` regardless of the opt-in (structured codes, not free-text clinical narrative).
 
 `WireError.Error()` values flow into REQ-098 observers and REQ-090 OTel span status; the PHI-safe default applies there too unless the consumer opts into raw bodies.
+
+### Unrouted requests render a placeholder
+
+Where a diagnostic string names the request's route, it **MUST** carry the caller's route template, or — when the request carried none — the stable placeholder `(unrouted)`; it **MUST NOT** fall back to the expanded request path or the resolved URL, either of which may hold a caller-supplied identifier.
+The placeholder's exact text is part of this contract, not an implementation detail: a caller may match on it.
+The obligation reaches inside a wrapped error: where a network failure arrives as a net/http `*url.Error`, whose own text prints the resolved URL, the SDK **MUST** substitute the same route slot for that URL and leave the error's type, its `Op` and its cause as they were, so `errors.AsType[*url.Error]`, `Timeout()`, `Temporary()` and `errors.Is` against the cause all answer as before.
+The telemetry surfaces resolve the route their own way (REQ-090 span naming and the `http.route` attribute, REQ-098 `Observation.Route`) and this clause does not bind them.
+
+### Bounded response reads
+
+Every `Client.Do` **MUST** cap how many bytes are read from the response body.
+The default limit is `transport.DefaultMaxResponseBody` (64 MiB).
+`transport.WithMaxResponseBody(n)` overrides the cap: `0` means default, a positive value sets an explicit limit, a negative value disables the cap (documented escape hatch for trusted backends).
+Exceeding the limit **MUST** fail the request with an error that `errors.Is` matches to `transport.ErrResponseTooLarge` and that names the limit, never with an unbounded `io.ReadAll`.
+What that failure returns beside the error is [§ REQ-151](#req-151--typed-2xx-decode-failure)'s.
 
 ---
 
 ## REQ-094 — `Prefer` response-shape negotiation
 
-openEHR REST 1.1.0 uses `Prefer: return=<mode>` on write paths. The SDK **MUST** support:
+openEHR REST 1.1.0 uses `Prefer: return=<mode>` on write paths.
+The SDK **MUST** support:
 
 | Mode | Server response | SDK return |
 |---|---|---|
@@ -126,9 +176,14 @@ Rules:
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
-For the `WriteResult` family (`composition`, `directory`, `ehr_status`, `demographic`), `identifier` fills the identifier slot of `VersionMetadata` from the ITS-REST `Identifier` body (`{"uid": …}`) through `(*ehr.VersionMetadata).ResolveIdentifierBody`, after the version identifier [REQ-054](wire.md#req-054) selects. `contribution.Commit` decodes a `representation` body and never fills the identifier slot from a body.
+For the `WriteResult` family (`composition`, `directory`, `ehr_status`, `demographic`), `identifier` fills the identifier slot of `VersionMetadata` from the ITS-REST `Identifier` body (`{"uid": …}`) through `(*ehr.VersionMetadata).ResolveIdentifierBody`, after the version identifier [REQ-054](wire.md#req-054) selects.
+`contribution.Commit` decodes a `representation` body and never fills the identifier slot from a body.
 
-**Absent resource on a successful write.** `minimal` and `identifier` **MUST** return a nil error and a zero resource. For a pointer resource type the zero value is a typed nil: `== nil` is the right test for a concrete `*T` return, but an interface return (`rm.Party`) can hold a typed-nil pointer, for which `== nil` is the wrong test. The SDK **MUST** expose a `HasResource` helper scoped to registered RM types: it reports false for a typed-nil pointer to a registered RM type, a bare-nil interface, and an interface holding a typed-nil registered RM pointer, and true for any populated resource. A typed nil of a type outside the RM registry is out of scope. The helper uses no reflection, and the write-path documentation names the typed-nil trap and points at it, and at `rm.IsTypedNil` for callers already on the RM type.
+**Absent resource on a successful write.** `minimal` and `identifier` **MUST** return a nil error and a zero resource.
+For a pointer resource type the zero value is a typed nil: `== nil` is the right test for a concrete `*T` return, but an interface return (`rm.Party`) can hold a typed-nil pointer, for which `== nil` is the wrong test.
+The SDK **MUST** expose a `HasResource` helper scoped to registered RM types: it reports false for a typed-nil pointer to a registered RM type, a bare-nil interface, and an interface holding a typed-nil registered RM pointer, and true for any populated resource.
+A typed nil of a type outside the RM registry is out of scope.
+The helper uses no reflection, and the write-path documentation names the typed-nil trap and points at it, and at `rm.IsTypedNil` for callers already on the RM type.
 
 **A failed body after a committed write.** A write whose `representation` body is empty or does not decode, and a write in any `Prefer` mode whose body could not be read, has still committed: [§ REQ-151](#req-151--typed-2xx-decode-failure) names the error it returns beside its version metadata.
 
@@ -162,11 +217,13 @@ transport.WithObservationTag(ctx, k, v) context.Context
 
 Rules:
 
-- The observer **MUST** fire exactly once per logical `Client.Do` call — after retries settle — with retry-aware `Attempts` and total wall-clock `Duration`. A call `Client.Do` refuses before any attempt (a nil `Request`, a context already ended, a service missing from the catalog, a path that fails validation) **MUST** be observed too, with `Attempts` 0 and an empty `URL`.
+- The observer **MUST** fire exactly once per logical `Client.Do` call — after retries settle — with retry-aware `Attempts` and total wall-clock `Duration`.
+  A call `Client.Do` refuses before any attempt (a nil `Request`, a context already ended, a service missing from the catalog, a path that fails validation) **MUST** be observed too, with `Attempts` 0 and an empty `URL`.
 - `WithObserver(nil)` **MUST** be a safe no-op.
 - A panicking observer **MUST NOT** break the request lifecycle: the transport recovers the panic and logs it through the configured `slog.Logger`.
 - `Observation.Tags` **MUST** be a copy of the context-attached tags, so an observer cannot change the caller's context.
-- The hook is **additive** to REQ-090 OTel — not a substitute. Consumers that want both keep both.
+- The hook is **additive** to REQ-090 OTel — not a substitute.
+  Consumers that want both keep both.
 
 Out of scope:
 - Per-observer filtering / sampling (composition concern).
@@ -176,15 +233,22 @@ Out of scope:
 
 ## REQ-150 — Path-parameter segment validation
 
-`REQ-050` makes the transport the single canonical path *encoder*. This requirement makes it the single path-*segment validator* as well. Encoding without validation leaves every caller owning a class of request-URI mutation that the type system cannot see.
+`REQ-050` makes the transport the single canonical path *encoder*.
+This requirement makes it the single path-*segment validator* as well.
+Encoding without validation leaves every caller owning a class of request-URI mutation that the type system cannot see.
 
-Before issuing an HTTP request, the transport **MUST** validate the decoded `Request.Path` (not the service base URL). The path is split on `/`; the leading empty segment of an absolute path is ignored. A `Request.Path` of exactly `"/"` — the service root, the System API's only operation (`OPTIONS /`, sent by the landed `system.Capabilities` / `Version` / `Health`) — carries no segments and **MUST** pass. Every remaining segment of any other path **MUST** be non-empty and **MUST NOT**:
+Before issuing an HTTP request, the transport **MUST** validate the decoded `Request.Path` (not the service base URL).
+The path is split on `/`; the leading empty segment of an absolute path is ignored.
+A `Request.Path` of exactly `"/"` — the service root, the System API's only operation (`OPTIONS /`, sent by the landed `system.Capabilities` / `Version` / `Health`) — carries no segments and **MUST** pass.
+Every remaining segment of any other path **MUST** be non-empty and **MUST NOT**:
 
 - be `.` or `..`;
 - contain `\`;
 - contain a control character (bytes `< 0x20` or `DEL` `0x7F`).
 
-A space or any other percent-encodable octet **MUST** be accepted — encoding remains the transport's job (REQ-050). Validation **MUST** run on the decoded path the transport already requires. A literal `%2e%2e` that was not decoded is an ordinary segment, not a separator.
+A space or any other percent-encodable octet **MUST** be accepted — encoding remains the transport's job (REQ-050).
+Validation **MUST** run on the decoded path the transport already requires.
+A literal `%2e%2e` that was not decoded is an ordinary segment, not a separator.
 
 The transport **MUST NOT** honour a caller-populated `url.URL.RawPath` when building the request URI: the encoded form is derived from the validated decoded path alone (REQ-050), so a pre-encoded spelling cannot bypass validation.
 
@@ -200,9 +264,12 @@ The SDK **MUST** export the same checks as package functions so a caller constru
 
 (The `Validate*`-returns-`error` spelling follows the repo's own precedent, `Compiled.ValidatePath` and `aql.ValidateIdentifier`, where `Valid*` names return `bool`, as in `rm.TimeDefinitions.ValidDay`.)
 
-`ValidateRequestPath` splits on `/`, so an interpolated parameter that *contains* `/` produces well-formed segments that segment inspection alone cannot catch. When `Request.Route` is set, the transport **MUST** therefore also refuse a decoded `Request.Path` whose segment count differs from the route template's: a smuggled separator changes the count and moves the request onto a different route. The check runs only when `Route` is set, so every path-interpolating leaf request sets it, and the check reads the `Route` field itself, never a helper that falls back to `Path` (a path's arity compared against itself never fires).
+`ValidateRequestPath` splits on `/`, so an interpolated parameter that *contains* `/` produces well-formed segments that segment inspection alone cannot catch.
+When `Request.Route` is set, the transport **MUST** therefore also refuse a decoded `Request.Path` whose segment count differs from the route template's: a smuggled separator changes the count and moves the request onto a different route.
+The check runs only when `Route` is set, so every path-interpolating leaf request sets it, and the check reads the `Route` field itself, never a helper that falls back to `Path` (a path's arity compared against itself never fires).
 
-Leaf clients do not re-implement the check. On every `openehr/client/*` operation, a path parameter that contains `/` **MUST** be refused, with an error wrapping `transport.ErrInvalidPathSegment` and `transport.ErrInvalidConfig`, and no request issued: a parameter that is a well-formed openEHR identifier satisfies every rule above and passes, and a `/` is refused as a smuggled separator, never let through on the expectation that openEHR identifiers carry no separator, which is exactly the expectation a hostile identifier exploits.
+Leaf clients do not re-implement the check.
+On every `openehr/client/*` operation, a path parameter that contains `/` **MUST** be refused, with an error wrapping `transport.ErrInvalidPathSegment` and `transport.ErrInvalidConfig`, and no request issued: a parameter that is a well-formed openEHR identifier satisfies every rule above and passes, and a `/` is refused as a smuggled separator, never let through on the expectation that openEHR identifiers carry no separator, which is exactly the expectation a hostile identifier exploits.
 
 Out of scope: a breaking `PathSegment` named type on every leaf; validating the service base URL; the `cadasto/admin` health-probe paths (`WithLivePath` / `WithReadyPath`), which bypass `transport.Do` by design and keep their own non-empty / leading-`/` guard.
 
@@ -212,9 +279,13 @@ Out of scope: a breaking `PathSegment` named type on every leaf; validating the 
 
 ## REQ-151 — Typed 2xx decode failure
 
-A 2xx status says the server did what was asked. On a write, the status and its `ETag` and `Location` are the proof that the server committed and the name of the version it made. A body that then cannot be used is therefore a different failure from a wire failure, and the SDK keeps what the server sent: the status, the headers and, when the body was read, its bytes.
+A 2xx status says the server did what was asked.
+On a write, the status and its `ETag` and `Location` are the proof that the server committed and the name of the version it made.
+A body that then cannot be used is therefore a different failure from a wire failure, and the SDK keeps what the server sent: the status, the headers and, when the body was read, its bytes.
 
-**The taxonomy.** When the body of a 2xx response cannot be used, the SDK **MUST** report it with the error this table names for the case:
+### The taxonomy
+
+When the body of a 2xx response cannot be used, the SDK **MUST** report it with the error this table names for the case:
 
 | After a 2xx | Error |
 |---|---|
@@ -223,25 +294,50 @@ A 2xx status says the server did what was asked. On a write, the status and its 
 | Any other body that does not decode as the requested representation, `ehr.Create`'s included | `*transport.DecodeError` |
 | A read that expected a representation got an empty body: `transport.Decode` and the reads that mirror it | an error wrapping `transport.ErrInvalidShape` |
 
-A body that could not be read is never decoded, so the first row takes precedence over the others. *Empty* means zero bytes, whitespace only, or the JSON `null` literal, decided on the raw bytes before any decode by `transport.IsNoRepresentationBody`: a `null` body decodes into a struct as a no-op with no error, so a decoder that tested only the length would return an all-zero value that looks populated.
+A body that could not be read is never decoded, so the first row takes precedence over the others.
+*Empty* means zero bytes, whitespace only, or the JSON `null` literal, decided on the raw bytes before any decode by `transport.IsNoRepresentationBody`: a `null` body decodes into a struct as a no-op with no error, so a decoder that tested only the length would return an all-zero value that looks populated.
 
 These outcomes are their own, and the table **MUST NOT** override them:
 
 - The `Prefer: return=identifier` arm (`(*ehr.VersionMetadata).ResolveIdentifierBody`, [§ REQ-094](#req-094--prefer-response-shape-negotiation)) reports a body it cannot read as an identifier with an error wrapping `transport.ErrInvalidShape`, not a `*transport.DecodeError`.
-- On the Definition list operations, and on `GetStoredQuery`, `PutStoredQuery`, `PutStoredQueryVersion` and `UploadTemplate`, an empty body is a success: the list operations return an empty catalog ([wire.md § REQ-144](wire.md#req-144--definition-metadata-decoding) *Empty list bodies*), and the other four return metadata they build themselves with a nil error ([wire.md § REQ-057](wire.md#req-057), [§ REQ-144](wire.md#req-144--definition-metadata-decoding)). A non-empty body there that does not decode is still a `*transport.DecodeError`.
+- On the Definition list operations, and on `GetStoredQuery`, `PutStoredQuery`, `PutStoredQueryVersion` and `UploadTemplate`, an empty body is a success: the list operations return an empty catalog ([wire.md § REQ-144](wire.md#req-144--definition-metadata-decoding) *Empty list bodies*), and the other four return metadata they build themselves with a nil error ([wire.md § REQ-057](wire.md#req-057), [§ REQ-144](wire.md#req-144--definition-metadata-decoding)).
+  A non-empty body there that does not decode is still a `*transport.DecodeError`.
 - A read that answers `204 No Content` with an outcome of its own before the empty-body refusal keeps it: `composition.ErrDeletedAtTime`, and `demographic.Get`'s nil PARTY for a party deleted at the requested time.
 
-**What each typed error carries.** Each typed error in the table **MUST** be recoverable from the returned error with `errors.AsType` through any `fmt.Errorf` operation-name wrap a leaf package adds, and **MUST** wrap its cause, exposing it through `Unwrap`, so `errors.Is` and `errors.AsType` still reach the cause's own diagnostics. Beneath a read failure that is `io.ErrUnexpectedEOF` for a connection cut mid-body, the content-coding error (such as `gzip.ErrHeader`) for a body that does not match its encoding, or `transport.ErrResponseTooLarge` for a body over the ceiling; beneath a decode failure, the codec's own typed errors (path, type, offset).
+### What each typed error carries
 
-**`Error()` stays value-free.** The `Error()` of each typed error in the table **MUST** follow the [REQ-093](#req-093--openehr-error-envelope-mapping) discipline: it names the classification and the request fields the error holds, the method and route template of a `DecodeError` and the status too for a `BodyReadError`, with the route under REQ-093's *Unrouted requests render a placeholder* rule, and it never names a header value, a body byte or the cause's own text. That text can carry the offending value or bytes the server sent: a `*strconv.NumError` beneath a decode failure always quotes its input, as a `*json.SemanticError` can beneath a `canjson.DecodeError` whose own text carries none ([wire.md § REQ-052](wire.md#req-052)), and net/http quotes a malformed chunked trailer in a read failure. The cause is reachable only by unwrapping. For a body over the ceiling the message names the limit, as REQ-093 requires; the limit is the caller's own setting, not a payload value.
+Each typed error in the table **MUST** be recoverable from the returned error with `errors.AsType` through any `fmt.Errorf` operation-name wrap a leaf package adds, and **MUST** wrap its cause, exposing it through `Unwrap`, so `errors.Is` and `errors.AsType` still reach the cause's own diagnostics.
+Beneath a read failure that is `io.ErrUnexpectedEOF` for a connection cut mid-body, the content-coding error (such as `gzip.ErrHeader`) for a body that does not match its encoding, or `transport.ErrResponseTooLarge` for a body over the ceiling; beneath a decode failure, the codec's own typed errors (path, type, offset).
 
-**Metadata still arrives.** The `(*T, *Metadata, error)` triples the leaf packages return **MUST** populate `*Metadata` from the response beside each typed error in the table, and beside the `*transport.WireError` of a non-2xx response whose body could not be read, so the `ETag`, `Location` and the other headers stay available. A `*ehr.NoRepresentationError` **MUST** also carry that version metadata itself, `VersionUID` included when the server supplied it, so a caller needs no correlation against a separately returned value. A leaf whose return has no metadata slot returns the error alone.
+### `Error()` stays value-free
 
-**A non-2xx is never this error.** A response whose status is not 2xx **MUST** be reported as a `*transport.WireError`, never as an error in the table, and recovering one of `*transport.WireError`, `*transport.BodyReadError`, `*transport.DecodeError` and `*ehr.NoRepresentationError` **MUST NOT** recover another.
+The `Error()` of each typed error in the table **MUST** follow the [REQ-093](#req-093--openehr-error-envelope-mapping) discipline: it names the classification and the request fields the error holds, the method and route template of a `DecodeError` and the status too for a `BodyReadError`, with the route under REQ-093's *Unrouted requests render a placeholder* rule, and it never names a header value, a body byte or the cause's own text.
+That text can carry the offending value or bytes the server sent: a `*strconv.NumError` beneath a decode failure always quotes its input, as a `*json.SemanticError` can beneath a `canjson.DecodeError` whose own text carries none ([wire.md § REQ-052](wire.md#req-052)), and net/http quotes a malformed chunked trailer in a read failure.
+The cause is reachable only by unwrapping.
+For a body over the ceiling the message names the limit, as REQ-093 requires; the limit is the caller's own setting, not a payload value.
 
-**A body that cannot be read.** On a 2xx, `Client.Do` **MUST** return the `*transport.BodyReadError` beside a non-nil `*transport.Response` that carries `StatusCode`, `Header` and `Metadata` as for any 2xx, and an empty `Body`; the error **MUST** carry the request's method, its route template and the status, and no byte read before the failure, since a partial body is not the representation. On any other status whose body cannot be read, `Client.Do` **MUST** return a non-nil `*Response` whose `Body` is empty, beside an error from which `errors.AsType` recovers the `*transport.WireError` the status and headers classify (its status sentinel, its route and, on a 401 or 403, its Bearer challenge under [§ REQ-166](#req-166--bearer-challenge-on-401-and-403)), with no openEHR envelope and no `RawBody`. That error **MUST** also wrap the read failure, so `errors.Is` reaches the same causes as on a 2xx, and the text it adds to the `WireError`'s own **MUST** stay value-free under the rule above. A body that cannot be read leaves the failure classified by its status, as a body that is not an error envelope already does. The [§ REQ-098](#req-098--request-level-observer-hook) observation of such a call carries the response status beside the error, and [§ REQ-091](#req-091--retry-policy) *Retrying after a body read failure* says when it is sent again.
+### Metadata still arrives
 
-**Whether the body arrived whole.** A `*transport.BodyReadError` **MUST** say in its `Complete` field whether the server sent its whole answer, so a caller can tell an answer it cannot use from one that never finished arriving. `Complete` is true when the failure lies in what the server sent, or in the client's own ceiling, and false when the body stopped arriving before its last byte:
+The `(*T, *Metadata, error)` triples the leaf packages return **MUST** populate `*Metadata` from the response beside each typed error in the table, and beside the `*transport.WireError` of a non-2xx response whose body could not be read, so the `ETag`, `Location` and the other headers stay available.
+A `*ehr.NoRepresentationError` **MUST** also carry that version metadata itself, `VersionUID` included when the server supplied it, so a caller needs no correlation against a separately returned value.
+A leaf whose return has no metadata slot returns the error alone.
+
+### A non-2xx is never this error
+
+A response whose status is not 2xx **MUST** be reported as a `*transport.WireError`, never as an error in the table, and recovering one of `*transport.WireError`, `*transport.BodyReadError`, `*transport.DecodeError` and `*ehr.NoRepresentationError` **MUST NOT** recover another.
+
+### A body that cannot be read
+
+On a 2xx, `Client.Do` **MUST** return the `*transport.BodyReadError` beside a non-nil `*transport.Response` that carries `StatusCode`, `Header` and `Metadata` as for any 2xx, and an empty `Body`; the error **MUST** carry the request's method, its route template and the status, and no byte read before the failure, since a partial body is not the representation.
+On any other status whose body cannot be read, `Client.Do` **MUST** return a non-nil `*Response` whose `Body` is empty, beside an error from which `errors.AsType` recovers the `*transport.WireError` the status and headers classify (its status sentinel, its route and, on a 401 or 403, its Bearer challenge under [§ REQ-166](#req-166--bearer-challenge-on-401-and-403)), with no openEHR envelope and no `RawBody`.
+That error **MUST** also wrap the read failure, so `errors.Is` reaches the same causes as on a 2xx, and the text it adds to the `WireError`'s own **MUST** stay value-free under the rule above.
+A body that cannot be read leaves the failure classified by its status, as a body that is not an error envelope already does.
+The [§ REQ-098](#req-098--request-level-observer-hook) observation of such a call carries the response status beside the error, and [§ REQ-091](#req-091--retry-policy) *Retrying after a body read failure* says when it is sent again.
+
+### Whether the body arrived whole
+
+A `*transport.BodyReadError` **MUST** say in its `Complete` field whether the server sent its whole answer, so a caller can tell an answer it cannot use from one that never finished arriving.
+`Complete` is true when the failure lies in what the server sent, or in the client's own ceiling, and false when the body stopped arriving before its last byte:
 
 | Read failure | `Complete` |
 |---|---|
@@ -250,20 +346,32 @@ These outcomes are their own, and the table **MUST NOT** override them:
 | A failure after the body's last byte: a malformed or over-long HTTP/1 chunked trailer, or any failure once every byte of a declared `Content-Length` has arrived, such as HTTP/2 data past it | true |
 | A connection cut before the body's last byte (`io.ErrUnexpectedEOF`) | false |
 
-A read failure the SDK does not recognise **MUST** count as incomplete, so an unknown failure is never taken for a whole answer. `Complete` changes neither the error's text nor what it wraps.
+A read failure the SDK does not recognise **MUST** count as incomplete, so an unknown failure is never taken for a whole answer.
+`Complete` changes neither the error's text nor what it wraps.
 
-**A body that does not decode.** A `*transport.DecodeError` **MUST** carry the request's method and route template, and the raw response bytes in `Body` whatever the client's options ([ADR 0018](../adr/0018-raw-bytes-on-decode-error.md)), bounded only by the client's `WithMaxResponseBody` ceiling: the 64 MiB default, an explicit positive limit, or none where the caller disabled the cap with a negative value (*Bounded response reads*, [§ REQ-093](#req-093--openehr-error-envelope-mapping)). `Body` holds patient data for a clinical resource, so reading it is a deliberate act: `Error()` never includes it, and the type's documentation says so, as it does for `ehr.NoRepresentationError.Cause`. ADR 0018 settles why these bytes are attached unconditionally while REQ-093 gates the bodies of non-2xx responses.
+### A body that does not decode
 
-**Scope.** The taxonomy binds every 2xx response body read on the `transport.Client` stack, through `transport.Decode` or a decode a leaf writes by hand, so which route a leaf took is invisible to the caller. Scope follows the decode, not the verb: the Definition upload and PUT leaves are in scope, since their 2xx metadata responses are decoded as any read response is.
+A `*transport.DecodeError` **MUST** carry the request's method and route template, and the raw response bytes in `Body` whatever the client's options ([ADR 0018](../adr/0018-raw-bytes-on-decode-error.md)), bounded only by the client's `WithMaxResponseBody` ceiling: the 64 MiB default, an explicit positive limit, or none where the caller disabled the cap with a negative value (*Bounded response reads*, [§ REQ-093](#req-093--openehr-error-envelope-mapping)).
+`Body` holds patient data for a clinical resource, so reading it is a deliberate act: `Error()` never includes it, and the type's documentation says so, as it does for `ehr.NoRepresentationError.Cause`.
+ADR 0018 settles why these bytes are attached unconditionally while REQ-093 gates the bodies of non-2xx responses.
 
-**Acceptance.**
+### Scope
 
-- A `201` with an `ETag` whose body is cut mid-read returns a `*Response` with status `201`, the headers, the parsed `Metadata` and an empty `Body`. Beside it is an error from which `errors.AsType[*transport.BodyReadError]` recovers status `201`, and `errors.Is(err, io.ErrUnexpectedEOF)` holds.
-- A `Content-Encoding: gzip` header over a plain body gives the same shape with `errors.Is(err, gzip.ErrHeader)`. A body over `WithMaxResponseBody` gives it with `errors.Is(err, transport.ErrResponseTooLarge)` and a message that names the limit.
+The taxonomy binds every 2xx response body read on the `transport.Client` stack, through `transport.Decode` or a decode a leaf writes by hand, so which route a leaf took is invisible to the caller.
+Scope follows the decode, not the verb: the Definition upload and PUT leaves are in scope, since their 2xx metadata responses are decoded as any read response is.
+
+### Acceptance
+
+- A `201` with an `ETag` whose body is cut mid-read returns a `*Response` with status `201`, the headers, the parsed `Metadata` and an empty `Body`.
+  Beside it is an error from which `errors.AsType[*transport.BodyReadError]` recovers status `201`, and `errors.Is(err, io.ErrUnexpectedEOF)` holds.
+- A `Content-Encoding: gzip` header over a plain body gives the same shape with `errors.Is(err, gzip.ErrHeader)`.
+  A body over `WithMaxResponseBody` gives it with `errors.Is(err, transport.ErrResponseTooLarge)` and a message that names the limit.
 - `composition.Save` against such a `201` returns no composition, the version metadata the `ETag` names, and the `*BodyReadError`.
-- A `409` whose body is cut matches `transport.ErrVersionConflict`; `errors.AsType[*transport.WireError]` recovers status `409`, and `errors.Is(err, io.ErrUnexpectedEOF)` holds. `errors.AsType[*transport.BodyReadError]` does not match.
+- A `409` whose body is cut matches `transport.ErrVersionConflict`; `errors.AsType[*transport.WireError]` recovers status `409`, and `errors.Is(err, io.ErrUnexpectedEOF)` holds.
+  `errors.AsType[*transport.BodyReadError]` does not match.
 - A value placed in a response header and in the bytes read before the cut appears nowhere in `BodyReadError.Error()`, and a value the server sends as a malformed chunked trailer appears nowhere in the error text on either arm.
-- A body cut mid-read gives a `BodyReadError` whose `Complete` is false. A malformed chunked trailer, an over-long chunked trailer, data past an HTTP/2 `Content-Length`, a body over the ceiling and a gzip body that fails its checksum each give one whose `Complete` is true.
+- A body cut mid-read gives a `BodyReadError` whose `Complete` is false.
+  A malformed chunked trailer, an over-long chunked trailer, data past an HTTP/2 `Content-Length`, a body over the ceiling and a gzip body that fails its checksum each give one whose `Complete` is true.
 
 - **Probes:** PROBE-101
 
@@ -271,7 +379,8 @@ A read failure the SDK does not recognise **MUST** count as incomplete, so an un
 
 ## REQ-166 — Bearer challenge on 401 and 403
 
-A resource server that refuses a bearer token says why in a `WWW-Authenticate: Bearer` challenge (RFC 6750 §3), and the openEHR REST overview requires services to use that header on 401 and 403. A client needs the reason to tell an expired or revoked token, which a refresh can fix, from a token that lacks a scope, which only a new authorization can fix.
+A resource server that refuses a bearer token says why in a `WWW-Authenticate: Bearer` challenge (RFC 6750 §3), and the openEHR REST overview requires services to use that header on 401 and 403.
+A client needs the reason to tell an expired or revoked token, which a refresh can fix, from a token that lacks a scope, which only a new authorization can fix.
 
 On a 401 or 403 response the transport **MUST** parse the `Bearer` challenge, matching the scheme name case-insensitively, from every `WWW-Authenticate` header line and from a line that lists several challenges (RFC 9110 §11.6.1), and **MUST** attach it to the `*WireError` as `Challenge *BearerChallenge`:
 
@@ -287,10 +396,12 @@ type BearerChallenge struct {
 ```
 
 - The parser **MUST** match auth-param names in any letter case (`Error`, `SCOPE` and `Resource_Metadata` are read as `error`, `scope` and `resource_metadata`), keeping every other auth-param in `Params` under its lower-case name, so a caller reads `Params["resource_metadata"]` whatever case the server wrote.
-- A response without a `Bearer` challenge **MUST** leave `Challenge` nil; a challenge the transport cannot parse **MUST** leave it nil too, and the response **MUST** still map to its status sentinel. The parser **MUST** ignore empty list elements (RFC 9110 §5.6.1.2).
+- A response without a `Bearer` challenge **MUST** leave `Challenge` nil; a challenge the transport cannot parse **MUST** leave it nil too, and the response **MUST** still map to its status sentinel.
+  The parser **MUST** ignore empty list elements (RFC 9110 §5.6.1.2).
 - The work spent on a challenge **MUST** stay bounded: a `WWW-Authenticate` field line whose value is longer than the parser's limit, 8 KiB, is treated as unparseable without being parsed, while the other lines are still read (RFC 9110 §5.4 lets a recipient ignore a field line it does not wish to process; real Bearer challenges are far shorter).
 - `WireError.Error()` **MUST NOT** include challenge values; they stay reachable through `errors.As`, under the same discipline as the openEHR error envelope (REQ-093): `Error`, `Scope`, `Realm`, `ErrorURI` and `Params` are always populated, while `ErrorDescription`, free text from the server, **MUST** be populated only when the client is built with `WithRawErrorBodies(true)`.
-- The opt-in 401 safety net (REQ-063) **MUST** call `Reauth` only for a 401 whose challenge is absent, carries no `error`, or carries `error="invalid_token"` (RFC 6750 §3.1: the token is expired, revoked or malformed, and a new one may succeed). A 401 whose challenge names any other error, `insufficient_scope` included, **MUST** be surfaced without calling `Reauth`, since a fresh token with the same grant cannot fix it.
+- The opt-in 401 safety net (REQ-063) **MUST** call `Reauth` only for a 401 whose challenge is absent, carries no `error`, or carries `error="invalid_token"` (RFC 6750 §3.1: the token is expired, revoked or malformed, and a new one may succeed).
+  A 401 whose challenge names any other error, `insufficient_scope` included, **MUST** be surfaced without calling `Reauth`, since a fresh token with the same grant cannot fix it.
 
 ---
 
@@ -298,7 +409,8 @@ type BearerChallenge struct {
 
 When the SDK is consumed by an AI-facing surface (MCP server, agent integration), the consumer can record AI-mediated provenance on outgoing requests: which agent identifier acted, which model provider was involved, the upstream trace context.
 
-The SDK **MUST** provide an opt-in carriage path for this metadata. Two equivalent shapes:
+The SDK **MUST** provide an opt-in carriage path for this metadata.
+Two equivalent shapes:
 
 ```go
 // Functional option at client construction.
@@ -324,4 +436,5 @@ Transport carriage:
 - The SDK **MUST NOT** add a claim about the user to the attribution metadata.
 - Callers **SHOULD NOT** put personally identifying claims about the *user* in the attribution metadata, because it travels as a plain header and as span attributes into logs and traces; the user's identity flows through the token and claim path, not through caller attribution.
 
-This is the SDK's contribution to platform-side audit. The platform decides what to do with the metadata.
+This is the SDK's contribution to platform-side audit.
+The platform decides what to do with the metadata.
