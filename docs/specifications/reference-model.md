@@ -207,7 +207,8 @@ Pinned schemas live in [`../resources/bmm/`](../../resources/bmm), and this tabl
 ### REQ-041 — Pinned BMM sources
 
 The BMM files in `resources/bmm/`, the pinned schemas and the SDK-authored roots over them, are the source of truth for the openEHR domain model.
-The generated RM and AOM 1.4 types, their primitive mappings and their type registry entries **MUST** correspond to the classes and properties of the pinned BMM files as the SDK-authored root schemas include and amend them ([§ SDK-authored root schemas](#sdk-authored-root-schemas)), mapped by [§ Mapping rules](#mapping-rules) and [§ Primitive type mapping](#primitive-type-mapping); hand-written Go code embeds no out-of-band information about openEHR types: what the pinned schemas lack or get wrong is declared in a root schema, never in a Go table.
+The generated RM and AOM 1.4 types, their primitive mappings and their type registry entries **MUST** correspond to the classes and properties of the pinned BMM files as the SDK-authored root schemas include and amend them ([§ SDK-authored root schemas](#sdk-authored-root-schemas)), mapped by [§ Mapping rules](#mapping-rules) and [§ Primitive type mapping](#primitive-type-mapping).
+Hand-written Go code embeds no out-of-band information about openEHR types: what the pinned schemas lack or get wrong is declared in a root schema, never in a Go table.
 
 How the SDK keeps that correspondence:
 
@@ -461,7 +462,8 @@ Schema, Class, Property, Type, FunctionParameter are the in-memory equivalents o
 
 `LoadAll` merges each include into the schema that includes it.
 A class the including schema declares shadows an included class of the same name ([ADR 0002 D2](../adr/0002-bmm-codegen-decisions.md#d2--descendant-shadows-ancestor-bmm-include-merge)).
-When one class reaches a schema through its includes in differing forms, the form whose schema descends, through its includes, from the schema of every other form wins, whatever the order of the includes; where several schemas bring one identical form, a differing form wins only when its schema descends from each of them: a root that includes AOM 1.4, which includes BASE, and RM, which includes BASE too, gets the RM form of each class RM and BASE both declare.
+When one class reaches a schema through its includes in differing forms, the form whose schema descends, through its includes, from the schema of every other form wins, whatever the order of the includes.
+Where several schemas bring one identical form, a differing form wins only when its schema descends from each of them: a root that includes AOM 1.4, which includes BASE, and RM, which includes BASE too, gets the RM form of each class RM and BASE both declare.
 Two differing forms neither of whose schemas descends from the other's give way to the form of a third schema that descends from both and declares the class again.
 When no form's schema descends from the schema of every other form, the load fails with `ErrSchemaConflict`.
 
@@ -617,7 +619,16 @@ A name outside the universe is distinguishable from every in-universe answer on 
 The compiled-in absence table equals an independent reduction of the pinned BMM, in both directions, under the fixed precedence, with the negative-space consistency held on every out-of-universe name it exercises — what [PROBE-098](conformance.md#probe-098--absence-reasons-account-for-the-universes-negative-space) asserts.
 Hand-editing a generated hierarchy field fails the drift check.
 
-**Out of scope:** runtime BMM loading (ruled out above, not deferred); AOM/AM class hierarchies; generic-parameter resolution beyond the root-type reduction the attribute tables already apply; selecting among multiple pinned schemas at run time; deriving *instantiability* beyond the BMM's own abstractness flag (an RM invariant that forbids a value is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this surface's); shipping any excluded model (the exclusions are pinned intent — PROBE-094 — and the absence reasons make them legible, not reversible); naming the *skipped package* for an excluded-package name (deferred until a consumer needs it); and policy — what a caller does with a reason is the caller's, not this surface's.
+**Out of scope:**
+
+- runtime BMM loading (ruled out above, not deferred);
+- AOM/AM class hierarchies;
+- generic-parameter resolution beyond the root-type reduction the attribute tables already apply;
+- selecting among multiple pinned schemas at run time;
+- deriving *instantiability* beyond the BMM's own abstractness flag (an RM invariant that forbids a value is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this surface's);
+- shipping any excluded model (the exclusions are pinned intent — PROBE-094 — and the absence reasons make them legible, not reversible);
+- naming the *skipped package* for an excluded-package name (deferred until a consumer needs it);
+- policy — what a caller does with a reason is the caller's, not this surface's.
 
 ## RM behavioural functions
 
@@ -732,7 +743,12 @@ These helpers **MUST NOT** panic on any value or receiver, and **MUST** answer a
 The leap second is still a valid ISO 8601 value: the accessors and `is_partial` read it as written.
 A duration component too large for a Go `int` is unparseable input.
 
-**Acceptance:** for canonical, partial and basic-layout sample strings of each type, with comma fractions, each zone form and the two SDK deviations (`10:30:00+0530`, a `DV_DATE_TIME` of `2024`), the component accessors and `is_partial` match the ISO 8601 decomposition; `magnitude()` and comparison order a known sequence correctly, and the `DV_DATE_TIME` `2026-01-01T10:00:00+05:00`, which is `05:00Z`, compares below `2026-01-01T08:00:00Z`; the Go-bridge conversion succeeds for full values and errors for partial/nominal ones; malformed samples (an illegal day such as `2024-04-31`, a repeated or misordered duration designator such as `P1Y2Y`) return an error from `ToTime`/`ToDuration`; `23:59:60` and `2016-12-31T23:59:60Z` return an error wrapping `rm.ErrTemporalConversion` from `ToTime`; and malformed samples give zero components and no partial flag, and never panic.
+**Acceptance:** for canonical, partial and basic-layout sample strings of each type, with comma fractions, each zone form and the two SDK deviations (`10:30:00+0530`, a `DV_DATE_TIME` of `2024`), the component accessors and `is_partial` match the ISO 8601 decomposition.
+`magnitude()` and comparison order a known sequence correctly, and the `DV_DATE_TIME` `2026-01-01T10:00:00+05:00`, which is `05:00Z`, compares below `2026-01-01T08:00:00Z`.
+The Go-bridge conversion succeeds for full values and errors for partial/nominal ones.
+Malformed samples (an illegal day such as `2024-04-31`, a repeated or misordered duration designator such as `P1Y2Y`) return an error from `ToTime`/`ToDuration`.
+`23:59:60` and `2016-12-31T23:59:60Z` return an error wrapping `rm.ErrTemporalConversion` from `ToTime`.
+Malformed samples give zero components and no partial flag, and never panic.
 A nil receiver never panics and answers as an unparseable value does.
 `ToDuration` errors for `PT9999999999999H` and `P400000D`, and for a length whose intermediate sum or product would wrap back into range, such as `PT18446744074S`; `PT1.9999999999S` converts to 2 s, its fraction rounded to the nearest nanosecond.
 `magnitude()` of `PT9999999999999999H` is that duration's length in seconds within the precision of the result, and `PT9999999999999999999H`, whose hours do not fit an `int`, answers as an unparseable value does.
