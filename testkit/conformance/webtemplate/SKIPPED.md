@@ -28,7 +28,7 @@ coverage: 83.1% of upstream keys are in the modelled subset
 
 [REQ-053](../../../docs/specifications/wire.md#req-053) (2026-11-16, issue 456) moved **5 keys** from excluded to compared, all in `data_types_dv_proportion`: the bare value the reference writes beside a DV_PROPORTION's numerator and denominator, at the leaf, at both `_normal_range` bounds and at both `_other_reference_ranges:0` bounds. Decode now reads it as the proportion's magnitude and refuses one that is not the numerator divided by the denominator. Encode still does not write it, since the RM holds no magnitude, so the comparison checks each of the 5 against the numerator and denominator the re-encode wrote, and the fixture pins them as derived (below). `data_types_dv_proportion` moved from 5 excluded and 34 compared to 0 and 39. The 3 excluded keys left were `_instruction_details`, refused as `path not modelled`.
 
-Until 2026-11-16 (the DV_PROPORTION bare value read) the position read:
+Until 2026-11-16 (an ELEMENT's value types are Web Template children) the position read:
 
 ```
 corpus: 34 fixtures, 1824 keys — 1510 compared, 8 excluded, 306 metadata held out
@@ -134,7 +134,7 @@ It is **not** hand-maintained. `Run` decodes each upstream body with the codec's
 
 Getting this wrong is not theoretical: the first cut dropped the whole leaf family plus subtree for every refusal, which cost 17 keys of real coverage and left `interval_event` comparing **nothing at all** — a fixture in the suite asserting zero. Until 2026-10-11 the composer's `external_ref` refusal named the leaf, and the harness removed `composer\|name` with it.
 
-Three things are treated differently:
+Four things are treated differently:
 
 - **Composition metadata** — 306 keys, held out of the comparison on *both* sides and not counted as a refusal. The hold-out is a narrow allow-list (`language|*`, `territory|*`, `composer|name`, `composer_self`, `context/start_time`, `context/setting|*`) precisely so that `context/other_context`, which carries archetyped data, can never be swallowed by it. Since 2026-08-05 everything in that list is one kind of thing — a **respelling**: upstream writes real paths (`<root>/language|code`, `<root>/composer|name`, `<root>/context/start_time`, `<root>/context/setting|code`); REQ-053 reads and writes the `ctx/` short forms (`ctx/language`, `ctx/composer_name`, `ctx/time`, `ctx/setting|code` + `|value`). Same information, different surface, and comparing across the two spellings would report every such key as both missing and extra. `composer_self` is held out even though this corpus writes only the `ctx/` form of it (one key, in `party_self`) — the codec accepts the real-path spelling, so the harness must account for it whether or not a fixture exercises it.
 

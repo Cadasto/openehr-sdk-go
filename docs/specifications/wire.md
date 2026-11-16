@@ -1123,8 +1123,8 @@ STRUCTURED carries the same vocabulary as nested members (`_`-keys as object mem
 
 #### DV_SCALE
 
-**DV_SCALE** takes the `DV_ORDINAL` suffix set — `|code` + `|value` + `|ordinal`, with `|ordinal` carrying DV_SCALE's **Real** `value`.
-The two classes differ only in that value's type, so decode **MUST** read, and encode write, the same three keys at a `DV_SCALE` leaf as at a `DV_ORDINAL` one.
+**DV_SCALE** takes the `DV_ORDINAL` suffix set — `|code` + `|value` + `|ordinal`, with `|ordinal` carrying DV_SCALE's **Real** `value`, and the optional `|terminology` decode reads at both (§ REQ-053).
+The two classes differ only in that value's type, so decode **MUST** read, and encode write, the same keys at a `DV_SCALE` leaf as at a `DV_ORDINAL` one.
 *Not corpus-pinned:* no vendored body and no reference sample spells a `DV_SCALE`, so this is this codec's choice within the format's conventions, and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) governs if a reference spelling later appears.
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
