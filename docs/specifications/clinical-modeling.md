@@ -835,10 +835,11 @@ A structure the RM or the OPT requires, as the BMM requires `EVENT.data`, or as 
 
 ##### What each policy visits
 
-Of the attributes the rules above leave, `Generate` **MUST** visit those the table below gives for the policy in force and no other, with two exceptions:
+Of the attributes the rules above leave, `Generate` **MUST** visit those the table below gives for the policy in force and no other, with three exceptions:
 
 - a `COMPOSITION`'s `context`, which it writes under every policy, built under the OPT's constraints as `Medium` does;
-- the optional RM attributes `Large` writes where the OPT does not name them (*Optional RM attributes under `Large`*).
+- the optional RM attributes `Large` writes where the OPT does not name them (*Optional RM attributes under `Large`*);
+- the optional attributes *Leaf values* and *RM defaults* write under every policy: a `DV_IDENTIFIER`'s `issuer`, a `DV_PROPORTION`'s `precision` of 0 and a `DV_MULTIMEDIA`'s `uri`.
 
 | Policy | `Generate` visits |
 |---|---|
@@ -975,7 +976,17 @@ Under every policy, a primitive leaf the generator writes for an OPT primitive c
 
 - an RM rule narrows it or keeps it within a set (§ [Precedence](#precedence) 3 and 4);
 - the constraint lists no code or ordinal to choose from, where *Placeholders* below decides;
-- it is the text of a coded value, which takes the rubric or term text of its code where the OPT's constraint on the text admits that text (*RM defaults*, *The text of a coded value*), under either `ValueFill`.
+- it is the text of a coded value, which takes the rubric or term text of its code where the OPT's constraint on the text admits that text (*RM defaults*, *The text of a coded value*), under either `ValueFill`;
+- the OPT leaves it open, where the list below decides.
+
+Under either `ValueFill`, where the OPT leaves one of these values open, with no constraint of its own or a `C_STRING` that has neither a list nor a pattern, the generator writes a value that carries a meaning:
+
+- a plain `DV_TEXT`'s `value`: the name the generator writes for its nearest enclosing locatable, such as the ELEMENT it is the value of, or `example` outside any locatable or where that name is only the RM type of a node the OPT gives no term; a `DV_CODED_TEXT` keeps the text the bullet above gives it;
+- a `DV_PARSABLE`'s `value`: `<example/>` where its `formalism` is an XML media type (`text/xml`, `application/xml` or one with the `+xml` suffix), `{}` where it is a JSON one (`application/json`, `text/json` or one with the `+json` suffix), and `example` otherwise;
+- a `DV_IDENTIFIER`'s `id`: `ID-0001`, a fixed identifier of a recognisable shape;
+- a `DV_IDENTIFIER`'s `issuer`, wherever the OPT does not prohibit it: `Example issuer`, or, where the OPT's `C_STRING` on the issuer rejects that, the example that `C_STRING` gives.
+
+A `C_STRING` with a list or a pattern gives its own example, a list member or a string the pattern builds, which `ExampleFill` writes and from which `RandomFill` draws.
 
 #### Clock
 
@@ -989,7 +1000,7 @@ Where neither the OPT nor an RM default below gives a value, the generator **SHO
 - the code `at0000` on a coded text, a code phrase, or an ordinal or scale symbol, that code in the terminology the OPT names for it where the OPT names one and lists no code (a `C_CODE_PHRASE` with an empty code list), under either `ValueFill`, and in `local` otherwise;
 - and the URI `ehr://example` on a `DV_EHR_URI`.
 
-Any other value the generator writes without a constraint, a placeholder or a default here is the implementation's choice, within § Contract *Output*.
+Any other value the generator writes without a constraint, a placeholder, a default here or a value *Leaf values* gives is the implementation's choice, within § Contract *Output*.
 
 #### RM defaults
 
@@ -1018,9 +1029,16 @@ A `COMPOSITION`'s `context` is written under every policy, `Required` included, 
 - a `TERM_MAPPING`'s `match`: `?`, so that `Match_valid` holds; its `purpose`: `openehr` `669|public health|`, so that `Purpose_valid` holds;
 - a `DV_PERIODIC_TIME_SPECIFICATION`'s `value`: a `DV_PARSABLE` whose `formalism` is `HL7:PIVL`, so that `Value_valid` holds;
 - an ELEMENT with no `value`: the `null_flavour` `openehr` `271|no information|`;
-- a `DV_MULTIMEDIA`'s `media_type`: `text/plain` in `IANA_media-types`, so that `Media_type_valid` holds; and its `uri`, where § [Precedence](#precedence) 2 has it written and the OPT names no allowed child for it: `http://example.com`.
+- a `DV_MULTIMEDIA`'s `media_type`: `text/plain` in `IANA_media-types`, so that `Media_type_valid` holds; and its `uri`, where § [Precedence](#precedence) 2 or the content rule below has it written and the OPT names no allowed child for it: `http://example.com`.
 
-Every `DV_MULTIMEDIA` the generator writes **SHOULD** carry inline `data`, a non-empty example payload that is the same under both `ValueFill` values, unless the OPT prohibits `data`, and a `size` that is the number of bytes of that `data`, which the RM defines as the original size of the unencoded data, unless the OPT's constraint on `size` rejects that number, when the size the walk wrote stays (§ [Precedence](#precedence) 1): the value then carries its content and meets DV_MULTIMEDIA `Not_empty` without a URI to resolve.
+Every `DV_MULTIMEDIA` the generator writes **SHOULD** carry the content its settled `media_type` suits, so that it meets DV_MULTIMEDIA `Not_empty`:
+
+- where the OPT prohibits `data`: a `uri`, which `Not_empty` then needs (§ [Precedence](#precedence) 2), with the fixed size below;
+- else, of a text media type (`text/` and a subtype), or of another one where the OPT prohibits the `uri`: inline `data`, a non-empty example payload that is the same under both `ValueFill` values, and a `size` that is the number of bytes of that `data`, which the RM defines as the original size of the unencoded data;
+- else: a `uri` and no `data`, and the `size` 1024, a fixed positive number, since the generator cannot read the content at the `uri`.
+
+The `uri` is built from its first allowed OPT child where the OPT names one, under every policy, and is the default `http://example.com` above otherwise.
+Where the OPT's constraint on `size` rejects the number, the size the walk wrote stays (§ [Precedence](#precedence) 1).
 
 ##### Optional RM attributes under `Large`
 
@@ -1033,7 +1051,7 @@ Under `Large`, `Generate` **MUST** write the optional RM attributes below where 
 
 Each participation has a `PARTY_SELF` performer, the `mode` `openehr` `193|not specified|` with its rubric, and a `function` that is a plain `DV_TEXT` whose `value` is `unknown`, the rubric of its RM default `253`, since FLAT's `|function` key carries only a plain `DV_TEXT` ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes)) and `Function_valid` binds only a coded `function`.
 An attribute the OPT node names is the visit's: `Large` builds it under the OPT's constraints where the OPT allows it, and leaves it out where the OPT prohibits it.
-`Large` writes no other optional RM attribute the OPT does not name, such as an ENTRY's `workflow_id` or `guideline_id`, a LOCATABLE's `links`, or a `HISTORY`'s `duration` or `period`.
+Beyond those *Leaf values* and *RM defaults* write under every policy, `Large` writes no other optional RM attribute the OPT does not name, such as an ENTRY's `workflow_id` or `guideline_id`, a LOCATABLE's `links`, or a `HISTORY`'s `duration` or `period`.
 The skeleton the composition builder seeds a `Builder` with under `Large` holds none of them ([§ REQ-101](#req-101--generic-opt-driven-composition-builder)).
 
 ##### The text of a coded value
@@ -1196,6 +1214,9 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
    - and for a DV_PROPORTION the first kind, in code order, whose rules the OPT's constraints on its parts let it meet.
 
    Where there is none, the value the walk wrote stays and the root breaks the rule (§ [Exceptions and known gaps](#exceptions-and-known-gaps)), as it does where the OPT admits a coded value of the set that it does not list.
+   A DV_PROPORTION whose OPT pins `is_integral` to true, with a `C_BOOLEAN` that admits `true` alone, takes a whole-number `numerator` and `denominator` whatever its kind, under either `ValueFill`.
+   Such a proportion, a fraction and an integer fraction take the `precision` 0 wherever the OPT admits 0, whether or not the walk wrote a precision.
+   So `Fraction_validity` holds under both readings of `is_integral`: whole-number operands, as the RM floor reads it, and a `precision` of 0, as the BMM defines it ("integers, i.e. if precision is 0").
 
 #### Errors
 
@@ -1267,7 +1288,7 @@ Where the visit rule does not, as for an optional `links` that holds a mandatory
 - where the OPT or the RM requires it;
 - or where it is the member a top-up takes.
 
-A DV_MULTIMEDIA's `data` is an array of octets that no OPT child describes, so the walk does not visit it, and the inline `data` § Contract gives a DV_MULTIMEDIA is written instead.
+A DV_MULTIMEDIA's `data` is an array of octets that no OPT child describes, so the walk does not visit it, and the inline `data` § Contract gives a DV_MULTIMEDIA of a text media type is written instead.
 
 #### Known gap: required lists canonical JSON cannot carry empty
 
@@ -1296,6 +1317,11 @@ The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill`
 
 - `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue`, a single representative value, byte-identical across calls for one OPT.
 - `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls.
+  It rounds what it draws where a precision applies, and keeps a draw unrounded where the rounded one would leave the constraint:
+  - a `DV_QUANTITY`'s `magnitude`: to as many decimals as its precision allows where that is 0 or 1, so to none where the precision admits 0 alone, and to two otherwise.
+    Its precision is the upper bound of the precision range of the `C_DV_QUANTITY` entry it is drawn in, or the `precision` the walk wrote where the OPT builds the quantity attribute by attribute.
+    A `C_DV_QUANTITY` entry's `magnitude` is drawn inside the entry's range, away from 0 and from the range's bounds, or from 1 to 100 where the range is open;
+  - a `DV_PROPORTION`'s `numerator` and `denominator`: to whole numbers where its kind or a `precision` of 0 asks for them (§ Contract *Precedence* 4), and otherwise as a magnitude is, to its `precision` up to two decimals.
 
 `RandomFill` reproducibility is caller-controlled via **`Options.ValueSource`** (a `math/rand/v2.Source`): a fixed source makes leaf values byte-reproducible (§ Contract *Reproducible uids*); `nil`, or a typed-nil source such as a nil `*rand.PCG`, draws from the auto-seeded package global so successive calls differ — mirroring the `UIDSource` determinism seam.
 A `Source` is not safe for concurrent use, so each concurrent `Generate` takes its own source, or leaves it `nil` for the concurrency-safe global.

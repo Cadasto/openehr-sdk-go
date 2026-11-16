@@ -35,7 +35,8 @@
 // Under every policy an RM rule can need
 // more than the policy visits, such as an ELEMENT's value or null
 // flavour, or a DV_MULTIMEDIA's
-// uri where the template prohibits its data, which the generator then
+// uri where the template prohibits its data or its media type is not a
+// text one, which the generator then
 // builds as a visit does, from the attribute's first allowed template
 // child where it has one; and a visited multi-valued attribute is topped
 // up to its lower bound.
@@ -160,7 +161,21 @@
 //
 // Under every policy, every primitive leaf the walk reaches is valued as
 // [Options.ValueFill] says: the constraint's example value under
-// [ExampleFill], an in-constraint draw under [RandomFill]. Where an RM
+// [ExampleFill], an in-constraint draw under [RandomFill]. A quantity's
+// drawn magnitude is rounded to the template's precision, with no decimals
+// where the precision admits 0 alone and at most two otherwise, and lies
+// inside its range away from 0 and from the range's bounds, or from 1 to
+// 100 where the range is open; a proportion's drawn numerator and
+// denominator are rounded the same way. Where the template leaves a text
+// open, with no constraint of its own or a string constraint with neither
+// a list nor a pattern, both fills write a value that means something: a
+// plain DV_TEXT takes the name of its nearest enclosing locatable, such as
+// the ELEMENT it is the value of, or example where that name is only an
+// RM type; a DV_PARSABLE takes <example/> for an XML formalism, {} for a
+// JSON one and example for any other; and a DV_IDENTIFIER takes the id
+// ID-0001 and, where the template allows an issuer, the issuer Example
+// issuer. A coded text never takes such a value: its text is its code's,
+// as below. Where an RM
 // rule narrows what the constraint leaves open, the value is taken from
 // what is left: a PARTY_REF's type is a party class name, a TERM_MAPPING's
 // match one of >, =, < and ?, a magnitude_status one of =, <, >, <=, >=
@@ -187,10 +202,13 @@
 // is then settled to the rules of its kind, inside the template's
 // constraints on its parts: a unitary proportion over 1, a percent over
 // 100, a fraction or an integer fraction over whole numbers, any
-// proportion of precision 0 over whole numbers, and every kind over a
-// denominator that is not 0. Where the
-// drawn type cannot meet its rule there, another type the template allows
-// is taken, and where none can, the value stays as the walk wrote it. A
+// proportion of precision 0, or whose template pins is_integral to true,
+// over whole numbers, and every kind over a denominator that is not 0. A
+// fraction, an integer fraction and a proportion whose template pins
+// is_integral take the precision 0 wherever the template admits it. Where
+// the drawn type cannot meet its rule there, another type the template
+// allows is taken, and where none can, the value stays as the walk wrote
+// it. A
 // coded text whose code is in the openEHR terminology, on an attribute the
 // RM ties to a group of that terminology (a COMPOSITION's category, an
 // INTERVAL_EVENT's math function, a PARTY_RELATED's relationship, …),
@@ -213,11 +231,14 @@
 // text the pin admits, with that text, and it keeps the walk's code and
 // text where the pin admits no listed code's term text. A code whose term
 // text the pin admits, such as one [RandomFill] drew, stays. A
-// DV_MULTIMEDIA carries inline data, the seven bytes of the text
-// "example" under both value fills,
-// with that byte count as its size, unless the template prohibits data or
-// its constraint on size rejects that count; where the template prohibits
-// data and names no child for the uri, the uri is http://example.com. A
+// DV_MULTIMEDIA of a text media type, text/plain by default, carries
+// inline data, the seven bytes of the text "example" under both value
+// fills, with that byte count as its size. One of any other media type
+// carries a uri instead, with the size 1024: the uri its template child
+// gives, or http://example.com where the template names no child for it.
+// Where the template prohibits the uri, the value carries the inline data,
+// and where it prohibits the data, a uri. The size the walk wrote stays
+// where the template's constraint on size rejects the generator's. A
 // language, encoding or charset the template names with no code, on an
 // entry, a text or an encapsulated value, takes Options.Language in
 // ISO_639-1 or UTF-8 in IANA_character-sets, and a periodic time
