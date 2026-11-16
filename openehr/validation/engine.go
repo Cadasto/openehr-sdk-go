@@ -126,11 +126,12 @@ type engine struct {
 	refused []string
 	// absent holds, in walk order, the path of each attribute a decode's
 	// report names ([WithMissing]) that the walk read as absent and reported
-	// as a missing mandatory attribute. A node's rules may read below the
-	// node, so the findings of the rules of the node the attribute is on,
-	// and of every node above it, at or below such a path are withdrawn once
-	// that node's attributes are visited, as a finding inside refused content
-	// is: the absence is the one report for the member
+	// as a missing mandatory attribute: the string the issue that reports it
+	// holds, written once ([issuePath.String]). A node's rules may read
+	// below the node, so the findings of the rules of the node the attribute
+	// is on, and of every node above it, at or below such a path are
+	// withdrawn once that node's attributes are visited, as a finding inside
+	// refused content is: the absence is the one report for the member
 	// ([engine.withdrawInside]). Nil until one is met, so a call with no
 	// report records none.
 	absent []string
@@ -958,11 +959,13 @@ func shapeFrom(container, primitiveItems, hash bool) attrShape {
 // is read as absent, whatever the value holds there, so it is reported as
 // any absent attribute is and not entered. Where the walk reports it as a
 // missing mandatory attribute, its path is recorded so that no rule of a
-// node above reports at or below it ([engine].absent). Where the attribute
-// is not mandatory on the node, a part of a reference whose own rule reports
-// it or one the node's role lets be blank, that rule reports from the value
-// as before. The report names the item of a list or the entry of a Hash
-// below the attribute by its position or its key ([attrReading.itemMissing]).
+// node above reports at or below it ([engine].absent); the record and the
+// issue that reports the attribute share the one string the attribute's
+// path handle writes ([issuePath.String]). Where the attribute is not
+// mandatory on the node, a part of a reference whose own rule reports it or
+// one the node's role lets be blank, that rule reports from the value as
+// before. The report names the item of a list or the entry of a Hash below
+// the attribute by its position or its key ([attrReading.itemMissing]).
 func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
 	r := readAttribute(n.value, a)
 	reported := false

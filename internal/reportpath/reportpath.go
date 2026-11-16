@@ -13,7 +13,10 @@
 // shared.
 package reportpath
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
 // Node is the last segment of a path and the path before it. The nil *Node is
 // the empty path: the root of the value.
@@ -135,12 +138,42 @@ func (p *Node) Len() int {
 	return n
 }
 
-// String returns the path's text: "" for the empty path.
+// String returns the path's text: "" for the empty path. It allocates the
+// text once, at its length, and writes the segments into it from the first
+// to the last. A segment longer than 64 bytes costs one more allocation, of
+// its own length.
 func (p *Node) String() string {
 	if p == nil {
 		return ""
 	}
-	return string(p.AppendText(make([]byte, 0, p.Len())))
+	var b strings.Builder
+	var scratch segmentScratch
+	p.writeText(&b, 0, &scratch)
+	return b.String()
+}
+
+// segmentScratch holds one segment while [Node.String] writes it. A longer
+// segment is made in a buffer of its own.
+type segmentScratch [64]byte
+
+// writeText writes the path's text to b, which holds nothing yet; n is the
+// length of the segments after p's own. It walks to the first segment,
+// summing the lengths, grows b once by the sum, then writes each segment on
+// the way back, making it in scratch first, or in a buffer of the segment's
+// length when it does not fit there, so that it never grows while it is
+// made.
+func (p *Node) writeText(b *strings.Builder, n int, scratch *segmentScratch) {
+	size := p.segmentLen()
+	if p.parent == nil {
+		b.Grow(n + size)
+	} else {
+		p.parent.writeText(b, n+size, scratch)
+	}
+	segment := scratch[:0]
+	if size > len(scratch) {
+		segment = make([]byte, 0, size)
+	}
+	b.Write(p.appendSegment(segment))
 }
 
 // AppendText appends the path's text to b and returns the extended buffer. It

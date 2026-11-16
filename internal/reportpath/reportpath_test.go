@@ -9,6 +9,7 @@ package reportpath_test
 import (
 	"bytes"
 	"encoding/json/jsontext"
+	"strconv"
 	"strings"
 	"testing"
 	"unsafe"
@@ -213,6 +214,141 @@ func matchJSONText(t *testing.T, dec *jsontext.Decoder, at *reportpath.Node) int
 		t.Fatal(err)
 	}
 	return checked
+}
+
+var stringSink string
+
+// TestNodeStringAllocatesOnce holds that writing a path's text allocates the
+// text and nothing else, for paths of every kind of segment. Each path is
+// longer than 32 bytes: the compiler may keep a shorter buffer on the stack,
+// so a shorter path would not show a second copy of the text.
+func TestNodeStringAllocatesOnce(t *testing.T) {
+	var root *reportpath.Node
+	composition := root.Element("composition", 1)
+	// long is a member name far longer than the 64 bytes String makes a
+	// segment in on the stack, with characters a token escapes, so that its
+	// segment grows while it is written unless it is made at its length;
+	// longName is an XML name as long, which holds neither.
+	long := strings.Repeat("a~b/cdefgh", 100)
+	longName := strings.Repeat("abcdefgh", 125)
+	rows := []struct {
+		name string
+		node *reportpath.Node
+		// want is the allocations String makes: the text alone, and one
+		// more for a segment longer than 64 bytes.
+		want float64
+	}{
+		{name: "tokens", node: root.Token("content").Token("data").Token("events").Token("archetype_node_id"), want: 1},
+		{name: "escaped tokens", node: root.Token("details").Token("en/GB").Token("a~b/c~/").Token("value"), want: 1},
+		{name: "names", node: root.Name("description").Name("details").Name("purpose").Name("x-note"), want: 1},
+		{name: "indexes", node: root.Token("items").Index(0).Index(12345).Index(7).Index(1000000).Index(42).Index(99).Index(123456), want: 1},
+		{name: "elements", node: composition.Element("content", 2).Element("data", 1).Element("events", 10), want: 1},
+		{name: "attribute", node: composition.Element("language", 1).Element("terminology_id", 1).Attr("lang"), want: 1},
+		{name: "text", node: composition.Element("name", 1).Element("value", 1).Text(), want: 1},
+		{name: "long escaped token", node: root.Token("details").Token(long).Token("value"), want: 2},
+		{name: "long name", node: root.Name("details").Name(longName), want: 2},
+		{name: "long element", node: composition.Element(longName, 3), want: 2},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			if n := row.node.Len(); n <= 32 {
+				t.Fatalf("Len() = %d, want a path longer than 32 bytes", n)
+			}
+			allocs := testing.AllocsPerRun(100, func() {
+				stringSink = row.node.String()
+			})
+			if allocs != row.want {
+				t.Errorf("String() of a %d-byte path allocates %v times, want %v", row.node.Len(), allocs, row.want)
+			}
+		})
+	}
+	if allocs := testing.AllocsPerRun(100, func() { stringSink = root.String() }); allocs != 0 {
+		t.Errorf("String() of the empty path allocates %v times, want 0", allocs)
+	}
+}
+
+// TestNodeStringMatchesText holds the text String gives to the text
+// AppendText gives and to the text the segments make one by one, for the
+// empty path, every kind of segment, escaped tokens, long segments and a
+// deep path.
+func TestNodeStringMatchesText(t *testing.T) {
+	var root *reportpath.Node
+	long := strings.Repeat("abcdefgh", 40)
+	deep, deepText := deepPath(1000)
+	rows := []struct {
+		name string
+		node *reportpath.Node
+		want string
+	}{
+		{name: "root", node: root, want: ""},
+		{name: "token escaped", node: root.Token("a~b/c~/"), want: "/a~0b~1c~0~1"},
+		{name: "empty tokens", node: root.Token("").Token(""), want: "//"},
+		{name: "index", node: root.Index(0).Index(-1).Index(12345), want: "/0/-1/12345"},
+		{name: "xml", node: root.Element("folder", 1).Name("x-note").Attr("lang").Text(), want: "/folder[1]/x-note/@lang/text()"},
+		{name: "long token", node: root.Token("items").Token(long + "/~"), want: "/items/" + long + "~1~0"},
+		{name: "long escaped token", node: root.Token(strings.Repeat("/~", 200)), want: "/" + strings.Repeat("~1~0", 200)},
+		{name: "long name", node: root.Name(long).Name("use"), want: "/" + long + "/use"},
+		{name: "long element", node: root.Element(long, 123456789), want: "/" + long + "[123456789]"},
+		{name: "long attribute", node: root.Element("a", 1).Attr(long), want: "/a[1]/@" + long},
+		{name: "deep", node: deep, want: deepText},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			got := row.node.String()
+			if got != row.want {
+				t.Errorf("String() = %q, want %q", got, row.want)
+			}
+			if appended := string(row.node.AppendText(nil)); got != appended {
+				t.Errorf("String() = %q, want the text AppendText(nil) gives, %q", got, appended)
+			}
+		})
+	}
+}
+
+// deepPath returns a path of n segments, cycling through every kind of
+// segment, and its text.
+func deepPath(n int) (*reportpath.Node, string) {
+	var (
+		node *reportpath.Node
+		text strings.Builder
+	)
+	for i := range n {
+		switch i % 6 {
+		case 0:
+			node = node.Token("en/GB~" + strconv.Itoa(i))
+			text.WriteString("/en~1GB~0" + strconv.Itoa(i))
+		case 1:
+			node = node.Name("details")
+			text.WriteString("/details")
+		case 2:
+			node = node.Index(i)
+			text.WriteString("/" + strconv.Itoa(i))
+		case 3:
+			node = node.Element("items", i)
+			text.WriteString("/items[" + strconv.Itoa(i) + "]")
+		case 4:
+			node = node.Attr("lang")
+			text.WriteString("/@lang")
+		case 5:
+			node = node.Text()
+			text.WriteString("/text()")
+		}
+	}
+	return node, text.String()
+}
+
+// BenchmarkNodeString writes the text of paths as deep as a typical report
+// path and as deep as a decode's depth limit allows.
+func BenchmarkNodeString(b *testing.B) {
+	for _, depth := range []int{8, 250, 1000} {
+		node, _ := deepPath(depth)
+		b.Run("depth="+strconv.Itoa(depth), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				stringSink = node.String()
+			}
+		})
+	}
 }
 
 // TestNodeBytes holds the size [reportpath.NodeBytes] counts a node for to
