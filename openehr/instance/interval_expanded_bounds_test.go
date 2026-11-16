@@ -151,7 +151,7 @@ func TestREQ107_IntervalOfExpandedQuantitiesStaysInEachSidesConstraint(t *testin
 			name:  "ranges 5..10 and 0..20, lowest with highest",
 			lower: expandedQuantity(realFrom(5, 10)), upper: expandedQuantity(realFrom(0, 20)),
 			want:       "[DV_QUANTITY 5 mm .. DV_QUANTITY 20 mm]",
-			wantRandom: "[DV_QUANTITY 8.382278298339125 mm .. DV_QUANTITY 10.170947953520528 mm]",
+			wantRandom: "[DV_QUANTITY 8.38 mm .. DV_QUANTITY 10.17 mm]",
 			ordered:    true,
 		},
 		{
@@ -160,7 +160,7 @@ func TestREQ107_IntervalOfExpandedQuantitiesStaysInEachSidesConstraint(t *testin
 			name:  "a lower range with no end, the upper bound stands in",
 			lower: expandedQuantity(realUpTo(20)), upper: expandedQuantity(realFrom(0, 10)),
 			want:       "[DV_QUANTITY 0 mm .. DV_QUANTITY 10 mm]",
-			wantRandom: "[DV_QUANTITY -12.354434033217501 mm .. DV_QUANTITY 5.085473976760264 mm]",
+			wantRandom: "[DV_QUANTITY -12.35 mm .. DV_QUANTITY 5.09 mm]",
 			ordered:    true,
 		},
 		{

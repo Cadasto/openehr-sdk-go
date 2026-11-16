@@ -198,3 +198,47 @@ func TestREQ107_RandomProportionIsRounded(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ107_RandomAttributeQuantityIsRounded is the REQ-107 Primitive-leaf
+// value fill check on a DV_QUANTITY the template builds attribute by
+// attribute, a C_REAL on its magnitude rather than a C_DV_QUANTITY: the
+// magnitude RandomFill draws is rounded to the decimals the quantity's
+// precision gives, up to two. The RM floor and the template validator
+// pass.
+func TestREQ107_RandomAttributeQuantityIsRounded(t *testing.T) {
+	r, closed := instance.RealRange, instance.Closed
+	quantity := func(precision ...string) string {
+		attrs := []string{
+			optSingle("magnitude", optPrimitive("REAL", "C_REAL", r(closed(0), closed(100)))),
+			optSingle("units", optPrimitive("STRING", "C_STRING", "<list>mm</list>")),
+		}
+		return optTemplate("ELEMENT", optSingle("value", optNode("DV_QUANTITY", "", append(attrs, precision...)...)))
+	}
+	cases := []struct {
+		name     string
+		opt      string
+		decimals int
+	}{
+		{name: "no precision", opt: quantity(), decimals: 2},
+		{name: "precision 0", opt: quantity(optProportionPart("precision", instance.IntList(0))), decimals: 0},
+		{name: "precision 1", opt: quantity(optProportionPart("precision", instance.IntList(1))), decimals: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, tc.opt, true)
+			eachRandomRun(t, func(opts instance.Options) (any, error) {
+				return instance.Generate(t.Context(), c, opts)
+			}, func(t *testing.T, what string, out any) {
+				var got []rm.DVQuantity
+				visitRM(out, func(_ string, q rm.DVQuantity) { got = append(got, q) })
+				if len(got) != 1 {
+					t.Fatalf("%s: %d DV_QUANTITY generated, want 1", what, len(got))
+				}
+				if m := float64(got[0].Magnitude); !decimalsAtMost(m, tc.decimals) {
+					t.Errorf("%s: DV_QUANTITY magnitude %v, want at most %d decimals", what, m, tc.decimals)
+				}
+				checkValid(t, out, c)
+			})
+		})
+	}
+}

@@ -330,8 +330,8 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(6, 30)), optSingle("units", guardString("mm")),
 				normalRangeOver("DV_QUANTITY", expandedQuantity(realFrom(5, 10)), expandedQuantity(realFrom(0, 20))), normalStatus("H")),
 			want: "DV_QUANTITY 21 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 20 mm]" + noRefs,
-			wantRandom: "DV_QUANTITY 22.2349358320278 mm; normal_status openehr_normal_statuses::H; " +
-				"normal_range [DV_QUANTITY 7.542736988380132 mm .. DV_QUANTITY 15.956046987772261 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 22.23 mm; normal_status openehr_normal_statuses::H; " +
+				"normal_range [DV_QUANTITY 7.54 mm .. DV_QUANTITY 15.96 mm]" + noRefs,
 		},
 		{
 			// As above for a DV_ORDINAL: the swapped pair would hand the lower
@@ -353,7 +353,7 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(0, 100)), optSingle("units", guardString("mm")),
 				normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("9")), normalStatus("H")),
 			want:       "DV_QUANTITY 10 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 9 mm]" + noRefs,
-			wantRandom: "DV_QUANTITY 67.6455659667825 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 9 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 67.65 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 9 mm]" + noRefs,
 		},
 		{
 			name: "DV_PROPORTION unitary numerator 0..100, range [0/1..9/1], H",
@@ -439,7 +439,7 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 					optNode("DV_QUANTITY", "", optSingle("magnitude", dvReal("9")), optSingle("units", guardString("cm")))),
 				normalStatus("N")),
 			want:        "DV_QUANTITY 0 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
-			wantRandom:  "DV_QUANTITY 67.6455659667825 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
+			wantRandom:  "DV_QUANTITY 67.65 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
 			asGenerated: true,
 		},
 		{

@@ -3103,19 +3103,36 @@ func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64
 	return true
 }
 
+// drawnDecimals is how many decimals a value RandomFill draws keeps under
+// precision, the precision of the quantity or the proportion that holds
+// it: precision where it is 0 or more and below maxQuantityDecimals, and
+// maxQuantityDecimals otherwise, as where it is nil or -1 (no limit).
+func drawnDecimals(precision *rm.Integer) int {
+	if precision != nil && *precision >= 0 && int(*precision) < maxQuantityDecimals {
+		return int(*precision)
+	}
+	return maxQuantityDecimals
+}
+
+// roundQuantity rounds the magnitude RandomFill drew for q, a DV_QUANTITY
+// the OPT builds attribute by attribute, to the decimals its precision
+// gives (drawnDecimals). The magnitude keeps its draw where the OPT's
+// constraint on it, opt being the OPT node of q, rejects the rounded value.
+func roundQuantity(opt *tcimpl.CompiledNode, q *rm.DVQuantity) {
+	if v := roundTo(float64(q.Magnitude), drawnDecimals(q.Precision)); componentFits(bindingChild(opt, "magnitude"), v) {
+		q.Magnitude = rm.Real(v)
+	}
+}
+
 // roundProportion rounds the numerator and the denominator RandomFill drew
-// for p, as a quantity's magnitude is rounded (quantityDecimals): to the
-// precision p carries where it is 0 or more and below
-// maxQuantityDecimals, and to maxQuantityDecimals otherwise. An operand
+// for p, as a quantity's magnitude is rounded, to the decimals its
+// precision gives (drawnDecimals). An operand
 // keeps its draw where the OPT's constraint on it, opt being the OPT node
 // of p, rejects the rounded value, and a denominator where it would round
 // to 0. settleProportion then makes whole numbers of them where the kind
 // or a precision of 0 asks for them.
 func roundProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
-	decimals := maxQuantityDecimals
-	if p.Precision != nil && *p.Precision >= 0 && int(*p.Precision) < decimals {
-		decimals = int(*p.Precision)
-	}
+	decimals := drawnDecimals(p.Precision)
 	if v := roundTo(float64(p.Numerator), decimals); componentFits(bindingChild(opt, "numerator"), v) {
 		p.Numerator = rm.Real(v)
 	}
@@ -3577,6 +3594,13 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 		settleMultimedia(opt, v)
 	case *rm.DVPeriodicTimeSpecification:
 		fillPeriodicFormalism(opt, v)
+	case *rm.DVQuantity:
+		// A C_DV_QUANTITY's draw is rounded where it is drawn
+		// (quantityMagnitude); one built attribute by attribute is rounded
+		// here.
+		if g.opts.ValueFill == RandomFill && primitiveOf(opt) == nil {
+			roundQuantity(opt, v)
+		}
 	case *rm.DVProportion:
 		// A bound of an interval is settled here too, before the interval's
 		// own walk puts its two bounds in order.
