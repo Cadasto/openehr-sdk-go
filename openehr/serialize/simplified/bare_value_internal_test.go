@@ -390,3 +390,135 @@ func withoutKeys(body map[string]any, keys ...string) map[string]any {
 	}
 	return out
 }
+
+// TestREQ053BareValueBesideAnotherDatatypesSuffixKeepsThePipe — REQ-053:
+// FLAT → STRUCTURED keeps a bare value as the `"|"` member where its element
+// holds a suffix no datatype with a bare value reads, so the conversion does
+// not change what the body means. A bare value at a DV_CODED_TEXT leaf beside
+// `|code` and `|terminology`, and one at a DV_QUANTITY leaf beside null
+// suffixes, are refused in FLAT; their STRUCTURED form is refused alike,
+// rather than read as the coded text's `|value` or dropped, and it converts
+// back to the bare key.
+func TestREQ053BareValueBesideAnotherDatatypesSuffixKeepsThePipe(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, tc := range map[string]struct {
+		leaf string
+		keys map[string]any
+	}{
+		"DV_CODED_TEXT beside |code": {
+			leaf: rmattrCodedText,
+			keys: map[string]any{rmattrCodedText: "Bare words", rmattrCodedText + "|code": "at0007", rmattrCodedText + "|terminology": "local"},
+		},
+		"DV_QUANTITY beside null suffixes": {
+			leaf: rmattrElement,
+			keys: map[string]any{rmattrElement: 5.0, rmattrElement + "|magnitude": nil, rmattrElement + "|unit": nil},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			body := mustJSON(t, rmattrBody(tc.keys))
+			doc, err := FlatToStructured(body)
+			if err != nil {
+				t.Fatalf("FlatToStructured = %v", err)
+			}
+			for mode, opts := range map[string][]Option{"default": nil, "strict": {WithStrict()}} {
+				_, flatErr := UnmarshalFlat(body, wt, opts...)
+				_, structuredErr := UnmarshalStructured(doc, wt, opts...)
+				if flatErr == nil || structuredErr == nil {
+					t.Fatalf("%s decode: FLAT = %v, STRUCTURED = %v; want both refused", mode, flatErr, structuredErr)
+				}
+				for _, sentinel := range []error{ErrUnknownPath, ErrUnsupportedDatatype} {
+					if errors.Is(flatErr, sentinel) != errors.Is(structuredErr, sentinel) {
+						t.Errorf("%s decode: STRUCTURED refusal %v, want it to wrap what the FLAT refusal %v wraps", mode, structuredErr, flatErr)
+					}
+				}
+			}
+			back, err := StructuredToFlat(doc)
+			if err != nil {
+				t.Fatalf("StructuredToFlat = %v", err)
+			}
+			var flat map[string]any
+			if err := json.Unmarshal(back, &flat); err != nil {
+				t.Fatal(err)
+			}
+			key := indexedKey(tc.leaf)
+			if _, kept := flat[key]; !kept {
+				t.Errorf("FLAT → STRUCTURED → FLAT = %s, want the bare key %s back", back, key)
+			}
+			if _, spelled := flat[key+"|"+bareValueSuffix]; spelled {
+				t.Errorf("FLAT → STRUCTURED → FLAT = %s, wrote the bare value as |value", back)
+			}
+		})
+	}
+}
+
+// indexedKey is key with `:0` on every segment that carries no index, the
+// spelling OPT-free STRUCTURED → FLAT conversion writes, the template root's
+// segment aside.
+func indexedKey(key string) string {
+	segs := strings.Split(key, "/")
+	for i := 1; i < len(segs); i++ {
+		if !strings.Contains(segs[i], ":") {
+			segs[i] += ":0"
+		}
+	}
+	return strings.Join(segs, "/")
+}
+
+// TestREQ053BareValueMemberFollowsTheSuffixesBesideIt — REQ-053: FLAT →
+// STRUCTURED moves a bare value to `|value` beside suffixes that some datatype
+// with a bare value reads, and keeps `"|"` beside any other, each suffix
+// judged off the suffix sets decode reads, so a datatype that gains a suffix
+// moves with it. A suffix only datatypes with no bare value read, such as a
+// coded text's `|code` or a quantity's `|magnitude`, keeps `"|"`.
+func TestREQ053BareValueMemberFollowsTheSuffixesBesideIt(t *testing.T) {
+	read := map[string]bool{}
+	other := map[string]bool{}
+	for rmType, set := range allowedSuffixes {
+		for suffix := range set {
+			if suffix == "" || suffix == bareValueSuffix {
+				continue
+			}
+			if readsBareValue(rmType) {
+				read[suffix] = true
+			} else {
+				other[suffix] = true
+			}
+		}
+	}
+	for _, suffix := range []string{"code", "magnitude", "unit", "terminology", "ordinal"} {
+		if read[suffix] || !other[suffix] {
+			t.Errorf("fixture: |%s is read by a datatype with a bare value, or by none without one", suffix)
+		}
+	}
+	for _, suffix := range slices.Sorted(maps.Keys(other)) {
+		if read[suffix] {
+			continue
+		}
+		t.Run("|"+suffix, func(t *testing.T) {
+			assertBareMember(t, suffix, bareStructuredKey)
+		})
+	}
+	for _, suffix := range slices.Sorted(maps.Keys(read)) {
+		t.Run("|"+suffix, func(t *testing.T) {
+			assertBareMember(t, suffix, bareValueMember)
+		})
+	}
+}
+
+// assertBareMember converts a FLAT leaf holding a bare value beside suffix to
+// STRUCTURED and asserts that the bare value is its element's member want.
+func assertBareMember(t *testing.T, suffix, want string) {
+	t.Helper()
+	doc, err := FlatToStructured(mustJSON(t, map[string]any{"t/x": "v", "t/x|" + suffix: "s"}))
+	if err != nil {
+		t.Fatalf("FlatToStructured = %v", err)
+	}
+	var root map[string]map[string][]map[string]any
+	if err := json.Unmarshal(doc, &root); err != nil {
+		t.Fatalf("FlatToStructured = %s: %v", doc, err)
+	}
+	el := root["t"]["x"][0]
+	if el[want] != "v" {
+		t.Errorf("FlatToStructured beside |%s = %s, want the bare value as the %q member", suffix, doc, want)
+	}
+}

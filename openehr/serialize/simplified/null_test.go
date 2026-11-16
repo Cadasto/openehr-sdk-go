@@ -409,11 +409,12 @@ func TestREQ053DvFromSuffixesReadsNullAsAbsent(t *testing.T) {
 // the datatype reads, and malformed alone. Null suffixes are absent, so a bare
 // value beside nothing else is alone, and refused as a value missing every
 // required suffix, rather than set aside while the null suffixes vanish: a
-// DV_QUANTITY's, in FLAT and as the `"|"` or the `""` member in STRUCTURED (the
-// `|value` member FLAT → STRUCTURED writes is a suffix, and a DV_QUANTITY has
-// no bare value and no `|value`). A DV_PROPORTION's bare value, its magnitude,
-// is read in every spelling, so beside a null numerator and denominator it is
-// alone too, and refused as the proportion missing its numerator.
+// DV_QUANTITY's, in FLAT and as the `"|"` or the `""` member in STRUCTURED (a
+// `|value` member is a suffix, and a DV_QUANTITY has no bare value and no
+// `|value`, so FLAT → STRUCTURED keeps `"|"` beside its `|magnitude`). A
+// DV_PROPORTION's bare value, its magnitude, is read in every spelling, so
+// beside a null numerator and denominator it is alone too, and refused as the
+// proportion missing its numerator.
 func TestREQ053BareValueBesideOnlyNullSuffixesIsAlone(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	// spellings decodes body, whose leaf's bare value is 1.5, in FLAT and in
@@ -424,12 +425,16 @@ func TestREQ053BareValueBesideOnlyNullSuffixesIsAlone(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FlatToStructured: %v", err)
 		}
+		held := []byte(strconv.Quote(bareValueMember) + `:1.5`)
+		if !bytes.Contains(doc, held) {
+			held = []byte(strconv.Quote(bareStructuredKey) + `:1.5`)
+		}
+		if !bytes.Contains(doc, held) {
+			t.Fatalf("fixture: no bare value member holding 1.5 in %s", doc)
+		}
 		out := map[string]error{"FLAT": refusedInEveryMode(t, wt, body)}
 		for _, member := range members {
-			spelled := bytes.Replace(doc, []byte(`"|value":1.5`), []byte(strconv.Quote(member)+`:1.5`), 1)
-			if member != bareValueMember && bytes.Equal(spelled, doc) {
-				t.Fatalf("fixture: no |value member holding 1.5 in %s", doc)
-			}
+			spelled := bytes.Replace(doc, held, []byte(strconv.Quote(member)+`:1.5`), 1)
 			out["STRUCTURED "+strconv.Quote(member)+" member"] = structuredDocRefusedInEveryMode(t, wt, spelled)
 		}
 		return out

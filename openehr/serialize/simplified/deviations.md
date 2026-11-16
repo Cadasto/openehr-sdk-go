@@ -768,7 +768,13 @@ writes `|value`, the reference's spelling ([ADR 0014](../../../docs/adr/0014-web
 and keeps `"|"` in two places: beside a `|value` of the leaf's own, so two values never share
 a member, and for a null bare value, which OPT-free conversion carries as written. Decode reads
 `|value`, `"|"` and `""` as the bare value at every datatype that has one, and refuses two
-that disagree. OPT-free STRUCTURED → FLAT writes `|value` as `x|value`, which the FLAT decode
+that disagree. OPT-free FLAT → STRUCTURED keeps `"|"` in a third place, since 2026-11-16:
+beside a suffix no datatype with a bare value reads, such as `|code` or `|magnitude`, where the
+leaf has no bare value and a `|value` would change what the body means. Before, a bare text
+beside `|code` and `|terminology` came back as a coded text's `|value`, and a bare DV_QUANTITY
+beside null suffixes was dropped by a default decode, where FLAT refuses both. A bare value
+beside suffixes some datatype with a bare value also reads, or beside no suffix, still converts
+to `|value`. OPT-free STRUCTURED → FLAT writes `|value` as `x|value`, which the FLAT decode
 reads as the bare value of every datatype that has one and as the own `|value` of
 DV_CODED_TEXT, DV_ORDINAL and DV_SCALE, so the template decides at decode what the conversion
 cannot. A leaf carrying nothing but a bare value stays a bare scalar. Pinned in

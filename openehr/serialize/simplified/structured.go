@@ -226,8 +226,9 @@ const bareValueMember = "|" + bareValueSuffix
 // then never share one member, and OPT-free conversion gives each back as
 // written. FLAT → STRUCTURED places every bare value here first, and
 // [spellBareValues] moves it to [bareValueMember] once every key is placed,
-// except a null one. A ctx/ field keeps it too, since ctx/setting has a
-// `|value` of its own.
+// except a null one and one beside a suffix no datatype with a bare value
+// reads. A ctx/ field keeps it too, since ctx/setting has a `|value` of its
+// own.
 const bareStructuredKey = "|"
 
 // emptyBareMember is the STRUCTURED member `""`, another spelling of a bare
@@ -247,16 +248,45 @@ func isBareMember(name string) bool {
 // one member. So does a null bare value, which carries nothing: OPT-free
 // conversion gives it back as the key it was written as, absent wherever that
 // key resolves (REQ-053), where a `|value` would be a suffix a position with
-// no bare value does not read.
+// no bare value does not read. So does an element holding a suffix no
+// datatype with a bare value reads ([readByBareValueDatatype]), such as a
+// coded text's |code or a quantity's |magnitude: its leaf has no bare value,
+// so a `|value` would be read as the leaf's own or not at all, where the bare
+// key is refused, as it is in FLAT. Encode writes no such element, since it
+// writes a bare value only where the datatype has one.
 func spellBareValues(bares []map[string]any) {
 	for _, el := range bares {
 		v, held := el[bareStructuredKey]
-		if _, own := el[bareValueMember]; !held || own || v == nil {
+		if _, own := el[bareValueMember]; !held || own || v == nil || holdsSuffixNoBareValueReads(el) {
 			continue
 		}
 		delete(el, bareStructuredKey)
 		el[bareValueMember] = v
 	}
+}
+
+// holdsSuffixNoBareValueReads reports whether el, an element object, holds a
+// |suffix member that no datatype with a bare value reads.
+func holdsSuffixNoBareValueReads(el map[string]any) bool {
+	for name := range el {
+		if suffix, piped := strings.CutPrefix(name, "|"); piped && suffix != "" && !readByBareValueDatatype(suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+// readByBareValueDatatype reports whether some datatype with a bare value
+// reads suffix ([readsBareValue], [readsSuffix]), judged off
+// [allowedSuffixes], so a datatype that gains a suffix or a bare value moves
+// the judgement with it.
+func readByBareValueDatatype(suffix string) bool {
+	for rmType := range allowedSuffixes {
+		if readsBareValue(rmType) && readsSuffix(rmType, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 // heldNull marks an array slot that a bare FLAT value of JSON null was placed
