@@ -57,9 +57,10 @@ import (
 // its own side admits, one that needs no more whole numbers than its type
 // does wherever the side admits one (proportionPrecision), so its
 // numerator is rounded only where its type, an is_integral its side pins
-// to true, or every precision its side admits, needs whole numbers. A pair fits a side only where that side's
-// constraint on precision admits the precision of its bound, so every
-// bound written keeps the whole numbers its precision needs. An ordinal
+// to true, or every precision its side admits, needs whole numbers. A pair
+// fits a side only where that side's constraint on precision admits the
+// precision of its bound, so every bound written keeps the whole numbers
+// its precision needs. An ordinal
 // bound the second pair replaces takes the symbol its side lists for the
 // new value, with the text the nearest archetype root's term gives a code
 // in any terminology other than openehr (useTermText), as the walk writes
@@ -761,10 +762,11 @@ func componentFits(node *tcimpl.CompiledNode, v any) bool {
 // proportionEnd returns the lowest (low) or highest ratio a side accepts
 // while keeping like's type and denominator, with the precision
 // proportionPrecision gives and a whole numerator where that precision,
-// the type or the side's is_integral pin needs whole numbers (sideWhole). It returns false when the numerator
-// constraint has no end in the direction that moves the ratio that way,
-// or no whole number toward that end where one is needed, or when the
-// side does not admit like's type or denominator, or admits no precision.
+// the type or the side's is_integral pin needs whole numbers (sideWhole).
+// It returns false when the numerator constraint has no end in the
+// direction that moves the ratio that way, or no whole number toward that
+// end where one is needed, or when the side does not admit like's type or
+// denominator, or admits no precision.
 func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (proportionKey, bool) {
 	if like.denominator == 0 || !componentFits(bindingChild(node, "type"), like.kind) || !componentFits(bindingChild(node, "denominator"), like.denominator) {
 		return proportionKey{}, false
@@ -790,9 +792,10 @@ func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (pro
 // none. It tries like's own precision, none, the members of the C_INTEGER
 // on precision, 1 and -1, in that order, and takes the first node admits
 // that needs no more whole numbers than the type, or an is_integral node
-// pins to true, does (sideWhole), so the numerator need not be rounded. Only where node admits no such precision does it
-// take the first node admits, which is then 0. It never takes a precision
-// below -1, which the RM floor rejects (-1 is no limit).
+// pins to true, does (sideWhole), so the numerator need not be rounded.
+// Only where node admits no such precision does it take the first node
+// admits, which is then 0. It never takes a precision below -1, which the
+// RM floor rejects (-1 is no limit).
 func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Integer, bool) {
 	candidates := []*rm.Integer{like.precision, nil}
 	if c, ok := primitiveOf(bindingChild(node, "precision")).(constraints.CInteger); ok {
