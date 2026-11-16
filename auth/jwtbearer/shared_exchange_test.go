@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -198,4 +199,86 @@ func TestREQ026_ExchangeFailureReachesWaitersAfterLeaderCancel(t *testing.T) {
 			t.Errorf("token-endpoint requests = %d, want 1 (one shared exchange)", got)
 		}
 	})
+}
+
+// errCallerGaveUp is the cause a leading call's context ends with.
+var errCallerGaveUp = errors.New("caller gave up")
+
+// heldTokenEndpoint is a token endpoint on the in-memory network that never
+// answers: it holds each request until the client gives up on it. It is for
+// tests inside a synctest bubble.
+func heldTokenEndpoint(t *testing.T) *httptest.Server {
+	t.Helper()
+	release := make(chan struct{})
+	srv := httptest.NewTestServer(t, http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	// The server's own cleanup waits for its handlers; release them first.
+	t.Cleanup(func() { close(release) })
+	return srv
+}
+
+// TestREQ026_LeaderContextEndedWithACauseGetsItsContextError pins REQ-026
+// (idiom.md § Concurrency) with REQ-063 for the call leading an exchange
+// when its context ends with a cause, as context.WithCancelCause,
+// context.WithTimeoutCause and errgroup end one. The HTTP client then
+// reports the cause instead of the context's error. That call still gets an
+// error that reports its context's error, and the cause and the exchange
+// failure stay inside it.
+func TestREQ026_LeaderContextEndedWithACauseGetsItsContextError(t *testing.T) {
+	endings := []struct {
+		name string
+		// start returns the leading call's context and the function that ends
+		// it with errCallerGaveUp while its request is held at the endpoint.
+		start func(t *testing.T) (context.Context, func())
+		// wantCtxErr is the error that context reports once it ended.
+		wantCtxErr error
+	}{
+		{
+			name: "cancelled with a cause",
+			start: func(t *testing.T) (context.Context, func()) {
+				ctx, cancel := context.WithCancelCause(t.Context())
+				t.Cleanup(func() { cancel(nil) })
+				return ctx, func() { cancel(errCallerGaveUp) }
+			},
+			wantCtxErr: context.Canceled,
+		},
+		{
+			name: "deadline with a cause",
+			start: func(t *testing.T) (context.Context, func()) {
+				ctx, cancel := context.WithTimeoutCause(t.Context(), time.Minute, errCallerGaveUp)
+				t.Cleanup(cancel)
+				return ctx, func() { time.Sleep(2 * time.Minute) } // past the deadline
+			},
+			wantCtxErr: context.DeadlineExceeded,
+		},
+	}
+	for _, ending := range endings {
+		t.Run(ending.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				srv := heldTokenEndpoint(t)
+				src := newSource(t, srv.URL, srv.Client())
+
+				ctx, end := ending.start(t)
+				var (
+					wg  sync.WaitGroup
+					err error
+				)
+				wg.Go(func() { _, err = src.Token(ctx) })
+				synctest.Wait() // the exchange is held at the endpoint
+				end()
+				wg.Wait()
+
+				if !errors.Is(err, ending.wantCtxErr) || !errors.Is(err, errCallerGaveUp) {
+					t.Errorf("Token() error = %v, want one that reports both its context's error %v and the cause %v", err, ending.wantCtxErr, errCallerGaveUp)
+				}
+				if _, ok := errors.AsType[*auth.ExchangeError](err); !ok || !errors.Is(err, auth.ErrTokenExchangeFailed) {
+					t.Errorf("Token() error = %v, want one that still carries the *auth.ExchangeError matching auth.ErrTokenExchangeFailed", err)
+				}
+			})
+		})
+	}
 }

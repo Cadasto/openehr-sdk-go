@@ -7,10 +7,7 @@ sdd:
 
   req_style: flat-numeric           # flat-numeric (REQ-NNN) — leaner for a library
   req_areas: []                     # area-prefixed only; a flat-numeric repository declares none
-  req_gap: 1                        # sequential: a new REQ takes the next free number above the
-                                    # highest registered one. The old decadal topic bands are
-                                    # historical and no longer allocated from; reservations and
-                                    # retired numbers are listed in REQ.md § Numbering policy.
+  req_gap: 1                        # sequential; REQ.md § Numbering policy
   excluded_areas: []                # area-prefixed only; tokens that are deliberately not areas
 
   # The document-kind vocabulary every `kind:` frontmatter value is checked against.
@@ -19,22 +16,13 @@ sdd:
   default_mode: spec-first          # the mode a specification has when its frontmatter names none
 
   paths:
-    # Requirements use a REGISTRY model, not per-REQ files: the REQ-NNN index lives in
-    # docs/specifications/REQ.md and each requirement's canonical normative prose lives in
-    # exactly one topic spec in the same tree. There is deliberately no separate
-    # docs/requirements/ dir (single canonical home — methodology §5).
+    # A registry, not per-REQ files: each requirement's prose lives in one topic spec.
     requirements: docs/specifications/REQ.md   # file form: the registry itself is the requirements index
     specifications: docs/specifications
     adr: docs/adr
     constitution: docs/architecture.md   # informative profile only; not read on this formal repository
 
-  # Single sources and what is generated from them (`make spec-generate`; `make spec-check` fails
-  # when a generated block is stale). Edit the source, never the generated table.
-  #   REQ citations in tests   -> each traceability.yaml row's tests: list
-  #   traceability.yaml        -> docs/specifications/REQ.md registry table
-  # The citation rule: docs/development-process.md § The ladder.
-  # traceability.yaml is a pure index: no notes, no comments in rows (spec-check refuses them).
-
+  # Its tests: lists and the REQ.md registry are generated (`make spec-generate`): docs/development-process.md § The ladder.
   traceability: docs/specifications/traceability.yaml
 
   forge: github                     # auto | github | azure-devops | none — how sdd-pr reaches the pull request
@@ -42,9 +30,6 @@ sdd:
   build_entrypoint: make            # single entry point — extend the Makefile, no ad-hoc scripts
   ci_target: ci                     # full PR gate: `make ci` (includes spec-check)
   spec_check_target: spec-check     # traceability drift gate: `make spec-check`
-  # Also: `make spec-generate` (regenerate the indexes). Two lanes — a change that alters no
-  # normative statement owes no spec/plan edits: docs/development-process.md § Two lanes.
-  # Also available: `make spec-context REQ=NNN` (one-shot bundle) and `make probe-status`.
 
   use_probes: true                  # PROBE-NNN conformance probes — catalog in docs/specifications/conformance.md
   use_strands: true                 # STRAND-NN open research questions — docs/specifications/research-strands.md

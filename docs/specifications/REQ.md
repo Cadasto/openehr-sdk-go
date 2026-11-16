@@ -60,7 +60,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-056 | Canonical XML | [wire.md](wire.md#req-056) | draft | landed |
 | REQ-057 | Stored AQL queries | [wire.md](wire.md#req-057) | draft | landed |
 | REQ-058 | Datamap V2 | [module-layout.md](module-layout.md#req-058--datamap-v2) | draft | planned |
-| REQ-059 | openEHR custom headers | [wire.md](wire.md#req-059) | draft | partial |
+| REQ-059 | openEHR custom headers | [wire.md](wire.md#req-059) | draft | landed |
 | REQ-060 | TokenSource interface | [auth.md](auth.md#req-060) | draft | landed |
 | REQ-061 | SMART-on-openEHR PKCE | [auth.md](auth.md#req-061--pkce-flow) | draft | landed |
 | REQ-062 | JWKS rotation | [auth.md](auth.md#req-062--jwks-rotation) | draft | landed |
@@ -77,8 +77,8 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-073 | Discovery trust posture | [auth.md](auth.md#req-073--discovery-trust-posture) | draft | landed |
 | REQ-080 | openEHR wire conformance (retired) | [retired-requirements.md](retired-requirements.md#req-080--openehr-wire-conformance) | deprecated | retired |
 | REQ-081 | Wire-level parity (retired) | [retired-requirements.md](retired-requirements.md#req-081--wire-level-parity) | deprecated | retired |
-| REQ-082 | Probe runnability | [conformance.md](conformance.md#req-082--runnability) | draft | partial |
-| REQ-083 | Cadasto platform API conformance | [conformance.md](conformance.md#req-083--cadasto-platform-api-conformance) | draft | partial |
+| REQ-082 | Probe runnability | [conformance.md](conformance.md#req-082--runnability) | draft | landed |
+| REQ-083 | `cadasto/admin` health checks | [conformance.md](conformance.md#req-083--cadastoadmin-health-checks) | draft | landed |
 | REQ-090 | OpenTelemetry hooks | [transport.md](transport.md#req-090--opentelemetry-hooks) | draft | landed |
 | REQ-091 | Retry policy | [transport.md](transport.md#req-091--retry-policy) | draft | landed |
 | REQ-092 | TLS posture | [transport.md](transport.md#req-092--tls-posture) | draft | landed |
@@ -98,15 +98,15 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-106 | WebTemplate JSON export | [clinical-modeling.md](clinical-modeling.md#req-106--webtemplate-json-export) | draft | landed |
 | REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | draft | landed |
 | REQ-108 | Untrusted document bounds | [clinical-modeling.md](clinical-modeling.md#req-108--untrusted-document-bounds) | draft | landed |
-| REQ-109 | AQL static lint | [clinical-modeling.md](clinical-modeling.md#req-109--aql-static-lint) | draft | landed |
+| REQ-109 | AQL static lint | [aql.md](aql.md#req-109--aql-static-lint) | draft | landed |
 | REQ-110 | Template-driven validation beyond COMPOSITION (retired) | [retired-requirements.md](retired-requirements.md#req-110--template-driven-validation-beyond-composition) | deprecated | retired |
 | REQ-111 | Public compiled-template bridge | [clinical-modeling.md](clinical-modeling.md#req-111--public-compiled-template-bridge) | draft | landed |
-| REQ-112 | Template-less Reference Model validation floor | [clinical-modeling.md](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) | draft | partial |
-| REQ-113 | Execution-oriented parsed AQL AST | [clinical-modeling.md](clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) | draft | landed |
+| REQ-112 | Template-less Reference Model validation floor | [clinical-modeling.md](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) | draft | landed |
+| REQ-113 | Execution-oriented parsed AQL AST | [aql.md](aql.md#req-113--execution-oriented-parsed-aql-ast) | draft | landed |
 | REQ-116 | Template-level node naming and name-predicated paths (retired) | [retired-requirements.md](retired-requirements.md#req-116--template-level-node-naming-and-name-predicated-paths) | deprecated | retired |
 | REQ-117 | AQL expression-catalogue completion (retired) | [retired-requirements.md](retired-requirements.md#req-117--aql-expression-catalogue-completion) | deprecated | retired |
 | REQ-118 | Deprecated `SELECT TOP` clause and literal source text (retired) | [retired-requirements.md](retired-requirements.md#req-118--deprecated-select-top-clause-and-literal-source-text) | deprecated | retired |
-| REQ-119 | Re-parseable canonical AQL emission | [clinical-modeling.md](clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) | draft | landed |
+| REQ-119 | Re-parseable canonical AQL emission | [aql.md](aql.md#req-119--re-parseable-canonical-aql-emission) | draft | landed |
 | REQ-120 | RM identifier parsing and derivation | [reference-model.md](reference-model.md#req-120--rm-identifier-parsing-and-derivation) | draft | landed |
 | REQ-121 | Locatable path read access | [reference-model.md](reference-model.md#req-121--locatable-path-read-access) | draft | landed |
 | REQ-122 | Version-control derived helpers (retired) | [retired-requirements.md](retired-requirements.md#req-122--version-control-derived-helpers) | deprecated | retired |
@@ -114,14 +114,14 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-130 | Contribution builder | [wire.md](wire.md#req-130--contribution-builder) | draft | landed |
 | REQ-140 | Underscore-prefixed RM attributes (simplified formats) | [wire.md](wire.md#req-140--underscore-prefixed-rm-attributes) | draft | landed |
 | REQ-142 | Contribution read (retired) | [retired-requirements.md](retired-requirements.md#req-142--contribution-read) | deprecated | retired |
-| REQ-143 | Template list filters | [wire.md](wire.md#req-143--template-list-filters) | draft | landed |
+| REQ-143 | Template list filters (retired) | [retired-requirements.md](retired-requirements.md#req-143--template-list-filters) | deprecated | retired |
 | REQ-144 | Definition metadata decoding | [wire.md](wire.md#req-144--definition-metadata-decoding) | draft | landed |
 | REQ-150 | Path-parameter segment validation | [transport.md](transport.md#req-150--path-parameter-segment-validation) | draft | landed |
 | REQ-151 | Typed 2xx decode failure | [transport.md](transport.md#req-151--typed-2xx-decode-failure) | draft | landed |
-| REQ-160 | AQL containment admissibility relation | [clinical-modeling.md](clinical-modeling.md#req-160--aql-containment-admissibility-relation) | draft | landed |
-| REQ-161 | AQL semantic and portability lint | [clinical-modeling.md](clinical-modeling.md#req-161--aql-semantic-and-portability-lint) | draft | landed |
+| REQ-160 | AQL containment admissibility relation | [aql.md](aql.md#req-160--aql-containment-admissibility-relation) | draft | landed |
+| REQ-161 | AQL semantic and portability lint | [aql.md](aql.md#req-161--aql-semantic-and-portability-lint) | draft | landed |
 | REQ-162 | Builder containment verification (retired) | [retired-requirements.md](retired-requirements.md#req-162--builder-containment-verification) | deprecated | retired |
-| REQ-163 | AQL write-side expressivity parity | [clinical-modeling.md](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) | draft | landed |
+| REQ-163 | AQL write-side expressivity parity | [aql.md](aql.md#req-163--aql-write-side-expressivity-parity) | draft | landed |
 | REQ-164 | AQL path-shape and paging lint (retired) | [retired-requirements.md](retired-requirements.md#req-164--aql-path-shape-and-paging-lint) | deprecated | retired |
 | REQ-165 | openEHR scope syntax | [auth.md](auth.md#req-165--openehr-scope-syntax) | draft | landed |
 | REQ-166 | Bearer challenge on 401 and 403 | [transport.md](transport.md#req-166--bearer-challenge-on-401-and-403) | draft | landed |
@@ -146,11 +146,10 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 
 A new requirement takes the **next free number above the highest registered one**, whatever its topic. The number carries no topic meaning; the canonical link says where the requirement belongs. Earlier requirements were numbered in topic bands (001–005 packaging, 010–014 layout, and so on); those numbers stay as they are, but the bands are no longer allocated from.
 
-Identifiers **MUST** be stable once published. Renumbering and reuse are prohibited.
+Identifiers are stable once published: never renumbered and never reused.
 
-A plan may reserve a number before its spec text exists; record the reservation in the list below, and remove the entry once the requirement is registered. The list is prose, not a table, so the registry stays the only index table in this file.
+Numbers released without becoming a requirement are listed below. The list is prose, not a table, so the registry stays the only index table in this file.
 
-- REQ-114: reserved for the OPT author validator.
-- REQ-115: reserved for the FLAT author linter.
+- REQ-114 and REQ-115: retired, never reused; they were reserved for an OPT author validator and a FLAT author linter that were never started.
 - REQ-124 and REQ-125: retired, never reused; they were reserved for the deferred RM-function stubs, which [reference-model.md](reference-model.md) records as out of scope.
 - REQ-141: retired, never reused.

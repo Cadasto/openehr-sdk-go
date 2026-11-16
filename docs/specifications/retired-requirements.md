@@ -102,7 +102,7 @@ Its rules are now [auth.md § REQ-064](auth.md#req-064--launch-context) *[Platfo
 
 ## REQ-080 — openEHR wire conformance
 
-Its test-writing rules moved to [development-process.md § Writing a probe](../development-process.md#writing-a-probe), and the round-trip comparison it restated is [wire.md § REQ-052](wire.md#req-052)'s.
+Its test-writing rules moved to [probe-harness.md § Writing a probe](../probe-harness.md#writing-a-probe), and the round-trip comparison it restated is [wire.md § REQ-052](wire.md#req-052)'s.
 
 ## REQ-081 — Wire-level parity
 
@@ -142,11 +142,11 @@ Its rules are now [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111
 
 ## REQ-117 — AQL expression-catalogue completion
 
-Its rules moved to [clinical-modeling.md § REQ-113](clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (the read-side catalogue and its residual), [clinical-modeling.md § REQ-109](clinical-modeling.md#req-109--aql-static-lint) (alias resolution in the lint) and [clinical-modeling.md § REQ-163](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) (the builder's containment algebra and in-text paging).
+Its rules moved to [aql.md § REQ-113](aql.md#req-113--execution-oriented-parsed-aql-ast) (the read-side catalogue and its residual), [aql.md § REQ-109](aql.md#req-109--aql-static-lint) (alias resolution in the lint) and [aql.md § REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) (the builder's containment algebra and in-text paging).
 
 ## REQ-118 — Deprecated `SELECT TOP` clause and literal source text
 
-Its rules moved to [clinical-modeling.md § REQ-113](clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (the `TOP` carrier and literal source text), [clinical-modeling.md § REQ-163](clinical-modeling.md#req-163--aql-write-side-expressivity-parity) (the builder's `TOP` and the row-bound channels) and [clinical-modeling.md § REQ-109](clinical-modeling.md#req-109--aql-static-lint) (the `TOP` lint codes).
+Its rules moved to [aql.md § REQ-113](aql.md#req-113--execution-oriented-parsed-aql-ast) (the `TOP` carrier and literal source text), [aql.md § REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) (the builder's `TOP` and the row-bound channels) and [aql.md § REQ-109](aql.md#req-109--aql-static-lint) (the `TOP` lint codes).
 
 ## REQ-122 — Version-control derived helpers
 
@@ -156,13 +156,17 @@ Its rule is now [reference-model.md § REQ-120](reference-model.md#req-120--rm-i
 
 The contribution read moved to [wire.md § REQ-174](wire.md#req-174--versioned-object-reads) *The contribution read*.
 
+## REQ-143 — Template list filters
+
+The list filters are a template operation: they moved to [wire.md § REQ-177](wire.md#req-177--template-representations) *[List filters](wire.md#list-filters)*.
+
 ## REQ-162 — Builder containment verification
 
-Its rules moved to [clinical-modeling.md § REQ-161 § Builder adapter](clinical-modeling.md#builder-adapter).
+Its rules moved to [aql.md § REQ-161 § Builder adapter](aql.md#builder-adapter).
 
 ## REQ-164 — AQL path-shape and paging lint
 
-Its checks are now [clinical-modeling.md § REQ-161](clinical-modeling.md#req-161--aql-semantic-and-portability-lint) *[Path-shape checks](clinical-modeling.md#path-shape-checks)*.
+Its checks are now [aql.md § REQ-161](aql.md#req-161--aql-semantic-and-portability-lint) *[Path-shape checks](aql.md#path-shape-checks)*.
 
 ## REQ-172 — Typed 2xx body-read failure
 

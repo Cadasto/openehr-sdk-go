@@ -24,16 +24,17 @@ Statements without these keywords are **informative** — context, rationale, ex
 
 ## Document kinds
 
-The repo uses several document kinds, each with a distinct role and boundary:
+Every document declares its kind in its frontmatter (`kind:`), from the vocabulary in [`docs/.sdd.yaml`](../.sdd.yaml) `doc_kinds`.
+The kinds this repository uses:
 
 | Kind | Answers | Normative? | Where it lives |
 |------|---------|------------|----------------|
-| **Specification** (this tree) | How must the system behave / be structured? | Yes (`MUST` / `SHALL` / `SHOULD` / `MAY`) | [`docs/specifications/`](.) — topic specs + REQ.md registry + traceability.yaml + conformance.md (PROBE-NNN) + research-strands.md (STRAND-NN) |
-| **ADR** | Which irreversible architectural fork did we take? | Decision record | [`docs/adr/`](../adr/) |
-| **Plan** | What exact work implements a slice? | No (delivery tasks) | [`docs/plans/`](../plans/) |
-| **Guide** | How do I work in this repo safely? | No | [`docs/architecture.md`](../architecture.md), [`docs/development-process.md`](../development-process.md), [`docs/ai-workflow.md`](../ai-workflow.md), [`docs/ci.md`](../ci.md) |
-| **Descriptor** | Machine-readable SDD conventions for tooling | Config (not prose) | [`docs/.sdd.yaml`](../.sdd.yaml) — REQ style, paths, build targets, PROBE/STRAND toggles; read by `sdd-*` skills |
-| **Roadmap** | What is still open, and which deployments are targeted? | No (status snapshot) | [`docs/roadmap.md`](../roadmap.md) |
+| `specification` (this tree) | How must the system behave / be structured? | Yes (`MUST` / `SHALL` / `SHOULD` / `MAY`) | [`docs/specifications/`](.) — topic specs + REQ.md registry + traceability.yaml + conformance.md (PROBE-NNN) + research-strands.md (STRAND-NN) |
+| `adr` | Which irreversible architectural fork did we take? | Decision record | [`docs/adr/`](../adr/) |
+| `reference` | A lookup that binds nothing | No | [retired-requirements.md](retired-requirements.md), [`docs/licensing.md`](../licensing.md) |
+| `guide` | How do I work in this repo, and what is still open? | No | [`docs/architecture.md`](../architecture.md), [`docs/development-process.md`](../development-process.md), [`docs/ai-workflow.md`](../ai-workflow.md), [`docs/roadmap.md`](../roadmap.md), [`docs/ci.md`](../ci.md) and the other pages under `docs/` |
+| `analysis` | What did a measurement or a study find? | No (evidence, dated) | [`docs/analysis/`](../analysis/) |
+| `plan` | What exact work implements a slice? | No (working note) | [`docs/plans/`](../plans/) |
 
 **Boundaries between kinds:**
 
@@ -46,7 +47,8 @@ The repo uses several document kinds, each with a distinct role and boundary:
 
 ## Source of truth
 
-When code and a spec disagree, the spec wins, unless the maintainer's instruction says otherwise ([AGENTS.md § Source of truth](../../AGENTS.md#source-of-truth)). Which changes owe spec edits, and in what order, is [development-process.md § Two lanes](../development-process.md#two-lanes) and [§ The ladder](../development-process.md#the-ladder-full-lane).
+What wins when code, a request or the maintainer disagrees with a spec is [AGENTS.md § Source of truth](../../AGENTS.md#source-of-truth).
+Which changes owe spec edits, and in what order, is [development-process.md § Two lanes](../development-process.md#two-lanes) and [§ The ladder](../development-process.md#the-ladder-full-lane).
 
 ## Status header
 
@@ -77,10 +79,9 @@ docs/specifications/traceability.yaml (the index: packages, probes, tests, statu
 
 Cite identifiers when crossing the chain:
 
-- Every test that exercises a normative requirement cites the REQ-ID and (if applicable) PROBE-ID in a comment; that citation is what lists the test under its REQ in `traceability.yaml`. Maintainer comments may cite them too; godoc on exported API does not (it is written for SDK users; see [AGENTS.md](../../AGENTS.md#spec-driven-workflow-agents)).
+- A test cites the REQ-ID, and the PROBE-ID if any, that it pins; that citation lists it under its REQ ([development-process.md § The ladder](../development-process.md#the-ladder-full-lane)). Godoc on exported API cites none ([AGENTS.md § Spec-driven workflow](../../AGENTS.md#spec-driven-workflow-agents)).
 - Every ADR in `docs/adr/` cites the STRAND-ID it resolves (from `research-strands.md`) and any REQ-IDs it amends.
 - The map lists no ADRs: an ADR names its REQs in its header, and `make spec-context` finds it from there. Plans are not part of the chain.
-- When landing code or probes, update the packages and probes in [`traceability.yaml`](traceability.yaml) and run `make spec-generate`, which writes the tests lists.
 
 `make spec-check` catches the drift a machine can see: a cited path, probe or anchor that does not exist, a landed requirement with no packages or tests, and a generated block that no longer matches its source.
 
@@ -93,7 +94,7 @@ Cite identifiers when crossing the chain:
 | `STRAND-NN` | Open research strand | `research-strands.md` |
 | `ADR-NNN` | Resolved architectural decision | [`../adr/`](../adr/) |
 
-Identifiers are stable once published — they are referenced from outside the file (commit messages, PR titles, code comments, test names). Renumbering and reuse are prohibited ([REQ.md § Numbering policy](REQ.md#numbering-policy)).
+Identifiers are stable once published ([REQ.md § Numbering policy](REQ.md#numbering-policy)).
 
 ## Index
 
@@ -102,7 +103,8 @@ Identifiers are stable once published — they are referenced from outside the f
 | [REQ.md](REQ.md) | Requirement registry (generated index) — links to canonical topic specs |
 | [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test map |
 | [../.sdd.yaml](../.sdd.yaml) | SDD project descriptor — identifier style, document paths, `make` targets (read by `sdd-*` skills) |
-| [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary, the conformance probe harness ([§ Conformance probes](../development-process.md#conformance-probes)) |
+| [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary |
+| [../probe-harness.md](../probe-harness.md) | How probes are written, run and kept; the CDR cross-check tool; the vendored fixtures |
 | [scope.md](scope.md) | What is in and out of v1 scope, and the use cases that justify it |
 | [glossary.md](glossary.md) | openEHR, SMART, Cadasto, and SDK-internal terms |
 | [module-layout.md](module-layout.md) | Module path (REQ-001), package taxonomy, dependency direction, building-block independence and each block's import rule (REQ-013), Datamap V2 (REQ-058), boundary rules, the `internal/` boundary, semantic versioning (REQ-004) |
@@ -111,7 +113,8 @@ Identifiers are stable once published — they are referenced from outside the f
 | [transport.md](transport.md) | Transport layer — OTel hooks, retry, TLS posture, error-envelope mapping, `Prefer` negotiation, the request observer, path-segment validation, typed 2xx failures, bearer challenges, caller attribution |
 | [auth.md](auth.md) | `auth.TokenSource` contract, the SMART-on-openEHR provider flow and the other providers, and service discovery (REQ-070 to REQ-073) |
 | [wire.md](wire.md) | openEHR REST 1.1.0 pin and its OpenAPI files, the openEHR headers, canonical JSON / XML, FLAT / STRUCTURED, AQL wire, the REST leaf operations and the Admin client |
-| [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — the operational template model, the compiled template and its paths, primitive constraints, validation, the instance generator and composition builder, the Web Template export, AQL parse, lint, containment and builders |
+| [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — the operational template model, the compiled template and its paths, primitive constraints, validation, the instance generator and composition builder, the Web Template export |
+| [aql.md](aql.md) | AQL above the wire boundary — the parsed query tree, canonical emission, the builder's write-side parity, the static lint, the containment relation and the semantic lint |
 | [conformance.md](conformance.md) | openEHR wire-conformance probe catalog |
 | [research-strands.md](research-strands.md) | Open strands awaiting resolution (each becomes an ADR) |
 | [retired-requirements.md](retired-requirements.md) | Lookup of retired `REQ-NNN`: where each rule went (binds nothing, so the gate's keyword rules skip it) |

@@ -1,6 +1,6 @@
 package webtemplate
 
-// REQ-106 / REQ-121 — the in-context ↔ rmpath seam.
+// REQ-106 / REQ-121 / REQ-053 — the in-context ↔ rmpath seam.
 //
 // The WebTemplate synthesizes in-context leaves per container RM type
 // (§ Output shape): nodes that come from the RM, not from the template. The

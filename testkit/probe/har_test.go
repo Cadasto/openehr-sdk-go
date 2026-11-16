@@ -14,7 +14,7 @@ import (
 // strand11HAR is the live capture that settled ADR 0020 — the same
 // bytes the PR reviews. go test runs in the package directory, so a
 // plain relative path reaches it.
-var strand11HAR = filepath.Join("..", "..", "docs", "plans", "strand-11-evidence", "ehr-create.har")
+var strand11HAR = filepath.Join("..", "recordings", "ehr-create.har")
 
 // credentialValue is the fake secret every unredacted-capture case
 // carries. No refusal may echo it: REQ-093 lets a diagnostic name a

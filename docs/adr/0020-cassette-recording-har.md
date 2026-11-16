@@ -9,11 +9,9 @@ date: 2026-09-07
 # ADR 0020 — Cassette recordings are HTTP Archive 1.2
 
 - **Status:** Accepted, 2026-09-07.
-- **Supersedes:** —
-- **Superseded by:** —
 - **Strand:** [STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml).
 - **Introduces:** —. **Amends:** [REQ-082](../specifications/conformance.md#req-082--runnability) Cassette encoding.
-- **Related:** the side-by-side capture in [strand-11-evidence](../plans/strand-11-evidence/).
+- **Related:** the side-by-side capture in [strand-11-recording-format](../analysis/strand-11-recording-format/).
 
 ## Context
 
@@ -23,8 +21,8 @@ order-preserving normalised matching — but left the on-disk encoding open as S
 HTTP Archive (`.har`) versus a purpose-built YAML schema.
 
 The strand asked for one real capture, serialised both ways, reviewed as a diff. That capture
-is a live `POST /ehr` against EHRbase 2.35.1 ([ehr-create.har](../plans/strand-11-evidence/ehr-create.har)
-and [ehr-create.yaml](../plans/strand-11-evidence/ehr-create.yaml)). The remaining question is
+is a live `POST /ehr` against EHRbase 2.35.1 ([ehr-create.har](../../testkit/recordings/ehr-create.har)
+and [ehr-create.yaml](../analysis/strand-11-recording-format/ehr-create.yaml)). The remaining question is
 which file a second implementation (or a reviewer) can treat as the recording.
 
 ## Decision
@@ -41,7 +39,7 @@ which file a second implementation (or a reviewer) can treat as the recording.
 
 ## Consequences
 
-- The recordings, once captured under `testkit/recordings/`, will be `.har`. A recording without
+- The recordings under `testkit/recordings/` are `.har`. A recording without
   `_req082.provenance` or without `_req082.redaction.ran: true` is discarded, not replayed.
 - Review diffs are larger and noisier than the YAML alternative. That cost is accepted so
   the recordings stay in a published interchange format rather than an SDK-private schema.
@@ -61,3 +59,8 @@ which file a second implementation (or a reviewer) can treat as the recording.
   drift, and REQ-082 discards a recording whose provenance cannot be stated
   ([conformance.md § Cassette mode](../specifications/conformance.md#cassette-mode)).
   One artefact cannot lose its attestation.
+
+## Traceability
+
+- Resolves: STRAND-11
+- Amends: REQ-082

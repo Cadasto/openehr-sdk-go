@@ -41,7 +41,7 @@ Where the project's own documents live:
 2. **Run `make ci` locally** before opening the PR. CI replicates the gate ([`docs/ci.md`](docs/ci.md)).
 3. Leave [`CHANGELOG.md`](CHANGELOG.md) to the maintainers. They curate it on request or when a release is cut, not in each feature PR ([releases.md § CHANGELOG](docs/releases.md#changelog)). Call out any consumer-visible change in the PR description so it can be folded in.
 4. If you add or change a REQ-marked behaviour, update [`docs/specifications/traceability.yaml`](docs/specifications/traceability.yaml) in the same PR (`make spec-check` enforces this).
-5. Cite REQ-NNN / PROBE-NNN in commit messages, tests and maintainer comments, never in what SDK users read: godoc, examples, README files and the user docs ([AGENTS.md § Spec-driven workflow](AGENTS.md#spec-driven-workflow-agents) has the full list). REQs are stable identifiers, so never renumber one.
+5. Cite REQ-NNN / PROBE-NNN in commit messages, tests and maintainer comments, never in what SDK users read: godoc, examples, README files and the user docs ([AGENTS.md § Spec-driven workflow](AGENTS.md#spec-driven-workflow-agents) has the full list).
 6. **New or changed `cmd/examples/`**: update [`docs/examples.md`](docs/examples.md) and [`cmd/examples/doc.go`](cmd/examples/doc.go) in the same PR; touch [`docs/quick-start.md`](docs/quick-start.md) when the onboarding path changes. See [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
 7. Keep PRs **scoped to one logical change**. Small PRs are easier to review and get merged sooner.
 
@@ -97,12 +97,12 @@ Nothing runs on commit, so run `make lint` yourself before opening a PR. If you 
 
 ## Code style
 
-The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md). It covers context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, imports & naming, and public-API stability. Commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions), and the format and lint commands in [§ Tooling & workflow](AGENTS.md#tooling--workflow). Read those first. The points below trip up most PRs:
+The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md). It covers context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, and imports & naming; public-API stability is [`module-layout.md` § REQ-004](docs/specifications/module-layout.md#req-004--semantic-versioning). Commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions), and the format and lint commands in [§ Tooling & workflow](AGENTS.md#tooling--workflow). Read those first. The points below trip up most PRs:
 
 - **Building-block independence (REQ-013)**: the openEHR building-block packages and the AQL blocks are usable standalone, with no `transport/` or `auth/` import. The exact package set and each package's import rule are in the table in [`docs/specifications/module-layout.md` § REQ-013](docs/specifications/module-layout.md#req-013--building-block-independence).
 - **No reflection** beyond the exceptions in [idiom.md § API conventions](docs/specifications/idiom.md#api-conventions): `_type` dispatch goes through the type registry, and generics are fine.
 - **Strict-encode / permissive-decode** numerics per [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md).
-- **Comments**: explain WHY, not WHAT; identifiers carry the WHAT. Do NOT cite issue numbers or commit SHAs (those rot). Where REQ-NNN / PROBE-NNN citations go, and how godoc on exported API is written, follow [AGENTS.md § Documentation](AGENTS.md#documentation). Godoc states the behaviour a caller needs in plain English, at whatever length that takes.
+- **Comments**: explain WHY, not WHAT; identifiers carry the WHAT. Do NOT cite issue numbers or commit SHAs (those rot). Where REQ-NNN / PROBE-NNN citations go, and how godoc on exported API is written, follow [AGENTS.md § Spec-driven workflow](AGENTS.md#spec-driven-workflow-agents). Godoc states the behaviour a caller needs in plain English, at whatever length that takes.
 - **Test contexts**: in the I/O-bearing test packages (`transport/`, `auth/`, `smart/`, `openehr/client/*`) use `t.Context()` (Go 1.24+) for request-scoped contexts. Because it is cancelled at test cleanup, leaks surface. Don't reintroduce `context.Background()` there; derive timeouts/cancellation from `t.Context()`. Pure-compute test packages are unaffected.
 
 ## Releases

@@ -60,9 +60,22 @@ func TestProbe001(t *testing.T) {
 }
 
 // TestProbe002 runs PROBE-002 and asserts the resolved catalog advertises
-// org.openehr.rest with a parseable base URL and a spec_version (REQ-070).
+// org.openehr.rest with a parseable base URL (REQ-070).
 func TestProbe002(t *testing.T) {
 	r, err := probes.Probe002OpenEHRRestService(context.Background(), smartConfigFixture(t))
+	assertPass(t, r, err)
+}
+
+// TestProbe002WithoutSpecVersion runs PROBE-002 on a catalog whose
+// org.openehr.rest entry declares no spec_version, which REQ-072 accepts,
+// so the probe passes.
+func TestProbe002WithoutSpecVersion(t *testing.T) {
+	b := smartConfigFixture(t)
+	out := bytes.ReplaceAll(b, []byte(`"spec_version": "1.1.0",`), nil)
+	if bytes.Equal(out, b) {
+		t.Fatal("spec_version removal did not match the fixture")
+	}
+	r, err := probes.Probe002OpenEHRRestService(context.Background(), out)
 	assertPass(t, r, err)
 }
 

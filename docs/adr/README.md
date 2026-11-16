@@ -6,7 +6,7 @@ kind: guide
 
 Closed architecture decisions for `openehr-sdk-go`. Each ADR is a numbered Markdown file with the standard headings (Status, Context, Decision, Consequences). Its frontmatter (`id`, `title`, `status`, `date`) is the source of the index below, which `python3 scripts/sdd-check.py generate` writes. Status reaches **Accepted** before the ADR is considered closed.
 
-Open decisions (those that would be ADRs once resolved) live in this repo as **research strands** — [`docs/specifications/research-strands.md`](../specifications/research-strands.md). When a strand is resolved, an ADR lands here.
+Open decisions (those that would be ADRs once resolved) live in this repo as **research strands** — [`docs/specifications/research-strands.md`](../specifications/research-strands.md). When a strand is resolved, an ADR lands here, and the index's *Resolves / amends* column names the strand.
 
 <!-- sdd:generated adr-index -->
 
@@ -14,29 +14,29 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 |---|---|---|---|---|
 | ADR-0001 | BMM version-bump runbook | Accepted | 2026-05-16 | — |
 | ADR-0002 | BMM code generator structural decisions | Accepted | 2026-05-16 | — |
-| ADR-0003 | Codec polymorphism for abstract generic RM classes | Accepted | 2026-05-16 | — |
-| ADR-0004 | Strict-encode, permissive-decode for BMM `Real` and `Integer` | Accepted | 2026-05-16 | — |
+| ADR-0003 | Codec polymorphism for abstract generic RM classes | Accepted | 2026-05-16 | Amends: ADR-0002 (D4) |
+| ADR-0004 | Strict-encode, permissive-decode for BMM `Real` and `Integer` | Accepted | 2026-05-16 | Amends: REQ-052 (decode of quoted numbers) |
 | ADR-0005 | Compiled OPT foundation (rminfo + internal templatecompile) | Accepted | 2026-05-22 | — |
 | ADR-0006 | Composition validation walker package placement | Accepted | 2026-06-11 | — |
 | ADR-0007 | AQL parser: ANTLR + SDK grammar profile | Accepted | 2026-06-15 | — |
-| ADR-0008 | SMART discovery: canonical `services` map shape | Accepted | 2026-06-17 | — |
-| ADR-0009 | SMART-on-openEHR auth library scope and dependency model | Accepted | 2026-06-18 | — |
-| ADR-0010 | Public compiled-template bridge placement | Accepted | 2026-06-17 | — |
+| ADR-0008 | SMART discovery: canonical `services` map shape | Accepted | 2026-06-17 | Amends: REQ-072 (the version gate) |
+| ADR-0009 | SMART-on-openEHR auth library scope and dependency model | Accepted | 2026-06-18 | Resolves: STRAND-05; Amends: REQ-061, REQ-062, REQ-063, REQ-064 |
+| ADR-0010 | Public compiled-template bridge placement | Accepted | 2026-06-17 | Amends: ADR-0005 (C2) |
 | ADR-0011 | RM behavioural-function surface and fallibility policy | Accepted | 2026-06-19 | — |
-| ADR-0012 | Retire SDK-GAP as a durable identifier; REQ/PROBE is the feature register | Accepted | 2026-07-02 | — |
-| ADR-0013 | Generated LOCATABLE identity surface and reverse type lookup | Accepted | 2026-07-12 | — |
+| ADR-0012 | Retire SDK-GAP as a durable identifier; REQ/PROBE is the feature register | Accepted | 2026-07-02 | Amends: REQ-055, REQ-057, REQ-107, REQ-083 (content promoted from three gaps) |
+| ADR-0013 | Generated LOCATABLE identity surface and reverse type lookup | Accepted | 2026-07-12 | Amends: REQ-031, REQ-040, REQ-043 |
 | ADR-0014 | WebTemplate reference implementation and id-generation lock | Accepted | 2026-07-14 | — |
-| ADR-0015 | Composition-level FLAT metadata: accept both spellings, emit `ctx/` | Accepted | 2026-08-03 | — |
-| ADR-0016 | EVENT_CONTEXT optionals ride the underscore grammar, not new `ctx/` short forms | Accepted | 2026-08-05 | — |
-| ADR-0017 | AQL semantic layer: derived containment relation, overlays, opt-in enforcement | Accepted | 2026-08-22 | — |
+| ADR-0015 | Composition-level FLAT metadata: accept both spellings, emit `ctx/` | Accepted | 2026-08-03 | Amends: REQ-053 |
+| ADR-0016 | EVENT_CONTEXT optionals ride the underscore grammar, not new `ctx/` short forms | Accepted | 2026-08-05 | Amends: REQ-053 |
+| ADR-0017 | AQL semantic layer: derived containment relation, overlays, opt-in enforcement | Accepted | 2026-08-22 | Amends: REQ-109 |
 | ADR-0018 | Raw response bytes on the typed 2xx decode error | Accepted | 2026-08-30 | — |
-| ADR-0019 | Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode | Accepted | 2026-08-30 | — |
-| ADR-0020 | Cassette recordings are HTTP Archive 1.2 | Accepted | 2026-09-07 | — |
-| ADR-0021 | Encoded JSON member order is not part of the canonical JSON contract | Accepted | 2026-09-14 | — |
-| ADR-0022 | Canonical JSON is encoded by `encoding/json/v2` | Accepted | 2026-09-14 | — |
-| ADR-0023 | SMART discovery: the Platform base URL and the OIDC issuer are separate values | Accepted | 2026-10-04 | — |
+| ADR-0019 | Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode | Accepted | 2026-08-30 | Amends: REQ-095 (retired into REQ-050) |
+| ADR-0020 | Cassette recordings are HTTP Archive 1.2 | Accepted | 2026-09-07 | Resolves: STRAND-11; Amends: REQ-082 |
+| ADR-0021 | Encoded JSON member order is not part of the canonical JSON contract | Accepted | 2026-09-14 | Amends: REQ-052 |
+| ADR-0022 | Canonical JSON is encoded by `encoding/json/v2` | Accepted | 2026-09-14 | Resolves: STRAND-04 (the `encoding/json/v2` and default-codec sub-questions); Amends: ADR-0002 |
+| ADR-0023 | SMART discovery: the Platform base URL and the OIDC issuer are separate values | Accepted | 2026-10-04 | Amends: REQ-070, REQ-071, REQ-073, REQ-061, REQ-065 |
 | ADR-0024 | A contribution deletion built without a payload carries no data, departing from the pinned UpdateVersion schema | Accepted | 2026-10-07 | Amends: REQ-095, REQ-130 |
-| ADR-0025 | Template-driven validation includes the RM floor | Accepted | 2026-10-11 | — |
+| ADR-0025 | Template-driven validation includes the RM floor | Accepted | 2026-10-11 | Resolves: STRAND-14; Amends: REQ-102, REQ-110, REQ-112 |
 | ADR-0026 | Stored-query execution sends offset and fetch only when the caller sets them, departing from the pinned Query schema | Accepted | 2026-10-13 | Resolves: STRAND-09 (item 2); Amends: REQ-057, REQ-095 |
 | ADR-0027 | Template admission precedes the RM rules at every node | Accepted | 2026-10-13 | Amends: ADR-0025 (clause 1), REQ-102, REQ-112 |
 | ADR-0028 | Generated attribute access replaces the hand-written RM readers | Accepted | 2026-10-13 | Amends: REQ-101, REQ-102, REQ-110, REQ-112, REQ-013 |
@@ -46,9 +46,9 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | ADR-0032 | The composition and EHR_STATUS version reads accept an ORIGINAL_VERSION without data, the RM's logical deletion, departing from the pinned version schemas | Accepted | 2026-10-26 | Amends: REQ-095, REQ-174 |
 | ADR-0033 | A missing mandatory member is reported by the decoder and read by the validators, not recorded on the value | Accepted | 2026-10-26 | Resolves: STRAND-15 (the presence question); Amends: REQ-112, REQ-171, ADR-0002 |
 | ADR-0034 | Each generation target's root is an SDK-authored BMM schema over the pinned openEHR schemas; the ADL 1.4 operational template is modelled from Template.xsd | Accepted | 2026-11-02 | Amends: REQ-041, REQ-045, REQ-056, ADR-0002 |
-| ADR-0035 | The compile step reads the generated operational template model; the OPT parser and its tree are deprecated once it does, then removed | Accepted | 2026-11-03 | Resolves: STRAND-17; Amends: REQ-176; when the switch lands, REQ-100, REQ-103, REQ-107, REQ-108, REQ-111, REQ-116, REQ-169, REQ-013; on 2026-11-04, REQ-170; on 2026-11-05, REQ-100 (retired), REQ-103, REQ-107, REQ-108, REQ-111, REQ-116, REQ-176, REQ-169, REQ-013 |
+| ADR-0035 | The compile step reads the generated operational template model, which replaces the OPT parser and its tree | Accepted | 2026-11-03 | Resolves: STRAND-17; Amends: REQ-176, REQ-111, REQ-100 (retired), REQ-103, REQ-107, REQ-108, REQ-116, REQ-169, REQ-170, REQ-013 |
 | ADR-0036 | Web Template ids: a duplicate sibling takes the format's `_1` suffix and an interval alternative the IPS spelling, departing from the reference's code | Accepted | 2026-11-11 | Amends: ADR-0014, REQ-106, REQ-053 |
 
 <!-- /sdd:generated -->
 
-See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.
+The departures from the pinned REST contract that several of these ADRs decide are listed, each with the section that specifies it, in [wire.md § Keyed exceptions](../specifications/wire.md#keyed-exceptions).

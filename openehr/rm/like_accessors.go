@@ -15,7 +15,7 @@ package rm
 // interface methods and stay for callers migrating off the
 // pre-ergonomics closed type-switch pattern.
 //
-// BMM-BUMP AUDIT (ADR 0001 step 10):
+// BMM-BUMP AUDIT (resources/bmm/README.md § Updating, step 10):
 //
 //   When a BMM bump introduces a NEW concrete subtype of any
 //   `<Parent>Like`-bearing class, the generator's field-lift picks

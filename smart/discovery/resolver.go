@@ -480,8 +480,8 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 	// The fetch's error reports the cause, not ctx's own error, when ctx
 	// ended with one. The caller still gets an error that reports its
 	// context's error, and the fetch's error with the cause stays inside it.
-	if ownContextEnded && !errors.Is(err, ctx.Err()) {
-		err = fmt.Errorf("%w: %w", ctx.Err(), err)
+	if ownContextEnded {
+		err = coalesce.ContextError(ctx, err)
 	}
 
 	call.catalog = cat

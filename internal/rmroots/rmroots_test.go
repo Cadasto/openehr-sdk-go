@@ -72,9 +72,10 @@ func bmmArchetypeRoots(t *testing.T) (classes, declarers, concrete []string) {
 }
 
 // TestREQ112_IsArchetypeRootMatchesBMM pins the closed list of archetype-root
-// classes to the vendored BMM (REQ-112, ADR 0001). It is the one test that
-// reads the BMM for the list; the RM floor's own test and the generator's
-// tests take their expectations from IsArchetypeRoot.
+// classes to the vendored BMM (REQ-112; a bump follows resources/bmm/README.md
+// § Updating). It is the one test that reads the BMM for the list; the RM
+// floor's own test and the generator's tests take their expectations from
+// IsArchetypeRoot.
 //
 // The BMM must give the declaring classes and concrete roots the spec names.
 // For every class the BMM defines, IsArchetypeRoot must answer true exactly
@@ -87,19 +88,19 @@ func bmmArchetypeRoots(t *testing.T) (classes, declarers, concrete []string) {
 func TestREQ112_IsArchetypeRootMatchesBMM(t *testing.T) {
 	classes, declarers, roots := bmmArchetypeRoots(t)
 	if want := []string{"COMPOSITION", "EHR_ACCESS", "EHR_STATUS", "ENTRY", "PARTY"}; !slices.Equal(declarers, want) {
-		t.Errorf("BMM Is_archetype_root declarers = %v, want %v: update the list and the spec together (ADR 0001)", declarers, want)
+		t.Errorf("BMM Is_archetype_root declarers = %v, want %v: update the list and the spec together (resources/bmm/README.md § Updating)", declarers, want)
 	}
 	wantRoots := []string{
 		"ACTION", "ADMIN_ENTRY", "AGENT", "COMPOSITION", "EHR_ACCESS", "EHR_STATUS", "EVALUATION",
 		"GROUP", "INSTRUCTION", "OBSERVATION", "ORGANISATION", "PERSON", "ROLE",
 	}
 	if !slices.Equal(roots, wantRoots) {
-		t.Errorf("BMM concrete archetype-root classes = %v, want %v: update the list and the spec together (ADR 0001)", roots, wantRoots)
+		t.Errorf("BMM concrete archetype-root classes = %v, want %v: update the list and the spec together (resources/bmm/README.md § Updating)", roots, wantRoots)
 	}
 	for _, name := range classes {
 		want := slices.Contains(roots, name)
 		if got := rmroots.IsArchetypeRoot(name); got != want {
-			t.Errorf("IsArchetypeRoot(%q) = %v, want %v from the vendored BMM (concrete roots %v): update the list and the spec together (ADR 0001)", name, got, want, roots)
+			t.Errorf("IsArchetypeRoot(%q) = %v, want %v from the vendored BMM (concrete roots %v): update the list and the spec together (resources/bmm/README.md § Updating)", name, got, want, roots)
 		}
 	}
 	for _, name := range []string{"", "observation", " OBSERVATION", "OBSERVATION ", "DV_INTERVAL<OBSERVATION>", "Any", "X_UNKNOWN"} {

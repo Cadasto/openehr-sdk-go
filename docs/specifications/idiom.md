@@ -56,7 +56,8 @@ The package documentation of `transport/` says that the injected client governs 
 
 ## API conventions
 
-These conventions shape the public surface and the library code behind it. They are informative: the code follows them, and the code can change them without an amendment here.
+These conventions shape the public surface and the library code behind it.
+They are informative, apart from the `Repository` rule of [§ Surface shape](#surface-shape): the code follows them, and the code can change them without an amendment here.
 
 ### Functional options
 
@@ -103,6 +104,8 @@ saved, meta, err := repo.Save(ctx, ehrID, comp)
 ```
 
 Such a repository is an interface (e.g. `composition.Repository`), so consumers can mock it directly rather than wrap the package functions, and the package-level functions stay present beside it.
+When a leaf gains an operation or an option, its package's `Repository` interface **MUST** grow with it.
+That is no break for a caller of the package functions, but it breaks an implementer of the interface at compile time ([module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)).
 
 ### Generics and reflection
 
@@ -136,43 +139,6 @@ A check defined over **bytes** — a wire-format guard, a byte-exact scanner —
 - **Exported names:** `CamelCase`. Acronyms preserve case (`HTTPClient`, `JWKS`, `EHRID`).
 - **Unexported names:** `camelCase` with leading lowercase.
 - **Constructor names:** `New<Thing>` returns `*Thing` or `Thing`; `New<Thing>(opts ...Option)` returns `(*Thing, error)` when configuration validation can fail.
-
-## Substitution slots and the `*Like` interfaces
-
-The openEHR RM permits Liskov substitution at every property slot (per AOM `valid_value` semantics). The Go SDK surfaces this on two distinct surfaces, and the call pattern differs between them, so it helps consumers to know which is which.
-
-**Concrete-with-subtypes parents → narrow `<Parent>Like` interfaces.** Where the BMM declares a property with a concrete parent class that has registered subtypes (`LOCATABLE.name DV_TEXT`, `EVENT_CONTEXT.health_care_facility PARTY_IDENTIFIED`, audit envelopes on Versions, `OBJECT_REF`-typed slots, `DV_URI`-typed slots), the generated Go field type is a narrow interface — `DVTextLike`, `PartyIdentifiedLike`, `AuditDetailsLike`, `ObjectRefLike`, `DVURILike`. The interface declares Get-prefixed accessor methods that work uniformly across the parent and every registered subtype:
-
-```go
-// Idiomatic — direct method call, no helper
-name := c.Name.GetValue()
-if code, ok := c.Name.GetDefiningCode(); ok {
-    // c.Name was a DV_CODED_TEXT on the wire; code is the terminology binding
-}
-```
-
-The Get-prefix is mechanical, not stylistic — BMM property names like `value` and `defining_code` are already field identifiers on the concrete structs, and Go forbids a method and a field with the same name on a single type. The closed type-switch helpers in `openehr/rm` (`AsDVText`, `AuditDetailsBase`, …) are compat shims for callers consuming the parent struct value directly; prefer the methods when reading scalar fields.
-
-**Nil interface values:** calling `name.GetValue()` on a `nil` `DVTextLike` (e.g. an optional `*Like`-typed field left unset by the caller) panics like any other nil-interface method call. The compat helpers (`rm.DVTextValueOf(nil) → ""`, `rm.AsDVText(nil) → (zero, false)`) absorb the nil case for callers that want defensive defaults; for required-by-spec slots, prefer the direct method and let the panic surface the missing field early.
-
-**Abstract RM categories → existing marker interfaces.** `DataValue`, `Item`, `ContentItem`, `UIDBasedID`, `PartyProxy`, `DVOrdered`, `ItemStructure`, etc. stay as marker-only interfaces (REQ-040). Reach concrete fields via type assertion:
-
-```go
-// Idiomatic — type assert on a marker-only abstract interface
-if q, ok := el.Value.(*rm.DVQuantity); ok {
-    use(q.Magnitude, q.Units)
-}
-```
-
-Quick decision matrix:
-
-| RM slot shape | Go field type | Read scalars by | Read full payload by |
-|---|---|---|---|
-| Concrete parent with subtypes (DV_TEXT, AUDIT_DETAILS, …) | `<Parent>Like` interface | `f.GetValue()` (etc.) — methods | `rm.AsDVText(f)` / `rm.AuditDetailsBase(f)` — helpers |
-| Abstract RM category (DATA_VALUE, ITEM_STRUCTURE, …) | abstract Go interface | type assert | type assert |
-| Concrete parent without subtypes | concrete struct | direct field access | direct field access |
-
-Adding a new subtype on a BMM bump is documented in [ADR-0001 § Procedure step 10](../adr/0001-bmm-version-bump-runbook.md).
 
 ## Errors (REQ-025)
 
@@ -235,19 +201,18 @@ Practical implications:
 - The auth refresh path coalesces concurrent refresh attempts (one goroutine refreshes; the others wait), and the discovery cache coalesces concurrent resolution attempts.
 - Connection pooling is handled by the injected `*http.Client`; the SDK does not need to do its own.
 
-A caller waiting on a coalesced refresh or resolution **MUST NOT** be handed the outcome of an attempt that failed only because the running caller's own context ended (its cancellation, deadline or cause), or that panicked: such an attempt releases every waiter, and a waiter whose own context is still live tries again, running a new attempt or joining a newer one, while the panic continues to the caller that ran the attempt. This holds for the token sources of `auth/smart`, `auth/clientcreds` and `auth/jwtbearer`, for the key-set (JWKS) refresh of `auth/smart`, and for discovery resolution, whose cache entry such a failure leaves in place ([auth.md § Refresh API](auth.md#refresh-api)). The token refresh of `auth/smart` runs on a goroutine of its own that the starting caller's context does not end ([auth.md § REQ-063](auth.md#req-063--token-refresh)), so it never fails only because that context ended. Its panic goes to the caller that started it while that caller waits; once that caller has returned, the panic surfaces on the refresh's goroutine after the waiters are released, as any unrecovered panic in a goroutine does.
+A caller waiting on a coalesced refresh or resolution **MUST NOT** be handed the outcome of an attempt that failed only because the running caller's own context ended (its cancellation, deadline or cause), or that panicked; such an attempt instead:
+
+- releases every waiter;
+- lets a waiter whose own context is still live try again, running a new attempt or joining a newer one;
+- lets the panic continue unchanged to the caller that ran the attempt.
+
+A caller whose own context ends before the coalesced attempt it started or joined has answered **MUST** get an error that `errors.Is` matches to its context's error.
+These rules hold for the token sources of `auth/smart`, `auth/clientcreds` and `auth/jwtbearer`, for the key-set (JWKS) refresh of `auth/smart`, and for discovery resolution, whose cache entry such a failure leaves in place ([auth.md § Refresh API](auth.md#refresh-api)).
+The token refresh of `auth/smart` runs on a goroutine of its own that the starting caller's context does not end ([auth.md § REQ-063](auth.md#req-063--token-refresh)), so it never fails only because that context ended.
+Its panic goes to the caller that started it while that caller waits; once that caller has returned, the panic surfaces on the refresh's goroutine after the waiters are released, as any unrecovered panic in a goroutine does.
 
 Documented exceptions:
 
 - Builders (`aql.NewBuilder()`, `composition.NewBuilder(ctx, compiled)`, `contribution.NewBuilder()`) are **not** goroutine-safe: they are construct-then-finalise types, not long-lived clients, so a caller does not share one across goroutines.
 - The Cassette `probe.Recorder` and `probe.Replayer` (REQ-082) guard their captured and remaining exchanges with a mutex, so both are safe to share across goroutines — no single-goroutine restriction applies.
-
-## Public-API stability
-
-Anything outside `internal/` participates in semver (REQ-004). Implications:
-
-- Adding to the public surface is a minor bump.
-- Renaming or removing a public symbol is a major bump.
-- Loosening a return type (e.g. `(*X, error)` → `(any, error)`) is a breaking change even if the new type is a superset.
-- Adding a method to a public interface is **breaking** for consumers that implement it — prefer adding a new interface and a runtime type-assertion to introduce optional behaviour.
-- Adding a struct field is not a breaking change per [module-layout.md § Versioning](module-layout.md#versioning). Positional struct literals are what break; struct literals **SHOULD** use field-by-name.

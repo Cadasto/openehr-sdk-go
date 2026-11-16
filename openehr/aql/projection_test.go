@@ -946,7 +946,7 @@ func TestProjectionRefusalsNameTheItem(t *testing.T) {
 // TestProjectionDiagnosticsAreValueFree pins that a refused projection is
 // reported without reproducing the offending text — a Build error is what a
 // consuming CDR logs, and a projection can carry an identifiable path or
-// literal (REQ-119 § Emission verified after emission).
+// literal (REQ-163 § `Build()` verifies the projection it emitted).
 func TestProjectionDiagnosticsAreValueFree(t *testing.T) {
 	const secret = "9d3d1b4e-0000-0000-0000-000000000000"
 	// Each witness must BOTH refuse and carry the value: the structural defect

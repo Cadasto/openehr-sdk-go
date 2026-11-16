@@ -12,11 +12,11 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// TestReauthOn401WithClientCredentials — REQ-063: with a client-credentials
+// TestReauthOn401WithClientCredentials — REQ-166, REQ-063: with a client-credentials
 // Source as both the token source and the Reauther, a 401 on a still-fresh
 // cached token makes the transport call Reauth, which runs a new exchange,
 // and the one retry carries the new token.
-func TestReauthOn401WithClientCredentials(t *testing.T) { // REQ-063
+func TestReauthOn401WithClientCredentials(t *testing.T) { // REQ-166, REQ-063
 	var (
 		tokenPosts    atomic.Int32
 		resourceCalls atomic.Int32

@@ -100,7 +100,7 @@ A Model Context Protocol server that exposes openEHR operations as MCP tools to 
 |---|---|
 | Typed method signatures that map ~1:1 to MCP tool definitions | MCP framework integration (e.g. `mark3labs/mcp-go`); tool registration; transport bindings |
 | Per-request `auth.TokenSource` via context (REQ-060 + ctx) | Obtaining a token for the openEHR API on the caller's behalf (for example by a token exchange) and wrapping it as a per-request `TokenSource` |
-| Idempotent, ctx-cancellable methods | Tool-result serialization for MCP transport |
+| ctx-cancellable methods | Tool-result serialization for MCP transport |
 | Sandbox / recorded transports for tool testing | LLM-side prompt engineering |
 
 The SDK's `context.Context`-first design (REQ-020) makes per-request auth natural: a `WithTokenSource(ctx, ts)` carries the token obtained for the openEHR API, never the token that arrived over the MCP transport, and propagates through every SDK call without rewiring.
@@ -113,7 +113,7 @@ Fan-out over multiple openEHR backends with per-node spec pinning, partial-failu
 |---|---|
 | Per-node SDK client with independent base URL, issuer, spec version | Federation policy (which node is authoritative; merge vs first-wins) |
 | Conformance probes per node (each node verified against the same probe set) | Partial-failure aggregation (degraded vs failed; SLO accounting) |
-| Independent `*http.Client` per node (REQ-021) | Identity reconciliation across nodes — see MPI research strand |
+| Independent `*http.Client` per node (REQ-021) | Identity reconciliation across nodes, a Cadasto MPI research track outside this SDK |
 | `context.Context` propagation across goroutines | Routing decisions (which subset of nodes to call) |
 
 Federation policy is the subject of a separate research track once MPI lands. The SDK provides the *primitives*; the policy is bespoke.

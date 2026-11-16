@@ -439,8 +439,7 @@ func TestMalformedTopDoesNotFoolTheVerification(t *testing.T) {
 
 // TestProjectionCoordinateNamesTheItem pins the diagnostic coordinate: a
 // refusal has to say WHICH item is at fault, because it may not quote any of
-// it (REQ-119 § Emission verified after emission) and a caller with a ten-item
-// projection has
+// it (REQ-163 § `Build()` verifies the projection it emitted) and a caller with a ten-item projection has
 // nothing else to go on.
 func TestProjectionCoordinateNamesTheItem(t *testing.T) {
 	a := &ast{sel: []SelectField{Col("c/a"), Col("c/b, c/c"), Col("c/d")}}

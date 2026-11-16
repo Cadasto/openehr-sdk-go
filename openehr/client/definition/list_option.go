@@ -11,7 +11,7 @@ import (
 // listConfig holds resolved [ListTemplates] options. The *Set flags record
 // whether the caller supplied an explicit value, so an explicit
 // WithOffset(0) / WithFetch(0) is distinguishable from "unset" and reaches
-// the wire instead of being silently dropped (REQ-143).
+// the wire instead of being silently dropped (REQ-177).
 type listConfig struct {
 	templateID string
 	concept    string
@@ -82,7 +82,7 @@ func WithFetch(n int) ListOption {
 }
 
 // resolveListOptions applies opts and validates the result. It returns the
-// query parameters to send; unset options contribute no key (REQ-143).
+// query parameters to send; unset options contribute no key (REQ-177).
 func resolveListOptions(opts []ListOption) (url.Values, error) {
 	var cfg listConfig
 	for _, o := range opts {

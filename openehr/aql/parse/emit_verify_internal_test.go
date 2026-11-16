@@ -62,7 +62,7 @@ func TestFailClosedHelpersRefuseUnmodelledShapes(t *testing.T) {
 }
 
 // TestSkeletonDistinguishesEveryCoordinate is the unit half of the per-slot
-// soundness table (§ Emission verified after emission): one row per slot NAME
+// soundness check (REQ-119 § Emission verified after emission): one row per slot NAME
 // the skeleton can emit, each confronting two parsed queries that differ in
 // exactly that slot and pinning the coordinate [diffSlots] reports. Deleting a
 // slot from [skeletonOf] makes its row's skeletons compare equal, so the row

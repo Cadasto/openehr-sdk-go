@@ -178,7 +178,7 @@ func BenchmarkDecodeWithMissing(b *testing.B) {
 
 // BenchmarkDecodeCompositionFixture measures decode plus encode of the largest
 // vendored fixture, the baseline the json/v2 migration is measured against
-// (PR 171; results in research-strands.md, STRAND-04). b.SetBytes reports against
+// (PR 171 records the results; ADR 0022 sets the regression budget). b.SetBytes reports against
 // the input document, so the MB/s figure is throughput per input byte over a
 // decode and an encode together. It is not comparable with the MB/s of
 // BenchmarkDecodeComposition_400, which decodes only.

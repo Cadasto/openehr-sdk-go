@@ -10,7 +10,7 @@ not by reasoning about the formats.
 
 | File | Format |
 |---|---|
-| [ehr-create.har](ehr-create.har) | HTTP Archive 1.2 (provenance and redaction stuffed into `log.comment`) |
+| [ehr-create.har](../../../testkit/recordings/ehr-create.har) | HTTP Archive 1.2 (provenance and redaction stuffed into `log.comment`) |
 | [ehr-create.yaml](ehr-create.yaml) | Purpose-built YAML (native `provenance` / `redaction` keys) |
 
 - Deployment: `ehrbase/ehrbase:latest` 2.35.1 at `http://127.0.0.1:8080/ehrbase/rest/openehr/v1`

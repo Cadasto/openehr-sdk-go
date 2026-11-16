@@ -9,7 +9,7 @@ date: 2026-05-16
 # ADR 0003 — Codec polymorphism for abstract generic RM classes
 
 - **Status:** Accepted, 2026-05-16.
-- **Tracks:** STRAND-04 (partial — Event/History fixture decode); the canonical JSON codec, landed on `main` in commit [374ccffb](https://github.com/Cadasto/openehr-sdk-go/commit/374ccffb).
+- **Tracks:** STRAND-04 (partial: Event/History fixture decode).
 - **Requirements:** [REQ-033](../specifications/retired-requirements.md#req-033--no-inheritance-emulation) (no inheritance emulation, which this codec polymorphism works within).
 
 ## Context
@@ -27,7 +27,7 @@ Consequences for `EVENT`:
 - `type Event interface { isEvent() }`
 - `PointEvent[T]` / `IntervalEvent[T]` flatten `EVENT` fields and implement `isEvent()`
 - `History[T].Events` is `[]Event` (interface slice), not `[]Event[T]`
-- Generated `UnmarshalJSON` routes `events` through `typereg.DecodeAs[Event]`
+- Decode dispatches `events` through the `Event` hook of [ADR 0002 D8](0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods), which replaced the generated `UnmarshalJSON` and its `typereg.DecodeAs[Event]` call
 
 Other abstract generics (including **VERSION**) continue to emit as generic structs until whitelisted.
 
@@ -41,3 +41,8 @@ Other abstract generics (including **VERSION**) continue to emit as generic stru
 
 - [`docs/specifications/reference-model.md`](../../docs/specifications/reference-model.md)
 - [`internal/bmmgen/render.go`](../../internal/bmmgen/render.go) — `codecPolymorphicAbstractGeneric`
+
+## Traceability
+
+- Amends: ADR-0002 (D4)
+- Applies: REQ-033; STRAND-04 (in part)

@@ -413,7 +413,7 @@ func TestEmitNeverReturnsUnparseableText(t *testing.T) {
 }
 
 // TestEmitVerificationPinsEachCarriedCoordinate is the end-to-end half of the
-// per-slot soundness table § Emission verified after emission requires: one
+// per-slot soundness check behind REQ-119 § Emission verified after emission: one
 // substitution per splice-REACHABLE coordinate, preserving everything BEFORE
 // it and diverging exactly there — so removing that slot from the skeleton
 // fails a named row (the REQ's mutation rule, per coordinate rather than per

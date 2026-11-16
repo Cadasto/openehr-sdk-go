@@ -112,7 +112,7 @@ func TestProbe067RejectsByteDrift(t *testing.T) {
 
 // TestProbe093TemplateListFilters drives PROBE-093 in Sandbox mode: the
 // fake records every request's query and answers each list call with a
-// template-metadata body (REQ-143).
+// template-metadata body (REQ-177).
 func TestProbe093TemplateListFilters(t *testing.T) {
 	var captured []url.Values
 	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
@@ -135,7 +135,7 @@ func TestProbe093TemplateListFilters(t *testing.T) {
 }
 
 // TestProbe093EmptyCatalogPasses pins that an empty catalog is a pass, not
-// a decode failure: REQ-143 licenses no assertion that a filtered
+// a decode failure: REQ-177 licenses no assertion that a filtered
 // deployment holds templates. This test says nothing about the shape of the
 // returned slice — the probe discards it entirely and asserts only on the
 // error and the captured queries. The non-nil zero-length slice the

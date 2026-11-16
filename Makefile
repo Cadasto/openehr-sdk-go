@@ -189,8 +189,9 @@ aqlgen: build-antlr ## Regenerate the AQL parser from the active/ grammar
 	@rm -f $(AQL_GEN_DIR)/*.go && cp $(AQL_GEN_DIR).tmp/*.go $(AQL_GEN_DIR)/ && rm -rf $(AQL_GEN_DIR).tmp
 	@echo "regenerated $(AQL_GEN_DIR)/ from $(AQL_GRAMMAR_DIR)/"
 
-spec-generate: ## Regenerate the map's tests lists and the REQ.md registry
+spec-generate: ## Regenerate the map's tests lists, the REQ.md registry and the ADR index
 	@bash scripts/spec-gen.sh
+	@python3 scripts/sdd-check.py generate --root .
 
 ##@ Vendor | refreshes the vendored upstream files
 

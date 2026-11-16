@@ -90,7 +90,7 @@ The generic `auth.TokenSource` sits at the bottom; the providers build on it.
 
 The `cadasto/` packages ship in the same module, kept separate so they can
 move to their own module later. Most of the surface is **planned**;
-`cadasto/admin` has health probes today. None of it is part of the openEHR
+`cadasto/admin` has health checks today. None of it is part of the openEHR
 REST contract.
 
 | Import | Maturity |

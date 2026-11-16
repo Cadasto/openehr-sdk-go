@@ -41,7 +41,7 @@ An in-repo advanced workflow was tried and dropped: an advanced configuration an
 
 ### Codegen drift bot
 
-The weekly workflow re-runs `make codegen-check` on a clean checkout. On failure it opens or comments on a single tracking issue labelled `bmm-drift`, then fails the workflow run. Follow [ADR 0001 (BMM version-bump runbook)](adr/0001-bmm-version-bump-runbook.md) when triaging. The workflow complements PR CI by catching generator-template drift between human-driven PRs.
+The weekly workflow re-runs `make codegen-check` on a clean checkout. On failure it opens or comments on a single tracking issue labelled `bmm-drift`, then fails the workflow run. Follow the bump procedure in [`resources/bmm/README.md` § Updating](../resources/bmm/README.md#updating) when triaging. The workflow complements PR CI by catching generator-template drift between human-driven PRs.
 
 ## Local reproduction
 

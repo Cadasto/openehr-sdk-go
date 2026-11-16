@@ -9,12 +9,8 @@ date: 2026-08-30
 # ADR 0018 — Raw response bytes on the typed 2xx decode error
 
 - **Status:** Accepted, 2026-08-30.
-- **Supersedes:** —
-- **Superseded by:** —
-- **Strand:** none — direct decision (this plan's Phase 0); no prior open research strand.
 - **Introduces:** [REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) (the typed 2xx decode failure and its `Body` field). **Amends:** —
-- **Landed in:** [PR 138](https://github.com/Cadasto/openehr-sdk-go/pull/138) (the read-path decode taxonomy).
-- **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (the "no strict-mode knob in v1" posture this decision follows); [REQ-093](../specifications/transport.md#req-093--openehr-error-envelope-mapping) (the PHI-safe error-surface discipline, the `WithRawErrorBodies` opt-in this decision deliberately does *not* extend, and the `WithMaxResponseBody` cap it relies on); [REQ-052](../specifications/wire.md#req-052) (the encode-only refusal sentinel — a rider delivered by the same plan, whose decision of record is the plan and § REQ-052 itself, not this ADR); [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (cross-reference only — REQ-094 owns `ehr.Create`'s empty/null-body arm, a typed `NoRepresentationError` since 2026-09-02 ([PR 142](https://github.com/Cadasto/openehr-sdk-go/pull/142)), while this ADR's primitive types only the decode-failure arm; at the time of this ADR that empty-body arm was still REQ-094's keyed exception).
+- **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (the "no strict-mode knob in v1" posture this decision follows); [REQ-093](../specifications/transport.md#req-093--openehr-error-envelope-mapping) (the PHI-safe error-surface discipline, the `WithRawErrorBodies` opt-in this decision deliberately does *not* extend, and the `WithMaxResponseBody` cap it relies on); [REQ-052](../specifications/wire.md#req-052) (the encode-only refusal sentinel, decided in § REQ-052, not here); [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (cross-reference only: REQ-094 owns `ehr.Create`'s empty/null-body arm, a typed `NoRepresentationError`, while this ADR's primitive types only the decode-failure arm).
 
 ## Context
 
@@ -25,7 +21,7 @@ payload. The bytes the server already delivered — already read into the proces
 against the response-size cap — become unrecoverable at the exact moment a caller most needs
 them: a body that did not parse is a body someone has to look at.
 
-The write-result contract ([PR 121](https://github.com/Cadasto/openehr-sdk-go/pull/121)) recorded
+The write-result contract (REQ-094) recorded
 this as a blocker rather than solving it. It typed the write side (`NoRepresentationError`,
 REQ-094) but deferred `ehr.Create`'s committed-but-unusable arm *because* EHR creation decodes
 through this same shared path: typing one arm of a shared decode while the shared decode itself
@@ -108,9 +104,7 @@ is no opt-in knob, and `WithRawErrorBodies` does not gate it.**
 - **`transport.DecodeError` becomes the taxonomy's shared primitive.** With it in place,
   REQ-094's deferred `ehr.Create` decode-failure arm is typed by REQ-151 without routing EHR
   creation through the write-result contract. `ehr.Create`'s empty/null-body arm stays REQ-094's
-  own, and since 2026-09-02 it is a typed `NoRepresentationError`
-  ([PR 142](https://github.com/Cadasto/openehr-sdk-go/pull/142)); at the time of this ADR it
-  was still the keyed exception — a separate amendment this ADR deliberately did not make.
+  own, a typed `NoRepresentationError`.
 
 ## Alternatives considered
 
@@ -134,3 +128,7 @@ is no opt-in knob, and `WithRawErrorBodies` does not gate it.**
   leaf already returns (REQ-094 depends on that shape), and it would hand bytes back on the
   success path too, where they are redundant. The failure is the only occasion the bytes are
   needed, so the error is where they belong.
+
+## Traceability
+
+- Introduces: REQ-151

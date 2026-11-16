@@ -71,7 +71,7 @@ The [package map](https://cadasto.github.io/openehr-sdk-go/packages/) gives the 
 - **AQL**: literal AQL wire models and result sets, fluent struct and verb builders, and static parse-and-lint.
 - **Authentication**: SMART-on-openEHR (PKCE), client credentials, JWT bearer, and basic token sources, all over one injected `TokenSource`.
 - **Service discovery**: a multi-backend service catalog with per-node spec pinning.
-- **Cadasto platform extras**: mostly still on the roadmap. Datamap, MPI, an Extra API, and Care aggregates are **planned**. The Cadasto admin package has health probes today, and the rest of it is **partial**. These packages live in the same module behind a `cadasto/` cut line, so they can later move out as a subtree instead of being rewritten.
+- **Cadasto platform extras**: mostly still on the roadmap. Datamap, MPI, an Extra API, and Care aggregates are **planned**. The Cadasto admin package has health checks today, and the rest of it is **partial**. These packages live in the same module behind a `cadasto/` cut line, so they can later move out as a subtree instead of being rewritten.
 - **Conformance**: an openEHR wire-conformance probe suite covering round trips that keep every value and spec-correct envelopes.
 
 ## Getting started

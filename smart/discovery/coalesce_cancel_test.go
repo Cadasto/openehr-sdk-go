@@ -534,7 +534,7 @@ func TestCoalescedStarterDeadlineIsItsOwnFailure(t *testing.T) { // REQ-071
 // errCallerGaveUp is the cause a fetching caller's context ends with.
 var errCallerGaveUp = errors.New("caller gave up")
 
-// TestCoalescedStarterContextEndedWithACauseIsItsOwnFailure pins REQ-071 for a
+// TestCoalescedStarterContextEndedWithACauseIsItsOwnFailure pins REQ-071 and REQ-026 for a
 // fetching caller whose context ends with a cause, as context.WithCancelCause,
 // context.WithTimeoutCause and errgroup end one. The HTTP client then reports
 // the cause instead of context.Canceled or context.DeadlineExceeded, but the
@@ -542,7 +542,7 @@ var errCallerGaveUp = errors.New("caller gave up")
 // gets an error that reports both its context's error and the cause, a waiter
 // whose context is live fetches again and gets a catalog, and the cached entry
 // stays in place.
-func TestCoalescedStarterContextEndedWithACauseIsItsOwnFailure(t *testing.T) { // REQ-071
+func TestCoalescedStarterContextEndedWithACauseIsItsOwnFailure(t *testing.T) { // REQ-071, REQ-026
 	endings := []struct {
 		name string
 		// start returns caller 1's context and the function that ends it with

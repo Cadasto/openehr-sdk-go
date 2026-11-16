@@ -1,11 +1,12 @@
 package templatecompile_test
 
-// parity_exceptions_test.go: REQ-111 § Recorded compiled trees, the exception
-// fixtures. Each operational template of testdata/parity-exceptions holds
-// one of the readings the model's reader refuses, or one of the compile
-// step's own grounds, and the reader or the compile step, each in its default
-// mode, refuses it with the error of that reading, told apart by the error
-// alone.
+// parity_exceptions_test.go: REQ-111 § What the compile step tolerates and
+// REQ-176 § What the reader tolerates, the exception fixtures. They hold at
+// least one operational template for each reading and ground refused. Each
+// operational template of testdata/parity-exceptions holds one of the
+// readings the model's reader refuses, or one of the compile step's own
+// grounds, and the reader or the compile step, each in its default mode,
+// refuses it with the error of that reading, told apart by the error alone.
 
 import (
 	"bytes"

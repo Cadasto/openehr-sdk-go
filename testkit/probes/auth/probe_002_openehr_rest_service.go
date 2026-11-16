@@ -9,14 +9,13 @@ import (
 )
 
 // Probe002OpenEHRRestService implements PROBE-002: the resolved service
-// catalog must contain an entry with id "org.openehr.rest", a parseable
-// base URL, and a declared spec_version.
+// catalog must contain an entry with id "org.openehr.rest" and a parseable
+// base URL. A spec_version is optional, so an entry without one passes.
 //
 // Pass conditions:
 //  1. Resolve succeeds.
 //  2. catalog.OpenEHRRest() returns an entry.
 //  3. The entry has a non-nil, absolute BaseURL.
-//  4. The entry declares a non-empty SpecVersion.
 func Probe002OpenEHRRestService(ctx context.Context, fixtureBody []byte) (Result, error) { // PROBE-002 (REQ-070)
 	r := Result{Probe: "PROBE-002"}
 	if len(fixtureBody) == 0 {
@@ -45,12 +44,8 @@ func Probe002OpenEHRRestService(ctx context.Context, fixtureBody []byte) (Result
 		r.Detail = fmt.Sprintf("org.openehr.rest base_url is not a parseable absolute URL: %v", entry.BaseURL)
 		return r, nil
 	}
-	if entry.SpecVersion == "" {
-		r.Status = "fail"
-		r.Detail = "org.openehr.rest entry declares no spec_version"
-		return r, nil
-	}
+	// An absent spec_version is accepted (REQ-072, ADR 0008).
 	r.Status = "pass"
-	r.Detail = fmt.Sprintf("org.openehr.rest advertised: base_url=%s spec_version=%s", entry.BaseURL, entry.SpecVersion)
+	r.Detail = fmt.Sprintf("org.openehr.rest advertised: base_url=%s spec_version=%q", entry.BaseURL, entry.SpecVersion)
 	return r, nil
 }

@@ -9,8 +9,6 @@ date: 2026-10-04
 # ADR 0023 — SMART discovery: the Platform base URL and the OIDC issuer are separate values
 
 - **Status:** Accepted, 2026-10-04 (maintainer sign-off on the proposal, choosing the cross-check on by default).
-- **Supersedes:** —
-- **Superseded by:** —
 - **Amends:** [REQ-070](../specifications/auth.md#req-070) (the catalog carries both values), [REQ-071](../specifications/auth.md#req-071) (the cache key), [REQ-073](../specifications/auth.md#req-073--discovery-trust-posture) (the issuer rule), [REQ-061](../specifications/auth.md#req-061--pkce-flow) (the default `aud`), [REQ-065](../specifications/retired-requirements.md#req-065--per-client-tenant-binding) (what a client binds to).
 - **Related:** [ADR 0008](0008-smart-discovery-services-shape.md) (the `services` map shape, unchanged); [ADR 0009](0009-smart-auth-library-scope.md) (the auth library scope, unchanged).
 
@@ -37,3 +35,7 @@ The catalog records the Platform base URL and the OIDC issuer as two values. The
 - The resolver no longer refuses a document for naming another issuer, but by default it confirms that issuer against the issuer's own OIDC discovery document, at the cost of one extra fetch whenever the SMART document is fetched or a cached catalog is renewed on a `304`, when the two URLs differ; a fresh cache hit makes none ([auth.md § REQ-071](../specifications/auth.md#req-071)). A Platform whose authorization server publishes no `openid-configuration` (SMART App Launch does not require one) is refused until the caller turns the confirmation off.
 - The authorization request always carries `aud`. A source built without a catalog has to name its audience, which is a new construction error for callers that relied on omitting it.
 - Binding each authorization request to its issuer, which is what actually defends a multi-Platform client against mix-up, becomes possible with a stable issuer value; this decision does not deliver it.
+
+## Traceability
+
+- Amends: REQ-070, REQ-071, REQ-073, REQ-061, REQ-065
