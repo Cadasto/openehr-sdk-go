@@ -1,0 +1,211 @@
+package simplified_test
+
+// REQ-053, issue 452 — an event the Web Template lifts, any subtype at max 1
+// that is its HISTORY's only event (REQ-106), spells no segment of its own:
+// its leaves are keyed under its OBSERVATION. Decode rebuilds the event with
+// the RM type the template gives it, its time and, for an INTERVAL_EVENT, its
+// width and math_function; encode writes them back under the same keys.
+
+import (
+	"bytes"
+	"maps"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+)
+
+const (
+	// labObs is the FLAT path of the laboratory test report's OBSERVATION,
+	// whose one event the Web Template lifts.
+	labObs = "laboratory_test_report/laboratory_test"
+	// labTestName is the path of the test name the event holds.
+	labTestName = "/content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0005]/value"
+)
+
+// labReportTarget builds the Web Template and the compiled template of the
+// corpus laboratory test report, whose OBSERVATION's one event is a
+// POINT_EVENT at 0..1, with that event's RM type replaced by eventType.
+func labReportTarget(t *testing.T, eventType string) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	raw, err := os.ReadFile(fixtures.TemplateOpt("IDCR - Laboratory Test Report.v0"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	point := []byte("<rm_type_name>POINT_EVENT</rm_type_name>")
+	if n := bytes.Count(raw, point); n != 1 {
+		t.Fatalf("the laboratory test report names POINT_EVENT %d times, want once — fixture changed?", n)
+	}
+	raw = bytes.Replace(raw, point, []byte("<rm_type_name>"+eventType+"</rm_type_name>"), 1)
+	opt, err := fixtures.ReadOperationalTemplate(raw)
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	return compileTemplate(t, "IDCR - Laboratory Test Report.v0", opt)
+}
+
+// labBody is a body over the laboratory test report keyed as the reference
+// keys it: the context, the test name and the event's time, plus extra.
+func labBody(extra map[string]any) map[string]any {
+	body := map[string]any{
+		"ctx/language":        "en",
+		"ctx/territory":       "GB",
+		"ctx/composer_name":   "Lab",
+		"ctx/time":            "2026-11-16T10:00:00Z",
+		labObs + "/test_name": "Full blood count",
+		labObs + "/time":      "2026-11-16T09:30:00Z",
+	}
+	maps.Copy(body, extra)
+	return body
+}
+
+// labIntervalKeys are the keys of a lifted INTERVAL_EVENT's width and
+// math_function.
+func labIntervalKeys() map[string]any {
+	return map[string]any{
+		labObs + "/width":               "PT1H",
+		labObs + "/math_function|code":  "146",
+		labObs + "/math_function|value": "mean",
+	}
+}
+
+// labTestNameOf returns the test name comp holds.
+func labTestNameOf(t *testing.T, comp *rm.Composition) string {
+	t.Helper()
+	v, err := rmpath.ItemAtPath(comp, labTestName)
+	if err != nil {
+		t.Fatalf("ItemAtPath(test name): %v", err)
+	}
+	text, ok := v.(*rm.DVText)
+	if !ok {
+		t.Fatalf("test name is a %T, want *rm.DVText", v)
+	}
+	return text.Value
+}
+
+// TestREQ053LiftedEventKeysDecode — REQ-053, issue 452. A strict decode of
+// the reference's keys for the laboratory test report, FLAT and STRUCTURED,
+// with and without the template, holds every key and rebuilds the event as
+// the POINT_EVENT the template gives, with its time and its test name.
+func TestREQ053LiftedEventKeysDecode(t *testing.T) {
+	wt, compiled := labReportTarget(t, "POINT_EVENT")
+	body := mustJSON(t, labBody(nil))
+	for _, mode := range shorthandModes(compiled) {
+		for _, format := range []string{"FLAT", "STRUCTURED"} {
+			t.Run(mode.name+"/"+format, func(t *testing.T) {
+				opts := append([]simplified.Option{simplified.WithStrict()}, mode.opts...)
+				comp := decodeAs(t, format, body, wt, opts...)
+				got := onlyEvent(t, wt, comp, "laboratory_test")
+				ev, ok := got.(*rm.PointEvent[rm.ItemStructure])
+				if !ok {
+					t.Fatalf("event is a %T, want *rm.PointEvent[rm.ItemStructure]", got)
+				}
+				if ev.Time.Value != "2026-11-16T09:30:00Z" {
+					t.Errorf("time = %q, want the body's", ev.Time.Value)
+				}
+				if got := labTestNameOf(t, comp); got != "Full blood count" {
+					t.Errorf("test name = %q, want the body's", got)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ053LiftedEventRoundTrips — REQ-053, issue 452. Encode writes a lifted
+// POINT_EVENT's and a lifted INTERVAL_EVENT's leaves under the OBSERVATION,
+// with no segment for the event, and a strict decode of the FLAT and the
+// STRUCTURED it writes, with and without the template, gives back the event's
+// RM type, time, width and math_function.
+func TestREQ053LiftedEventRoundTrips(t *testing.T) {
+	for _, tc := range []struct {
+		eventType string
+		extra     map[string]any
+	}{
+		{eventType: "POINT_EVENT"},
+		{eventType: "INTERVAL_EVENT", extra: labIntervalKeys()},
+	} {
+		t.Run(tc.eventType, func(t *testing.T) {
+			wt, compiled := labReportTarget(t, tc.eventType)
+			comp := decodeWith(t, wt, labBody(tc.extra), simplified.WithStrict(), simplified.WithTemplate(compiled))
+			flat := flatOf(t, comp, wt)
+			for key, v := range labBody(tc.extra) {
+				if strings.HasPrefix(key, "ctx/") {
+					continue
+				}
+				if flat[key] != v {
+					t.Errorf("MarshalFlat wrote %q = %#v, want %#v", key, flat[key], v)
+				}
+			}
+			for key := range flat {
+				if strings.Contains(key, "any_event") {
+					t.Errorf("MarshalFlat wrote %q, a segment for the lifted event", key)
+				}
+			}
+			for _, mode := range shorthandModes(compiled) {
+				opts := append([]simplified.Option{simplified.WithStrict()}, mode.opts...)
+				for _, format := range []string{"FLAT", "STRUCTURED"} {
+					back := decodeAs(t, format, mustJSON(t, flat), wt, opts...)
+					assertLabEvent(t, mode.name+"/"+format, tc.eventType, onlyEvent(t, wt, back, "laboratory_test"))
+				}
+			}
+			assertLabEvent(t, "MarshalStructured", tc.eventType, onlyEvent(t, wt, structuredRoundTrip(t, comp, wt), "laboratory_test"))
+		})
+	}
+}
+
+// assertLabEvent checks that ev, decoded in the way named how, is an event of
+// eventType with the time labBody gives it and, as an INTERVAL_EVENT, the
+// width and math_function labIntervalKeys give it.
+func assertLabEvent(t *testing.T, how, eventType string, ev rm.Event) {
+	t.Helper()
+	if got := eventTimeOf(t, ev); got != "2026-11-16T09:30:00Z" {
+		t.Errorf("%s: time = %q, want 2026-11-16T09:30:00Z", how, got)
+	}
+	if eventType != "INTERVAL_EVENT" {
+		if _, ok := ev.(*rm.PointEvent[rm.ItemStructure]); !ok {
+			t.Errorf("%s: event is a %T, want *rm.PointEvent[rm.ItemStructure]", how, ev)
+		}
+		return
+	}
+	iv, ok := ev.(*rm.IntervalEvent[rm.ItemStructure])
+	if !ok {
+		t.Errorf("%s: event is a %T, want *rm.IntervalEvent[rm.ItemStructure]", how, ev)
+		return
+	}
+	if iv.Width.Value != "PT1H" {
+		t.Errorf("%s: width = %q, want PT1H", how, iv.Width.Value)
+	}
+	if mf := iv.MathFunction; mf.Value != "mean" || mf.DefiningCode.CodeString != "146" {
+		t.Errorf("%s: math_function = %+v, want 146|mean", how, mf)
+	}
+}
+
+// TestREQ053LiftedIntervalEventKeepsItsType — REQ-053, issue 452. A lifted
+// INTERVAL_EVENT whose body spells neither its width nor its math_function
+// still decodes as the INTERVAL_EVENT the template gives, without the
+// template and with it; with it, the two take their defaults, the openEHR
+// 640|actual and PT0S.
+func TestREQ053LiftedIntervalEventKeepsItsType(t *testing.T) {
+	wt, compiled := labReportTarget(t, "INTERVAL_EVENT")
+	for _, mode := range shorthandModes(compiled) {
+		for _, format := range []string{"FLAT", "STRUCTURED"} {
+			t.Run(mode.name+"/"+format, func(t *testing.T) {
+				opts := append([]simplified.Option{simplified.WithStrict()}, mode.opts...)
+				comp := decodeAs(t, format, mustJSON(t, labBody(nil)), wt, opts...)
+				iv := intervalEvent(t, onlyEvent(t, wt, comp, "laboratory_test"))
+				if mode.opts == nil {
+					return
+				}
+				if iv.MathFunction.DefiningCode.CodeString != "640" || iv.Width.Value != "PT0S" {
+					t.Errorf("math_function = %+v, width = %q; want the 640|actual and PT0S defaults", iv.MathFunction, iv.Width.Value)
+				}
+			})
+		}
+	}
+}

@@ -621,6 +621,7 @@ requirements:
       - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/leaf_rmtype_test.go
+      - openehr/serialize/simplified/lifted_event_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
       - openehr/serialize/simplified/mediatype_internal_test.go
       - openehr/serialize/simplified/mediatype_test.go
@@ -1551,6 +1552,7 @@ requirements:
       - openehr/serialize/simplified/composition_pinned_name_test.go
       - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
+      - openehr/serialize/simplified/lifted_event_test.go
       - openehr/serialize/simplified/template_roundtrip_test.go
       - openehr/template/webtemplate/build_internal_test.go
       - openehr/template/webtemplate/build_test.go
@@ -1564,6 +1566,7 @@ requirements:
       - openehr/template/webtemplate/names_test.go
       - openehr/template/webtemplate/parity_test.go
       - openehr/template/webtemplate/req116_gap_test.go
+      - openehr/template/webtemplate/sole_event_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
 
