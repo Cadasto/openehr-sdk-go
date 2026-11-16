@@ -877,7 +877,8 @@ A visited multi-valued attribute gets, in OPT order, these members of each allow
 It gets no more members in all than its `cardinality.upper` when that is bounded.
 Within that bound the room goes first to the members asked for by the children whose occurrences lower bound is bounded and at least 1, which fit wherever § [Errors](#errors) does not refuse the list: any other child, before or after them, gets only the room they leave, and the members still stand in OPT order.
 So `CLUSTER.items` at cardinality `0..1` over an optional `at0001` and a required `at0002` holds the `at0002` member alone.
-Under `Medium`, an optional child (occurrences lower bound 0) whose identity (*Sibling identity*) a required sibling, before or after it, or an earlier optional sibling carries gets no member of its own; the top-up below can still build one.
+Under `Medium`, an optional child (occurrences lower bound 0) whose identity (*Sibling identity*) a required sibling, before or after it, or an earlier optional sibling that gets a member of its own carries gets no member of its own; the top-up below can still build one.
+An optional sibling that gets no member of its own, such as one that needs undescribed content, carries no identity for this rule.
 Under `Large`, such a child gets its members as any other optional child does, so a `Large` root holds a member of every sibling of one identity that needs no undescribed content, whether the OPT pins a name on it or not, within the cardinality bound above.
 The validator binds those members by room and by trial ([§ REQ-102](#req-102--composition-validation) *Structural — binding items*), each to the sibling whose constraints built it wherever that sibling comes first among those with room (§ *Exceptions and known gaps*).
 An optional multi-valued attribute with no allowed OPT child gets no member, so nothing archetype-rooted appears without its `archetype_details`.

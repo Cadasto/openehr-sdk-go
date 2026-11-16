@@ -208,10 +208,11 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 		},
 		{
 			// Both children carry at0002, and only the second needs no
-			// undescribed content. Under Large the second gets its own
-			// member, which the validator binds to it by trial, since the
-			// first's slot does not admit it. Under Medium the second
-			// yields to the first, whose identity it shares, and the
+			// undescribed content. Under Large and Medium the second gets
+			// its own member, since the first gets none of its own and so
+			// carries no identity, and the validator binds it to the
+			// second by trial, since the first's slot does not admit it.
+			// Under Required neither gets a member of its own, and the
 			// validator binds a member with node id at0002 to the first, so
 			// the top-up takes the first child that is not a slot rather
 			// than the second, and the RM requirement keeps its fill.
@@ -220,7 +221,7 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 				slotOnlyCluster("at0002", guardOccurrences01),
 				guardChild("C_COMPLEX_OBJECT", "CLUSTER", "at0002", guardOccurrences01, "",
 					optMultiple("items", optNode("ELEMENT", "at0003"))))),
-			large: "at0002(at0003)", medium: "at0002(" + stub + "(at0000))",
+			large: "at0002(at0003)", medium: "at0002(at0003)",
 			required: "at0002(" + stub + "(at0000))",
 		},
 		{

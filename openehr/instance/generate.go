@@ -2210,6 +2210,10 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 	upperBound := memberCap(optNode, attr)
 	reserved := askedMembers(children)
 	total := 0
+	// own[i] reports whether children[i] gets a member of its own, as far
+	// as the policy decides it; ownMemberSkipped reads it for the children
+	// before the one it decides.
+	own := make([]bool, len(children))
 	for i, child := range children {
 		// Slots are caller-filled; the synthesiser does not invent
 		// archetype roots to fill them and instead leaves the count
@@ -2218,9 +2222,10 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 		if child.IsSlot() {
 			continue
 		}
-		if g.ownMemberSkipped(children, i) {
+		if g.ownMemberSkipped(children, i, own) {
 			continue
 		}
+		own[i] = true
 		asks := asksMember(child)
 		childCount := 1
 		if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() {
@@ -3234,23 +3239,24 @@ func newHierObjectID() *rm.HierObjectID {
 }
 
 // ownMemberSkipped reports whether children[i], an allowed child that is
-// not a slot, gets no member of its own under the policy in force. Under
+// not a slot, gets no member of its own under the policy in force, given
+// own, which says for each child before it whether it gets one. Under
 // Large and Medium, an optional child that needs content the OPT does not
 // describe gets none (optionalUndescribed). Under Medium, neither does a
-// child whose identity a sibling carries (identityTaken), so the attribute
-// holds one member of every optional archetype, not one of each use of it.
-// Under Large every other child gets its members, each named or unnamed
-// use of one archetype included, which the validator binds by room and by
-// trial. Required skips no child here: it sizes each child by its
-// occurrences lower bound, which gives an optional child no member. The
-// top-up to the attribute's lower bound can still build a member of a
-// skipped child.
-func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int) bool {
+// child whose identity a sibling that gets a member of its own carries
+// (identityTaken), so the attribute holds one member of every optional
+// archetype, not one of each use of it. Under Large every other child gets
+// its members, each named or unnamed use of one archetype included, which
+// the validator binds by room and by trial. Required skips no child here:
+// it sizes each child by its occurrences lower bound, which gives an
+// optional child no member. The top-up to the attribute's lower bound can
+// still build a member of a skipped child.
+func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int, own []bool) bool {
 	switch g.opts.Policy {
 	case Large:
 		return g.optionalUndescribed(children[i])
 	case Medium:
-		return g.optionalUndescribed(children[i]) || identityTaken(children, i)
+		return g.optionalUndescribed(children[i]) || identityTaken(children, i, own)
 	case Required:
 		return false
 	}
@@ -3258,14 +3264,17 @@ func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int) boo
 	return false
 }
 
-// identityTaken reports whether children[i] is optional and a sibling
-// carries its identity: a required sibling before or after it, or an
-// optional sibling before it. Under Medium such a child gets no member of
-// its own, so the attribute holds one member of an identity where the
-// template asks for no more, though the top-up to the attribute's lower
-// bound can still build one, from the child it takes (materialiseMultiple);
-// a required child is always built. A slot does not count as a sibling. A
-// sibling carries an identity as the validator binds a member by it
+// identityTaken reports whether children[i] is optional and a sibling that
+// gets a member of its own (siblingOwnsMember, given own) carries its
+// identity: a required sibling before or after it, or an optional sibling
+// before it that the policy does not skip. An optional sibling that gets
+// no member of its own, as one that needs undescribed content, carries
+// none. Under Medium such a child gets no member of its own, so the
+// attribute holds one member of an identity where the template asks for
+// no more, though the top-up to the attribute's lower bound can still
+// build one, from the child it takes (materialiseMultiple); a required
+// child is always built. A slot does not count as a sibling. A sibling
+// carries an identity as the validator binds a member by it
 // (carriesIdentity), so an archetype root also carries its node id: an
 // optional child that is not a root gets no member after a root with its
 // node id, while optional archetype roots of different archetypes are not
@@ -3274,37 +3283,35 @@ func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int) boo
 // is not part of it. Optional and required are as childRequired reads
 // them: a child with no occurrences, or with an unbounded lower bound,
 // counts as required.
-func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
+func identityTaken(children []*tcimpl.CompiledNode, i int, own []bool) bool {
 	child := children[i]
 	if childRequired(child) {
 		return false
-	}
-	if identityCarriedBefore(children, i) {
-		return true
 	}
 	id := childIdentity(child)
 	if id == "" {
 		return false
 	}
-	for _, sib := range children[i+1:] {
-		if !sib.IsSlot() && childRequired(sib) && carriesIdentity(sib, id) {
+	for j, sib := range children {
+		if siblingOwnsMember(children, i, j, own) && carriesIdentity(sib, id) {
 			return true
 		}
 	}
 	return false
 }
 
-// identityCarriedBefore reports whether a sibling before children[i], other
-// than a slot, carries its identity (childIdentity, carriesIdentity). A
-// child with no identity is never carried.
-func identityCarriedBefore(children []*tcimpl.CompiledNode, i int) bool {
-	id := childIdentity(children[i])
-	if id == "" {
-		return false
+// siblingOwnsMember reports whether children[j], a sibling of children[i],
+// gets a member of its own as the identity rule reads it: one before it
+// that own says gets one, or one after it that is required and not a slot.
+// A child is not its own sibling.
+func siblingOwnsMember(children []*tcimpl.CompiledNode, i, j int, own []bool) bool {
+	switch {
+	case j < i:
+		return own[j]
+	case j > i:
+		return !children[j].IsSlot() && childRequired(children[j])
 	}
-	return slices.ContainsFunc(children[:i], func(sib *tcimpl.CompiledNode) bool {
-		return !sib.IsSlot() && carriesIdentity(sib, id)
-	})
+	return false
 }
 
 // childRequired reports whether child counts as required: every child does

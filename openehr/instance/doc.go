@@ -52,10 +52,11 @@
 //     template prohibits the list, or where the RM types its items as
 //     primitive values, such as a DV_MULTIMEDIA's data. A visited
 //     multi-valued attribute gets its members as under Large, except that
-//     an optional child whose identity a required or earlier sibling
-//     carries gets none. So Medium builds a member of each optional
-//     archetype under an attribute, but not of each use of one, the
-//     medium level. It is the zero value, and so the default.
+//     an optional child whose identity a required sibling, or an earlier
+//     one that gets a member of its own, carries gets none. So Medium
+//     builds a member of each optional archetype under an attribute, but
+//     not of each use of one, the medium level. It is the zero value, and
+//     so the default.
 //   - Required: the required attributes, in the sense above, but not one
 //     that only its cardinality lower bound asks for, nor one merely
 //     because it has an allowed template child, except a composition's

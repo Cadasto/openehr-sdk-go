@@ -81,3 +81,47 @@ func TestREQ107_MediumBuildsEveryOptionalArchetype(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_MediumSkippedSiblingCarriesNoIdentity is the REQ-107 check of
+// Sibling identity that an optional sibling that gets no member of its
+// own, because it needs undescribed content, carries no identity for the
+// siblings after it. The content lists two optional uses of one
+// OBSERVATION archetype, the first with a protocol that admits only a
+// slot, so under Medium, as under Large, the second gets its member, which
+// has no protocol. Required builds no optional child, and the content is
+// optional. Every root passes the RM floor and the template validator,
+// under every policy, both value fills and both compile modes.
+func TestREQ107_MediumSkippedSiblingCarriesNoIdentity(t *testing.T) {
+	slottedProtocol := optSingle("protocol", optSlot("ITEM_TREE", "at0002"))
+	opt := guardOPT(guardCompositionID, guardMultiple("content", guardExistence01,
+		undescribedObservation(usedObservationID, guardOccurrences01, describedHistory, slottedProtocol),
+		undescribedObservation(usedObservationID, guardOccurrences01, describedHistory)))
+	want := map[instance.Policy]string{
+		instance.Large:    usedObservationID,
+		instance.Medium:   usedObservationID,
+		instance.Required: "",
+	}
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range guardOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				if got := archetypeShape(out); got != want[opts.Policy] {
+					t.Fatalf("Generate built %q, want %q", got, want[opts.Policy])
+				}
+				if comp := out.(*rm.Composition); len(comp.Content) > 0 {
+					if obs, ok := comp.Content[0].(*rm.Observation); !ok || obs.Protocol != nil && !rm.IsTypedNil(obs.Protocol) {
+						t.Errorf("content member is %#v, want an OBSERVATION with no protocol, the second use's", comp.Content[0])
+					}
+				}
+				noFloorErrors(t, out)
+				for _, iss := range templateErrors(out, c) {
+					t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+				}
+			})
+		}
+	}
+}
