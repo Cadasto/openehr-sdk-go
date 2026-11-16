@@ -296,7 +296,7 @@ The policies:
 - No optional node is built whose only content the template leaves undescribed, such as a cluster that holds nothing but an open slot.
 - No optional structure is built that would hold no item, such as a protocol whose tree holds nothing but an open slot.
 - No `uid` is written that the template does not require, on a composition, an entry or a party alike, so the server that stores the document gives it its id.
-- Every primitive leaf holds its example value.
+- Every primitive leaf holds its example value, or the default value the template sets, and a value the template leaves open gets one that carries a meaning, such as an element's name as its text.
 
 **Packages:** `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/instance`, `openehr/rm`, `openehr/serialize/canjson`. **No `internal/` import.**
 
