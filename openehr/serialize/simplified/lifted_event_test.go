@@ -10,8 +10,10 @@ package simplified_test
 
 import (
 	"bytes"
+	"errors"
 	"maps"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -216,4 +218,75 @@ func TestREQ053LiftedIntervalEventKeepsItsType(t *testing.T) {
 			})
 		}
 	}
+}
+
+// labIntervalAttrs are the keys of each of a lifted event's three
+// INTERVAL_EVENT attributes, by attribute.
+func labIntervalAttrs() map[string]map[string]any {
+	return map[string]map[string]any{
+		"width": {labObs + "/width": "PT1H"},
+		"math_function": {
+			labObs + "/math_function|code":        "146",
+			labObs + "/math_function|value":       "mean",
+			labObs + "/math_function|terminology": "openehr",
+		},
+		"sample_count": {labObs + "|sample_count": 4},
+	}
+}
+
+// TestREQ053LiftedPointEventReadsNoIntervalAttributes — REQ-053, issue 452.
+// The laboratory test report's template types its lifted event a POINT_EVENT,
+// which has no width, math_function or sample_count, and the reference gives
+// those keys no node there. With the template, a strict decode, FLAT and
+// STRUCTURED, refuses `<observation>/width`, `/math_function` and
+// `|sample_count` as unmatched content; the default decode reports each
+// unmatched, drops it and keeps the POINT_EVENT. Without the template a
+// folded POINT_EVENT cannot be told from a folded abstract EVENT, so a strict
+// decode reads each and builds an INTERVAL_EVENT.
+func TestREQ053LiftedPointEventReadsNoIntervalAttributes(t *testing.T) {
+	wt, compiled := labReportTarget(t, "POINT_EVENT")
+	for _, attr := range slices.Sorted(maps.Keys(labIntervalAttrs())) {
+		keys := labIntervalAttrs()[attr]
+		for _, format := range cdrFormats {
+			t.Run(attr+"/"+format, func(t *testing.T) {
+				_, err := decodeFormat(t, format, wt, labBody(keys), simplified.WithStrict(), simplified.WithTemplate(compiled))
+				if !errors.Is(err, simplified.ErrUnknownPath) || !strings.Contains(err.Error(), "unmatched content") {
+					t.Errorf("strict decode with the template = %v, want it refused as unmatched content", err)
+				}
+
+				var unmatched []string
+				comp, err := decodeFormat(t, format, wt, labBody(keys), simplified.WithTemplate(compiled),
+					simplified.WithUnmatched(func(path string) { unmatched = append(unmatched, path) }))
+				if err != nil {
+					t.Fatalf("decode with the template = %v", err)
+				}
+				if ev := onlyEvent(t, wt, comp, "laboratory_test"); !isPointEvent(ev) {
+					t.Errorf("decode with the template: event is a %T, want *rm.PointEvent[rm.ItemStructure]", ev)
+				}
+				if len(unmatched) == 0 {
+					t.Errorf("decode with the template reported nothing unmatched, want the %s keys", attr)
+				}
+				for _, path := range unmatched {
+					if !strings.Contains(path, attr) {
+						t.Errorf("decode with the template reported %q unmatched, want only the %s keys", path, attr)
+					}
+				}
+				if format == "FLAT" && !slices.Equal(slices.Sorted(slices.Values(unmatched)), slices.Sorted(maps.Keys(keys))) {
+					t.Errorf("decode with the template reported %q unmatched, want %q", unmatched, slices.Sorted(maps.Keys(keys)))
+				}
+
+				comp, err = decodeFormat(t, format, wt, labBody(keys), simplified.WithStrict())
+				if err != nil {
+					t.Fatalf("strict decode without the template = %v", err)
+				}
+				intervalEvent(t, onlyEvent(t, wt, comp, "laboratory_test"))
+			})
+		}
+	}
+}
+
+// isPointEvent reports whether ev is a POINT_EVENT.
+func isPointEvent(ev rm.Event) bool {
+	_, ok := ev.(*rm.PointEvent[rm.ItemStructure])
+	return ok
 }
