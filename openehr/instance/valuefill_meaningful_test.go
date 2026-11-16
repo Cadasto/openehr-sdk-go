@@ -136,3 +136,50 @@ func TestREQ107_PlainTextTakesTheNameOfItsLocatable(t *testing.T) {
 		})
 	})
 }
+
+// optParsableValue is an ELEMENT template whose value is a DV_PARSABLE
+// with the given attributes.
+func optParsableValue(attrs ...string) string {
+	return optTemplate("ELEMENT", optSingle("value", optNode("DV_PARSABLE", "", attrs...)))
+}
+
+// stringAttr is the attribute name carrying a C_STRING item with body.
+func stringAttr(name, body string) string {
+	return optSingle(name, optPrimitive("STRING", "C_STRING", body))
+}
+
+// TestREQ107_ParsableContentFitsItsFormalism is the REQ-107 Leaf values
+// check on a DV_PARSABLE whose template leaves its value open: under both
+// value fills its value fits its formalism, <example/> for an XML one
+// (text/xml, application/xml or a +xml type), {} for a JSON one
+// (application/json or a +json type), and the example otherwise. A
+// C_STRING on the value with a list or a pattern gives its own example,
+// which wins. The RM floor and the template validator pass.
+func TestREQ107_ParsableContentFitsItsFormalism(t *testing.T) {
+	formalism := func(f string) string { return stringAttr("formalism", "<list>"+f+"</list>") }
+	cases := []struct {
+		name  string
+		attrs []string
+		want  string
+	}{
+		{name: "text/xml", attrs: []string{formalism("text/xml")}, want: "<example/>"},
+		{name: "application/xml", attrs: []string{formalism("application/xml")}, want: "<example/>"},
+		{name: "a +xml type", attrs: []string{formalism("application/fhir+xml")}, want: "<example/>"},
+		{name: "application/json", attrs: []string{formalism("application/json")}, want: "{}"},
+		{name: "a +json type", attrs: []string{formalism("application/fhir+json")}, want: "{}"},
+		{name: "text/plain", attrs: []string{formalism("text/plain")}, want: "example"},
+		{name: "formalism left silent", want: "example"},
+		{name: "XML under a value C_STRING with neither a list nor a pattern", attrs: []string{formalism("text/xml"), stringAttr("value", "")}, want: "<example/>"},
+		{name: "XML under a value C_STRING with a list", attrs: []string{formalism("text/xml"), stringAttr("value", "<list>&lt;note/&gt;</list>")}, want: "<note/>"},
+		{name: "XML under a value C_STRING with a pattern", attrs: []string{formalism("text/xml"), stringAttr("value", "<pattern>[a-z]+</pattern>")}, want: "example"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			eachSetting(t, optParsableValue(tc.attrs...), func(t *testing.T, _ instance.Options, out any) {
+				if got := rootElementValue[*rm.DVParsable](t, out); got.Value != tc.want {
+					t.Errorf("DV_PARSABLE of formalism %q has value %q, want %q", got.Formalism, got.Value, tc.want)
+				}
+			})
+		})
+	}
+}

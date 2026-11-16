@@ -3654,6 +3654,8 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 // which it settles after them (settleMultimedia).
 func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	switch v := rmValue.(type) {
+	case *rm.DVParsable:
+		settleParsable(opt, v)
 	case *rm.DVPeriodicTimeSpecification:
 		fillPeriodicFormalism(opt, v)
 	case *rm.DVQuantity:
@@ -3723,6 +3725,39 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 			v.Symbol = localSymbol()
 		}
 	}
+}
+
+// settleParsable gives p, a DV_PARSABLE whose OPT node is opt, a value
+// that fits its formalism (parsableContent) where the OPT leaves the value
+// open: p holds exampleText, the value populatePrimitiveDefault writes,
+// and the OPT puts no C_STRING on the value or one that gives no example
+// of its own (openString). A C_STRING with a list or a pattern keeps the
+// value it gives. The formalism is the walk's, so a formalism RandomFill
+// draws gets content that fits it.
+func settleParsable(opt *tcimpl.CompiledNode, p *rm.DVParsable) {
+	if p.Value != exampleText {
+		return
+	}
+	if cs, ok := primitiveOf(bindingChild(opt, "value")).(constraints.CString); ok && !openString(cs) {
+		return
+	}
+	p.Value = parsableContent(p.Formalism)
+}
+
+// parsableContent is the content a DV_PARSABLE of formalism takes:
+// <example/> for an XML media type (text/xml, application/xml or one with
+// the +xml suffix), {} for a JSON one (application/json, text/json or one
+// with the +json suffix), and exampleText for any other formalism, such as
+// text/plain. Letter case does not matter.
+func parsableContent(formalism string) string {
+	f := strings.ToLower(strings.TrimSpace(formalism))
+	switch {
+	case f == "text/xml" || f == "application/xml" || strings.HasSuffix(f, "+xml"):
+		return "<example/>"
+	case f == "application/json" || f == "text/json" || strings.HasSuffix(f, "+json"):
+		return "{}"
+	}
+	return exampleText
 }
 
 // periodicFormalisms are the two formalisms RM Value_valid admits on a
