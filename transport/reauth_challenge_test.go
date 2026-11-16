@@ -3,7 +3,7 @@ package transport_test
 // reauth_challenge_test.go — REQ-166 as a consumer sees it: the Bearer
 // challenge on the *transport.WireError of a real 401 or 403, the value-free
 // Error() text beside it, and the opt-in 401 safety net that reads it
-// (REQ-063). External, like decode_error_test.go, so every assertion goes
+// (REQ-166). External, like decode_error_test.go, so every assertion goes
 // through the exported surface; the parser's own table lives in
 // challenge_test.go.
 
@@ -185,7 +185,7 @@ func TestWireErrorChallengeDescriptionNeedsRawErrorBodies(t *testing.T) { // REQ
 	}
 }
 
-// TestReauthOn401FollowsBearerChallenge — REQ-166, REQ-063: the opt-in 401
+// TestReauthOn401FollowsBearerChallenge — REQ-166: the opt-in 401
 // safety net calls Reauth and retries once only when the 401 has no Bearer
 // challenge, or one that names no error or invalid_token. Any other error,
 // insufficient_scope included, comes back at once: no Reauth, no retry. A
@@ -291,7 +291,7 @@ func TestReauthOn401FollowsBearerChallenge(t *testing.T) { // REQ-166
 	}
 }
 
-// TestReauthOn401RetryPolicyComesFirst — REQ-166, REQ-063, REQ-091: a
+// TestReauthOn401RetryPolicyComesFirst — REQ-166, REQ-091: a
 // RetryPolicy that lists 401 retries it under that policy whatever the
 // challenge says; the challenge gate is consulted only once the policy has
 // given up.

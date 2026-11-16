@@ -41,7 +41,7 @@ type BearerChallenge struct {
 }
 
 // permitsReauth reports whether a 401 carrying c may be answered with one
-// Reauth and a retry (REQ-166, REQ-063): only when there is no challenge,
+// Reauth and a retry (REQ-166): only when there is no challenge,
 // it names no error, or it names invalid_token, the one RFC 6750 §3.1
 // error a new token can fix. A nil receiver is the "no challenge" case.
 func (c *BearerChallenge) permitsReauth() bool {

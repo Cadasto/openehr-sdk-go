@@ -730,7 +730,7 @@ func TestRepository(t *testing.T) {
 
 // TestListTemplatesFilters pins the ITS-REST list query parameters on the
 // wire: each option emits its named key, unset options omit theirs, and an
-// explicit zero offset/fetch is sent rather than dropped (REQ-143,
+// explicit zero offset/fetch is sent rather than dropped (REQ-177,
 // PROBE-093).
 func TestListTemplatesFilters(t *testing.T) {
 	cases := []struct {
@@ -816,7 +816,7 @@ func TestListTemplatesFilters(t *testing.T) {
 			if captured.URL.Path != "/openehr/v1/definition/template/adl1.4" {
 				t.Errorf("path = %q, want the unfiltered list path", captured.URL.Path)
 			}
-			// The decode is unchanged by filtering (REQ-143).
+			// The decode is unchanged by filtering (REQ-177).
 			if len(list) != 2 {
 				t.Errorf("len(list) = %d, want 2", len(list))
 			}
@@ -826,7 +826,7 @@ func TestListTemplatesFilters(t *testing.T) {
 
 // TestListTemplatesRejectsNegativePaging pins the SDK floor: the pin gives
 // offset/fetch no negative semantics, so a negative fails closed with no
-// request rather than being forwarded (REQ-143, PROBE-093).
+// request rather than being forwarded (REQ-177, PROBE-093).
 func TestListTemplatesRejectsNegativePaging(t *testing.T) {
 	cases := []struct {
 		name string
@@ -855,7 +855,7 @@ func TestListTemplatesRejectsNegativePaging(t *testing.T) {
 }
 
 // TestRepositoryListTemplatesCarriesOptions pins that the DI seam reaches
-// the same filters as the package function (REQ-143).
+// the same filters as the package function (REQ-177).
 func TestRepositoryListTemplatesCarriesOptions(t *testing.T) {
 	var captured *http.Request
 	listBody := readFixture(t, "template_list.json")

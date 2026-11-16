@@ -1107,7 +1107,7 @@ func TestMaxResponseBodyLimitEdges(t *testing.T) { // REQ-093
 	}
 }
 
-// --- 401→reauth tests (REQ-063) ---
+// --- 401→reauth tests (REQ-166) ---
 
 // stubReauther is a test double for auth.Reauther that records how many
 // times Reauth was called and which token the associated TokenSource
@@ -1147,10 +1147,10 @@ func (s *stubTokenSource) Reauths() int {
 	return s.reauths
 }
 
-// TestDoReauthOn401 — REQ-063: on a wire 401, if a Reauther is configured
+// TestDoReauthOn401 — REQ-166: on a wire 401, if a Reauther is configured
 // and this Do has not yet reauthed, transport calls Reauth once then retries.
 // Assert: exactly 2 upstream calls, second carries refreshed bearer, final err=nil.
-func TestDoReauthOn401(t *testing.T) { // REQ-063
+func TestDoReauthOn401(t *testing.T) { // REQ-166
 	var (
 		hits     atomic.Int32
 		captured [2]atomic.Value // Store/Load from handler and test goroutines
@@ -1198,11 +1198,11 @@ func TestDoReauthOn401(t *testing.T) { // REQ-063
 	}
 }
 
-// TestDoReauthOn401RetriesEveryMethod — REQ-063: the one retry after Reauth
+// TestDoReauthOn401RetriesEveryMethod — REQ-166: the one retry after Reauth
 // fires for every HTTP method, non-idempotent writes included, since a 401
 // means the request was not processed; the retry repeats the method and the
 // body.
-func TestDoReauthOn401RetriesEveryMethod(t *testing.T) { // REQ-063
+func TestDoReauthOn401RetriesEveryMethod(t *testing.T) { // REQ-166
 	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete} {
 		t.Run(method, func(t *testing.T) {
 			var hits atomic.Int32
@@ -1246,10 +1246,10 @@ func TestDoReauthOn401RetriesEveryMethod(t *testing.T) { // REQ-063
 	}
 }
 
-// TestDoReauthOn401TwiceFails — REQ-063: when the retry after Reauth also
+// TestDoReauthOn401TwiceFails — REQ-166: when the retry after Reauth also
 // returns 401, transport surfaces ErrUnauthorized and does NOT loop.
 // Assert: Reauth attempted exactly once, err=ErrUnauthorized.
-func TestDoReauthOn401TwiceFails(t *testing.T) { // REQ-063
+func TestDoReauthOn401TwiceFails(t *testing.T) { // REQ-166
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
@@ -1276,10 +1276,10 @@ func TestDoReauthOn401TwiceFails(t *testing.T) { // REQ-063
 	}
 }
 
-// TestDoNoReautherUnchanged — REQ-063: when no Reauther is configured, a
+// TestDoNoReautherUnchanged — REQ-166: when no Reauther is configured, a
 // wire 401 is returned immediately as ErrUnauthorized with exactly one
 // upstream call (unchanged existing contract).
-func TestDoNoReautherUnchanged(t *testing.T) { // REQ-063
+func TestDoNoReautherUnchanged(t *testing.T) { // REQ-166
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
@@ -1297,10 +1297,10 @@ func TestDoNoReautherUnchanged(t *testing.T) { // REQ-063
 	}
 }
 
-// TestDoReauthReturnsError — REQ-063: when the configured Reauther fails on a
+// TestDoReauthReturnsError — REQ-166: when the configured Reauther fails on a
 // 401, transport surfaces the (wrapped) reauth error rather than retrying or
 // swallowing it, and makes no second upstream call.
-func TestDoReauthReturnsError(t *testing.T) { // REQ-063
+func TestDoReauthReturnsError(t *testing.T) { // REQ-166
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
@@ -1325,13 +1325,13 @@ func TestDoReauthReturnsError(t *testing.T) { // REQ-063
 	}
 }
 
-// TestDoReauthWithRealSmartSource — REQ-063: end-to-end proof that a real
+// TestDoReauthWithRealSmartSource — REQ-166, REQ-063: end-to-end proof that a real
 // *smart.Source satisfies auth.Reauther and recovers from a wire 401 by running
 // its refresh_token grant. The cached token looks valid (far-future expiry, so
 // no proactive refresh fires), but the resource rejects it once — simulating
 // server-side revocation — and transport drives Source.Reauth, which POSTs a
 // refresh grant to the token endpoint, then retries with the fresh bearer.
-func TestDoReauthWithRealSmartSource(t *testing.T) { // REQ-063
+func TestDoReauthWithRealSmartSource(t *testing.T) { // REQ-166, REQ-063
 	var resourceHits atomic.Int32
 	var secondBearer atomic.Value
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1382,7 +1382,7 @@ func TestDoReauthWithRealSmartSource(t *testing.T) { // REQ-063
 	}
 }
 
-// TestDoReauthDoesNotRestartRetryBudget — REQ-063: when WithReauthOn401 and a
+// TestDoReauthDoesNotRestartRetryBudget — REQ-166: when WithReauthOn401 and a
 // RetryPolicy are both configured, a 401 encountered mid-5xx-sequence MUST
 // grant exactly ONE additional attempt and MUST NOT reopen the 5xx retry
 // budget.
@@ -1394,7 +1394,7 @@ func TestDoReauthWithRealSmartSource(t *testing.T) { // REQ-063
 //
 // Total upstream calls = 4: 3 within the retry budget + 1 reauth-extra.
 // The 5xx budget is NOT restarted, so no further 503 retries happen.
-func TestDoReauthDoesNotRestartRetryBudget(t *testing.T) { // REQ-063
+func TestDoReauthDoesNotRestartRetryBudget(t *testing.T) { // REQ-166
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := int(hits.Add(1))

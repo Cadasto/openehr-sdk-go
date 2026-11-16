@@ -388,7 +388,7 @@ func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-151
 
 // TestBodyReadErrorNonTwoXXKeepsBearerChallenge pins the REQ-166 part of
 // REQ-151's non-2xx arm: a 401 whose body is cut still carries its Bearer
-// challenge, and the opt-in 401 safety net (REQ-063) still reads it through
+// challenge, and the opt-in 401 safety net (REQ-166) still reads it through
 // the wrap, so Reauth runs and the request is sent once more.
 func TestBodyReadErrorNonTwoXXKeepsBearerChallenge(t *testing.T) { // REQ-151
 	var hits, reauths atomic.Int32

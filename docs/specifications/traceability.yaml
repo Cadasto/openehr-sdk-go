@@ -965,11 +965,8 @@ requirements:
       - testkit/probes/auth/probe_007_proactive_refresh.go
       - testkit/probes/auth/probe_007_transport_refresh.go
       - testkit/probes/auth/probes_test.go
-      - transport/body_read_error_test.go
       - transport/client_test.go
       - transport/reauth_backend_test.go
-      - transport/reauth_challenge_test.go
-      - transport/reauth_error_test.go
 
   - id: REQ-064
     title: Launch context
@@ -2230,10 +2227,6 @@ requirements:
     implementation: landed
     packages: [openehr/client/definition]
     probes: [PROBE-093]
-    tests:
-      - openehr/client/definition/template_test.go
-      - testkit/probes/definition/probe_093_template_list_filters.go
-      - testkit/probes/definition/probes_test.go
 
   - id: REQ-144
     title: Definition metadata decoding
@@ -2444,7 +2437,10 @@ requirements:
     tests:
       - transport/body_read_error_test.go
       - transport/challenge_test.go
+      - transport/client_test.go
+      - transport/reauth_backend_test.go
       - transport/reauth_challenge_test.go
+      - transport/reauth_error_test.go
 
   - id: REQ-167
     title: Token revocation
@@ -2773,5 +2769,7 @@ requirements:
       - openehr/client/definition/body_read_error_test.go
       - openehr/client/definition/path_encoding_test.go
       - openehr/client/definition/template_representations_test.go
+      - openehr/client/definition/template_test.go
+      - testkit/probes/definition/probe_093_template_list_filters.go
       - testkit/probes/definition/probe_112_template_representations.go
       - testkit/probes/definition/probes_test.go

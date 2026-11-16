@@ -12,13 +12,13 @@ import (
 	"github.com/cadasto/openehr-sdk-go/auth"
 )
 
-// TestREQ063_ReauthFailureKeepsThe401 pins what Do returns when the 401
+// TestREQ166_ReauthFailureKeepsThe401 pins what Do returns when the 401
 // safety net calls Reauth and Reauth fails: the reauth error, wrapped, and
 // beside it the 401 that triggered it. errors.Is still matches the reauth
 // error and ErrUnauthorized, errors.AsType still recovers the *WireError with
 // its status, the request is not sent again, and the text added stays
-// value-free (REQ-063, REQ-093).
-func TestREQ063_ReauthFailureKeepsThe401(t *testing.T) {
+// value-free (REQ-166, REQ-093).
+func TestREQ166_ReauthFailureKeepsThe401(t *testing.T) {
 	t.Parallel()
 	const ehrID = "7d44b88c-4199-4bad-97dc-d78268e01398"
 	var hits atomic.Int32

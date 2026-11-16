@@ -294,7 +294,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		span.SetAttributes(attribute.Int("retry.attempt", otelAttempt-1))
 		resp, lastErr = c.doOnce(ctx, req, targetURL, safeURL)
 		if !c.shouldRetry(ctx, req, resp, lastErr, attempt) {
-			// 401→reauth safety net (REQ-063, opt-in): if the final error is
+			// 401→reauth safety net (REQ-166, opt-in): if the final error is
 			// a wire 401, a Reauther is configured, this Do call has not yet
 			// reauthed, and the 401's Bearer challenge allows it (REQ-166),
 			// invoke Reauth once and retry the request once.
@@ -313,7 +313,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 				// Single reauth-retry: cap attempt at MaxAttempts so that
 				// shouldRetry returns false on the very next iteration,
 				// granting exactly one additional upstream call without
-				// reopening the 5xx retry budget (REQ-063, REQ-091).
+				// reopening the 5xx retry budget (REQ-166, REQ-091).
 				// When retry is disabled (MaxAttempts ≤ 1), attempt is
 				// already beyond the budget — shouldRetry still returns
 				// false and the loop runs once more before the inner guard
@@ -791,7 +791,7 @@ func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 }
 
 // isWire401 reports whether err is a *WireError whose StatusCode is 401.
-// Used by the opt-in 401→reauth guard in Do (REQ-063).
+// Used by the opt-in 401→reauth guard in Do (REQ-166).
 // A boxed typed-nil *WireError matches with ok=true and a nil pointer,
 // so the nil check is load-bearing (REQ-025 nil-receiver axis).
 func isWire401(err error) bool {
@@ -800,7 +800,7 @@ func isWire401(err error) bool {
 }
 
 // challengePermitsReauth reports whether the Bearer challenge on err's
-// *WireError lets the opt-in 401 safety net call Reauth (REQ-166, REQ-063).
+// *WireError lets the opt-in 401 safety net call Reauth (REQ-166).
 // A 401 whose challenge names insufficient_scope or any error other than
 // invalid_token is surfaced at once, since a fresh token from the same
 // grant cannot fix it. A boxed typed-nil *WireError answers false, so the

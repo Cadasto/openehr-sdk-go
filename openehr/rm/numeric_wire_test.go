@@ -14,7 +14,7 @@ import (
 // ADR 0004: a JSON quoted decimal string is accepted for a `Real`
 // field. The vendored fixtures (BMI.json) carry quoted magnitudes and
 // the SDK MUST decode them without error.
-func TestRealQuotedNumberDecodes(t *testing.T) {
+func TestRealQuotedNumberDecodes(t *testing.T) { // REQ-052
 	in := []byte(`{"_type":"DV_QUANTITY","magnitude":"80.5","units":"kg"}`)
 	var q rm.DVQuantity
 	if err := canjson.Unmarshal(in, &q); err != nil {
@@ -29,7 +29,7 @@ func TestRealQuotedNumberDecodes(t *testing.T) {
 // regardless of how the value was decoded, encode emits a JSON number.
 // This is the load-bearing guarantee for downstream consumers and
 // openEHR wire conformance.
-func TestRealEncodesAsNumber(t *testing.T) {
+func TestRealEncodesAsNumber(t *testing.T) { // REQ-052
 	in := []byte(`{"_type":"DV_QUANTITY","magnitude":"80.5","units":"kg"}`)
 	var q rm.DVQuantity
 	if err := canjson.Unmarshal(in, &q); err != nil {
@@ -51,7 +51,7 @@ func TestRealEncodesAsNumber(t *testing.T) {
 // `Integer`. `DV_COUNT.magnitude` is `rm.Integer64` (BMM Integer64), which
 // takes the same rule at 64 bits, so we use `DV_PROPORTION.type` which is
 // BMM `Integer` (`rm.Integer`) for this assertion.
-func TestIntegerQuotedNumberDecodes(t *testing.T) {
+func TestIntegerQuotedNumberDecodes(t *testing.T) { // REQ-052
 	in := []byte(`{"_type":"DV_PROPORTION","numerator":1,"denominator":2,"type":"1"}`)
 	var p rm.DVProportion
 	if err := canjson.Unmarshal(in, &p); err != nil {
