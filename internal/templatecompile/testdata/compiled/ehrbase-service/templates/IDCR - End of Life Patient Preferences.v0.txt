@@ -140,31 +140,31 @@ node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EV
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]
-  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..2 slot=false
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003,'Preferred place of care']
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="Preferred place of care" occurrences=0..2 slot=false
   term[en] "at0003" code="at0003" description="The subject's preferred place of care." text="Preferred place of care"
   attr "name" rm_type="DV_TEXT" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
   attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/name
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003,'Preferred place of care']/name
   rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
   attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/name/defining_code
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003,'Preferred place of care']/name/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0004"]}
   code_term[en] "at0004" code="at0004" description="The patient's preferred place of care (first choice)." text="Preferred place of care"
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/value
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003,'Preferred place of care']/value
   rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
   attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/value/defining_code
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003,'Preferred place of care']/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0006" "at0007" "at0008" "at0009" "at0010" "at0011" "at0012" "at0013" "at0014"]}
   code_term[en] "at0006" code="at0006" description="The patient's preferred place of care is at home." text="Preferred place of care - home"
@@ -179,8 +179,8 @@ node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EV
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]
-  rm_type="ELEMENT" node_id="at0015" archetype_id="" node_name="" occurrences=0..2 slot=false
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015,'Preferred place of death']
+  rm_type="ELEMENT" node_id="at0015" archetype_id="" node_name="Preferred place of death" occurrences=0..2 slot=false
   term[en] "at0015" code="at0015" description="The subject's preferred place of death." text="Preferred place of death"
   binding terminology="SNOMED-CT" node_or_path="at0015" target_terminology="SNOMED-CT" target_code="395091006"
   binding terminology="READ2" node_or_path="at0015" target_terminology="READ2" target_code="67P1."
@@ -188,24 +188,24 @@ node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EV
   attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/name
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015,'Preferred place of death']/name
   rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
   attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/name/defining_code
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015,'Preferred place of death']/name/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0027"]}
   code_term[en] "at0027" code="at0027" description="The patient's first choice preferred place of death." text="Preferred place of death"
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/value
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015,'Preferred place of death']/value
   rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
   attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/value/defining_code
+node /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015,'Preferred place of death']/value/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0016" "at0017" "at0018" "at0019" "at0020" "at0021" "at0022" "at0023" "at0024" "at0025" "at0032" "at0033"]}
   code_term[en] "at0016" code="at0016" description="The patient's preferred place of death is at home." text="Preferred place of death: home"

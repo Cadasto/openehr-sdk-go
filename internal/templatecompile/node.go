@@ -106,16 +106,26 @@ func (n *CompiledNode) RMTypeName() string { return n.rmTypeName }
 // "" when the template sets none.
 func (n *CompiledNode) NodeID() string { return n.nodeID }
 
-// NodeName returns the template-level node name (the fixed C_STRING
-// the OPT pins on this node's name attribute), or "" when the node
+// NodeName returns the template-level node name (the fixed name the
+// OPT pins on this node's name attribute), or "" when the node
 // pins no fixed name. The archetype concept term is never
 // substituted: distinct sibling names are what disambiguate a reused
 // archetype under one slot, and the reference WebTemplate derives its
 // node ids and name-predicated paths from this value. A node pins a name
-// when its name attribute holds a DV_TEXT or DV_CODED_TEXT whose value is a
-// C_STRING listing exactly one entry, not blank, in a list that is not open;
-// the name is that entry, trimmed. Where the name attribute has
-// alternatives, the first that pins a name gives it. A slot pins none.
+// in one of two ways:
+//
+//   - its name attribute holds a DV_TEXT or DV_CODED_TEXT whose value is a
+//     C_STRING listing exactly one entry, not blank, in a list that is not
+//     open; the name is that entry, trimmed. Where the name attribute has
+//     alternatives, the first that pins a name gives it;
+//   - failing that, its name attribute holds one child, a DV_CODED_TEXT
+//     whose defining_code holds one code phrase that names a terminology and
+//     lists exactly one code with a term text; the name is that text,
+//     trimmed, unless a C_STRING on the child's value rejects it. A code of
+//     the openehr terminology takes its rubric, and any other the text the
+//     node's own archetype defines for it.
+//
+// A slot pins none.
 func (n *CompiledNode) NodeName() string { return n.nodeName }
 
 // ArchetypeID returns the slot-fill archetype id when this node is a

@@ -16,6 +16,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // object is what the walk reads of one constraint object of the model
@@ -28,6 +29,10 @@ type object struct {
 	archetypeID string // an archetype root's only
 	nodeName    string // a complex object's only ([nodeNameFromModel])
 
+	// terms is an archetype root's term definitions ([termsFromModel]);
+	// nil for every other kind.
+	terms map[string]template.ArchetypeTerm
+
 	// occurrences is the object's occurrences interval; nil for a slot,
 	// whose occurrences the compiled node does not carry.
 	occurrences *rm.Interval[aom14.Integer]
@@ -39,26 +44,37 @@ type object struct {
 	slot    *aom14.ArchetypeSlot  // nil unless the object is a slot
 }
 
-// objectOf returns what the walk reads of the constraint object o. An error
-// wraps ErrInvalidInput when o is nil or a nil pointer, and reports a kind
-// the compile does not handle, which the model's decode does not produce,
+// objectOf returns what the walk reads of the constraint object o, held by
+// an attribute of parent, nil for the definition. A code that names o reads
+// its term text from the terms of o's own archetype: o's own where o is an
+// archetype root with an archetype id, else those of parent's nearest
+// enclosing archetype root ([nodeNameFromModel]). An error wraps
+// ErrInvalidInput when o is nil or a nil pointer, and reports a kind the
+// compile does not handle, which the model's decode does not produce,
 // without wrapping it.
-func objectOf(o aom14.CObject) (object, error) {
+func objectOf(o aom14.CObject, parent *CompiledNode) (object, error) {
 	switch v := o.(type) {
 	case *aom14.CArchetypeRoot:
 		if v != nil {
-			ob := complexOf(o, &v.CComplexObject)
+			archetypeID := strings.TrimSpace(v.ArchetypeID.Value)
+			terms := termsFromModel(v.TermDefinitions)
+			termText := rootTermText(parent)
+			if archetypeID != "" {
+				termText = func(key string) string { return terms[key].Items["text"] }
+			}
+			ob := complexOf(o, &v.CComplexObject, termText)
 			ob.root = v
-			ob.archetypeID = strings.TrimSpace(v.ArchetypeID.Value)
+			ob.archetypeID = archetypeID
+			ob.terms = terms
 			return ob, nil
 		}
 	case *aom14.CComplexObject:
 		if v != nil {
-			return complexOf(o, v), nil
+			return complexOf(o, v, rootTermText(parent)), nil
 		}
 	case *aom14.TComplexObject:
 		if v != nil {
-			return complexOf(o, &v.CComplexObject), nil
+			return complexOf(o, &v.CComplexObject, rootTermText(parent)), nil
 		}
 	case *aom14.ArchetypeSlot:
 		if v != nil {
@@ -109,13 +125,14 @@ func objectOf(o aom14.CObject) (object, error) {
 
 // complexOf returns what the walk reads of the complex object c, which o
 // holds: an archetype root's, a template's own complex object's, or c
-// itself.
-func complexOf(o aom14.CObject, c *aom14.CComplexObject) object {
+// itself. termText reads the terms of o's own archetype
+// ([nodeNameFromModel]).
+func complexOf(o aom14.CObject, c *aom14.CComplexObject, termText func(key string) string) object {
 	return object{
 		o:           o,
 		rmTypeName:  strings.TrimSpace(c.RMTypeName),
 		nodeID:      strings.TrimSpace(c.NodeID),
-		nodeName:    nodeNameFromModel(c.Attributes),
+		nodeName:    nodeNameFromModel(c.Attributes, termText),
 		occurrences: &c.Occurrences,
 		complex:     c,
 	}
@@ -228,20 +245,32 @@ func attributeName(rmType string, attrs []aom14.CAttribute, name string) string 
 }
 
 // nodeNameFromModel returns the template-level node name of a complex
-// object whose attributes are attrs: the fixed C_STRING the template pins on
-// its name attribute, name → a DV_TEXT or DV_CODED_TEXT child → value → a
-// C_PRIMITIVE_OBJECT whose C_STRING lists exactly one entry, not blank once
-// trimmed, and is not open. Anything looser (no name attribute, a pattern, a
-// list of several entries, an open list, a lone blank entry) pins no name
-// and gives "": the archetype concept term is never substituted. Where the
-// name attribute has alternatives, the first that pins a name gives it.
-func nodeNameFromModel(attrs []aom14.CAttribute) string {
+// object whose attributes are attrs, or "" where it pins none: the archetype
+// concept term is never substituted. Its name attribute pins a name in one
+// of two ways:
+//
+//   - a DV_TEXT or DV_CODED_TEXT child whose value is a C_PRIMITIVE_OBJECT
+//     whose C_STRING lists exactly one entry, not blank once trimmed, and is
+//     not open, pins that entry, trimmed ([fixedValueString]). Anything
+//     looser (a pattern, a list of several entries, an open list, a lone
+//     blank entry) pins none. Where the name attribute has alternatives, the
+//     first that pins a name gives it;
+//   - failing that, a sole DV_CODED_TEXT child whose code is fixed pins the
+//     term text of that code, which termText reads from the terms of the
+//     object's own archetype ([codedNameText]).
+func nodeNameFromModel(attrs []aom14.CAttribute, termText func(key string) string) string {
 	for _, a := range attrs {
 		if rawAttributeName(a) != "name" {
 			continue
 		}
-		for _, child := range attributeChildren(a) {
+		children := attributeChildren(a)
+		for _, child := range children {
 			if name := fixedValueString(child); name != "" {
+				return name
+			}
+		}
+		if len(children) == 1 {
+			if name := codedNameText(children[0], termText); name != "" {
 				return name
 			}
 		}
@@ -252,22 +281,7 @@ func nodeNameFromModel(attrs []aom14.CAttribute) string {
 // fixedValueString returns the one string the name constraint o pins on its
 // value attribute, trimmed, or "" when it pins none ([nodeNameFromModel]).
 func fixedValueString(o aom14.CObject) string {
-	var attrs []aom14.CAttribute
-	switch v := o.(type) {
-	case *aom14.CComplexObject:
-		if v != nil {
-			attrs = v.Attributes
-		}
-	case *aom14.CArchetypeRoot:
-		if v != nil {
-			attrs = v.Attributes
-		}
-	case *aom14.TComplexObject:
-		if v != nil {
-			attrs = v.Attributes
-		}
-	}
-	for _, a := range attrs {
+	for _, a := range complexAttributes(o) {
 		if rawAttributeName(a) != "value" {
 			continue
 		}
@@ -286,6 +300,97 @@ func fixedValueString(o aom14.CObject) string {
 		}
 	}
 	return ""
+}
+
+// codedNameText returns the term text of the one code the name constraint o
+// fixes, trimmed, or "" where it fixes none ([nodeNameFromModel]). o fixes a
+// code where its defining_code holds one child, a C_CODE_PHRASE or a
+// C_CODE_REFERENCE read as the code phrase it carries, that names a
+// terminology and lists exactly one code once blank entries are left out.
+// The text is the code's term text ([codeTermText]), read through termText,
+// and o fixes none where the code has no term text, or where o's value holds
+// one C_STRING that rejects the text.
+func codedNameText(o aom14.CObject, termText func(key string) string) string {
+	attrs := complexAttributes(o)
+	i := slices.IndexFunc(attrs, func(a aom14.CAttribute) bool { return rawAttributeName(a) == "defining_code" })
+	if i < 0 {
+		return ""
+	}
+	children := attributeChildren(attrs[i])
+	if len(children) != 1 {
+		return ""
+	}
+	var phrase constraints.CodePhrase
+	switch v := children[0].(type) {
+	case *aom14.CCodePhrase:
+		if v != nil {
+			phrase = codePhraseFromModel(v)
+		}
+	case *aom14.CCodeReference:
+		if v != nil {
+			phrase = codePhraseFromModel(&v.CCodePhrase)
+		}
+	}
+	if phrase.Terminology == "" || len(phrase.CodeList) != 1 {
+		return ""
+	}
+	text, ok := codeTermText(termText, phrase.Terminology, phrase.CodeList[0])
+	if text = strings.TrimSpace(text); !ok || text == "" {
+		return ""
+	}
+	if value, ok := valueString(attrs); ok && len(value.Validate(text)) > 0 {
+		return ""
+	}
+	return text
+}
+
+// valueString returns the C_STRING constraint of the value attribute among
+// attrs, the attributes of a name constraint, where that attribute holds one
+// child and the child is a C_PRIMITIVE_OBJECT whose item is a C_STRING; ok is
+// false otherwise.
+func valueString(attrs []aom14.CAttribute) (constraints.CString, bool) {
+	i := slices.IndexFunc(attrs, func(a aom14.CAttribute) bool { return rawAttributeName(a) == "value" })
+	if i < 0 {
+		return constraints.CString{}, false
+	}
+	children := attributeChildren(attrs[i])
+	if len(children) != 1 {
+		return constraints.CString{}, false
+	}
+	p, ok := children[0].(*aom14.CPrimitiveObject)
+	if !ok || p == nil {
+		return constraints.CString{}, false
+	}
+	if item, ok := p.Item.(*aom14.CString); !ok || item == nil {
+		return constraints.CString{}, false
+	}
+	c, err := primitiveItemFromModel(p.Item, false)
+	if err != nil {
+		return constraints.CString{}, false
+	}
+	s, ok := c.(constraints.CString)
+	return s, ok
+}
+
+// complexAttributes returns the attributes of o where it is a complex
+// object, an archetype root or a template's own complex object, and nil
+// otherwise.
+func complexAttributes(o aom14.CObject) []aom14.CAttribute {
+	switch v := o.(type) {
+	case *aom14.CComplexObject:
+		if v != nil {
+			return v.Attributes
+		}
+	case *aom14.CArchetypeRoot:
+		if v != nil {
+			return v.Attributes
+		}
+	case *aom14.TComplexObject:
+		if v != nil {
+			return v.Attributes
+		}
+	}
+	return nil
 }
 
 // multiplicityOf returns the interval iv closed into a Multiplicity, as

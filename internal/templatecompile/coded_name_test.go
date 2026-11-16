@@ -187,7 +187,7 @@ func TestREQ111_CodedNodeNameReadsItsOwnArchetypesTerms(t *testing.T) {
 // code at1027, whose term text is "Heart Rate". That text is the node's
 // template-level name, and its compiled path carries it as a name predicate.
 func TestREQ111_CodedNodeNameOnTheVitalSignsPulseRate(t *testing.T) {
-	const path = "/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data[at0002]/events[at0003]/data[at0001]/items[at0004,'Heart Rate']"
+	const path = "/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004,'Heart Rate']"
 	c, err := templatecompile.Compile(mustReadModelFile(t, fixtures.TemplateOpt("IDCR - Vital Signs Encounter.v1")))
 	if err != nil {
 		t.Fatalf("Compile(IDCR - Vital Signs Encounter.v1) = %v", err)

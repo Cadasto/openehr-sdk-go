@@ -110,7 +110,9 @@ in this builder's spelling (§ Duplicate sibling ids).
 
   - **EHRbase** uses the node's **template-level name** — the `name` attribute
     constrained to a fixed `C_STRING` in the OPT (`<item xsi:type="C_STRING">
-    <list>Husten</list></item>`). Sibling archetype roots therefore differ naturally.
+    <list>Husten</list></item>`), or to a `DV_CODED_TEXT` of one code, whose term
+    text is the name (the IDCR vital signs pulse rate's "Heart Rate", issue 455).
+    Sibling archetype roots therefore differ naturally.
   - **This builder** uses the *archetype's* concept term, looked up by `NodeID()`
     (`idOf` → `termText`). Every sibling sharing an archetype id gets the **same**
     text, hence the collision.
