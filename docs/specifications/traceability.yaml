@@ -1187,8 +1187,8 @@ requirements:
     probes: [PROBE-007, PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071, PROBE-086, PROBE-023, PROBE-025, PROBE-026, PROBE-072, PROBE-073, PROBE-084, PROBE-091, PROBE-092, PROBE-093, PROBE-101]
 
   - id: REQ-083
-    title: Cadasto platform API conformance
-    canonical: docs/specifications/conformance.md#req-083--cadasto-platform-api-conformance
+    title: "`cadasto/admin` health checks"
+    canonical: docs/specifications/conformance.md#req-083--cadastoadmin-health-checks
     status: draft
     implementation: landed
     packages: [cadasto, cadasto/admin]

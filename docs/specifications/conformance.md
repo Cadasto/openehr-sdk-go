@@ -59,12 +59,7 @@ The runner **MUST** refuse to execute a mutating probe in Live mode without an e
 
 The CDR cross-check tool (`make cdr-crosscheck`) measures live CDRs and the SDK against each other; it records numbers and asserts nothing, so it is a tool and not a probe ([probe-harness.md § The CDR cross-check tool](../probe-harness.md#the-cdr-cross-check-tool)). It **MUST NOT** write to a CDR without an explicit per-invocation opt-in, `OPENEHR_LIVE_ALLOW_MUTATING`.
 
-### REQ-083 — Cadasto platform API conformance
-
-The `cadasto/` extras have no openEHR specification: their wire contract is the Cadasto platform API, its OpenAPI document where one exists, and otherwise fixture documents captured from a reference Cadasto deployment.
-Their probes check the SDK's wire shape against that contract, not against another SDK.
-
-#### Health checks (`cadasto/admin`)
+### REQ-083 — `cadasto/admin` health checks
 
 `cadasto/admin` exposes deployment liveness and readiness checks (`Live`, `Ready`, `ReadyBody`) with a wire contract of their own, independent of the rest of the Cadasto platform API.
 They are distinct from the ITS-REST Admin client, `openehr/client/admin`.
@@ -81,7 +76,7 @@ They are distinct from the ITS-REST Admin client, `openehr/client/admin`.
   It **MUST** read at most a fixed number of bytes of that body, for at most a fixed time, before closing it: a body that never ends, streamed fast or trickled, **MUST NOT** hold a check until its context ends.
   A `ReadyBody` 2xx body is read under *The readiness body* below instead.
 
-##### The readiness body
+#### The readiness body
 
 A readiness endpoint often answers with a small document that names the service and its version, and `Ready` discards it.
 `ReadyBody` sends the request `Ready` sends, takes the same options, and has `Ready`'s path guard and status mapping; on a 2xx it **MUST** return the response body instead of `nil`.

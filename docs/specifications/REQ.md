@@ -78,7 +78,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-080 | openEHR wire conformance (retired) | [retired-requirements.md](retired-requirements.md#req-080--openehr-wire-conformance) | deprecated | retired |
 | REQ-081 | Wire-level parity (retired) | [retired-requirements.md](retired-requirements.md#req-081--wire-level-parity) | deprecated | retired |
 | REQ-082 | Probe runnability | [conformance.md](conformance.md#req-082--runnability) | draft | landed |
-| REQ-083 | Cadasto platform API conformance | [conformance.md](conformance.md#req-083--cadasto-platform-api-conformance) | draft | landed |
+| REQ-083 | `cadasto/admin` health checks | [conformance.md](conformance.md#req-083--cadastoadmin-health-checks) | draft | landed |
 | REQ-090 | OpenTelemetry hooks | [transport.md](transport.md#req-090--opentelemetry-hooks) | draft | landed |
 | REQ-091 | Retry policy | [transport.md](transport.md#req-091--retry-policy) | draft | landed |
 | REQ-092 | TLS posture | [transport.md](transport.md#req-092--tls-posture) | draft | landed |

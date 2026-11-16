@@ -82,6 +82,9 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 
 Application-specific layer. Shipped in the same module for adoption convenience; the `cadasto/` subtree is a single cut line for later conditional extraction (STRAND-08).
 
+The `cadasto/` extras have no openEHR specification: their wire contract is the Cadasto platform API, its OpenAPI document where one exists, and otherwise fixture documents captured from a reference Cadasto deployment.
+Their probes and tests check the SDK's wire shape against that contract, not against another SDK.
+
 | Package | Scope |
 |---|---|
 | `cadasto/extra/` | Cadasto Extra API client. Reserved: the package holds no code yet. |
@@ -188,7 +191,7 @@ See [scope.md § Building-block use cases](scope.md#building-block-use-cases).
 
 ## REQ-058 — Datamap V2
 
-`cadasto/datamap/` **MUST** implement version 2 of Datamap, the Cadasto payload format for reading and writing clinical and demographic data without building Reference Model instances ([glossary.md](glossary.md)). Earlier Datamap versions are out of scope. The format (its keys, value shapes and coded-value forms) is the Cadasto platform's, and [REQ-083](conformance.md#req-083--cadasto-platform-api-conformance) names the authority the package conforms to.
+`cadasto/datamap/` **MUST** implement version 2 of Datamap, the Cadasto payload format for reading and writing clinical and demographic data without building Reference Model instances ([glossary.md](glossary.md)). Earlier Datamap versions are out of scope. The format (its keys, value shapes and coded-value forms) is the Cadasto platform's, and [§ Cadasto extras](#cadasto-extras) names the authority the package conforms to.
 
 The package is a codec between Datamap V2 and openEHR canonical JSON, driven by the operational template that governs the data. It has two profiles, chosen by the template's root type:
 
