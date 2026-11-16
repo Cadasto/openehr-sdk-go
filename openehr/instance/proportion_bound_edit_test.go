@@ -43,6 +43,13 @@ func OptionalPrecision(body string) string {
 		`<item xsi:type="C_INTEGER">` + body + `</item></children></attributes>`
 }
 
+// IntegralPin is an is_integral attribute whose C_BOOLEAN admits true
+// alone, which a bound appends as its precisionAttr, before any precision
+// attribute of its own.
+func IntegralPin() string {
+	return boundPrimitive("is_integral", "BOOLEAN", "C_BOOLEAN", "<true_valid>true</true_valid><false_valid>false</false_valid>")
+}
+
 // ProhibitedPrecision is a precision attribute of existence 0..0.
 func ProhibitedPrecision() string {
 	return `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>precision</rm_attribute_name>` +

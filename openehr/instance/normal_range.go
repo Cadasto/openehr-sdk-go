@@ -523,7 +523,7 @@ func settleQuantityNormal(opt *tcimpl.CompiledNode, q *rm.DVQuantity, end normal
 // C_REAL on its numerator, and reports false where it cannot
 // (settleNormalRange). Its type, denominator and precision stay, which the
 // walk and settleProportion settled under the OPT, and so do the whole
-// numbers its kind or its precision needs (wholeOperands).
+// numbers its kind, its precision or an is_integral pin needs (sideWhole).
 func settleProportionNormal(opt *tcimpl.CompiledNode, p *rm.DVProportion, end normalEnd) bool {
 	if p.NormalStatus == nil || p.NormalRange == nil {
 		return true
@@ -533,7 +533,7 @@ func settleProportionNormal(opt *tcimpl.CompiledNode, p *rm.DVProportion, end no
 		return true
 	}
 	value := proportionKeyOf(*p)
-	whole := wholeOperands(value.kind, value.precision)
+	whole := sideWhole(opt, value.kind, value.precision)
 	withNumerator := func(n float64) proportionKey {
 		k := value
 		k.numerator = n

@@ -56,8 +56,8 @@ import (
 // proportion bound keeps its type and denominator and takes a precision
 // its own side admits, one that needs no more whole numbers than its type
 // does wherever the side admits one (proportionPrecision), so its
-// numerator is rounded only where its type, or every precision its side
-// admits, needs whole numbers. A pair fits a side only where that side's
+// numerator is rounded only where its type, an is_integral its side pins
+// to true, or every precision its side admits, needs whole numbers. A pair fits a side only where that side's
 // constraint on precision admits the precision of its bound, so every
 // bound written keeps the whole numbers its precision needs. An ordinal
 // bound the second pair replaces takes the symbol its side lists for the
@@ -690,7 +690,8 @@ func setProportionKey(p *rm.DVProportion, k proportionKey) {
 // denominator reverses which numerator end is the low ratio. A bound that
 // needs whole numbers, as a fraction or a bound of precision 0 does, takes
 // the whole number nearest that end its C_REAL accepts, so the
-// replacement keeps the rules of its kind (settleProportion). Where
+// replacement keeps the rules of its kind (settleProportion); so does a
+// bound whose side pins is_integral to true (sideWhole). Where
 // proportionEnd gives a side no bound, for whatever reason, the side takes
 // the other bound's ratio on its own type and denominator instead
 // (proportionAdopt), kept only where its constraints accept the result.
@@ -727,12 +728,14 @@ func proportionRatio(k proportionKey) (float64, bool) {
 
 // proportionFits reports whether k suits a side's bound node: its
 // numerator, denominator, type and precision each fit the node's own
-// constraint on that attribute.
+// constraint on that attribute, and its numerator and denominator are
+// whole numbers where the node pins is_integral to true (integralPinned).
 func proportionFits(node *tcimpl.CompiledNode, k proportionKey) bool {
 	return componentFits(bindingChild(node, "numerator"), k.numerator) &&
 		componentFits(bindingChild(node, "denominator"), k.denominator) &&
 		componentFits(bindingChild(node, "type"), k.kind) &&
-		precisionFits(node, k.precision)
+		precisionFits(node, k.precision) &&
+		(!integralPinned(node) || (math.Trunc(k.numerator) == k.numerator && math.Trunc(k.denominator) == k.denominator))
 }
 
 // precisionFits reports whether a side's bound node admits precision, nil
@@ -757,8 +760,8 @@ func componentFits(node *tcimpl.CompiledNode, v any) bool {
 
 // proportionEnd returns the lowest (low) or highest ratio a side accepts
 // while keeping like's type and denominator, with the precision
-// proportionPrecision gives and a whole numerator where that precision or
-// the type needs whole numbers. It returns false when the numerator
+// proportionPrecision gives and a whole numerator where that precision,
+// the type or the side's is_integral pin needs whole numbers (sideWhole). It returns false when the numerator
 // constraint has no end in the direction that moves the ratio that way,
 // or no whole number toward that end where one is needed, or when the
 // side does not admit like's type or denominator, or admits no precision.
@@ -774,7 +777,7 @@ func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (pro
 	if like.denominator < 0 {
 		numLow = !low
 	}
-	n, ok := realEndOf(bindingChild(node, "numerator"), numLow, wholeOperands(like.kind, precision))
+	n, ok := realEndOf(bindingChild(node, "numerator"), numLow, sideWhole(node, like.kind, precision))
 	if !ok {
 		return proportionKey{}, false
 	}
@@ -786,8 +789,8 @@ func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (pro
 // side, like being the bound that side drew, and false when node admits
 // none. It tries like's own precision, none, the members of the C_INTEGER
 // on precision, 1 and -1, in that order, and takes the first node admits
-// that needs no more whole numbers than the type does, so the numerator
-// need not be rounded. Only where node admits no such precision does it
+// that needs no more whole numbers than the type, or an is_integral node
+// pins to true, does (sideWhole), so the numerator need not be rounded. Only where node admits no such precision does it
 // take the first node admits, which is then 0. It never takes a precision
 // below -1, which the RM floor rejects (-1 is no limit).
 func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Integer, bool) {
@@ -798,13 +801,13 @@ func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Int
 		}
 	}
 	candidates = append(candidates, new(rm.Integer(1)), new(rm.Integer(-1)))
-	typeWhole := wholeOperands(like.kind, nil)
+	typeWhole := sideWhole(node, like.kind, nil)
 	for _, rounded := range []bool{false, true} {
 		for _, p := range candidates {
 			if p != nil && *p < -1 {
 				continue
 			}
-			if (rounded || wholeOperands(like.kind, p) == typeWhole) && precisionFits(node, p) {
+			if (rounded || sideWhole(node, like.kind, p) == typeWhole) && precisionFits(node, p) {
 				return p, true
 			}
 		}
@@ -812,11 +815,20 @@ func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Int
 	return nil, false
 }
 
+// sideWhole reports whether a bound of kind with precision on a side's
+// bound node needs a whole-number numerator and denominator: where its kind
+// or its precision does (wholeOperands), and wherever the node pins
+// is_integral to true (integralPinned).
+func sideWhole(node *tcimpl.CompiledNode, kind int64, precision *rm.Integer) bool {
+	return wholeOperands(kind, precision) || integralPinned(node)
+}
+
 // proportionAdopt returns the bound a side takes at other, the other
 // side's current bound, where proportionEnd gave it none, low naming the
 // lower side: like's type and denominator, the precision
 // proportionPrecision gives, and the numerator that puts its ratio at
-// other's. Where that precision or the type needs whole numbers, the
+// other's. Where that precision, the type or the side's is_integral pin
+// needs whole numbers (sideWhole), the
 // numerator is the whole number next to that one on the side's own side of
 // other, down for the lower side over a positive denominator. float64 can
 // leave the ratio just past other's where the two denominators differ, so
@@ -840,7 +852,7 @@ func proportionAdopt(node *tcimpl.CompiledNode, like, other proportionKey, low b
 	if low == (like.denominator > 0) {
 		round, away = math.Floor, math.Inf(-1)
 	}
-	whole := wholeOperands(like.kind, precision)
+	whole := sideWhole(node, like.kind, precision)
 	if whole {
 		k.numerator = round(k.numerator)
 	}

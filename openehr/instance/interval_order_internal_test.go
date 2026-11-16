@@ -548,6 +548,96 @@ func TestOrderIntervalBoundsProportion(t *testing.T) {
 	})
 }
 
+// TestOrderIntervalBoundsKeepIsIntegral pins the REQ-107 ordering rule on
+// DV_PROPORTION bounds whose side pins is_integral to true (Precedence 4):
+// a bound the ordering writes on such a side has a whole-number numerator
+// and denominator, whatever its kind and its precision, and the precision
+// 0 where the bound had it and the side admits it. That holds for the
+// lowest and highest ends of each side, for a side that adopts the other
+// bound's ratio on its own denominator, and for a swap, which a bound that
+// is not whole cannot make onto such a side.
+func TestOrderIntervalBoundsKeepIsIntegral(t *testing.T) {
+	p := func(num, den float64, precision int32) rm.DVProportion {
+		return rm.DVProportion{Numerator: rm.Real(num), Denominator: rm.Real(den), Precision: new(rm.Integer(precision))}
+	}
+	opt := ReadVendoredOPT(t, CountIntervalOPT)
+	node := func(lower, upper string) *tcimpl.CompiledNode {
+		t.Helper()
+		return intervalNode(t, RetargetInterval(t, opt, "DV_PROPORTION", lower, upper))
+	}
+	// A ratio side that pins is_integral and requires the precision 2, so
+	// no precision of 0 makes its numbers whole.
+	integral := func(numerator, denominator string) string {
+		return ProportionKindBoundOver(numerator, denominator, IntList(0), IntegralPin()+RequiredPrecision(IntList(2)))
+	}
+	cases := []struct {
+		name         string
+		node         *tcimpl.CompiledNode
+		bounds, want [2]rm.DVProportion
+	}{
+		{
+			// The swap puts 18 outside the upper range, so each side takes
+			// the whole number nearest its end: 11 and 15, not 10.5 and 15.5.
+			name: "ends of each side",
+			node: node(integral(RealRange(Closed(10.5), Closed(20.5)), ""),
+				integral(RealRange(Closed(0.5), Closed(15.5)), "")),
+			bounds: [2]rm.DVProportion{p(18, 1, 2), p(12, 1, 2)},
+			want:   [2]rm.DVProportion{p(11, 1, 2), p(15, 1, 2)},
+		},
+		{
+			// The upper numerator has no high end, so that side adopts the
+			// lower bound 19/3 on its own denominator 2: 12.67 is not whole,
+			// so it takes 13.
+			name: "a side that adopts the other bound's ratio",
+			node: node(integral(RealRange(Closed(10.5), Closed(20.5)), RealList(3)),
+				integral(RealRange(Closed(0.5), NoEnd), RealList(2))),
+			bounds: [2]rm.DVProportion{p(19, 3, 2), p(4, 2, 2)},
+			want:   [2]rm.DVProportion{p(11, 3, 2), p(13, 2, 2)},
+		},
+		{
+			// The lower side pins nothing, so its 12.5 is valid there, but a
+			// swap would put it on the upper side, which pins is_integral.
+			name: "no swap of a number that is not whole onto such a side",
+			node: node(ProportionKindBound(RealRange(Closed(0), Closed(20)), IntList(0), RequiredPrecision(IntList(2))),
+				integral(RealRange(Closed(0), Closed(20)), "")),
+			bounds: [2]rm.DVProportion{p(12.5, 1, 2), p(3, 1, 2)},
+			want:   [2]rm.DVProportion{p(0, 1, 2), p(20, 1, 2)},
+		},
+		{
+			// Both sides admit the precision 0, which each bound has, so the
+			// ends keep it.
+			name: "the precision 0 kept",
+			node: node(ProportionKindBound(RealRange(Closed(10.5), Closed(20.5)), IntList(0), IntegralPin()+RequiredPrecision(IntList(2, 0))),
+				ProportionKindBound(RealRange(Closed(0.5), Closed(15.5)), IntList(0), IntegralPin()+RequiredPrecision(IntList(2, 0)))),
+			bounds: [2]rm.DVProportion{p(18, 1, 0), p(12, 1, 0)},
+			want:   [2]rm.DVProportion{p(11, 1, 0), p(15, 1, 0)},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			iv := &rm.DVInterval[rm.DVProportion]{}
+			iv.Lower, iv.Upper = tc.bounds[0], tc.bounds[1]
+			orderIntervalBounds(tc.node, iv)
+			in := [2]string{proportionWithPrecision(tc.bounds[0]), proportionWithPrecision(tc.bounds[1])}
+			got := [2]string{proportionWithPrecision(iv.Lower), proportionWithPrecision(iv.Upper)}
+			want := [2]string{proportionWithPrecision(tc.want[0]), proportionWithPrecision(tc.want[1])}
+			if got != want {
+				t.Errorf("orderIntervalBounds(%q) = %q, want %q", in, got, want)
+			}
+		})
+	}
+}
+
+// proportionWithPrecision renders a DV_PROPORTION bound as
+// numerator/denominator type t precision p, with "none" for no precision.
+func proportionWithPrecision(p rm.DVProportion) string {
+	precision := "none"
+	if p.Precision != nil {
+		precision = fmt.Sprint(*p.Precision)
+	}
+	return fmt.Sprintf("%v/%v type %d precision %s", p.Numerator, p.Denominator, p.Type, precision)
+}
+
 // TestOrderIntervalBoundsOrdinal pins the REQ-107 ordering rule on
 // DV_ORDINAL, compared by Value. The symbol travels with the value on a
 // swap, and an extreme taken from the OPT carries that entry's symbol.

@@ -281,6 +281,17 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 				"normal_range (DV_PROPORTION 1/1 type 1 .. DV_PROPORTION 2/1 type 1)" + noRefs,
 		},
 		{
+			// The template pins is_integral and admits the precision 2
+			// alone, so the lower bound 3/2 rebased on the denominator 1 is
+			// the whole number 2, not 1.5.
+			name: "DV_PROPORTION ratio pinned is_integral, precision 2, numerator 0..100, range [3/2..9/2], N",
+			value: optNode("DV_PROPORTION", "", optIntegralPinned(), optSingle("numerator", realFrom(0, 100)),
+				optSingle("denominator", dvReal("1")), optSingle("type", dvInteger("0")), optSingle("precision", dvInteger("2")),
+				normalRangeOver("DV_PROPORTION", ratioBound("3", "2"), ratioBound("9", "2")), normalStatus("N")),
+			want: "DV_PROPORTION 2/1 type 0; normal_status openehr_normal_statuses::N; " +
+				"normal_range [DV_PROPORTION 3/2 type 0 .. DV_PROPORTION 9/2 type 0]" + noRefs,
+		},
+		{
 			name: "DV_ORDINAL value 1..3 with a symbol of its own, range [2..3], N",
 			value: optNode("DV_ORDINAL", "", optSingle("value", integerFrom(1, 3)),
 				optSingle("symbol", optCodedText("local", "at0001", "at0002", "at0003")),
