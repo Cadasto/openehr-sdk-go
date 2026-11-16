@@ -225,17 +225,29 @@ var stringSink string
 func TestNodeStringAllocatesOnce(t *testing.T) {
 	var root *reportpath.Node
 	composition := root.Element("composition", 1)
+	// long is a member name far longer than the 64 bytes String makes a
+	// segment in on the stack, with characters a token escapes, so that its
+	// segment grows while it is written unless it is made at its length;
+	// longName is an XML name as long, which holds neither.
+	long := strings.Repeat("a~b/cdefgh", 100)
+	longName := strings.Repeat("abcdefgh", 125)
 	rows := []struct {
 		name string
 		node *reportpath.Node
+		// want is the allocations String makes: the text alone, and one
+		// more for a segment longer than 64 bytes.
+		want float64
 	}{
-		{name: "tokens", node: root.Token("content").Token("data").Token("events").Token("archetype_node_id")},
-		{name: "escaped tokens", node: root.Token("details").Token("en/GB").Token("a~b/c~/").Token("value")},
-		{name: "names", node: root.Name("description").Name("details").Name("purpose").Name("x-note")},
-		{name: "indexes", node: root.Token("items").Index(0).Index(12345).Index(7).Index(1000000).Index(42).Index(99).Index(123456)},
-		{name: "elements", node: composition.Element("content", 2).Element("data", 1).Element("events", 10)},
-		{name: "attribute", node: composition.Element("language", 1).Element("terminology_id", 1).Attr("lang")},
-		{name: "text", node: composition.Element("name", 1).Element("value", 1).Text()},
+		{name: "tokens", node: root.Token("content").Token("data").Token("events").Token("archetype_node_id"), want: 1},
+		{name: "escaped tokens", node: root.Token("details").Token("en/GB").Token("a~b/c~/").Token("value"), want: 1},
+		{name: "names", node: root.Name("description").Name("details").Name("purpose").Name("x-note"), want: 1},
+		{name: "indexes", node: root.Token("items").Index(0).Index(12345).Index(7).Index(1000000).Index(42).Index(99).Index(123456), want: 1},
+		{name: "elements", node: composition.Element("content", 2).Element("data", 1).Element("events", 10), want: 1},
+		{name: "attribute", node: composition.Element("language", 1).Element("terminology_id", 1).Attr("lang"), want: 1},
+		{name: "text", node: composition.Element("name", 1).Element("value", 1).Text(), want: 1},
+		{name: "long escaped token", node: root.Token("details").Token(long).Token("value"), want: 2},
+		{name: "long name", node: root.Name("details").Name(longName), want: 2},
+		{name: "long element", node: composition.Element(longName, 3), want: 2},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -245,8 +257,8 @@ func TestNodeStringAllocatesOnce(t *testing.T) {
 			allocs := testing.AllocsPerRun(100, func() {
 				stringSink = row.node.String()
 			})
-			if allocs != 1 {
-				t.Errorf("String() of %q allocates %v times, want 1", row.node.String(), allocs)
+			if allocs != row.want {
+				t.Errorf("String() of a %d-byte path allocates %v times, want %v", row.node.Len(), allocs, row.want)
 			}
 		})
 	}

@@ -159,15 +159,21 @@ type segmentScratch [64]byte
 // writeText writes the path's text to b, which holds nothing yet; n is the
 // length of the segments after p's own. It walks to the first segment,
 // summing the lengths, grows b once by the sum, then writes each segment on
-// the way back, making it in scratch first.
+// the way back, making it in scratch first, or in a buffer of the segment's
+// length when it does not fit there, so that it never grows while it is
+// made.
 func (p *Node) writeText(b *strings.Builder, n int, scratch *segmentScratch) {
-	n += p.segmentLen()
+	size := p.segmentLen()
 	if p.parent == nil {
-		b.Grow(n)
+		b.Grow(n + size)
 	} else {
-		p.parent.writeText(b, n, scratch)
+		p.parent.writeText(b, n+size, scratch)
 	}
-	b.Write(p.appendSegment(scratch[:0]))
+	segment := scratch[:0]
+	if size > len(scratch) {
+		segment = make([]byte, 0, size)
+	}
+	b.Write(p.appendSegment(segment))
 }
 
 // AppendText appends the path's text to b and returns the extended buffer. It
