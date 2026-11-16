@@ -16,7 +16,7 @@ A **conformance probe** is an executable assertion that the SDK exercises agains
 
 to verify wire-level conformance to openEHR REST and SMART-on-openEHR, or an in-repo property over vendored inputs or the SDK's own output that reaches no server.
 
-Each probe has a stable `PROBE-NNN` ID, one catalogue entry here, and a pass/fail outcome. How probes are written, run and kept is [development-process.md § Conformance probes](../development-process.md#conformance-probes).
+Each probe has a stable `PROBE-NNN` ID, one catalogue entry here, and a pass/fail outcome. How probes are written, run and kept is [probe-harness.md](../probe-harness.md).
 
 ## Conformance scope
 
@@ -27,7 +27,7 @@ An **in-repo** probe asserts a property over vendored inputs or over the SDK's o
 Each catalogue entry's **Modes** line says which applies: 37 of the 83 catalog entries are in-repo by construction.
 Today 8 entries declare all three modes.
 
-How the runner selects a mode, what a probe reports and each mode's working rules are in [development-process.md § Conformance probes](../development-process.md#conformance-probes).
+How the runner selects a mode, what a probe reports and each mode's working rules are in [probe-harness.md](../probe-harness.md).
 This section holds what an SDK consumer, or the operator of a deployment a probe writes to, relies on.
 
 #### Sandbox mode
@@ -57,7 +57,7 @@ The runner **MUST** refuse to execute a mutating probe in Live mode without an e
 
 #### The CDR cross-check tool
 
-The CDR cross-check tool (`make cdr-crosscheck`) measures live CDRs and the SDK against each other; it records numbers and asserts nothing, so it is a tool and not a probe ([development-process.md § The CDR cross-check tool](../development-process.md#the-cdr-cross-check-tool)). It **MUST NOT** write to a CDR without an explicit per-invocation opt-in, `OPENEHR_LIVE_ALLOW_MUTATING`.
+The CDR cross-check tool (`make cdr-crosscheck`) measures live CDRs and the SDK against each other; it records numbers and asserts nothing, so it is a tool and not a probe ([probe-harness.md § The CDR cross-check tool](../probe-harness.md#the-cdr-cross-check-tool)). It **MUST NOT** write to a CDR without an explicit per-invocation opt-in, `OPENEHR_LIVE_ALLOW_MUTATING`.
 
 ### REQ-083 — Cadasto platform API conformance
 
@@ -102,7 +102,7 @@ A readiness endpoint often answers with a small document that names the service 
 
 ### Vendored fixtures (`testkit/corpus/`)
 
-The probes read their fixture documents (bodies, not recorded exchanges) from `testkit/corpus/`; the layout, the ingests and the integrity checks are [development-process.md § Vendored fixtures](../development-process.md#vendored-fixtures). The cross-format sets come from Apache-2.0 upstreams only, as [LICENSING.md](../../LICENSING.md) records for each vendored corpus ([licensing.md](../licensing.md)).
+The probes read their fixture documents (bodies, not recorded exchanges) from `testkit/corpus/`; the layout, the ingests and the integrity checks are [testkit/corpus/README.md](../../testkit/corpus/README.md). The cross-format sets come from Apache-2.0 upstreams only, as [LICENSING.md](../../LICENSING.md) records for each vendored corpus ([licensing.md](../licensing.md)).
 
 ## Probe catalog
 
@@ -404,7 +404,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 #### PROBE-107 — Upstream AQL suite admissibility corpus
 
 - **Title:** Every query the vendored upstream AQL suites send and a conformant engine answers with rows parses under the SDK grammar profile and draws no Error-severity lint code, unless a reviewed decline names it and why — so the REQ-109 grammar profile and the REQ-160 compatibility guard are held to every clause family an engine answers.
-- **Preconditions:** The vendored suite corpus under `testkit/corpus/aql/suites/`, with its provenance pin `AQL_SOURCE.txt` and the ingest-generated `EXCLUDED.txt` beside it ([development-process.md § Vendored fixtures](../development-process.md#vendored-fixtures)); the reader takes each query template from the suite that sends it and transcribes none.
+- **Preconditions:** The vendored suite corpus under `testkit/corpus/aql/suites/`, with its provenance pin `AQL_SOURCE.txt` and the ingest-generated `EXCLUDED.txt` beside it ([probe-harness.md § Vendored fixtures](../probe-harness.md#vendored-fixtures)); the reader takes each query template from the suite that sends it and transcribes none.
   The vendored grammar profile and the pinned BMM; no CDR, no OPT.
 - **Wire assertion:** In-repo property.
   - **Rebuild.** The reader takes each test's query text from the vendored suites alone: a data-driven suite's single query template filled from every row of the CSV the suite names, or a test case's own query.
@@ -600,7 +600,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 #### PROBE-105 — Upstream cross-format parity
 
 - **Title:** For each vendored upstream set that gives one composition in two or more of canonical JSON, canonical XML, FLAT and STRUCTURED, the SDK codecs carry the composition across every leg below whose two formats the set gives and agree with the upstream sibling over the subset they model; every place they do not agree is a recorded outcome with its reason, never a silent waiver.
-- **Preconditions:** The sets under `testkit/corpus/crossformat/` ([development-process.md § Vendored fixtures](../development-process.md#vendored-fixtures)), each with the OPT of its template, from which the probe builds the Web Template (`templatecompile.Compile` + `webtemplate.Build`).
+- **Preconditions:** The sets under `testkit/corpus/crossformat/` ([probe-harness.md § Vendored fixtures](../probe-harness.md#vendored-fixtures)), each with the OPT of its template, from which the probe builds the Web Template (`templatecompile.Compile` + `webtemplate.Build`).
 - **Wire assertion:** In-repo, not backend-facing. Per set, every leg whose two formats the set carries:
   - (a) **JSON and XML:** the canonical JSON and the canonical XML each decode, and the two decoded compositions, re-encoded through `canjson`, are compared leaf by leaf: a comparison of decoded values, never of bytes ([§ REQ-052](wire.md#req-052)).
   - (b) **canonical to FLAT:** `simplified.MarshalFlat` over the decoded upstream canonical document is compared key by key with the upstream FLAT. That document is the set's canonical JSON when the set has one, and its canonical XML otherwise.
@@ -622,7 +622,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 #### PROBE-030 — Canonical-JSON round trip
 
 - **Title:** Decoding a canonical-JSON RM value and re-encoding it, then decoding and encoding that output again, recovers the same value and a document wire-equivalent to the first, and the recovered value satisfies the reference-model floor.
-- **Preconditions:** A canonical-JSON RM root fixture from the top-level files of `testkit/corpus/compositions/` and `testkit/corpus/rm/` ([development-process.md § Vendored fixtures](../development-process.md#vendored-fixtures)): a COMPOSITION, or another root sample such as an EHR_STATUS or a FOLDER. The probe's leaf values, a DV_QUANTITY and a DV_CODED_TEXT, are inline in the probe.
+- **Preconditions:** A canonical-JSON RM root fixture from the top-level files of `testkit/corpus/compositions/` and `testkit/corpus/rm/` ([probe-harness.md § Vendored fixtures](../probe-harness.md#vendored-fixtures)): a COMPOSITION, or another root sample such as an EHR_STATUS or a FOLDER. The probe's leaf values, a DV_QUANTITY and a DV_CODED_TEXT, are inline in the probe.
 - **Wire assertion:** Decode, Encode (`b1`), Decode (`A`), Encode (`b2`), Decode (`B`), then the comparison [§ REQ-052](wire.md#req-052) gives a round trip: `A` and `B` equal by typed deep comparison (`reflect.DeepEqual` over the decoded RM values, which compares an interface-typed field by its dynamic type and value, so it covers every substitutable slot and every `DV_INTERVAL[T]` bound with no comparison options); `B` clean under `validation.ValidateRM` ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)); `b1` and `b2` [wire-equivalent](#terms); and `b1` wire-equivalent to the input's expected form, so a member the decoder reads with the wrong meaning, a wrongly defaulted interval flag among them, fails the probe. No byte equality is checked anywhere. An input whose vendored content carries an RM-floor finding unrelated to the round trip is held out of the `ValidateRM` leg only, named in the probe with the finding, while the fidelity legs still run on it.
 - **Modes:** In-repo (round-trip property against vendored fixtures; no backend).
 - **Status:** Implemented (inline).
@@ -649,7 +649,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 #### PROBE-033 — Canonical-XML round trip
 
 - **Title:** Decoding a canonical-XML RM value and re-encoding it, then decoding and encoding that output again, produces two byte-identical compact-XML SDK encodes.
-- **Preconditions:** A canonical-XML RM value fixture from the top-level files of `testkit/corpus/compositions/` and `testkit/corpus/rm/` ([development-process.md § Vendored fixtures](../development-process.md#vendored-fixtures)): a COMPOSITION, or an RM root or leaf sample such as a FOLDER or a DV_QUANTITY. The probe also builds a DV_QUANTITY, a DV_TEXT and a COMPOSITION inline.
+- **Preconditions:** A canonical-XML RM value fixture from the top-level files of `testkit/corpus/compositions/` and `testkit/corpus/rm/` ([probe-harness.md § Vendored fixtures](../probe-harness.md#vendored-fixtures)): a COMPOSITION, or an RM root or leaf sample such as a FOLDER or a DV_QUANTITY. The probe also builds a DV_QUANTITY, a DV_TEXT and a COMPOSITION inline.
 - **Wire assertion:** Decode → Encode → Decode → Encode; the two compact-XML SDK encodes are byte-identical. Equality with the input fixture is not checked: the fixture's whitespace and serialisation choices differ from the SDK's compact form ([§ REQ-056](wire.md#req-056)), so the stability checked is that of the SDK's own output.
 - **Modes:** In-repo (round-trip property against vendored fixtures; no backend).
 - **Status:** Implemented (inline).

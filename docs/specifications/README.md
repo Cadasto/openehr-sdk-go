@@ -103,7 +103,8 @@ Identifiers are stable once published — they are referenced from outside the f
 | [REQ.md](REQ.md) | Requirement registry (generated index) — links to canonical topic specs |
 | [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test map |
 | [../.sdd.yaml](../.sdd.yaml) | SDD project descriptor — identifier style, document paths, `make` targets (read by `sdd-*` skills) |
-| [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary, the conformance probe harness ([§ Conformance probes](../development-process.md#conformance-probes)) |
+| [../development-process.md](../development-process.md) | The two lanes, the delivery ladder, the superpowers boundary |
+| [../probe-harness.md](../probe-harness.md) | How probes are written, run and kept; the CDR cross-check tool; the vendored fixtures |
 | [scope.md](scope.md) | What is in and out of v1 scope, and the use cases that justify it |
 | [glossary.md](glossary.md) | openEHR, SMART, Cadasto, and SDK-internal terms |
 | [module-layout.md](module-layout.md) | Module path (REQ-001), package taxonomy, dependency direction, building-block independence and each block's import rule (REQ-013), Datamap V2 (REQ-058), boundary rules, the `internal/` boundary, semantic versioning (REQ-004) |
