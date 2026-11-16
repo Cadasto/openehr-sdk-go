@@ -1165,10 +1165,11 @@ The pairs it can compare are:
 - two DV_QUANTITY with equal `units`;
 - two DV_PROPORTION of one `type`, by ratio;
 - two DV_ORDINAL, by `value`;
-- and two DV_DATE, two DV_TIME or two DV_DATE_TIME values the REQ-123 parse accepts, in the order [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* gives them: at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it, and two times or date-times written with different zone designators as instants.
+- two DV_DATE, two DV_TIME or two DV_DATE_TIME values the REQ-123 parse accepts, in the order [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* gives them: at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it, and two times or date-times written with different zone designators as instants;
+- and two DV_DURATION values the REQ-123 parse accepts, by the magnitude it gives, as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* orders them.
 
 The same holds in a `DV_INTERVAL<DV_ORDERED>` whose two bounds are one of those types.
-No other pair is one it can compare, for example, a zoned against a zoneless time or date-time, a value the REQ-123 parse refuses, or two DV_DURATION.
+No other pair is one it can compare, for example, a zoned against a zoneless time or date-time, or a value the REQ-123 parse refuses.
 
 #### Precedence
 
@@ -1261,7 +1262,7 @@ An error `Generate` returns **MUST NOT** wrap more than one of `ErrArchetypeIDMi
 A root `Generate` returns can break § Contract's output rule in these cases, and in no other:
 
 - **An interval pair left as generated** (§ Contract *Intervals*) can break `DV_INTERVAL.Limits_consistent`, which the floor reports for a pair it orders whose bounds are out of order and for a pair it reads as not strictly comparable (§ REQ-112 *DV_INTERVAL*): bounds of two classes, and two DV_QUANTITY or two DV_PROPORTION whose two sides admit no one unit or type.
-  An ordered value that forms no pair § Contract *Intervals* lists with the bounds of its `normal_range` is left as generated too (§ [Precedence](#precedence) 3), so it can break `Normal_range_and_status_consistency`.
+  An ordered value that forms no pair § Contract *Intervals* lists with the bounds of its `normal_range`, and a DV_DURATION whatever its `normal_range`, is left as generated too (§ [Precedence](#precedence) 3), so it can break `Normal_range_and_status_consistency`.
 - **An OPT constraint that admits no value an RM rule accepts**, where § [Precedence](#precedence) 3 does not name that rule, or that admits a coded value a rule of § [Precedence](#precedence) 4 accepts without listing it, such as an RM default that yields to the OPT (§ [Precedence](#precedence) 1), or a PARTICIPATION `mode` the OPT codes in `local`, breaks that RM rule.
 - **An OPT that contradicts itself** in a way § [Errors](#errors) does not refuse, such as one that requires a single-valued attribute and prohibits every child of it, or requires a list and gives it a cardinality upper bound of 0, gets whichever side § Contract writes.
   One whose `HISTORY` allows none of the events and summaries § [Precedence](#precedence) 2 tries gets neither, and breaks `Events_valid`.

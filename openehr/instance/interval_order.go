@@ -27,15 +27,17 @@ import (
 // lower.is_strictly_comparable_to(upper), can hold.
 //
 // It orders DV_COUNT, DV_QUANTITY, DV_DATE, DV_TIME, DV_DATE_TIME,
-// DV_PROPORTION and DV_ORDINAL bounds, in a DV_INTERVAL of that type and
-// in a DV_INTERVAL<DV_ORDERED> whose two bounds are the same one of those
-// types. Quantities are ordered only when both bounds share their units,
-// since magnitudes in different units do not compare. Proportions are
-// ordered by the ratio numerator/denominator, and only when both bounds
+// DV_DURATION, DV_PROPORTION and DV_ORDINAL bounds, in a DV_INTERVAL of that
+// type and in a DV_INTERVAL<DV_ORDERED> whose two bounds are the same one of
+// those types. Quantities are ordered only when both bounds share their
+// units, since magnitudes in different units do not compare. Proportions
+// are ordered by the ratio numerator/denominator, and only when both bounds
 // share their type (proportionScale). Dates, times and date-times are
 // ordered as the RM floor orders them: at the precision the two share, and
 // two times or date-times written with different zone designators as
-// instants (temporalCompare). A pair that does not compare is left alone.
+// instants (temporalCompare). Durations are ordered by their length in
+// seconds, as the RM floor orders them (compareDurations). A pair that does
+// not compare is left alone.
 //
 // An inverted pair is replaced by the first of these two pairs that is in
 // order and fits each side's OPT constraint:
@@ -110,6 +112,8 @@ func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any) {
 		orderConcrete(&iv.Interval, optNode, timeScale, timeKeyOf, setTimeKey)
 	case *rm.DVInterval[rm.DVDateTime]:
 		orderConcrete(&iv.Interval, optNode, dateTimeScale, dateTimeKeyOf, setDateTimeKey)
+	case *rm.DVInterval[rm.DVDuration]:
+		orderConcrete(&iv.Interval, optNode, durationScale, durationKeyOf, setDurationKey)
 	case *rm.DVInterval[rm.DVProportion]:
 		orderConcrete(&iv.Interval, optNode, proportionScale, proportionKeyOf, setProportionKey)
 	case *rm.DVInterval[rm.DVOrdinal]:
@@ -156,6 +160,9 @@ func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrder
 		return
 	}
 	if orderOrderedAs(iv, optNode, dateTimeScale, asDateTime, dateTimeKeyOf, setDateTimeKey, setOrderedDateTime) {
+		return
+	}
+	if orderOrderedAs(iv, optNode, durationScale, asDuration, durationKeyOf, setDurationKey, setOrderedDuration) {
 		return
 	}
 	if orderOrderedAs(iv, optNode, proportionScale, asProportion, proportionKeyOf, setProportionKey, setOrderedProportion) {
@@ -556,13 +563,29 @@ func setOrderedQuantity(slot *rm.DVOrdered, k quantityKey) {
 }
 
 // dateScale, timeScale and dateTimeScale order DV_DATE, DV_TIME and
-// DV_DATE_TIME bounds (temporalCompare says how). A C_DATE, C_TIME or
-// C_DATE_TIME has no numeric end, so only a swap repairs an inversion.
+// DV_DATE_TIME bounds (temporalCompare says how), and durationScale
+// DV_DURATION bounds (compareDurations). A C_DATE, C_TIME, C_DATE_TIME or
+// C_DURATION has no numeric end, so only a swap repairs an inversion.
 var (
 	dateScale     = temporalScale(temporalCompare(dateOrderRead))
 	timeScale     = temporalScale(temporalCompare(timeOrderRead))
 	dateTimeScale = temporalScale(temporalCompare(dateTimeOrderRead))
+	durationScale = temporalScale(compareDurations)
 )
+
+// compareDurations compares two ISO 8601 durations by their length in
+// seconds, BASE Iso8601_duration.to_seconds, which is the magnitude the
+// REQ-123 parse gives and the order the RM floor puts two DV_DURATION
+// bounds in (REQ-112 DV_INTERVAL). A value the parse refuses does not
+// compare.
+func compareDurations(a, b string) (int, bool) {
+	da, errA := iso8601.ParseDuration(a)
+	db, errB := iso8601.ParseDuration(b)
+	if errA != nil || errB != nil {
+		return 0, false
+	}
+	return compareOrdered(da.ToSeconds(), db.ToSeconds()), true
+}
 
 // temporalRead reads an ISO 8601 value of one type as the order of its
 // type reads it: its fields as written, the zone not applied
@@ -601,6 +624,10 @@ func setTimeKey(d *rm.DVTime, v string) { d.Value = v }
 func dateTimeKeyOf(d rm.DVDateTime) string { return d.Value }
 
 func setDateTimeKey(d *rm.DVDateTime, v string) { d.Value = v }
+
+func durationKeyOf(d rm.DVDuration) string { return d.Value }
+
+func setDurationKey(d *rm.DVDuration, v string) { d.Value = v }
 
 func temporalScale(compare func(a, b string) (int, bool)) scale[string] {
 	return scale[string]{
@@ -1078,6 +1105,18 @@ func asDateTime(v rm.DVOrdered) (rm.DVDateTime, bool) {
 	return rm.DVDateTime{}, false
 }
 
+func asDuration(v rm.DVOrdered) (rm.DVDuration, bool) {
+	switch x := v.(type) {
+	case rm.DVDuration:
+		return x, true
+	case *rm.DVDuration:
+		if x != nil {
+			return *x, true
+		}
+	}
+	return rm.DVDuration{}, false
+}
+
 func asProportion(v rm.DVOrdered) (rm.DVProportion, bool) {
 	switch x := v.(type) {
 	case rm.DVProportion:
@@ -1127,6 +1166,16 @@ func setOrderedDateTime(slot *rm.DVOrdered, value string) {
 	case *rm.DVDateTime:
 		x.Value = value
 	case rm.DVDateTime:
+		x.Value = value
+		*slot = x
+	}
+}
+
+func setOrderedDuration(slot *rm.DVOrdered, value string) {
+	switch x := (*slot).(type) {
+	case *rm.DVDuration:
+		x.Value = value
+	case rm.DVDuration:
 		x.Value = value
 		*slot = x
 	}

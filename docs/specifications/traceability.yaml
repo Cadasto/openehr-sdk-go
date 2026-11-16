@@ -1648,6 +1648,7 @@ requirements:
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/integer_draw_window_test.go
+      - openehr/instance/interval_duration_internal_test.go
       - openehr/instance/interval_expanded_bounds_test.go
       - openehr/instance/interval_expanded_internal_test.go
       - openehr/instance/interval_flags_test.go
@@ -1942,6 +1943,7 @@ requirements:
       - openehr/instance/coded_term_text_test.go
       - openehr/instance/coded_text_internal_test.go
       - openehr/instance/history_events_test.go
+      - openehr/instance/interval_duration_internal_test.go
       - openehr/instance/interval_shared_unit_test.go
       - openehr/instance/interval_temporal_internal_test.go
       - openehr/instance/phase4_test.go
