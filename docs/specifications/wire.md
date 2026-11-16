@@ -1150,7 +1150,8 @@ An unrecognised `_`-segment and an unrecognised suffix inside a family are unmat
 
 Encode **MUST NOT** silently lose an in-scope attribute: a populated attribute is emitted in this grammar; what the grammar cannot carry either rides `|raw` (where a `|raw` carrier exists) or is a typed error, so a decorated value whose extras the grammar expresses (a `normal_range`, `mappings`, …) rides suffixes and `_`-attribute keys, not a whole `|raw` fragment.
 Three attribute classes are deliberately **out of scope**, and they are the only three.
-The first is the `_uid` / `_link:N` / `_feeder_audit` of a **folded structural wrapper** — an `ITEM_TREE`, `ITEM_LIST`, `ITEM_TABLE`, `ITEM_SINGLE`, `HISTORY` or lifted `max: 1` `EVENT`, none of which the Web Template models as a node: FLAT has no key for one, so encode drops those attributes with no error and decode can never read them back.
+The first is the `_uid` / `_link:N` / `_feeder_audit` of a **folded structural wrapper**, which the Web Template does not model as a node: an `ITEM_TREE`, `ITEM_LIST`, `ITEM_TABLE`, `ITEM_SINGLE` or `HISTORY`, or a lifted event, its `HISTORY`'s only event at `max: 1`, of any type (`EVENT`, `POINT_EVENT` or `INTERVAL_EVENT`).
+FLAT has no key for one, so encode drops those attributes with no error and decode can never read them back.
 This boundary cannot be closed codec-side at all — it needs a FLAT spelling for a folded wrapper, a reference-side change ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md) § folded structural wrappers.
 The second is `archetype_details` on any LOCATABLE: no FLAT key carries it, because decode rebuilds it from the Web Template ([§ REQ-053](#req-053)).
