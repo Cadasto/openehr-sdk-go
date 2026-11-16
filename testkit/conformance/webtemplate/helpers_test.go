@@ -213,6 +213,50 @@ func TestCompare(t *testing.T) {
 	}
 }
 
+// TestSettleDerivedComparesTheMagnitudeWithItsOperands — PROBE-086, REQ-053.
+// An upstream key the re-encode does not write is derived, not missing, only
+// where it is a DV_PROPORTION's bare value whose |numerator and |denominator
+// the re-encode wrote, and it equals numerator/denominator to within one part
+// in a billion. One that does not equal them, or sits beside a zero
+// denominator, is mismatched; one without both operands stays missing.
+func TestSettleDerivedComparesTheMagnitudeWithItsOperands(t *testing.T) {
+	const key = "c/obs/proportion"
+	operands := map[string]any{key + "|numerator": json.Number("20.5"), key + "|denominator": json.Number("12.4")}
+	tests := []struct {
+		name                         string
+		upstream                     any
+		emitted                      map[string]any
+		derived, missing, mismatched []string
+	}{
+		{name: "equal", upstream: json.Number("1.6532258064516128"), emitted: operands, derived: []string{key}},
+		{name: "quoted and inside the tolerance", upstream: "1.6532258064", emitted: operands, derived: []string{key}},
+		{
+			name: "past the tolerance", upstream: json.Number("1.6532258"), emitted: operands,
+			mismatched: []string{key + ": upstream=1.6532258 ours=20.5/12.4"},
+		},
+		{
+			name: "zero denominator", upstream: json.Number("1"),
+			emitted:    map[string]any{key + "|numerator": json.Number("1"), key + "|denominator": json.Number("0")},
+			mismatched: []string{key + ": upstream=1 ours=1/0"},
+		},
+		{name: "no denominator", upstream: json.Number("1"), emitted: map[string]any{key + "|numerator": json.Number("1")}, missing: []string{key}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			derived, missing, mismatched := settleDerived(map[string]any{key: tt.upstream}, tt.emitted, []string{key}, nil)
+			if !slices.Equal(derived, tt.derived) {
+				t.Errorf("derived = %q, want %q", derived, tt.derived)
+			}
+			if !slices.Equal(missing, tt.missing) {
+				t.Errorf("missing = %q, want %q", missing, tt.missing)
+			}
+			if !slices.Equal(mismatched, tt.mismatched) {
+				t.Errorf("mismatched = %q, want %q", mismatched, tt.mismatched)
+			}
+		})
+	}
+}
+
 // TestCompareSortsVerdicts — the reports are diffed across commits, so the
 // three lists must not inherit map iteration order.
 func TestCompareSortsVerdicts(t *testing.T) {

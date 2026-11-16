@@ -5,11 +5,15 @@ package simplified
 // and § INTERVAL_EVENT, issue 424): an INTERVAL_EVENT's `sample_count`, a
 // suffix on its event node; an abstract EVENT's `math_function` and `width`,
 // leaves under its node, which an INTERVAL_EVENT node already has; and an
-// OBSERVATION's `history_origin`, a leaf under its node. The reference
-// implementation gives none of them a Web Template node either, so the codec
-// reads and writes them itself, and the Web Template stays the reference's.
+// OBSERVATION's `history_origin`, a leaf under its node. An abstract EVENT the
+// Web Template folds into its OBSERVATION has no node, so its three are
+// spelled at the OBSERVATION's (issue 456). The reference implementation gives
+// none of them a Web Template node either, so the codec reads and writes them
+// itself, and the Web Template stays the reference's.
 
 import (
+	"strings"
+
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
@@ -33,21 +37,22 @@ var sampleCountFit = valueFit{attr: "INTERVAL_EVENT.sample_count", bmmType: "Int
 //     node has as children;
 //   - under an OBSERVATION node, `history_origin`, the DV_DATE_TIME at
 //     `data/origin`, where the node's events name the HISTORY's node id
-//     ([historyNodeID]).
+//     ([historyNodeID]);
+//   - under an OBSERVATION node that folds in an abstract EVENT
+//     ([foldedEvent]), that event's `math_function` and `width`, as under the
+//     event's node.
 //
 // The leaf is built per call, and its path extends the parent's, so it
 // resolves through [reusedSiblings] as the parent does.
 func codecLeaf(parent *webtemplate.Node, id string) *webtemplate.Node {
 	switch nodeRMType(parent) {
 	case "EVENT":
-		switch id {
-		case mathFunctionSeg:
-			return &webtemplate.Node{ID: id, Name: "Math_function", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: parent.AQLPath + "/" + id}
-		case widthSeg:
-			return &webtemplate.Node{ID: id, Name: "Width", RMType: "DV_DURATION", Max: 1, AQLPath: parent.AQLPath + "/" + id}
-		}
+		return intervalAttrLeaf(parent.AQLPath, id)
 	case "OBSERVATION":
 		if id != historyOriginSeg {
+			if event, folded := foldedEvent(parent); folded {
+				return intervalAttrLeaf(event.AQLPath, id)
+			}
 			return nil
 		}
 		if history, ok := historyNodeID(parent); ok {
@@ -60,11 +65,56 @@ func codecLeaf(parent *webtemplate.Node, id string) *webtemplate.Node {
 	return nil
 }
 
-// intervalEventLeaf reports whether leaf, under an abstract EVENT node, is an
-// INTERVAL_EVENT attribute, which makes the event it is spelled on an
-// INTERVAL_EVENT.
-func intervalEventLeaf(parent, leaf *webtemplate.Node) bool {
-	return nodeRMType(parent) == "EVENT" && (leaf.ID == mathFunctionSeg || leaf.ID == widthSeg)
+// intervalAttrLeaf returns the leaf of the INTERVAL_EVENT attribute id of the
+// abstract EVENT at eventPath, `math_function` or `width`, or nil for any
+// other id.
+func intervalAttrLeaf(eventPath, id string) *webtemplate.Node {
+	switch id {
+	case mathFunctionSeg:
+		return &webtemplate.Node{ID: id, Name: "Math_function", RMType: "DV_CODED_TEXT", Max: 1, AQLPath: eventPath + "/" + id}
+	case widthSeg:
+		return &webtemplate.Node{ID: id, Name: "Width", RMType: "DV_DURATION", Max: 1, AQLPath: eventPath + "/" + id}
+	}
+	return nil
+}
+
+// intervalEventOf returns the path of the abstract EVENT whose INTERVAL_EVENT
+// attribute leaf is, a [codecLeaf] under parent: the attribute makes the event
+// an INTERVAL_EVENT. It reports false for any other leaf.
+func intervalEventOf(parent, leaf *webtemplate.Node) (string, bool) {
+	switch nodeRMType(parent) {
+	case "EVENT", "OBSERVATION":
+		if leaf.ID == mathFunctionSeg || leaf.ID == widthSeg {
+			return strings.TrimSuffix(leaf.AQLPath, "/"+leaf.ID), true
+		}
+	}
+	return "", false
+}
+
+// foldedEvent returns the abstract EVENT an OBSERVATION node folds in. The Web
+// Template gives an abstract EVENT that occurs at most once no node: it lifts
+// the event's children into the OBSERVATION's node, its `time` leaf among
+// them, each at its path through the event ([webtemplate.Build]). The node
+// returned stands for the event and holds its path, read off that `time`
+// leaf. It reports false where obs folds in no event, or more than one.
+func foldedEvent(obs *webtemplate.Node) (*webtemplate.Node, bool) {
+	depth := len(parseAQL(obs.AQLPath))
+	path := ""
+	for _, ch := range obs.Children {
+		segs := parseAQL(ch.AQLPath)
+		if len(segs) != depth+3 || segs[depth].attr != "data" || segs[depth+1].attr != "events" || segs[depth+2].attr != "time" {
+			continue
+		}
+		event := ch.AQLPath[:segs[depth+1].end]
+		if path != "" && path != event {
+			return nil, false
+		}
+		path = event
+	}
+	if path == "" {
+		return nil, false
+	}
+	return &webtemplate.Node{RMType: "EVENT", Max: 1, AQLPath: path}, true
 }
 
 // historyNodeID returns the node id of the HISTORY an OBSERVATION node's
@@ -87,14 +137,18 @@ func historyNodeID(obs *webtemplate.Node) (string, bool) {
 	return id, id != ""
 }
 
-// carriesSampleCount reports whether a Web Template node takes the
-// `|sample_count` suffix: an event node, abstract or an INTERVAL_EVENT.
-func carriesSampleCount(node *webtemplate.Node) bool {
+// sampleCountEvent returns the event whose `|sample_count` a Web Template node
+// takes as a suffix: an event node's own, abstract or an INTERVAL_EVENT, and
+// an OBSERVATION node's that folds in an abstract EVENT ([foldedEvent]). It
+// reports false for any other node.
+func sampleCountEvent(node *webtemplate.Node) (*webtemplate.Node, bool) {
 	switch nodeRMType(node) {
 	case "EVENT", "INTERVAL_EVENT":
-		return true
+		return node, true
+	case "OBSERVATION":
+		return foldedEvent(node)
 	}
-	return false
+	return nil, false
 }
 
 // placeSampleCount places v, the `|sample_count` of the event at eventPath
@@ -116,8 +170,9 @@ func placeSampleCount(compJSON map[string]any, eventPath, eventNames string, pre
 
 // emitCodecAttrs writes the attributes [codecLeaf] and `|sample_count` name, of
 // v, the instance at node, under flatPath: an INTERVAL_EVENT's sample_count
-// where it is set, an abstract EVENT node's math_function and width where the
-// instance is an INTERVAL_EVENT, and an OBSERVATION's history origin
+// where it is set, an abstract EVENT's math_function and width where the
+// instance is an INTERVAL_EVENT, at its node or at the OBSERVATION node that
+// folds it in ([foldedEvent]), and an OBSERVATION's history origin
 // ([emitHistoryOrigin]). root and rootAql are the resolution root v's children
 // resolve against.
 func emitCodecAttrs(out map[string]any, node *webtemplate.Node, flatPath string, v any, root rm.Locatable, rootAql string, sib *reusedSiblings) error {
@@ -127,25 +182,66 @@ func emitCodecAttrs(out map[string]any, node *webtemplate.Node, flatPath string,
 		if !ok {
 			return nil
 		}
-		if ev.SampleCount != nil {
-			out[flatPath+"|"+sampleCountSuffix] = int64(*ev.SampleCount)
-		}
 		if nodeRMType(node) != "EVENT" {
+			emitSampleCount(out, flatPath, ev)
 			return nil
 		}
-		for _, id := range []string{mathFunctionSeg, widthSeg} {
-			if err := emitNode(out, codecLeaf(node, id), flatPath, root, rootAql, sib); err != nil {
-				return err
-			}
-		}
+		return emitIntervalAttrs(out, node, flatPath, ev, root, rootAql, sib)
 	case "OBSERVATION":
 		obs, ok := as[rm.Observation](v)
-		if !ok || codecLeaf(node, historyOriginSeg) == nil {
+		if !ok {
+			return nil
+		}
+		if err := emitFoldedEvent(out, node, flatPath, root, rootAql, sib); err != nil {
+			return err
+		}
+		if codecLeaf(node, historyOriginSeg) == nil {
 			return nil
 		}
 		return emitHistoryOrigin(out, flatPath+"/"+historyOriginSeg, obs.Data)
 	}
 	return nil
+}
+
+// emitSampleCount writes ev's sample_count at flatPath, where it is set.
+func emitSampleCount(out map[string]any, flatPath string, ev rm.IntervalEvent[rm.ItemStructure]) {
+	if ev.SampleCount != nil {
+		out[flatPath+"|"+sampleCountSuffix] = int64(*ev.SampleCount)
+	}
+}
+
+// emitIntervalAttrs writes ev, an INTERVAL_EVENT at the abstract EVENT node or
+// the OBSERVATION node that folds it in, as node's [codecLeaf] spellings and
+// `|sample_count` under flatPath.
+func emitIntervalAttrs(out map[string]any, node *webtemplate.Node, flatPath string, ev rm.IntervalEvent[rm.ItemStructure], root rm.Locatable, rootAql string, sib *reusedSiblings) error {
+	emitSampleCount(out, flatPath, ev)
+	for _, id := range []string{mathFunctionSeg, widthSeg} {
+		if err := emitNode(out, codecLeaf(node, id), flatPath, root, rootAql, sib); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// emitFoldedEvent writes the INTERVAL_EVENT attributes of the event an
+// OBSERVATION node folds in ([foldedEvent]) under flatPath, the OBSERVATION's,
+// where the instance there is an INTERVAL_EVENT. root, the OBSERVATION, and
+// rootAql are the resolution root the event resolves against.
+func emitFoldedEvent(out map[string]any, node *webtemplate.Node, flatPath string, root rm.Locatable, rootAql string, sib *reusedSiblings) error {
+	event, folded := foldedEvent(node)
+	if !folded {
+		return nil
+	}
+	relPath := strings.TrimPrefix(sib.nodePath(event), rootAql)
+	v, err := scope{root: root, path: rootAql, sib: sib}.itemAt(relPath)
+	if err != nil {
+		return skipNotFound(err, relPath)
+	}
+	ev, ok := as[rm.IntervalEvent[rm.ItemStructure]](v)
+	if !ok {
+		return nil
+	}
+	return emitIntervalAttrs(out, node, flatPath, ev, root, rootAql, sib)
 }
 
 // emitHistoryOrigin writes h's origin at flatPath, unless it is the origin

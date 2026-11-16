@@ -281,7 +281,7 @@ func TestREQ053OrdinalTerminologyIsItsSymbols(t *testing.T) {
 // issue 456. Where the template's C_DV_ORDINAL pairs give the ordinal's code
 // and value one terminology, a |terminology naming another contradicts it:
 // a WithTemplate decode refuses it, wrapping ErrUnsupportedDatatype and naming
-// the key, never the value.
+// the FLAT key, never the value.
 func TestREQ053OrdinalTerminologyTheTemplateContradictsIsRefused(t *testing.T) {
 	wt, compiled := templateOf(t, "minimal_admin.en.v1")
 	key := ordinalKey + "|terminology"
@@ -292,8 +292,12 @@ func TestREQ053OrdinalTerminologyTheTemplateContradictsIsRefused(t *testing.T) {
 	} {
 		for _, format := range cdrFormats {
 			_, err := decodeFormat(t, format, wt, body, opts...)
-			if !errors.Is(err, simplified.ErrUnsupportedDatatype) || !strings.Contains(err.Error(), strconv.Quote(key)) {
-				t.Errorf("%s: decode = %v, want ErrUnsupportedDatatype naming %q", format, err, key)
+			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+				t.Errorf("%s: decode = %v, want ErrUnsupportedDatatype", format, err)
+				continue
+			}
+			if format == "FLAT" && !strings.Contains(err.Error(), strconv.Quote(key)) {
+				t.Errorf("%s: decode = %v, want it to name %q", format, err, key)
 			}
 			if err != nil && strings.Contains(err.Error(), "0456") {
 				t.Errorf("%s: decode = %v carries the value", format, err)

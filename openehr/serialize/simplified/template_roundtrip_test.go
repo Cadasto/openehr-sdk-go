@@ -16,10 +16,12 @@ package simplified_test
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"maps"
 	"os"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -731,10 +733,13 @@ func TestREQ053WithTemplateOrdinalTerminology(t *testing.T) {
 }
 
 // TestREQ053WithTemplateOrdinalIntervalTerminology — REQ-053. A bound of a
-// DV_INTERVAL<DV_ORDINAL> leaf carries its code and value but not its
-// terminology, like an ordinal leaf. A WithTemplate decode gives a bound built
-// from its suffixes the terminology of the template's pair for that bound, and
-// a |raw bound keeps its own; decode without the template leaves both local.
+// DV_INTERVAL<DV_ORDINAL> leaf carries its code and value and, where the body
+// gives one, its terminology, like an ordinal leaf. A WithTemplate decode gives
+// a bound built from its suffixes with no |terminology the terminology of the
+// template's pair for that bound, and a |raw bound keeps its own; decode
+// without the template leaves both local. A bound's |terminology is taken as
+// written without the template, and refused, naming its key, where the
+// template's pair gives the bound's code and value another.
 func TestREQ053WithTemplateOrdinalIntervalTerminology(t *testing.T) {
 	const (
 		id         = "Test_dv_interval_dv_count_lower_upper_constraint.v0"
@@ -831,6 +836,16 @@ func TestREQ053WithTemplateOrdinalIntervalTerminology(t *testing.T) {
 		return ord.Symbol.DefiningCode.TerminologyID.Value
 	}
 
+	// named is body with the lower bound's |terminology given as term.
+	named := func(t *testing.T, term string) []byte {
+		t.Helper()
+		var m map[string]any
+		if err := json.Unmarshal(body, &m); err != nil {
+			t.Fatal(err)
+		}
+		m[key+"/lower|terminology"] = term
+		return mustJSON(t, m)
+	}
 	for _, format := range []string{"FLAT", "STRUCTURED"} {
 		t.Run(format, func(t *testing.T) {
 			bare := decodeAs(t, format, body, wt)
@@ -841,6 +856,21 @@ func TestREQ053WithTemplateOrdinalIntervalTerminology(t *testing.T) {
 			if lower, upper := terminologyAt(t, got, "lower"), terminologyAt(t, got, "upper"); lower != "SNOMED-CT" || upper != "local" {
 				t.Errorf("WithTemplate decode: bound terminologies lower %q, upper %q; want SNOMED-CT, the template's, and local, the |raw bound's own", lower, upper)
 			}
+
+			for _, opts := range [][]simplified.Option{{simplified.WithStrict()}, {simplified.WithStrict(), simplified.WithTemplate(compiled)}} {
+				agreed := decodeAs(t, format, named(t, "SNOMED-CT"), wt, opts...)
+				if lower := terminologyAt(t, agreed, "lower"); lower != "SNOMED-CT" {
+					t.Errorf("lower|terminology SNOMED-CT: lower bound terminology %q, want SNOMED-CT", lower)
+				}
+			}
+			local := decodeAs(t, format, named(t, "local"), wt, simplified.WithStrict())
+			if lower := terminologyAt(t, local, "lower"); lower != "local" {
+				t.Errorf("lower|terminology local without the template: lower bound terminology %q, want local as written", lower)
+			}
 		})
+	}
+	_, err = simplified.UnmarshalFlat(named(t, "local"), wt, simplified.WithTemplate(compiled))
+	if want := strconv.Quote(key + "/lower|terminology"); !errors.Is(err, simplified.ErrUnsupportedDatatype) || !strings.Contains(err.Error(), want) {
+		t.Errorf("WithTemplate decode of a lower|terminology the template contradicts = %v, want ErrUnsupportedDatatype naming %s", err, want)
 	}
 }

@@ -319,7 +319,7 @@ var Recorded = map[string]map[Leg]Record{
 				"the event time, so FLAT encode writes it as history_origin, which the upstream FLAT omits. " +
 				"DV_IDENTIFIER: this upstream FLAT writes the id as " +
 				"the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare " +
-				"value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the " +
+				"value, which the codec reads and does not write, and writes the Integer type and the " +
 				"Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical " +
 				"writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the " +
 				"extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream " +
@@ -330,18 +330,16 @@ var Recorded = map[string]map[Leg]Record{
 				"and proportion type spellings above.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 423, Missing: 35, Extra: 42, Altered: 35, Excluded: 1},
-			Reason: "The excluded key is " +
-				"the bare proportion_any, reported as " +
-				"unmatched content, as follows. ISM transition careflow step: the upstream FLAT gives the " +
+			Outcome: Outcome{Compared: 423, Missing: 35, Extra: 42, Altered: 35},
+			Reason: "ISM transition careflow step: the upstream FLAT gives the " +
 				"section_3 ACTION's transition a current state (526, planned) and no careflow step, so decode " +
 				"gives it the one careflow step of the template whose current states hold 526 " +
 				"(openehr/serialize/simplified/deviations.md), where the canonical has none (6 extra leaves); " +
 				"this is the intended reading of such a body, not a gap. " +
 				"party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's " +
 				"reference the type PARTY against the canonical's PERSON. " +
-				"DV_PROPORTION: decode reports the bare proportion_any, the " +
-				"derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1. " +
+				"DV_PROPORTION: decode reads the bare proportion_any, the " +
+				"derived magnitude, as its numerator divided by its denominator, and |type 1.0 as the Integer 1. " +
 				"Upstream conversion differences: a DV_URI and the proportion's " +
 				"precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream " +
 				"date and time spelling: the canonical writes dates in the basic format (20190114) and date-times " +

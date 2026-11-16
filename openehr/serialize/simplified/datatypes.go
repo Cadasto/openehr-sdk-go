@@ -510,9 +510,10 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		if !codePhraseCaptured(sym["defining_code"]) {
 			return false
 		}
-		// The ordinal suffix set has no |terminology channel and decode without
-		// the template rebuilds the symbol as archetype-local; a non-local
-		// terminology would be silently rewritten, so it rides |raw instead.
+		// Encode writes no |terminology, and decode of a symbol without one
+		// rebuilds it as archetype-local, or in the template's terminology; a
+		// non-local terminology would be silently rewritten, so it rides |raw
+		// instead.
 		if dc, ok := sym["defining_code"].(map[string]any); ok {
 			if tv := codePhraseTerminology(dc); tv != "" && tv != "local" {
 				return false
@@ -1069,9 +1070,10 @@ func scaleToFlat(out map[string]any, flatPath string, dv rm.DVScale) {
 }
 
 // proportionToFlat emits the |numerator, |denominator and |type suffixes for a
-// DV_PROPORTION leaf. The derived bare magnitude and the status suffixes are
-// not emitted (they are recomputed from numerator/denominator) — see
-// deviations.md.
+// DV_PROPORTION leaf, and the optional ordered suffixes it carries. The bare
+// value, the magnitude, is not emitted: the RM derives it from the numerator
+// and the denominator and stores none, and decode reads one only to check it
+// against them — see deviations.md.
 func proportionToFlat(out map[string]any, flatPath string, dv rm.DVProportion) {
 	out[flatPath+"|numerator"] = float64(dv.Numerator)
 	out[flatPath+"|denominator"] = float64(dv.Denominator)

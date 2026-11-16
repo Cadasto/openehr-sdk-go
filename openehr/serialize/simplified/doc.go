@@ -85,6 +85,13 @@
 // earliest time the events carry. Any other spelling of the four, such as
 // "<event>/sample_count", is unmatched content.
 //
+// An abstract EVENT that occurs at most once has no Web Template node: the
+// Web Template folds it into its OBSERVATION, whose node holds the event's
+// "time" leaf. Its three interval keys are then spelled at the OBSERVATION,
+// as "<observation>/width", "<observation>/math_function" and
+// "<observation>|sample_count", and read and written there as at an EVENT
+// node.
+//
 // # An ELEMENT with several value types
 //
 // An ELEMENT with one value alternative, or with two that are a coded text
@@ -136,6 +143,22 @@
 // one member. Decode reads "|value", "|" and "" as the bare value of every
 // datatype that has one, and refuses two of them that disagree. A coded text,
 // an ordinal and a scale have a "|value" of their own and no bare value.
+//
+// A proportion's bare value is its magnitude, the numerator divided by the
+// denominator, which the reference implementation writes beside them. Decode
+// reads it and refuses, with [ErrUnsupportedDatatype], one that differs from
+// that quotient by more than one part in a billion, or that stands beside a
+// zero denominator. The value holds no magnitude of its own, so a bare value
+// without both a numerator and a denominator is refused as the proportion
+// missing them, and encode writes none.
+//
+// An ordinal's or a scale's "|terminology" is its symbol's terminology. Without
+// one the symbol is in local, or, with [WithTemplate], in the terminology the
+// template's ordinal list gives its code and value. With [WithTemplate], an
+// ordinal's "|terminology" that names another terminology than that list
+// gives its code and value is refused with [ErrUnsupportedDatatype]. Encode
+// writes no "|terminology": an ordinal or a scale coded outside local rides
+// "|raw".
 //
 // FLAT reads "|value" the same way: "<leaf>|value" is the bare value of every
 // datatype that has one. [StructuredToFlat] writes a "|value" member as that

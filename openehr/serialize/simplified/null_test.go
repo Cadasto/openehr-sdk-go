@@ -15,6 +15,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -403,33 +404,44 @@ func TestREQ053DvFromSuffixesReadsNullAsAbsent(t *testing.T) {
 // bare value at a datatype with no bare spelling is unmatched beside a suffix
 // the datatype reads, and malformed alone. Null suffixes are absent, so a bare
 // value beside nothing else is alone, and refused as a value missing every
-// required suffix, rather than set aside while the null suffixes vanish.
-// STRUCTURED spells that bare value beside the suffixes as the `"|"` or the
-// `""` member: the `|value` member FLAT → STRUCTURED writes is a suffix, and
-// DV_PROPORTION, with no bare value, has no `|value` either.
+// required suffix, rather than set aside while the null suffixes vanish: a
+// DV_QUANTITY's, in FLAT and as the `"|"` or the `""` member in STRUCTURED (the
+// `|value` member FLAT → STRUCTURED writes is a suffix, and a DV_QUANTITY has
+// no bare value and no `|value`). A DV_PROPORTION's bare value, its magnitude,
+// is read in every spelling, so beside a null numerator and denominator it is
+// alone too, and refused as the proportion missing its numerator.
 func TestREQ053BareValueBesideOnlyNullSuffixesIsAlone(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	body := rmattrBody(map[string]any{
-		rmattrProportion: 1.5, rmattrProportion + "|numerator": nil, rmattrProportion + "|denominator": nil,
-	})
-	doc, err := FlatToStructured(mustJSON(t, body))
-	if err != nil {
-		t.Fatalf("FlatToStructured: %v", err)
-	}
-	spelled := func(member string) []byte {
-		out := bytes.Replace(doc, []byte(`"|value":1.5`), []byte(`"`+member+`":1.5`), 1)
-		if bytes.Equal(out, doc) {
-			t.Fatalf("fixture: no |value member holding 1.5 in %s", doc)
+	// spellings decodes body, whose leaf's bare value is 1.5, in FLAT and in
+	// STRUCTURED with the bare value as each member in members, and returns
+	// the refusal each gives in every mode.
+	spellings := func(body map[string]any, members ...string) map[string]error {
+		doc, err := FlatToStructured(mustJSON(t, body))
+		if err != nil {
+			t.Fatalf("FlatToStructured: %v", err)
+		}
+		out := map[string]error{"FLAT": refusedInEveryMode(t, wt, body)}
+		for _, member := range members {
+			spelled := bytes.Replace(doc, []byte(`"|value":1.5`), []byte(strconv.Quote(member)+`:1.5`), 1)
+			if member != bareValueMember && bytes.Equal(spelled, doc) {
+				t.Fatalf("fixture: no |value member holding 1.5 in %s", doc)
+			}
+			out["STRUCTURED "+strconv.Quote(member)+" member"] = structuredDocRefusedInEveryMode(t, wt, spelled)
 		}
 		return out
 	}
-	for form, err := range map[string]error{
-		"FLAT":                  refusedInEveryMode(t, wt, body),
-		`STRUCTURED "|" member`: structuredDocRefusedInEveryMode(t, wt, spelled("|")),
-		`STRUCTURED "" member`:  structuredDocRefusedInEveryMode(t, wt, spelled("")),
-	} {
+	quantity := rmattrBody(map[string]any{rmattrElement: 1.5, rmattrElement + "|magnitude": nil, rmattrElement + "|unit": nil})
+	for form, err := range spellings(quantity, bareStructuredKey, emptyBareMember) {
 		if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "bare value") {
-			t.Errorf("%s: decode = %v, want the lone bare value refused (ErrUnsupportedDatatype)", form, err)
+			t.Errorf("DV_QUANTITY %s: decode = %v, want the lone bare value refused (ErrUnsupportedDatatype)", form, err)
+		}
+	}
+	proportion := rmattrBody(map[string]any{
+		rmattrProportion: 1.5, rmattrProportion + "|numerator": nil, rmattrProportion + "|denominator": nil,
+	})
+	for form, err := range spellings(proportion, bareValueMember, bareStructuredKey, emptyBareMember) {
+		if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "missing required |numerator") {
+			t.Errorf("DV_PROPORTION %s: decode = %v, want the lone bare value refused as missing |numerator (ErrUnsupportedDatatype)", form, err)
 		}
 	}
 }
