@@ -232,7 +232,7 @@ When adding to `internal/`:
 The SDK **MUST** follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Major versions `v2` and beyond **MUST** use Go's semantic-import-versioning convention (`…/v2/`).
 
 A release **MUST** take the highest bump that any of its changes maps to in the table below.
-While on `v0.x`, a change the table maps to major takes a minor bump instead, and the release notes **MUST** name it.
+While on `v0.x`, a change the table maps to major takes a minor bump instead, and the release notes name it ([releases.md § CHANGELOG](../releases.md#changelog)).
 
 Anything outside `internal/` is public surface for this table:
 

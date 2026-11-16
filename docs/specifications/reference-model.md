@@ -278,7 +278,12 @@ LOCATABLE concrete descendants additionally receive the generated identity surfa
 | `P_BMM_CONTAINER_PROPERTY` | `[]T` for `List`, `Array` and `Set`; `map[string]V` for `Hash` — see § Container mapping |
 | `P_BMM_GENERIC_PROPERTY` | The generic instantiation, e.g. `*DVInterval[DVQuantity]` for `DV_INTERVAL<DV_QUANTITY>` |
 
-Three cases depart from the single-property rows. A non-mandatory property whose type the generator emits as a Go interface (an abstract class, or a concrete class with subtypes, emitted as a narrow `…Like` interface) stays `T`, because an interface field is already nilable. A mandatory property that closes a cycle of mandatory struct-typed properties, such as `ARCHETYPE.ontology` and `ARCHETYPE_ONTOLOGY.parent_archetype` in the pinned `openehr_am_1.4.0`, becomes `*T`, because Go cannot declare a struct that contains itself by value. A non-mandatory property whose BMM type is `Any` **MUST** be emitted as `*any`, because `Any` is a primitive and not a class the interface exception covers. The pinned `openehr_am_1.4.0` emits five, each an `assumed_value` it declares on `C_DEFINED_OBJECT` or `C_PRIMITIVE`; the AOM 1.4 root drops it from `C_COMPLEX_OBJECT` and `C_PRIMITIVE_OBJECT` and gives it, on the other classes that have one, the type the AM Release-1.4 schema gives it ([clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)), so the generated types hold none. A mandatory `Any` property **MUST** be emitted as `any`.
+Three cases depart from the single-property rows:
+
+- A non-mandatory property whose type the generator emits as a Go interface (an abstract class, or a concrete class with subtypes, emitted as a narrow `…Like` interface) stays `T`, because an interface field is already nilable.
+- A mandatory property that closes a cycle of mandatory struct-typed properties, such as `ARCHETYPE.ontology` and `ARCHETYPE_ONTOLOGY.parent_archetype` in the pinned `openehr_am_1.4.0`, becomes `*T`, because Go cannot declare a struct that contains itself by value.
+- A non-mandatory property whose BMM type is `Any` becomes `*any`, because `Any` is a primitive and not a class the interface exception covers; a mandatory one is `any`, as the primitive table says.
+  The pinned `openehr_am_1.4.0` emits five, each an `assumed_value` it declares on `C_DEFINED_OBJECT` or `C_PRIMITIVE`; the AOM 1.4 root drops it from `C_COMPLEX_OBJECT` and `C_PRIMITIVE_OBJECT` and gives it, on the other classes that have one, the type the AM Release-1.4 schema gives it ([clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model)), so the generated types hold no `*any` field.
 
 JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitzero` on a non-mandatory single or generic property held as a pointer (`*T`, `*DVInterval[DVQuantity]`, `*[]T`, `*map[string]V`), so that only a nil pointer is omitted, and `omitempty` on a non-mandatory one that is not a pointer (a Go interface, or a `P_BMM_SINGLE_PROPERTY_OPEN` typed by the open generic parameter).
 A mandatory property whose Go field can hold no value carries an omit option, so that an absent one is left out of canonical JSON ([REQ-052](wire.md#req-052) § An absent mandatory member):
@@ -465,9 +470,10 @@ For a class in the universe, the surface **MUST** answer:
 
 #### The flattened attribute tables stay flattened
 
-The per-class attribute tables are inheritance-**flattened** and **MUST** stay so: they answer the inheritance-*resolved* question the REQ-112 validation floor and the REQ-111 compiled template depend on. The declaration site is **additive** — it recovers what the fold erases — rather than a narrowing of any table to own-only declarations.
+The per-class attribute tables are inheritance-**flattened**: they answer the inheritance-*resolved* question the REQ-112 validation floor and the REQ-111 compiled template depend on.
+The declaration site is **additive**: it recovers what the fold erases, rather than narrowing any table to own-only declarations.
 
-The declaration site **MUST** agree with the fold that produced those tables. Observably, for an attribute a class carries:
+The tables **MUST** stay flattened, and the declaration site agree with the fold that produced them; observably, for an attribute a class carries:
 
 - the class named is that class or one of its BMM ancestors — the **unfiltered** ancestor chain, since the site may lie outside the universe (§ The class universe above);
 - the named class's own BMM declaration carries the attribute;
@@ -506,7 +512,8 @@ The *out-of-universe* state itself has structure: why a given name is not in the
 
 The universe answers "does this surface model the class?" with membership. The negative space behind a "no" has structure the generator already computes: a name can be undeclared by the pinned schemas, declared but in a package the target skips wholesale, declared but in the generator's named-class exclusion set, a `primitive_types` value rather than a modelled class ([§ Primitive type mapping](#primitive-type-mapping)), or a BMM enumeration. The surface keeps these apart, for the reason [§ Three answers, never conflated](#three-answers-never-conflated) keeps the in-universe states apart.
 
-For a name **not** in the class universe, the surface **MUST** report exactly one reason, drawn from this closed set:
+The surface **MUST** answer the reason question with exactly one reason from the closed set below for a name **not** in the class universe, and with a distinguished *none* answer for a name the universe **does** contain.
+*None* is the reason type's zero value and equals no absence reason, so the accessor cannot be misread as a membership test with inverted sense.
 
 | Reason | Meaning |
 |---|---|
@@ -515,8 +522,6 @@ For a name **not** in the class universe, the surface **MUST** report exactly on
 | **excluded class** | declared; in the generator's named-class exclusion set |
 | **primitive** | declared as (or mapped to) a [§ Primitive type mapping](#primitive-type-mapping) entry — a value the RM *uses*, not a class this surface models, even where the target emits a Go type for it |
 | **enumeration** | declared as a BMM enumeration, not a class |
-
-For a name the universe **does** contain, the surface **MUST** report a distinguished *none* answer — the reason type's zero value — that equals no absence reason, so the accessor cannot be misread as a membership test with inverted sense.
 
 A name that more than one rule matches **MUST** report the reason ranked first in this fixed precedence, which puts what a name *is* ahead of why it was *skipped*:
 
@@ -572,7 +577,7 @@ The SDK **MUST** expose the derived components of the openEHR identifier types, 
 - `TERMINOLOGY_ID` (lexical form `name [ '(' version ')' ]`): `name` and `version_id`.
 - `DV_URI` (an RFC 3986 URI reference, `[ scheme ':' ] hier-part [ '?' query ] [ '#' fragment ]`): `scheme`, `path`, `query` and `fragment_id`, which `DV_EHR_URI` inherits. Each is the RFC 3986 component as written, not percent-decoded, or empty when the reference has none. A relative reference has no scheme, and the path leaves out the authority (the `//system_id` of an `ehr://` URI). The RM admits plain text as a `DV_URI` value, so these functions split any text: the text before the first colon is the scheme only when RFC 3986 § 3.1 admits it as one (a letter, then letters, digits, `+`, `-` or `.`), and the rest splits as RFC 3986 appendix B reads a reference. A nil `DV_URI` or `DV_EHR_URI` answers empty for each, and the malformed-string rule below does not apply to them.
 
-`OBJECT_REF` / `PARTY_REF` and the `PARTY_PROXY` family **SHOULD** expose convenience accessors for their reference and identity components, and `LOCATABLE_REF` **SHOULD** provide `as_uri()` — the `ehr:`-scheme URI built from `namespace` + `id.value` + `path` — because callers otherwise rebuild these from the fields by hand.
+`LOCATABLE_REF` **SHOULD** provide `as_uri()`, the `ehr:`-scheme URI built from `namespace` + `id.value` + `path`, because callers otherwise rebuild it from the fields by hand.
 
 Each fallible identifier form has one error-returning parser in `openehr/rm` (`ParseObjectVersionID`, `ParseVersionTreeID`, `ParseArchetypeID`, `ParseTerminologyID`), and client-side helpers such as the version-uid splitter in `openehr/client/ehr` delegate to it rather than re-parse. `HIER_OBJECT_ID` / `UID_BASED_ID` decomposition is best-effort only, with no `Parse…` entry point.
 
@@ -585,21 +590,21 @@ For a malformed identifier string, the `Parse…` function **MUST** return a non
 
 **Acceptance:** for canonical and malformed sample strings of each identifier form, `Parse…`, where the form has one, round-trips the input and derived components equal the spec's lexical decomposition; malformed input yields an error from `Parse…` (no panic); best-effort methods never panic; the client version-uid helper produces identical results to the canonical parser. `ParseObjectVersionID` refuses an `object_id` or `creating_system_id` that is blank or holds white space, a control character or other punctuation, and accepts one with `_`; `ParseVersionTreeID` refuses a part with a sign, a leading zero or a value past the signed 64-bit range, and accepts `3000000000`. The `DV_URI` functions split sample references with and without each component, a `DV_EHR_URI` decoded from a `LINK` target answers them without a panic, and a nil `DV_URI` or `DV_EHR_URI` answers empty.
 
-**Out of scope:** checking a `UID` part beyond the reading above, such as RFC 1034 label syntax or a UUID's version bits; generation of new identifiers (covered for instance synthesis by REQ-107). Of the recommended convenience accessors, only `LOCATABLE_REF.as_uri` exists; the `OBJECT_REF` / `PARTY_REF` / `PARTY_PROXY` ones are deferred, and the underlying fields are already directly accessible on the generated structs.
+**Out of scope:** checking a `UID` part beyond the reading above, such as RFC 1034 label syntax or a UUID's version bits; generation of new identifiers (covered for instance synthesis by REQ-107).
+Convenience accessors for the reference and identity components of `OBJECT_REF`, `PARTY_REF` and the `PARTY_PROXY` family are deferred; the underlying fields are already directly accessible on the generated structs.
 
 #### Version-control derived helpers
 
-The SDK **MUST** implement the pure, derived version-control functions, computed from the version identifier:
+The SDK **MUST** implement the one pure, derived version-control function, `VERSION.is_branch`, from the version's `uid`: true iff its `version_tree_id` is a branch, as above.
 
-- `VERSION.is_branch` **MUST** be derived from the version's `uid` (true iff its `version_tree_id` is a branch, as above).
-
-Client-side version *container management* is **out of scope** and **MUST NOT** be implemented as in-memory RM behaviour: `VERSIONED_OBJECT` operations (`version_count`, `all_versions`, `all_version_ids`, `has_version_at_time`, `has_version_id`, `version_at_time`, `version_with_id`, `latest_version`, `latest_trunk_version`, `trunk_lifecycle_state`) and all `commit_*` mutators are server-mediated in this SDK — they are realised over REST in `openehr/client/ehr` and `openehr/client/demographic`, not against a materialised in-memory container. These methods **MUST** remain explicit, documented stubs that fail loudly rather than return a misleading value (e.g. a `version_count` of `0`).
+Client-side version *container management* is **out of scope**: the `VERSIONED_OBJECT` operations (`version_count`, `all_versions`, `all_version_ids`, `has_version_at_time`, `has_version_id`, `version_at_time`, `version_with_id`, `latest_version`, `latest_trunk_version`, `trunk_lifecycle_state`) and all `commit_*` mutators are server-mediated in this SDK, realised over REST in `openehr/client/ehr` and `openehr/client/demographic`, not against a materialised in-memory container.
+Their generated methods **MUST** stay explicit, documented stubs that fail loudly, never in-memory RM behaviour that returns a misleading value (e.g. a `version_count` of `0`).
 
 **Acceptance:** `VERSION.is_branch` is true for a branch version uid and false for a trunk uid; the out-of-scope container operations are documented as server-side and do not silently return zero values.
 
 ### REQ-121 — Locatable path read access
 
-The SDK **MUST** provide read navigation of an in-memory RM instance by an openEHR path, implementing the `PATHABLE` read operations over the actual object tree:
+The SDK provides read navigation of an in-memory RM instance by an openEHR path, implementing the `PATHABLE` read operations over the actual object tree:
 
 - `item_at_path(path)` **MUST** return the single item at a **unique** path, and **MUST** return an error when the path is absent or resolves to more than one item.
 - `items_at_path(path)` **MUST** return all items matching a **non-unique** path (empty when none match).
