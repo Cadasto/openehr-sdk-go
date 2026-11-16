@@ -13,7 +13,7 @@ date: 2026-09-07
 - **Superseded by:** —
 - **Strand:** [STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml).
 - **Introduces:** —. **Amends:** [REQ-082](../specifications/conformance.md#req-082--runnability) Cassette encoding.
-- **Related:** the side-by-side capture in [strand-11-evidence](../plans/strand-11-evidence/).
+- **Related:** the side-by-side capture in [strand-11-recording-format](../analysis/strand-11-recording-format/).
 
 ## Context
 
@@ -23,8 +23,8 @@ order-preserving normalised matching — but left the on-disk encoding open as S
 HTTP Archive (`.har`) versus a purpose-built YAML schema.
 
 The strand asked for one real capture, serialised both ways, reviewed as a diff. That capture
-is a live `POST /ehr` against EHRbase 2.35.1 ([ehr-create.har](../plans/strand-11-evidence/ehr-create.har)
-and [ehr-create.yaml](../plans/strand-11-evidence/ehr-create.yaml)). The remaining question is
+is a live `POST /ehr` against EHRbase 2.35.1 ([ehr-create.har](../../testkit/recordings/ehr-create.har)
+and [ehr-create.yaml](../analysis/strand-11-recording-format/ehr-create.yaml)). The remaining question is
 which file a second implementation (or a reviewer) can treat as the recording.
 
 ## Decision

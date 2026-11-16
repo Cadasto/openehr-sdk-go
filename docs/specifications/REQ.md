@@ -146,11 +146,10 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 
 A new requirement takes the **next free number above the highest registered one**, whatever its topic. The number carries no topic meaning; the canonical link says where the requirement belongs. Earlier requirements were numbered in topic bands (001–005 packaging, 010–014 layout, and so on); those numbers stay as they are, but the bands are no longer allocated from.
 
-Identifiers **MUST** be stable once published. Renumbering and reuse are prohibited.
+Identifiers are stable once published: never renumbered and never reused.
 
-A plan may reserve a number before its spec text exists; record the reservation in the list below, and remove the entry once the requirement is registered. The list is prose, not a table, so the registry stays the only index table in this file.
+Numbers released without becoming a requirement are listed below. The list is prose, not a table, so the registry stays the only index table in this file.
 
-- REQ-114: reserved for the OPT author validator.
-- REQ-115: reserved for the FLAT author linter.
+- REQ-114 and REQ-115: retired, never reused; they were reserved for an OPT author validator and a FLAT author linter that were never started.
 - REQ-124 and REQ-125: retired, never reused; they were reserved for the deferred RM-function stubs, which [reference-model.md](reference-model.md) records as out of scope.
 - REQ-141: retired, never reused.
