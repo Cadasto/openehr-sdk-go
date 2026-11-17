@@ -37,7 +37,8 @@ var attributeGroups = func() map[classAttribute]*terminology.Group {
 // ties v's attribute to (nodeGroup); the rubric is the group's, since one
 // code can have another rubric in another group. On an attribute the RM
 // ties to no group, such as a locatable's name, it takes the rubric every
-// group that holds it agrees on (agreedRubric). A code of any other
+// group that holds it agrees on, as tcimpl.CodeTermText reads it, the rule
+// the FLAT and STRUCTURED decode names a node by. A code of any other
 // terminology takes the text of the term node's own archetype defines for
 // it (useTermText). A code the group has no rubric for, a code the groups
 // disagree on, and a code the archetype defines no term for keep the text
@@ -56,30 +57,11 @@ func useCodedText(node *tcimpl.CompiledNode, v *rm.DVCodedText) {
 	if group := nodeGroup(node); group != nil {
 		rubric, ok = group.Rubric(code)
 	} else {
-		rubric, ok = agreedRubric(code)
+		rubric, ok = tcimpl.CodeTermText(node, terminology.ID, code)
 	}
 	if ok {
 		takeText(node, v, rubric)
 	}
-}
-
-// agreedRubric returns the rubric the openEHR terminology gives code where
-// no group is chosen: the one every group that holds code gives it, so 433
-// is "event", while 532, "complete" in one group and "completed" in
-// another, has none. ok is false where no group holds code or two give it
-// different rubrics.
-func agreedRubric(code string) (rubric string, ok bool) {
-	for g := range terminology.Groups() {
-		r, held := g.Rubric(code)
-		if !held {
-			continue
-		}
-		if rubric != "" && r != rubric {
-			return "", false
-		}
-		rubric = r
-	}
-	return rubric, rubric != ""
 }
 
 // nodeGroup returns the group of the openEHR terminology the RM ties to
