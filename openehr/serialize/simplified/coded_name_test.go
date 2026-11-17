@@ -3,9 +3,9 @@ package simplified_test
 // REQ-053, REQ-111 — the formats have no key for a node's name below the root,
 // so a WithTemplate decode names each node it rebuilds from the template.
 // Where the template constrains the name as a DV_CODED_TEXT whose code it
-// constrains through one code phrase, decode gives the node the coded name
-// the generator writes there; everywhere else the node keeps its DV_TEXT
-// name. These cases edit the name constraint of the sdk_crosscheck_values.v1
+// constrains through one code phrase, or leaves unconstrained, decode gives
+// the node the coded name the generator writes there; everywhere else the
+// node keeps its DV_TEXT name. These cases edit the name constraint of the sdk_crosscheck_values.v1
 // ELEMENT at0016, write the edited template's Medium skeleton as FLAT or
 // STRUCTURED, decode it with the edited template, and check the name decode
 // gives the node.
@@ -65,14 +65,29 @@ func replacing(old, replacement string) valuesEdit {
 // stringValue is a value attribute whose STRING the C_STRING body item
 // constrains.
 func stringValue(item string) string {
-	return optAttribute("C_SINGLE_ATTRIBUTE", "value", "1", "",
-		optChild("C_PRIMITIVE_OBJECT", "STRING", "1", "1", "", `<item xsi:type="C_STRING">`+item+`</item>`))
+	return optAttribute("C_SINGLE_ATTRIBUTE", "value", "1", "", stringChild(item))
+}
+
+// stringChild is a STRING child, occurring once, that the C_STRING body item
+// constrains.
+func stringChild(item string) string {
+	return optChild("C_PRIMITIVE_OBJECT", "STRING", "1", "1", "", `<item xsi:type="C_STRING">`+item+`</item>`)
 }
 
 // pinnedValue is a value attribute that pins text: a closed C_STRING list of
 // that one entry.
 func pinnedValue(text string) string {
 	return stringValue(`<list>` + text + `</list>`)
+}
+
+// pinnedAlternatives is a value attribute with one STRING alternative per
+// entry of texts, in order, each pinning that text.
+func pinnedAlternatives(texts ...string) string {
+	children := make([]string, len(texts))
+	for i, text := range texts {
+		children[i] = stringChild(`<list>` + text + `</list>`)
+	}
+	return optAttribute("C_SINGLE_ATTRIBUTE", "value", "1", "", children...)
 }
 
 // codePhrase is a C_CODE_PHRASE child of the terminology terminologyID (none
@@ -164,19 +179,20 @@ func editValues(t *testing.T, edits ...valuesEdit) editedValues {
 // TestREQ053CodedNameRules — REQ-053, REQ-111: where the template constrains a
 // node's name as a DV_CODED_TEXT, through one child or alternatives that
 // agree, whose defining_code it constrains through one C_CODE_PHRASE, or the
-// one a C_CODE_REFERENCE carries (REQ-103), decode gives the node the coded
-// name the generator writes there under its example fill. Its code is the
-// first listed one, else the placeholder at0000 in the terminology the phrase
-// names (a reference set's URI included), else in local. Its text is the
-// code's term text (the node's archetype term for a local code, its rubric
-// for an openehr one) where the C_STRING on the name's value admits it; else,
-// for a code of any other terminology than openehr, the first listed code
-// whose term text that C_STRING admits takes its place, with that text; else
-// the text is the one the generator writes under that C_STRING, or "example"
-// with none. Defining_code alternatives and name alternatives that disagree
-// leave the node its DV_TEXT name. Where decode gives a coded name, it is the
-// one the skeleton writes, and the round trip validates against the edited
-// template.
+// one a C_CODE_REFERENCE carries (REQ-103), or leaves unconstrained, decode
+// gives the node the coded name the generator writes there under its example
+// fill. Its code is the first listed one, else the placeholder at0000 in the
+// terminology the phrase names (a reference set's URI included), else in
+// local; an unconstrained defining_code gives the placeholder in local. Its
+// text is the code's term text (the node's archetype term for a local code,
+// its rubric for an openehr one) where the C_STRING on the name's value, the
+// first alternative there, admits it; else, for a code of any other
+// terminology than openehr, the first listed code whose term text that
+// C_STRING admits takes its place, with that text; else the text is the one
+// the generator writes under that C_STRING, or "example" with none.
+// Defining_code alternatives and name alternatives that disagree leave the
+// node its DV_TEXT name. Where decode gives a coded name, it is the one the
+// skeleton writes, and the round trip validates against the edited template.
 func TestREQ053CodedNameRules(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -320,6 +336,40 @@ func TestREQ053CodedNameRules(t *testing.T) {
 			name:  "an external at-code, whose bare key names an archetype term",
 			edits: []valuesEdit{withName(codedText(definingCode(codePhrase("SNOMED-CT", "at0017"))))},
 			want:  codedNameJSON("example", "at0017", "SNOMED-CT"),
+		},
+		{
+			// The generator writes the placeholder at0000 in local where
+			// the template leaves the defining_code unconstrained.
+			name:  "no defining_code",
+			edits: []valuesEdit{withName(codedText())},
+			want:  codedNameJSON("example", "at0000", "local"),
+		},
+		{
+			name:  "no defining_code and a pinned text",
+			edits: []valuesEdit{withName(codedText(pinnedValue("First option")))},
+			want:  codedNameJSON("First option", "at0000", "local"),
+		},
+		{
+			name:  "a defining_code with no child",
+			edits: []valuesEdit{withName(codedText(definingCode()))},
+			want:  codedNameJSON("example", "at0000", "local"),
+		},
+		{
+			name:  "a defining_code whose one child constrains no code",
+			edits: []valuesEdit{withName(codedText(definingCode(optStructure("CODE_PHRASE", ""))))},
+			want:  codedNameJSON("example", "at0000", "local"),
+		},
+		{
+			// The text is judged by the first alternative on the name's
+			// value, as the generator judges it.
+			name:  "value alternatives, the first with the second code's term",
+			edits: []valuesEdit{withName(localCodes(pinnedAlternatives("Second option", "Third option"), "at0017", "at0018"))},
+			want:  codedNameJSON("Second option", "at0018", "local"),
+		},
+		{
+			name:  "value alternatives, the first with no listed code's term",
+			edits: []valuesEdit{withName(localCodes(pinnedAlternatives("Third option", "Second option"), "at0017", "at0018"))},
+			want:  codedNameJSON("Third option", "at0017", "local"),
 		},
 		{
 			name:  "defining_code alternatives",
