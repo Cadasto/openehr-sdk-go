@@ -8,10 +8,12 @@ package instance_test
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -162,34 +164,85 @@ func TestREQ107_REQ111_CorpusNamesAreTheNodeNames(t *testing.T) {
 }
 
 // TestREQ107_REQ111_NodeNamesHoldInAnotherLanguage is the same check with
-// Options.Language other than the template's own language, on the vendored
-// templates that carry an archetype's terms in another language besides
-// their own: the name a template fixes is read in the one language whose
-// terms the compile reads, and so is the name the generator writes, so the
-// two agree whatever Options.Language asks for.
+// Options.Language other than the template's own language: the name a
+// template fixes by one code is read in the one language whose terms the
+// compile reads, and so is the name the generator writes, so the two agree
+// whatever Options.Language asks for. IDCR - Vital Signs Encounter.v1 fixes
+// the pulse rate's name by a code; a synthetic template fixes its name to
+// its concept code and carries a German term for it in a component
+// ontology, as family_history.v.1.2.3 carries the German terms of its
+// archetypes.
 func TestREQ107_REQ111_NodeNamesHoldInAnotherLanguage(t *testing.T) {
+	model, err := aom14.ReadOperationalTemplate(strings.NewReader(translatedConceptOPT()))
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
+	}
+	if !carriesTerm(model, "de", "at0000", "Konzept") {
+		t.Fatal("the translated template's model carries no German term for at0000 — fixture changed?")
+	}
+	translated := compileOPTText(t, translatedConceptOPT(), true)
+	if got := translated.Root().NodeName(); got != "Concept" {
+		t.Fatalf("translated template NodeName() = %q, want %q", got, "Concept")
+	}
 	checked := 0
-	for _, tc := range []struct{ template, language string }{
-		{template: "IDCR - Vital Signs Encounter.v1", language: "de"},
-		{template: "family_history.v.1.2.3", language: "de"},
-		{template: "body_weight", language: "nl"},
+	for _, tc := range []struct {
+		name     string
+		c        *templatecompile.Compiled
+		language string
+	}{
+		{name: "IDCR - Vital Signs Encounter.v1", c: compileFixture(t, "IDCR - Vital Signs Encounter.v1"), language: "de"},
+		{name: "translated concept", c: translated, language: "de"},
+		{name: "translated concept", c: translated, language: "en"},
 	} {
-		c := compileFixture(t, tc.template)
 		for _, opts := range defaultsOptions() {
 			opts.Language = tc.language
 			opts.Territory, opts.Composer = "NL", testComposer()
-			out, err := instance.Generate(t.Context(), c, opts)
+			out, err := instance.Generate(t.Context(), tc.c, opts)
 			if err != nil {
-				t.Fatalf("%s/%v/%v: Generate: %v", tc.template, opts.Policy, opts.ValueFill, err)
+				t.Fatalf("%s/lang=%s/%v/%v: Generate: %v", tc.name, tc.language, opts.Policy, opts.ValueFill, err)
 			}
-			for _, m := range pinnedNameMismatches(c.Root(), out, "", &checked) {
-				t.Errorf("%s/lang=%s/%v/%v: %s", tc.template, tc.language, opts.Policy, opts.ValueFill, m)
+			if el, ok := out.(*rm.Element); ok {
+				if got := elementCodedName(t, el).Value; got != tc.c.Root().NodeName() {
+					t.Errorf("%s/lang=%s/%v/%v: name = %q, want the node name %q", tc.name, tc.language, opts.Policy, opts.ValueFill, got, tc.c.Root().NodeName())
+				}
+				checked++
+			}
+			for _, m := range pinnedNameMismatches(tc.c.Root(), out, "", &checked) {
+				t.Errorf("%s/lang=%s/%v/%v: %s", tc.name, tc.language, opts.Policy, opts.ValueFill, m)
 			}
 		}
 	}
 	if checked == 0 {
 		t.Fatal("no generated locatable whose OPT node fixes a name, so nothing was checked")
 	}
+}
+
+// translatedConceptOPT is an ELEMENT template, in English, whose name the
+// OPT fixes to the concept code at0000, Concept, and whose component
+// ontology gives at0000 the German text Konzept.
+func translatedConceptOPT() string {
+	ontology := `<component_ontologies archetype_id="openEHR-EHR-ELEMENT.rm_defaults.v1"><term_definitions language="de">` +
+		`<items code="at0000"><items id="text">Konzept</items></items></term_definitions></component_ontologies>`
+	opt := optTemplate("ELEMENT", conceptTerm, optSingle("name", optCodedText("local", "at0000")))
+	return strings.Replace(opt, "</definition>", "</definition>"+ontology, 1)
+}
+
+// carriesTerm reports whether a component ontology of opt gives code the
+// text in language.
+func carriesTerm(opt *aom14.OperationalTemplate, language, code, text string) bool {
+	for _, o := range opt.ComponentOntologies {
+		for _, set := range o.TermDefinitions {
+			if set.Language != language {
+				continue
+			}
+			for _, term := range set.Items {
+				if term.Code == code && term.Items["text"] == text {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // pinnedNameMismatches walks the RM value v beside n, the OPT node it was
