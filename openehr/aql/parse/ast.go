@@ -126,17 +126,23 @@ func boundedSpan(start, end Position) Span {
 // containment tree is flattened to document order; nesting is not kept
 // because the linter reasons over the set of bound classes, not their
 // containment shape.
+//
+// A ClassExpr carrying a [ClassExpr.ParsedPredicate] is not safe to compare
+// with `==`; see that field.
 type ClassExpr struct {
 	// RMType is the reference-model class name (e.g. "OBSERVATION",
 	// "COMPOSITION", "EHR"), or "VERSION" for a VERSION class expression.
 	RMType string
 	// Alias is the binding variable (e.g. "o"), or "" when anonymous.
 	Alias string
-	// Archetype is the literal archetype HRID from a containment predicate
-	// (e.g. "openEHR-EHR-OBSERVATION.blood_pressure.v1"), the `$param`
-	// placeholder text when ParamArchetype is true (e.g. "$arch"), or ""
-	// when the class carries no archetype predicate. Callers must consult
-	// ParamArchetype before treating Archetype as a literal HRID.
+	// Archetype is the literal archetype HRID the class bracket names (e.g.
+	// "openEHR-EHR-OBSERVATION.blood_pressure.v1"), the `$param` placeholder
+	// text when ParamArchetype is true (e.g. "$arch"), or "" when the bracket
+	// names no archetype. The HRID is set for the bare form `[hrid]` and for
+	// the named form `[hrid, 'name']` alike; for the named form
+	// [ClassExpr.Predicate] also carries the whole bracket text, which is what
+	// the emitter renders. Callers must consult ParamArchetype before treating
+	// Archetype as a literal HRID.
 	Archetype string
 	// ParamArchetype is true when the archetype predicate is a $param
 	// placeholder (`[$arch]`) rather than a literal HRID; the
@@ -152,11 +158,14 @@ type ClassExpr struct {
 	// from a bare one.
 	HasPredicate bool
 	// Predicate is the raw text inside the class predicate brackets when
-	// HasPredicate is true and the predicate is not a literal archetype HRID
-	// (which lives on [ClassExpr.Archetype]) or a `$param` archetype
-	// (signalled by [ClassExpr.ParamArchetype]). Carries standing predicates
-	// such as `ehr_id/value=$x` so the emitter can round-trip them, with
-	// brackets stripped and content verbatim from the source.
+	// HasPredicate is true and the predicate is not a bare literal archetype
+	// HRID (which lives on [ClassExpr.Archetype] alone) or a `$param`
+	// archetype (signalled by [ClassExpr.ParamArchetype]). Carries standing
+	// predicates such as `ehr_id/value=$x`, and the named archetype form
+	// `hrid, 'name'` beside its HRID on Archetype, so the emitter can
+	// round-trip them, with brackets stripped and content verbatim from the
+	// source. When Predicate is set the emitter renders it; otherwise it
+	// renders Archetype.
 	Predicate string
 	// PredicateComparison is the standing class predicate parsed as a
 	// `{path, operator, value}` comparison (e.g. `ehr_id/value = $x`),
@@ -181,6 +190,25 @@ type ClassExpr struct {
 	// Alias (a relative predicate path binds no FROM alias), matching the
 	// WHERE side for the class-predicate left-hand side.
 	PredicateComparison *aql.Comparison
+	// ParsedPredicate is the typed form of the class bracket, whichever field
+	// carries its text (Archetype for a bare HRID or `$param`, Predicate
+	// otherwise). It is derived as [PathSegment.Parsed] is, since the class
+	// bracket is the same grammar production as a path step's, and both views
+	// populate it. It is a read-side derivation: no write path reads it, so
+	// mutating it cannot change what the emitter produces, and the text fields
+	// stay authoritative for emission.
+	//
+	// nil means the SDK does not structure this form, and a reader may rely on
+	// that and fail closed on it. There is no partial structure: a non-nil
+	// ParsedPredicate is complete for its kind. It is nil when the class
+	// carries no bracket, and for a VERSION class, whose bracket is a
+	// different production. When a class bracket is present and
+	// ParsedPredicate is nil, the predicate is one of the enumerated
+	// unstructured forms listed on [PathSegment.Parsed].
+	//
+	// Not `==`-comparable and not usable as a map key; see the Comparability
+	// section of [aql.SegmentPredicate]. Compare with [aql.EqualPredicates].
+	ParsedPredicate aql.SegmentPredicate
 	// Pos is the source position of the class expression.
 	Pos Position
 }
@@ -228,10 +256,10 @@ func (d *Document) extract() {
 // with the structured extractor's extractClassExprOperand
 // (extract_query.go) so a consumer reading the flat lint view and the
 // structured Query sees identical raw [ClassExpr] fields for the same
-// source — RMType / Alias / Archetype / Predicate / HasPredicate,
-// including the standing-predicate body and the param-archetype
-// placeholder name carried verbatim in Archetype. The structured
-// extractor additionally populates [ClassExpr.PredicateComparison],
+// source — RMType / Alias / Archetype / Predicate / HasPredicate /
+// ParsedPredicate, including the standing-predicate body and the
+// param-archetype placeholder name carried verbatim in Archetype. The
+// structured extractor additionally populates [ClassExpr.PredicateComparison],
 // which this flat lint view intentionally omits — that field's own
 // godoc is the canonical statement of the rule for consumers (REQ-113:
 // the classification belongs on the type a consumer holds).
@@ -245,6 +273,9 @@ func (e *extractor) EnterClassExpression(c *gen.ClassExpressionContext) {
 	}
 	if pp := c.PathPredicate(); pp != nil {
 		ce.HasPredicate = true
+		// REQ-113 § Structured node predicates: the class bracket is the same
+		// production as a path step, so it gets the same typed form.
+		ce.ParsedPredicate = structuredPathPredicate(pp)
 		switch {
 		case pp.ArchetypePredicate() != nil:
 			ap := pp.ArchetypePredicate()
@@ -256,6 +287,7 @@ func (e *extractor) EnterClassExpression(c *gen.ClassExpressionContext) {
 			}
 		default:
 			ce.Predicate = trimBrackets(sourceText(pp))
+			ce.Archetype = namedArchetypeHRID(pp)
 		}
 	}
 	e.classes = append(e.classes, ce)
@@ -296,6 +328,9 @@ func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
 	}
 	if pp := c.PathPredicate(); pp != nil {
 		ip.Predicate = trimBrackets(sourceText(pp))
+		// REQ-113 § Structured node predicates: the alias-root bracket is the
+		// same production as a path step, so it gets the same typed form.
+		ip.ParsedPredicate = structuredPathPredicate(pp)
 	}
 	if op := c.ObjectPath(); op != nil {
 		for _, part := range op.AllPathPart() {

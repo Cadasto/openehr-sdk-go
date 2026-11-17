@@ -6,6 +6,7 @@ package parse_test
 // archetype form those brackets carry.
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
@@ -197,5 +198,213 @@ func TestREQ113_VersionClassCarriesNoParsedPredicate(t *testing.T) {
 				t.Errorf("%s(%q): VERSION class ParsedPredicate = %+v; want nil", view, q, p)
 			}
 		}
+	}
+}
+
+// emitClass emits `SELECT o/data FROM <class>` with the FROM root replaced by
+// class: the direct-construction path a consumer reaches by assembling or
+// rewriting an AST by hand, which is what the REQ-119 emission guards bind.
+func emitClass(t *testing.T, class parse.ClassExpr) (string, error) {
+	t.Helper()
+	q, err := parse.ParseQuery("SELECT o/data FROM OBSERVATION o")
+	if err != nil {
+		t.Fatal(err)
+	}
+	q.From.Root = class
+	return q.Emit()
+}
+
+// TestREQ119_NamedArchetypeFormEmits pins the one Archetype-and-Predicate
+// pair Emit accepts: the named archetype form ParseQuery produces, with every
+// name spelling the slot admits and with trivia inside the bracket. The
+// emitted text is the verbatim Predicate, and it reads back as the same pair.
+func TestREQ119_NamedArchetypeFormEmits(t *testing.T) {
+	t.Parallel()
+	for _, pred := range []string{
+		bloodPressure + ", 'Blood pressure'",
+		bloodPressure + `, 'O\'Brien'`,
+		bloodPressure + ", $name",
+		bloodPressure + ", SNOMED-CT::271649006|systolic|",
+		bloodPressure + ", at0004",
+		bloodPressure + ", id4",
+		"  " + bloodPressure + " -- the archetype\n ,  'x' ",
+	} {
+		t.Run(pred, func(t *testing.T) {
+			t.Parallel()
+			src := "SELECT o/data FROM OBSERVATION o[" + pred + "]"
+			pq, err := parse.ParseQuery(src)
+			if err != nil {
+				t.Fatalf("ParseQuery(%q) = %v", src, err)
+			}
+			if pq.From.Root.Archetype != bloodPressure || pq.From.Root.Predicate != pred {
+				t.Fatalf("parsed Archetype %q, Predicate %q; want %q beside the verbatim text",
+					pq.From.Root.Archetype, pq.From.Root.Predicate, bloodPressure)
+			}
+			out, err := pq.Emit()
+			if err != nil {
+				t.Fatalf("Emit refused the named form ParseQuery produced: %v", err)
+			}
+			if want := "SELECT o/data FROM OBSERVATION o[" + pred + "]"; out != want {
+				t.Errorf("Emit = %q; want %q, the verbatim Predicate", out, want)
+			}
+
+			// The same pair, built by hand, emits the same text.
+			built, err := emitClass(t, parse.ClassExpr{
+				RMType: "OBSERVATION", Alias: "o", Archetype: bloodPressure, Predicate: pred,
+			})
+			if err != nil || built != out {
+				t.Errorf("hand-built pair: Emit = %q, %v; want %q", built, err, out)
+			}
+		})
+	}
+}
+
+// TestREQ119_NamedFormWithoutArchetypeStillEmits keeps the spelling ParseQuery
+// produced before Archetype carried the named form's HRID: Predicate alone.
+// It must still emit, and the verification that re-reads the emitted text
+// must not take the HRID it now finds on Archetype for a different query.
+func TestREQ119_NamedFormWithoutArchetypeStillEmits(t *testing.T) {
+	t.Parallel()
+	pred := bloodPressure + ", 'Blood pressure'"
+	out, err := emitClass(t, parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Predicate: pred})
+	if err != nil {
+		t.Fatalf("Emit refused a named form carried on Predicate alone: %v", err)
+	}
+	if want := "SELECT o/data FROM OBSERVATION o[" + pred + "]"; out != want {
+		t.Errorf("Emit = %q; want %q", out, want)
+	}
+}
+
+// TestREQ119_ArchetypeBesideAnotherPredicateIsRefused pins every pair Emit
+// still refuses. Emission renders Predicate when it is set, so a pair other
+// than the archetype's own named form would drop the archetype, or emit a
+// different one, with err == nil.
+func TestREQ119_ArchetypeBesideAnotherPredicateIsRefused(t *testing.T) {
+	t.Parallel()
+	const labResult = "openEHR-EHR-OBSERVATION.lab_result.v1"
+	named := bloodPressure + ", 'x'"
+	cases := []struct {
+		name  string
+		class parse.ClassExpr
+	}{
+		// The named form of a different archetype: emission would query
+		// lab_result's name under blood_pressure's Archetype.
+		{"mismatched HRID", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: labResult, Predicate: named}},
+		// Text that is not the named form at all.
+		{"standing predicate", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: bloodPressure, Predicate: "name/value='x'"}},
+		{"bare hrid, no name", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: bloodPressure, Predicate: bloodPressure}},
+		{"node id with a name", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: bloodPressure, Predicate: "at0001, 'x'"}},
+		{"named form in a junction", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: bloodPressure, Predicate: named + " and at0001"}},
+		{"second name", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: bloodPressure, Predicate: named + ", 'y'"}},
+		{"no comma", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: bloodPressure, Predicate: bloodPressure + " 'x'"}},
+		{"path in the name slot", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: bloodPressure, Predicate: bloodPressure + ", name/value"}},
+		{"unterminated name", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: bloodPressure, Predicate: bloodPressure + ", 'x"}},
+		// The named form beside a $param archetype or on a VERSION class.
+		{"$param archetype", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: bloodPressure, ParamArchetype: true, Predicate: named}},
+		{"$param placeholder", parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", Archetype: "$arch", ParamArchetype: true, Predicate: "$arch, 'x'"}},
+		{"VERSION class", parse.ClassExpr{RMType: "VERSION", Version: true, Alias: "o", Archetype: bloodPressure, Predicate: named}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			out, err := emitClass(t, tc.class)
+			if err == nil {
+				t.Fatalf("Emit = %q with err == nil; Archetype %q beside Predicate %q must be refused",
+					out, tc.class.Archetype, tc.class.Predicate)
+			}
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("err = %v; want it to wrap aql.ErrInvalidQuery", err)
+			}
+		})
+	}
+}
+
+// TestREQ119_EmitIgnoresTheParsedPredicate shows Emit does not read the
+// model at the class or alias-root bracket: replacing it, or clearing it,
+// leaves the emitted text byte-identical.
+func TestREQ119_EmitIgnoresTheParsedPredicate(t *testing.T) {
+	t.Parallel()
+	const src = "SELECT o[at0002, 'X']/data FROM OBSERVATION o[" + bloodPressure + ", 'Blood pressure']" +
+		" CONTAINS CLUSTER k[at0003] WHERE o[at0002]/data/value = 1"
+	pq, err := parse.ParseQuery(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := pq.Emit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoy := aql.NodeIDPredicate{ID: "at9999"}
+	for name, set := range map[string]func(q *parse.Query, p aql.SegmentPredicate){
+		"class": func(q *parse.Query, p aql.SegmentPredicate) {
+			q.From.Root.ParsedPredicate = p
+			q.From.Contains.Class.ParsedPredicate = p
+		},
+		"alias root": func(q *parse.Query, p aql.SegmentPredicate) {
+			pe := q.Select.Items[0].Expr.(parse.PathExpr)
+			pe.ParsedPredicate = p
+			q.Select.Items[0].Expr = pe
+			cmp := q.Where.(aql.Comparison)
+			parsed := *cmp.ParsedPath
+			parsed.ParsedPredicate = p
+			cmp.ParsedPath = &parsed
+			q.Where = cmp
+		},
+	} {
+		for _, p := range []aql.SegmentPredicate{decoy, nil} {
+			q, err := parse.ParseQuery(src)
+			if err != nil {
+				t.Fatal(err)
+			}
+			set(q, p)
+			got, err := q.Emit()
+			if err != nil || got != want {
+				t.Errorf("%s ParsedPredicate = %v: Emit = %q, %v; want %q", name, p, got, err, want)
+			}
+		}
+	}
+}
+
+// TestREQ119_JunctionRootIgnoresAParsedPredicate pins the same rule where the
+// FROM root is a junction and Root itself is unused: a ParsedPredicate left
+// on Root is not class data the emitter drops, since emission never reads it.
+func TestREQ119_JunctionRootIgnoresAParsedPredicate(t *testing.T) {
+	t.Parallel()
+	q, err := parse.ParseQuery("SELECT c/uid/value FROM COMPOSITION c OR EHR e")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := q.Emit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	q.From.Root.ParsedPredicate = aql.NodeIDPredicate{ID: "at0001"}
+	got, err := q.Emit()
+	if err != nil || got != want {
+		t.Errorf("Emit = %q, %v; want %q: Root's ParsedPredicate is not emitted content", got, err, want)
+	}
+}
+
+// TestREQ113_JunctionClassBracketNamesNoArchetype keeps Archetype to the
+// named form itself: a junction whose first operand is a named archetype is
+// not that form, so Archetype stays empty and the query still emits.
+func TestREQ113_JunctionClassBracketNamesNoArchetype(t *testing.T) {
+	t.Parallel()
+	const src = "SELECT o/data FROM OBSERVATION o[" + bloodPressure + ", 'x' and at0001]"
+	flat, structured := classesOf(t, src)
+	for view, classes := range map[string]map[string]parse.ClassExpr{"Parse": flat, "ParseQuery": structured} {
+		if a := classes["o"].Archetype; a != "" {
+			t.Errorf("%s: Archetype = %q; want empty for a junction", view, a)
+		}
+		if _, ok := classes["o"].ParsedPredicate.(aql.JunctionPredicate); !ok {
+			t.Errorf("%s: ParsedPredicate = %+v; want a junction", view, classes["o"].ParsedPredicate)
+		}
+	}
+	pq, err := parse.ParseQuery(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out, err := pq.Emit(); err != nil || out != src {
+		t.Errorf("Emit = %q, %v; want %q", out, err, src)
 	}
 }

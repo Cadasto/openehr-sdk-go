@@ -58,6 +58,21 @@ func structuredPathPredicate(pp gen.IPathPredicateContext) aql.SegmentPredicate 
 	return structuredNodePredicate(pp.NodePredicate())
 }
 
+// namedArchetypeHRID returns the HRID of a bracket that is nodePredicate's
+// `ARCHETYPE_HRID (SYM_COMMA name)?` alternative, and "" for every other
+// bracket. At the top of a bracket that alternative is always the named
+// archetype form: the bare HRID is also archetypePredicate's, the earlier
+// alternative of pathPredicate, which the parser picks. A junction holds its
+// HRIDs in its operands' contexts, not its own, so it returns "".
+func namedArchetypeHRID(pp gen.IPathPredicateContext) string {
+	if np := pp.NodePredicate(); np != nil {
+		if hrid := np.ARCHETYPE_HRID(); hrid != nil {
+			return hrid.GetText()
+		}
+	}
+	return ""
+}
+
 // structuredStandardPredicate lifts the standing comparison shared by
 // standardPredicate and nodePredicate's comparison alternative.
 func structuredStandardPredicate(sp gen.IStandardPredicateContext) aql.SegmentPredicate {

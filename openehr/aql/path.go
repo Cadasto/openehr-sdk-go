@@ -39,10 +39,10 @@ type PathSegment struct {
 // steps are Segments. It is the structured form of a path a consumer would
 // otherwise re-tokenize from raw text.
 //
-// Raw is authoritative for emission; Alias / Predicate / Segments are a
-// read-only structured decomposition of it. The single producer (the
-// parser) sets all fields consistently from one source node; a consumer
-// mutating one without the others desynchronizes the value.
+// Raw is authoritative for emission; Alias / Predicate / ParsedPredicate /
+// Segments are a read-only structured decomposition of it. The single
+// producer (the parser) sets all fields consistently from one source node; a
+// consumer mutating one without the others desynchronizes the value.
 type IdentifiedPath struct {
 	// Alias is the root binding (e.g. "o"); for a WHERE path it must
 	// resolve to a FROM / CONTAINS class alias. "" when the path is
@@ -51,6 +51,22 @@ type IdentifiedPath struct {
 	// Predicate is a predicate applied directly to the alias root
 	// (`o[...]/...`), brackets stripped; "" in the common case.
 	Predicate string
+	// ParsedPredicate is the typed form of Predicate, derived as
+	// [PathSegment.Parsed] is, since the alias-root bracket is the same
+	// grammar production as a path step's. It is a read-side derivation: no
+	// write path reads it, so mutating it cannot change what the emitter
+	// produces, and Raw stays authoritative for emission.
+	//
+	// nil means the SDK does not structure this form, and a reader may rely on
+	// that and fail closed on it. There is no partial structure: a non-nil
+	// ParsedPredicate is complete for its kind. When Predicate is "" the alias
+	// root carries no predicate at all. When Predicate is populated and
+	// ParsedPredicate is nil, the predicate is one of the enumerated
+	// unstructured forms listed on [PathSegment.Parsed].
+	//
+	// Not `==`-comparable and not usable as a map key; see the Comparability
+	// section of [SegmentPredicate]. Compare with [EqualPredicates].
+	ParsedPredicate SegmentPredicate
 	// Segments are the path steps after the alias, in order.
 	Segments []PathSegment
 	// Raw is the verbatim source text of the whole path, whitespace included.

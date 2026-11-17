@@ -353,12 +353,15 @@ func classToken(c ClassExpr) string {
 	if rm == "" && c.Alias == "" && c.Archetype == "" && c.Predicate == "" {
 		return ""
 	}
-	// The VERSION branch renders `Predicate` and never `Archetype`, where the
-	// class branch prefers `Archetype`. The divergence is unreachable only
-	// because `checkClassOperands` refuses a VERSION class carrying an archetype
-	// first; mirrored here so the token cannot drift if that guard moves.
+	// Both branches render `Predicate` when it is set. The class branch falls
+	// back to `Archetype`; the VERSION branch never renders it, which is
+	// unreachable only because `checkClassOperands` refuses a VERSION class
+	// carrying an archetype first, and is mirrored here so the token cannot
+	// drift if that guard moves. With `Predicate` first, a named archetype form
+	// built on `Predicate` alone reduces to the same token as its re-parse,
+	// which carries the HRID on `Archetype` as well.
 	bracket := c.Predicate
-	if !c.Version && c.Archetype != "" {
+	if bracket == "" && !c.Version {
 		bracket = c.Archetype
 	}
 	return rm + "|" + c.Alias + "|" + bracket

@@ -21,7 +21,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/antlr4-go/antlr/v4"
+
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse/gen"
 )
 
 // Query is the structured AQL AST: a parse-time mirror of [aql.Builder]'s
@@ -879,12 +882,15 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 // wholly zero).
 //
 // [Position] is source metadata rather than query content, so it is zeroed
-// first; everything else is compared BY VALUE against the zero ClassExpr, so a
-// field added later is covered the day it lands rather than the day someone
-// remembers to extend a list. A future field that is not comparable stops this
-// compiling, which is the loud failure rather than a silent gap.
+// first, and so is [ClassExpr.ParsedPredicate], the structured model emission
+// never reads (REQ-119 § Emission ignores the structured model); everything
+// else is compared BY VALUE against the zero ClassExpr, so a field added later
+// is covered the day it lands rather than the day someone remembers to extend
+// a list. A future field that is not comparable stops this compiling, which is
+// the loud failure rather than a silent gap.
 func (c ClassExpr) carriesData() bool {
 	c.Pos = Position{}
+	c.ParsedPredicate = nil
 	return c != ClassExpr{}
 }
 
@@ -904,13 +910,16 @@ func emitClassExpr(c ClassExpr) string {
 		out += " " + c.Alias
 	}
 	switch {
+	case c.Predicate != "":
+		// The verbatim bracket text. Beside Archetype it is the named
+		// archetype form `hrid, name`, the one pair checkClassOperands
+		// accepts, whose HRID Archetype repeats.
+		out += "[" + c.Predicate + "]"
 	case c.Archetype != "":
 		// Archetype carries either a literal HRID or, when
 		// ParamArchetype is true, the source `$name` placeholder
 		// verbatim — both forms wrap in brackets unchanged.
 		out += "[" + c.Archetype + "]"
-	case c.Predicate != "":
-		out += "[" + c.Predicate + "]"
 	}
 	return out
 }
@@ -1120,17 +1129,24 @@ func validateContainmentTree(from FromClause) error {
 // spellings at once: [ClassExpr.Archetype] and [ClassExpr.Predicate] are the
 // grammar's two mutually exclusive readings of the ONE `[...]` predicate, and
 // [emitClassExpr] renders whichever its switch reaches first — so setting both
-// silently dropped the standing predicate, a row FILTER, and the emitted query
-// returned more rows than the AST asked for (REQ-119's substitution class).
-// The same dual-operand rule already guards [aql.Comparison] (Path vs Left)
-// and [aql.MatchesExpr] (its three operand forms); this is the third type with
-// two spellings of one position. The extractor never sets both (the grammar's
-// `pathPredicate` is one or the other); this binds the direct-construction
-// path.
+// silently dropped one of them, a row FILTER, and the emitted query returned
+// more rows than the AST asked for (REQ-119's substitution class). The same
+// dual-operand rule already guards [aql.Comparison] (Path vs Left) and
+// [aql.MatchesExpr] (its three operand forms); this is the third type with two
+// spellings of one position.
+//
+// One pair is not two spellings: the named archetype form `[hrid, name]`,
+// whose whole text is on Predicate and whose HRID the extractor repeats on
+// Archetype so a reader of Archetype alone sees the class's archetype.
+// [emitClassExpr] renders Predicate, so the pair is accepted exactly when
+// rendering it drops nothing: Predicate is that archetype's named form
+// ([namedArchetypePair]). Every other pair is refused, the extractor never
+// producing one; this binds the direct-construction path.
 func checkClassOperands(c ClassExpr) error {
-	if c.Archetype != "" && c.Predicate != "" {
-		return fmt.Errorf("%w: class %q sets both an archetype (%q) and a standing predicate (%q); "+
-			"the bracket position carries exactly one, and emission would silently drop the predicate",
+	if c.Archetype != "" && c.Predicate != "" && !namedArchetypePair(c) {
+		return fmt.Errorf("%w: class %q sets both an archetype (%q) and a predicate (%q) that is not "+
+			"that archetype's named form; the bracket position carries one spelling, and emission "+
+			"would silently drop the archetype",
 			aql.ErrInvalidQuery, c.RMType, c.Archetype, aql.RedactPredicateValues(c.Predicate))
 	}
 	// VERSION is a SEPARATE `classExprOperand` alternative, not a class that
@@ -1281,6 +1297,61 @@ func checkClassOperands(c ClassExpr) error {
 		}
 	}
 	return nil
+}
+
+// namedArchetypePair reports whether c's Archetype and Predicate are the named
+// archetype form the extractor produces: Predicate reads as exactly
+// `ARCHETYPE_HRID SYM_COMMA name` with that HRID equal to Archetype, on a class
+// that is neither VERSION nor a $param archetype.
+//
+// The VERSION and $param conditions are refused again further down
+// [checkClassOperands] (a VERSION class takes no archetype; a $param archetype
+// must start with `$`, which no HRID does). They are stated here too so the
+// accepted pair is defined in one place and does not depend on the order of
+// the guards after it; the internal test pins each condition.
+func namedArchetypePair(c ClassExpr) bool {
+	if c.Version || c.ParamArchetype {
+		return false
+	}
+	hrid := namedArchetypeText(c.Predicate)
+	return hrid != "" && hrid == c.Archetype
+}
+
+// namedArchetypeText returns the HRID of text when the parser's lexer reads it
+// as exactly three tokens on the default channel, `ARCHETYPE_HRID SYM_COMMA
+// (STRING | PARAMETER | TERM_CODE | AT_CODE | ID_CODE)`, and "" otherwise, a
+// lexer error included. Trivia the lexer skips (whitespace, a `--` comment, a
+// byte-order mark) is allowed anywhere, as the parser allows it; whether a
+// comment escapes the emitted bracket is [aql.ValidatePathPredicate]'s to
+// decide, and [checkClassOperands] runs that on the same text.
+func namedArchetypeText(text string) string {
+	lexer := gen.NewAqlLexer(antlr.NewInputStream(text))
+	lexErrors := &errorCollector{}
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(lexErrors)
+
+	want := [][]int{
+		{gen.AqlLexerARCHETYPE_HRID},
+		{gen.AqlLexerSYM_COMMA},
+		{gen.AqlLexerSTRING, gen.AqlLexerPARAMETER, gen.AqlLexerTERM_CODE, gen.AqlLexerAT_CODE, gen.AqlLexerID_CODE},
+	}
+	hrid, n := "", 0
+	for tok := lexer.NextToken(); tok.GetTokenType() != antlr.TokenEOF; tok = lexer.NextToken() {
+		if tok.GetChannel() != antlr.TokenDefaultChannel {
+			continue
+		}
+		if n == len(want) || !slices.Contains(want[n], tok.GetTokenType()) {
+			return ""
+		}
+		if n == 0 {
+			hrid = tok.GetText()
+		}
+		n++
+	}
+	if n != len(want) || len(lexErrors.errors) > 0 {
+		return ""
+	}
+	return hrid
 }
 
 // isContainmentJunction reports whether a node is a pure boolean
