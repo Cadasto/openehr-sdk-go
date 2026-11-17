@@ -55,6 +55,15 @@ func TestREQ103TemporalRangeOrdersAcrossZone(t *testing.T) {
 			refused:  []string{"2031-01-01T14:00:01Z", "2031-06-01T10:00Z", "2031-01-01T00:00", "2031"},
 		},
 		{
+			// A value with a zone inside the year 2030 at both readings is
+			// equal to the bound, as its twin with no zone is at the
+			// precision the two share, so the excluded bound refuses both.
+			name:    "date-time, below the year 2030 with no zone",
+			c:       constraints.CDateTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "2030"}},
+			detail:  "value outside (*..2030)",
+			refused: []string{"2030-06-01T10:00Z", "2030-06-01T10:00"},
+		},
+		{
 			name:     "time, up to 02:00 in UTC",
 			c:        constraints.CTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "02:00:00Z", UpperInclusive: true}},
 			detail:   "value outside (*..02:00:00Z]",
