@@ -218,6 +218,21 @@ in this builder's spelling (§ Duplicate sibling ids).
   `<id>_<k-1>`. `TestREQ106ReferenceSiblingIDRenames` pins its renames whole per
   golden: the four above in `test_all_types`, none in the others.
 
+- **A name fixed by codes** — **diverges** from the reference in two cases. The
+  reference takes a node's name from the labels of its `name` constraint's `code`
+  input, each a listed code's term text (`OPTParser.parseCCOMPLEXOBJECT` at the
+  pinned commit); this builder takes it from `CompiledNode.NodeName`, which a name fixed by
+  one code sets (issue 455).
+
+  - **One code whose text the name's `value` rejects.** Where a `C_STRING` on the
+    `DV_CODED_TEXT`'s `value` rejects the code's term text, the reference still names
+    the node with that text. This builder pins no name, so the node keeps its
+    archetype term, the name FLAT decode gives such a node
+    (`TestREQ053CodedNameRules`), and its `aqlPath` carries no name predicate.
+  - **Several codes.** The reference emits one node per listed code, each named by its
+    code's term text, with that name in its `aqlPath`. This builder emits one node,
+    named by its archetype term.
+
 - **ELEMENT value alternatives** — match the reference (`OPTParser.updateChoiceId`,
   `addAnyNode`, `pushProperties`; `Filter.preHandle`, `skip`). By the value
   alternatives an ELEMENT's template constrains:
