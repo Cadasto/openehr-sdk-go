@@ -1916,7 +1916,7 @@ So the floor decides it per node, on every LOCATABLE the walk visits.
 A node is an archetype root when any of these holds:
 
 - its class is always one: the class-level `Is_archetype_root` invariant fixes `is_archetype_root` true on the class that declares it and on its descendants;
-- its `archetype_node_id` parses as an `ARCHETYPE_ID` (`rm_originator-rm_name-rm_entity.concept.vN`);
+- its `archetype_node_id` parses as an `ARCHETYPE_ID`, as [REQ-120](reference-model.md#req-120--rm-identifier-parsing-and-derivation)'s `ParseArchetypeID` reads it;
 - it carries `archetype_details`.
 
 The classes that are always roots are COMPOSITION, EHR_ACCESS, EHR_STATUS, PARTY (with its concrete descendants PERSON, ORGANISATION, GROUP, AGENT, ROLE) and ENTRY (with its concrete descendants ADMIN_ENTRY, OBSERVATION, EVALUATION, INSTRUCTION, ACTION).
