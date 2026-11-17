@@ -138,10 +138,61 @@ func TestREQ107_TemplateDefaultValueStandsInForTheFill(t *testing.T) {
 	}
 }
 
+// TestREQ107_TemplateDefaultThatBreaksAnRMRuleLeavesTheFill is the REQ-107
+// Output check on a template default that validates under its node's
+// constraints but breaks an RM rule the RM floor reads: under every policy
+// and both value fills the generator keeps the value the walk built, so the
+// root passes the RM floor and the template validator. The defaults leave
+// an attribute the BMM marks mandatory empty (a DV_TEXT's value, the code
+// string of a DV_ORDINAL's symbol), or break a rule the walk settles its
+// own value by (a DV_PROPORTION's Valid_denominator and Percent_validity, a
+// DV_TEXT's Language_valid).
+func TestREQ107_TemplateDefaultThatBreaksAnRMRuleLeavesTheFill(t *testing.T) {
+	text := optNode("DV_TEXT", "")
+	proportion := optNode("DV_PROPORTION", "")
+	cases := []struct {
+		name  string
+		value string
+		// rmType and body give the default value.
+		rmType, body string
+		// fault is the default as commentText renders it, which the
+		// generator must not write.
+		fault string
+	}{
+		{name: "DV_TEXT whose value is empty", value: text, rmType: "DV_TEXT", body: "<value></value>", fault: ""},
+		{
+			name: "DV_PROPORTION whose denominator is 0", value: proportion, rmType: "DV_PROPORTION",
+			body: "<numerator>1.0</numerator><denominator>0.0</denominator><type>0</type>", fault: "1/0 type 0",
+		},
+		{
+			name: "DV_PROPORTION, a percent whose denominator is not 100", value: proportion, rmType: "DV_PROPORTION",
+			body: "<numerator>10.0</numerator><denominator>50.0</denominator><type>2</type>", fault: "10/50 type 2",
+		},
+		{
+			name: "DV_ORDINAL whose symbol has no code string", value: optNode("DV_ORDINAL", ""), rmType: "DV_ORDINAL",
+			body: ordinalBody("1", "First", ""), fault: "1 First local::",
+		},
+		{
+			name: "DV_TEXT whose language is no ISO 639-1 code", value: text, rmType: "DV_TEXT",
+			body:  `<value>Leeds EPCCS</value><language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>xx</code_string></language>`,
+			fault: "Leeds EPCCS",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			eachSetting(t, withDefault(optCommentValue(tc.value), tc.rmType, tc.body), func(t *testing.T, _ instance.Options, out any) {
+				if got := commentText(t, out); got == tc.fault {
+					t.Errorf("ELEMENT.value = %q, the default that breaks an RM rule; want the value the walk built", got)
+				}
+			})
+		})
+	}
+}
+
 // commentText renders the value of the one ELEMENT under the CLUSTER root
 // out as the check above compares it: a text's value, a coded text's value
-// and code, a count's magnitude, or an ordinal's value, symbol text and
-// code.
+// and code, a count's magnitude, an ordinal's value, symbol text and code,
+// or a proportion's numerator, denominator and type.
 func commentText(t *testing.T, out any) string {
 	t.Helper()
 	cluster, ok := out.(*rm.Cluster)
@@ -162,8 +213,10 @@ func commentText(t *testing.T, out any) string {
 	case *rm.DVOrdinal:
 		code := v.Symbol.DefiningCode
 		return fmt.Sprintf("%d %s %s::%s", v.Value, v.Symbol.Value, code.TerminologyID.Value, code.CodeString)
+	case *rm.DVProportion:
+		return fmt.Sprintf("%v/%v type %d", v.Numerator, v.Denominator, v.Type)
 	}
-	t.Fatalf("ELEMENT.value is %T, want a DV_TEXT, a DV_CODED_TEXT, a DV_COUNT or a DV_ORDINAL", element.Value)
+	t.Fatalf("ELEMENT.value is %T, want a DV_TEXT, a DV_CODED_TEXT, a DV_COUNT, a DV_ORDINAL or a DV_PROPORTION", element.Value)
 	return ""
 }
 
