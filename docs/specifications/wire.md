@@ -943,10 +943,7 @@ The codecs **MUST**:
   - The third is a coded node name.
     Where the template constrains a rebuilt node's name as a `DV_CODED_TEXT`, through one child or alternatives that agree, and determines one coded value, decode gives the node that `DV_CODED_TEXT` name as the generator writes it, in place of the `DV_TEXT` name from the archetype terminology.
     The value is determined where the name's `C_CODE_PHRASE` lists exactly one code, or lists several of which exactly one has a term text equal to the text the template pins on the name.
-    Its terminology is the `C_CODE_PHRASE`'s, and its text is the pinned text, else the code's term text:
-    - for a `local` code, its archetype term;
-    - for an external code, the archetype term it has under `<terminology>::<code>` or its bare code;
-    - for an `openehr` code, the openEHR terminology rubric, where every terminology group that holds the code gives the same one.
+    Its terminology is the `C_CODE_PHRASE`'s, and its text is the pinned text, else the code's term text, read as [clinical-modeling.md § *Node names and name predicates*](clinical-modeling.md#node-names-and-name-predicates) reads it.
 
     No node name below the root has a key in the formats, so a coded name the template leaves open (a code from an external reference set, or several codes and no pinned text) comes back as `DV_TEXT`.
   - The fourth is an ordinal's terminology.
@@ -1083,7 +1080,8 @@ Encode **MUST** write:
 - `math_function` and `width` for an INTERVAL_EVENT at an EVENT node or a folded event;
 - `history_origin`, unless the origin sets `value` alone and that value is, as written, the earliest time its events carry, the origin decode gives a HISTORY with no `history_origin`; an origin that sets any other attribute, such as `magnitude_status`, is written.
 
-Where an EVENT node, or the OBSERVATION node a folded event is spelled at, has a child whose `id` is `math_function` or `width` and which is not that event's own leaf of the attribute, that key is the child's, which decode reads as the child, so encode refuses an INTERVAL_EVENT there, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+Where an EVENT node, or the OBSERVATION node a folded event is spelled at, holds no leaf of the event's own for `math_function` or `width` and has a child whose `id` is that attribute's name, that key is the child's, which decode reads as the child, so encode refuses an INTERVAL_EVENT there, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+Where the node holds the event's own leaf, as a folded INTERVAL_EVENT's does, encode writes the attribute at that leaf, whose `id` takes the duplicate-sibling suffix beside such a child (`width_1`, [clinical-modeling.md § *`id` generation*](clinical-modeling.md#id-generation-adr-0014)).
 An OBSERVATION that folds in two or more events, a Web Template neither this SDK nor the reference builds, gives the three keys to none of them: decode reads them there as unmatched content (§ REQ-170), and encode refuses an INTERVAL_EVENT among those events that holds any of the three, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
 Every other spelling of the four, such as `<event>/sample_count` or `<observation>|history_origin`, is unmatched content (§ REQ-170).
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).

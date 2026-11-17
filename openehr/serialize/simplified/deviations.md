@@ -126,8 +126,9 @@ Concretely:
   at the OBSERVATION, `<observation>/width`, `<observation>/math_function` and
   `<observation>|sample_count`, as the reference writes them, and read and written there as
   at an EVENT node (since 2026-11-16, issue 456); before, decode reported them as unmatched
-  content and encode dropped an INTERVAL_EVENT's three there. Where the node has a child whose
-  id is `math_function` or `width`, the key is the child's, and decode reads it as the child:
+  content and encode dropped an INTERVAL_EVENT's three there. Where the node holds no leaf of
+  the event's own for `math_function` or `width` and has a child whose id is that attribute's
+  name, the key is the child's, and decode reads it as the child:
   encode then refuses an INTERVAL_EVENT there with `ErrUnsupportedDatatype` naming the key,
   where it wrote the attribute at the child's key. Where the OBSERVATION folds in two or more
   abstract EVENTs, the keys name none of them: decode reads them as unmatched content, and

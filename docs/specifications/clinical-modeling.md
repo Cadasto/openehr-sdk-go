@@ -1556,7 +1556,7 @@ An OPT node may pin its runtime `LOCATABLE.name` by constraining the `name` attr
 Fixedness is a property of what the OPT declared, so it is judged on the wire list *before* any blank-entry normalisation: a multi-entry list is a choice even when all but one entry is blank, and a lone blank entry pins nothing.
 An open list fixes nothing either: a one-entry list whose `list_open` is true admits names outside it, so it pins no name.
 `list_open` is read as [§ REQ-103](#req-103--primitive-constraint-introspection) reads it for `CString.ListOpen`, so an absent element leaves the list closed.
-Where no such `C_STRING` pins one, a `name` attribute whose one child is a `DV_CODED_TEXT` fixes the name by its code, as the reference does ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
+Where no such `C_STRING` pins one, a `name` attribute whose one child is a `DV_CODED_TEXT` fixes the name by its one code, as the reference does ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)); the Web Template [deviations register](../../openehr/template/webtemplate/deviations.md) lists the two cases where the reference names such a node otherwise.
 It does so where the child's `defining_code` holds one `C_CODE_PHRASE`, or one `C_CODE_REFERENCE` read as the code phrase it carries, that names a terminology and lists **exactly one** code with a term text; the name is that text, trimmed.
 A code of the `openehr` terminology takes its rubric, where every terminology group that holds the code gives the same one; any other code takes the text its node's own archetype defines for it, under the code for a `local` code, else under `<terminology>::<code>`, or under the code alone where that is no at-code.
 The code fixes nothing where a `C_STRING` on the child's `value` rejects the text, where the child lists several codes or a code with no term text, or where `name` holds alternatives.
@@ -1611,6 +1611,7 @@ The exported root **MUST** carry `templateId`, `version` (the string `"2.3"`), `
 Each node **MUST** carry `id`, `rmType`, `min`, `max` (with `-1` denoting unbounded), and `aqlPath`; and where the compiled template supplies them, `name` / localized names, `nodeId`, `inputs`, and `children`.
 A node with a `nodeId` takes its `name` and localized names from the template-level name its template pins on it, where it pins one, else from its archetype term ([§ Node names and name predicates](#node-names-and-name-predicates)).
 A node below the root whose constraint carries no node id, such as the COMPOSITION's `category` and `context`, takes the name of the RM attribute that holds it as its `name` and localized name, and carries no localized names, as the reference names it.
+An in-context leaf, and the merged `ism_transition` node with its leaves, keep the names the reference gives them, as the `test_all_types` golden shows.
 JSON field names are camelCase.
 Encoding **MUST** be deterministic: the same compiled template produces byte-identical output across runs and SDK patch releases (fixed field order; map keys sorted).
 
