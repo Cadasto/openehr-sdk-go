@@ -190,8 +190,9 @@ func editValues(t *testing.T, edits ...valuesEdit) editedValues {
 // terminology than openehr, the first listed code whose term text that
 // C_STRING admits takes its place, with that text; else the text is the one
 // the generator writes under that C_STRING, or "example" with none.
-// Defining_code alternatives and name alternatives that disagree leave the
-// node its DV_TEXT name. Where decode gives a coded name, it is the one the
+// Defining_code alternatives, a defining_code constrained other than through
+// a code phrase, and name alternatives that disagree leave the node its
+// DV_TEXT name. Where decode gives a coded name, it is the one the
 // skeleton writes, and the round trip validates against the edited template.
 func TestREQ053CodedNameRules(t *testing.T) {
 	cases := []struct {
@@ -358,6 +359,15 @@ func TestREQ053CodedNameRules(t *testing.T) {
 			name:  "a defining_code whose one child constrains no code",
 			edits: []valuesEdit{withName(codedText(definingCode(optStructure("CODE_PHRASE", ""))))},
 			want:  codedNameJSON("example", "at0000", "local"),
+		},
+		{
+			// Decode reads a code only from a code phrase constraint, so a
+			// child that constrains the code another way is not left
+			// unconstrained: the node keeps its DV_TEXT name.
+			name: "a defining_code whose one child constrains its code_string",
+			edits: []valuesEdit{withName(codedText(definingCode(optStructure("CODE_PHRASE", "",
+				optAttribute("C_SINGLE_ATTRIBUTE", "code_string", "1", "", stringChild(`<list>at0017</list>`))))))},
+			want: textNameJSON("Coded name"),
 		},
 		{
 			// The text is judged by the first alternative on the name's

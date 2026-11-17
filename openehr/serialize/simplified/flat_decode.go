@@ -3231,29 +3231,29 @@ func codedNameOf(n *templatecompile.CompiledNode) codedName {
 // codedValueOf returns the coded name the generator writes under its example
 // fill for c, a child of a node's name, or the zero codedName where decode
 // gives none. c must be a DV_CODED_TEXT whose defining_code the template
-// constrains through one C_CODE_PHRASE, or one C_CODE_REFERENCE read as the
-// code phrase it carries, in the terminology its terminology: URI names where
-// that phrase names none.
+// constrains through one code phrase, or leaves unconstrained
+// ([definingCodePhrase]).
 //
 // The code is the phrase's example value: its first listed code, else the
 // placeholder at0000, in the phrase's terminology, else in local. It takes
 // the text, or another listed code, the terms of the listed codes give it
-// ([listedCodeName]), judged by the C_STRING on c's value, if any. Otherwise
-// it keeps the text the generator writes under that C_STRING
-// ([cstringvalue.Pick] of its example value), or "example" where there is
-// none; a C_STRING no string the generator builds satisfies leaves the node
-// no coded name.
+// ([listedCodeName]), judged by the C_STRING on c's value, if any: the first
+// alternative the template allows there, which the generator writes the
+// text from and judges it by. Otherwise it keeps the text the generator
+// writes under that C_STRING ([cstringvalue.Pick] of its example value), or
+// "example" where there is none; a C_STRING no string the generator builds
+// satisfies leaves the node no coded name.
 func codedValueOf(c *templatecompile.CompiledNode) codedName {
 	if c.RMTypeName() != "DV_CODED_TEXT" {
 		return codedName{}
 	}
-	phrase, ok := constraints.CodePhraseWithTerminologyOf(onePrimitive(c, "defining_code"))
+	phrase, ok := definingCodePhrase(c)
 	if !ok {
 		return codedName{}
 	}
 	example, _ := phrase.ExampleValue().(constraints.CodedTermRef)
 	name := codedName{code: example.CodeString, terminology: example.Terminology}
-	text, hasText := onePrimitive(c, "value").(constraints.CString)
+	text, hasText := firstPrimitive(c, "value").(constraints.CString)
 	admits := func(s string) bool { return !hasText || len(text.Validate(s)) == 0 }
 	if named, ok := listedCodeName(c, phrase, name, admits); ok {
 		return named
@@ -3267,6 +3267,50 @@ func codedValueOf(c *templatecompile.CompiledNode) codedName {
 		name.value = picked
 	}
 	return name
+}
+
+// definingCodePhrase returns the code phrase the generator writes the code
+// of a coded name from, where the template puts it on the defining_code of
+// c: its one C_CODE_PHRASE, or its one C_CODE_REFERENCE read as the code
+// phrase it carries, in the terminology its terminology: URI names where
+// that phrase names none. Where the template leaves the defining_code
+// unconstrained, with no attribute, no child, or one child that constrains
+// nothing, it returns the empty phrase, whose example value is the
+// placeholder at0000 in local, the code the generator writes there. ok is
+// false where the defining_code has alternatives, or one child that
+// constrains it in any other way.
+func definingCodePhrase(c *templatecompile.CompiledNode) (phrase constraints.CodePhrase, ok bool) {
+	attr := c.Attribute("defining_code")
+	if attr == nil {
+		return constraints.CodePhrase{}, true
+	}
+	children := tcimpl.AllowedChildNodes(attr)
+	switch {
+	case len(children) == 0:
+		return constraints.CodePhrase{}, true
+	case len(children) > 1:
+		return constraints.CodePhrase{}, false
+	}
+	if constrainsNothing(children[0]) {
+		return constraints.CodePhrase{}, true
+	}
+	return constraints.CodePhraseWithTerminologyOf(children[0].PrimitiveConstraint())
+}
+
+// constrainsNothing reports whether the template node n constrains nothing
+// below its RM type: it carries no primitive constraint and allows no child
+// on any of its attributes, such as the ones the compiled template adds
+// where the RM requires them.
+func constrainsNothing(n *templatecompile.CompiledNode) bool {
+	if n.PrimitiveConstraint() != nil {
+		return false
+	}
+	for _, a := range tcimpl.NodeAttributes(n) {
+		if len(tcimpl.AllowedChildNodes(a)) > 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // exampleText is the text the generator writes on a String attribute the
@@ -3315,6 +3359,20 @@ func onePrimitive(n *templatecompile.CompiledNode, attr string) constraints.Prim
 	}
 	children := tcimpl.AllowedChildNodes(a)
 	if len(children) != 1 {
+		return nil
+	}
+	return children[0].PrimitiveConstraint()
+}
+
+// firstPrimitive returns the primitive constraint of the first child the
+// template allows on the attribute attr of n, or nil where it allows none.
+func firstPrimitive(n *templatecompile.CompiledNode, attr string) constraints.PrimitiveConstraint {
+	a := n.Attribute(attr)
+	if a == nil {
+		return nil
+	}
+	children := tcimpl.AllowedChildNodes(a)
+	if len(children) == 0 {
 		return nil
 	}
 	return children[0].PrimitiveConstraint()

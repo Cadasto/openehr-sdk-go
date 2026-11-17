@@ -406,12 +406,15 @@ partially or silently accepted.
   archetype defines the same code; without it, those nodes are unnamed and the round-trip is merely
   **format-idempotent**. Their names never leak into FLAT, so idempotence is preserved either
   way. **A coded node name:** where the template constrains a node's name as a `DV_CODED_TEXT`
-  (one child, or alternatives that agree) whose `defining_code` holds one `C_CODE_PHRASE`, or one
-  `C_CODE_REFERENCE` read as its code phrase, decode gives the node, in place of the `DV_TEXT`
-  one, the coded name the generator writes there under `ExampleFill`. Its code is the phrase's
-  first listed code, else the placeholder `at0000` in the terminology the phrase, or the
-  reference set's `terminology:` URI, names, else in `local`. Its text is the code's term text
-  where the `C_STRING` on the name's value admits it: a `local` code's archetype term, an
+  (one child, or alternatives that agree) whose `defining_code` it constrains through one
+  `C_CODE_PHRASE`, or one `C_CODE_REFERENCE` read as its code phrase, or leaves unconstrained,
+  decode gives the node, in place of the `DV_TEXT` one, the coded name the generator writes there
+  under `ExampleFill`. Its code is the phrase's first listed code, else the placeholder `at0000`
+  in the terminology the phrase, or the reference set's `terminology:` URI, names, else in
+  `local`. A `defining_code` with no attribute, no child, or one child that constrains nothing
+  gives the placeholder `at0000` in `local`, as the generator writes it. Its text is the code's
+  term text where the `C_STRING` on the name's value admits it, the first alternative the
+  template allows there, which the generator judges the text by: a `local` code's archetype term, an
   external code's term under `<terminology>::<code>` or the bare code, or an `openehr` code's
   rubric where every terminology group that holds the code gives the same one; the placeholder
   names no term. Where that `C_STRING` rejects the term text of a code outside `openehr`, the
@@ -425,9 +428,10 @@ partially or silently accepted.
   whose code comes from an external reference set, and the `Vital signs monitoring` pulse
   interpretation's, which lists two local codes and pins no text.
   **Registered format limit:** FLAT has no key for a node's name below the root, so a coded name
-  whose alternatives disagree, or whose `defining_code` has alternatives, comes back as
-  `DV_TEXT`, which the template refuses when the round trip is validated: decode does not
-  choose among the alternatives. No corpus template writes one. **The
+  whose alternatives disagree, or whose `defining_code` has alternatives or constrains the code
+  other than through a code phrase, comes back as `DV_TEXT`, which the template refuses when the
+  round trip is validated: decode does not choose among the alternatives, nor read a code from
+  the attributes of a `CODE_PHRASE` node. No corpus template writes one. **The
   composition's own name** travels as `<root>/_name` (REQ-140, since 2026-10-15), in both modes: decode sets the COMPOSITION's `name` from it, in the DV_TEXT leaf grammar
   (`\|formatting` beside a bare name, a coded name in the `\|code` + `\|value` +
   `\|terminology` substitution form, a name the suffixes cannot carry as `_name\|raw`), and a
