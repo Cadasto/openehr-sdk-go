@@ -2,12 +2,13 @@ package simplified_test
 
 // REQ-053, REQ-111 — the formats have no key for a node's name below the root,
 // so a WithTemplate decode names each node it rebuilds from the template.
-// Where the template constrains the name as a DV_CODED_TEXT and determines
-// its code and its text, decode gives the node that coded name; everywhere
-// else the node keeps its DV_TEXT name. These cases edit the name constraint
-// of the sdk_crosscheck_values.v1 ELEMENT at0016, write the edited template's
-// Medium skeleton as FLAT or STRUCTURED, decode it with the edited template,
-// and check the name decode gives the node.
+// Where the template constrains the name as a DV_CODED_TEXT whose code it
+// constrains through one code phrase, decode gives the node the coded name
+// the generator writes there; everywhere else the node keeps its DV_TEXT
+// name. These cases edit the name constraint of the sdk_crosscheck_values.v1
+// ELEMENT at0016, write the edited template's Medium skeleton as FLAT or
+// STRUCTURED, decode it with the edited template, and check the name decode
+// gives the node.
 
 import (
 	"os"
@@ -160,16 +161,22 @@ func editValues(t *testing.T, edits ...valuesEdit) editedValues {
 	return editedValues{wt: wt, compiled: compiled, comp: comp}
 }
 
-// TestREQ053CodedNameRules — REQ-053, REQ-111: decode gives a node a coded
-// name only where the template constrains the name as a DV_CODED_TEXT, through
-// one child or alternatives that agree, whose one C_CODE_PHRASE, or the one
-// a C_CODE_REFERENCE carries (REQ-103), lists one code, or several of which
-// only one has the pinned text as its term text.
-// The text is the pinned one, else the code's term text: the node's archetype
-// term for a local code, its rubric for an openehr one. Everywhere else, a
-// code or a text the template leaves open included, the node keeps the DV_TEXT
-// name the index gives it. Where decode gives a coded name, the round trip
-// validates against the edited template.
+// TestREQ053CodedNameRules — REQ-053, REQ-111: where the template constrains a
+// node's name as a DV_CODED_TEXT, through one child or alternatives that
+// agree, whose defining_code it constrains through one C_CODE_PHRASE, or the
+// one a C_CODE_REFERENCE carries (REQ-103), decode gives the node the coded
+// name the generator writes there under its example fill. Its code is the
+// first listed one, else the placeholder at0000 in the terminology the phrase
+// names (a reference set's URI included), else in local. Its text is the
+// code's term text (the node's archetype term for a local code, its rubric
+// for an openehr one) where the C_STRING on the name's value admits it; else,
+// for a code of any other terminology than openehr, the first listed code
+// whose term text that C_STRING admits takes its place, with that text; else
+// the text is the one the generator writes under that C_STRING, or "example"
+// with none. Defining_code alternatives and name alternatives that disagree
+// leave the node its DV_TEXT name. Where decode gives a coded name, it is the
+// one the skeleton writes, and the round trip validates against the edited
+// template.
 func TestREQ053CodedNameRules(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -187,19 +194,24 @@ func TestREQ053CodedNameRules(t *testing.T) {
 			want:  codedNameJSON("Second option", "at0017", "local"),
 		},
 		{
-			name:  "several codes, one with the pinned text as its term",
+			name:  "several codes, the first with the pinned text as its term",
 			edits: []valuesEdit{withName(localCodes(pinnedValue("First option"), "at0017", "at0018"))},
 			want:  codedNameJSON("First option", "at0017", "local"),
 		},
 		{
+			name:  "several codes, the second with the pinned text as its term",
+			edits: []valuesEdit{withName(localCodes(pinnedValue("Second option"), "at0017", "at0018"))},
+			want:  codedNameJSON("Second option", "at0018", "local"),
+		},
+		{
 			name:  "several codes, no pinned text",
 			edits: []valuesEdit{withName(localCodes("", "at0017", "at0018"))},
-			want:  textNameJSON("Coded name"),
+			want:  codedNameJSON("First option", "at0017", "local"),
 		},
 		{
 			name:  "a pinned text no listed code has",
 			edits: []valuesEdit{withName(localCodes(pinnedValue("Third option"), "at0017", "at0018"))},
-			want:  textNameJSON("Third option"),
+			want:  codedNameJSON("Third option", "at0017", "local"),
 		},
 		{
 			name: "a pinned text two listed codes have",
@@ -207,38 +219,38 @@ func TestREQ053CodedNameRules(t *testing.T) {
 				replacing(`<items id="text">First option</items>`, `<items id="text">Second option</items>`),
 				withName(localCodes(pinnedValue("Second option"), "at0017", "at0018")),
 			},
-			want: textNameJSON("Second option"),
+			want: codedNameJSON("Second option", "at0017", "local"),
 		},
 		{
 			name:  "an open list, which pins no text",
 			edits: []valuesEdit{withName(localCodes(stringValue(`<list>First option</list><list_open>true</list_open>`), "at0017", "at0018"))},
-			want:  textNameJSON("Coded name"),
+			want:  codedNameJSON("First option", "at0017", "local"),
 		},
 		{
 			name:  "a list of two texts, which pins none",
 			edits: []valuesEdit{withName(localCodes(stringValue(`<list>First option</list><list>Second option</list>`), "at0017", "at0018"))},
-			want:  textNameJSON("Coded name"),
+			want:  codedNameJSON("First option", "at0017", "local"),
 		},
 		{
 			name:  "a pattern that rejects the code's term text",
 			edits: []valuesEdit{withName(localCodes(stringValue(`<pattern>Other.*</pattern>`), "at0017"))},
-			want:  textNameJSON("Coded name"),
+			want:  codedNameJSON("Other", "at0017", "local"),
 		},
 		{
 			name:  "a code phrase that lists no code",
 			edits: []valuesEdit{withName(localCodes(""))},
-			want:  textNameJSON("Coded name"),
+			want:  codedNameJSON("example", "at0000", "local"),
 		},
 		{
 			name:  "a code phrase that names no terminology",
 			edits: []valuesEdit{withName(codedText(definingCode(codePhrase("", "248152002"))))},
-			want:  textNameJSON("Coded name"),
+			want:  codedNameJSON("Female", "248152002", "local"),
 		},
 		{
 			name: "an external reference set",
 			edits: []valuesEdit{withName(codedText(definingCode(optChild("C_CODE_REFERENCE", "CODE_PHRASE", "1", "1", "",
 				`<referenceSetUri>terminology:example?subset=names</referenceSetUri>`))))},
-			want: textNameJSON("Coded name"),
+			want: codedNameJSON("example", "at0000", "example"),
 		},
 		{
 			// REQ-103: a C_CODE_REFERENCE is read as the code phrase
@@ -252,7 +264,7 @@ func TestREQ053CodedNameRules(t *testing.T) {
 		{
 			name:  "a local code with no term",
 			edits: []valuesEdit{withName(localCodes("", "at0099"))},
-			want:  textNameJSON("Coded name"),
+			want:  codedNameJSON("example", "at0099", "local"),
 		},
 		{
 			name: "a local code whose term has no text",
@@ -260,7 +272,7 @@ func TestREQ053CodedNameRules(t *testing.T) {
 				replacing(`<items id="text">First option</items>`, `<items id="text"></items>`),
 				withName(localCodes("", "at0017")),
 			},
-			want: textNameJSON("Coded name"),
+			want: codedNameJSON("example", "at0017", "local"),
 		},
 		{
 			name:  "an openehr code",
@@ -268,14 +280,21 @@ func TestREQ053CodedNameRules(t *testing.T) {
 			want:  codedNameJSON("event", "433", "openehr"),
 		},
 		{
+			// An openehr code takes no other listed code in place of its
+			// own: the first listed one keeps the pinned text.
+			name:  "openehr codes, the second with the pinned text as its rubric",
+			edits: []valuesEdit{withName(codedText(pinnedValue("mean"), definingCode(codePhrase("openehr", "433", "146"))))},
+			want:  codedNameJSON("mean", "433", "openehr"),
+		},
+		{
 			name:  "an openehr code that two groups give two rubrics",
 			edits: []valuesEdit{withName(codedText(definingCode(codePhrase("openehr", "532"))))},
-			want:  textNameJSON("Coded name"),
+			want:  codedNameJSON("example", "532", "openehr"),
 		},
 		{
 			name:  "an openehr code no group holds",
 			edits: []valuesEdit{withName(codedText(definingCode(codePhrase("openehr", "99999"))))},
-			want:  textNameJSON("Coded name"),
+			want:  codedNameJSON("example", "99999", "openehr"),
 		},
 		{
 			name:  "an external code, its term under the code alone",
@@ -293,7 +312,7 @@ func TestREQ053CodedNameRules(t *testing.T) {
 		{
 			name:  "an external at-code, whose bare key names an archetype term",
 			edits: []valuesEdit{withName(codedText(definingCode(codePhrase("SNOMED-CT", "at0017"))))},
-			want:  textNameJSON("Coded name"),
+			want:  codedNameJSON("example", "at0017", "SNOMED-CT"),
 		},
 		{
 			name:  "defining_code alternatives",
@@ -318,6 +337,7 @@ func TestREQ053CodedNameRules(t *testing.T) {
 	}
 	for _, tc := range cases {
 		e := editValues(t, tc.edits...)
+		written, _ := nameAt(t, e.comp, codedNameNode)
 		for _, format := range []string{"FLAT", "STRUCTURED"} {
 			t.Run(tc.name+"/"+format, func(t *testing.T) {
 				back := bmiRoundTrip(t, format, e.comp, e.wt, simplified.WithTemplate(e.compiled), simplified.WithStrict())
@@ -327,6 +347,9 @@ func TestREQ053CodedNameRules(t *testing.T) {
 				}
 				if tc.want["_type"] != "DV_CODED_TEXT" {
 					return
+				}
+				if !reflect.DeepEqual(got, written) {
+					t.Errorf("decoded name at %s = %s, want the written %s", codedNameNode, jsonText(got), jsonText(written))
 				}
 				for _, is := range validation.ValidateComposition(back, e.compiled).Issues {
 					t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
@@ -356,37 +379,58 @@ func TestREQ053OPTFreeDecodeGivesNoCodedName(t *testing.T) {
 	}
 }
 
-// TestREQ053CodedNameTheTemplateLeavesOpen — REQ-053: the Referral Request.v1
-// annotation's name is a DV_CODED_TEXT whose code comes from an external
-// reference set, so the template determines no code, and FLAT has no key for
-// the name. Decode invents none: the node keeps its DV_TEXT name, and the
-// round trip reports the name's type against the template. This is the
-// registered format limit.
+// TestREQ053CodedNameTheTemplateLeavesOpen — REQ-053: FLAT and STRUCTURED have
+// no key for a node's name below the root, so decode gives a coded name the
+// template leaves open the one the generator writes there. The Referral
+// Request.v1 annotation's name takes its code from an external reference set
+// the template lists no code of: the generator writes the placeholder at0000
+// in the terminology the set's URI names, with the example text. The Vital
+// signs monitoring pulse's clinical interpretation lists two local codes and
+// pins no text: the generator writes the first with its term text. The round
+// trip gives each node the written name and validates against the template.
 func TestREQ053CodedNameTheTemplateLeavesOpen(t *testing.T) {
-	const annotation = "/context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]"
-	wt, compiled := templateOf(t, "Referral Request.v1")
-	comp := skeletonOf(t, compiled, instance.Medium)
-	if written, _ := nameAt(t, comp, annotation); written["_type"] != "DV_CODED_TEXT" {
-		t.Fatalf("the written name at %s is %s, want a DV_CODED_TEXT — fixture changed?", annotation, jsonText(written))
+	cases := []struct {
+		template string
+		policy   instance.Policy
+		path     string
+		want     map[string]any
+	}{
+		{
+			template: "Referral Request.v1",
+			policy:   instance.Medium,
+			path:     "/context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]",
+			want:     codedNameJSON("example", "at0000", "code24"),
+		},
+		{
+			template: "Referral Request.v1",
+			policy:   instance.Large,
+			path:     "/context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]",
+			want:     codedNameJSON("example", "at0000", "code24"),
+		},
+		{
+			template: "Vital signs monitoring",
+			policy:   instance.Large,
+			path:     "/content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1023]",
+			want:     codedNameJSON("Clinical interpretation", "at1057", "local"),
+		},
 	}
-	for _, format := range []string{"FLAT", "STRUCTURED"} {
-		t.Run(format, func(t *testing.T) {
-			back := bmiRoundTrip(t, format, comp, wt, simplified.WithTemplate(compiled), simplified.WithStrict())
-			if got, want := mustName(t, back, annotation), textNameJSON("Annotation"); !reflect.DeepEqual(got, want) {
-				t.Errorf("decoded name at %s = %s, want %s", annotation, jsonText(got), jsonText(want))
-			}
-			var mismatch bool
-			for _, is := range validation.ValidateComposition(back, compiled).Issues {
-				if is.Code == "rm_type_mismatch" && is.Path == annotation+"/name" {
-					mismatch = true
-					continue
+	for _, tc := range cases {
+		wt, compiled := templateOf(t, tc.template)
+		comp := skeletonOf(t, compiled, tc.policy)
+		if written := mustName(t, comp, tc.path); !reflect.DeepEqual(written, tc.want) {
+			t.Fatalf("the %s %s skeleton writes the name %s at %s, want %s — fixture or generator changed?", tc.template, tc.policy, jsonText(written), tc.path, jsonText(tc.want))
+		}
+		for _, format := range []string{"FLAT", "STRUCTURED"} {
+			t.Run(tc.template+"/"+tc.policy.String()+"/"+format, func(t *testing.T) {
+				back := bmiRoundTrip(t, format, comp, wt, simplified.WithTemplate(compiled), simplified.WithStrict())
+				if got := mustName(t, back, tc.path); !reflect.DeepEqual(got, tc.want) {
+					t.Errorf("decoded name at %s = %s, want the written %s", tc.path, jsonText(got), jsonText(tc.want))
 				}
-				t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
-			}
-			if !mismatch {
-				t.Errorf("ValidateComposition reports no rm_type_mismatch at %s/name, want the registered limit", annotation)
-			}
-		})
+				for _, is := range validation.ValidateComposition(back, compiled).Issues {
+					t.Errorf("decoded composition: %s at %s: %s", is.Code, is.Path, is.Detail)
+				}
+			})
+		}
 	}
 }
 
