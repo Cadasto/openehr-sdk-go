@@ -92,22 +92,28 @@ func TestREQ106RootNameIsThePinnedName(t *testing.T) {
 }
 
 // TestREQ106InContextNamesMatchTestAllTypes — REQ-106: every node without a
-// node id that the builder names carries the name of the test_all_types
-// golden, the one vendored golden the reference's own code regenerated: the
-// in-context leaves in lower case, as their RM attribute names, and the merged
-// ACTION node's `Careflow_step` and `Current_state`, which the reference
-// capitalises. The older goldens capitalise every in-context leaf, so they are
-// not compared here.
+// node id carries the name and localizedName of the test_all_types golden,
+// the one vendored golden the reference's own code regenerated: category and
+// context, named by their RM attribute (issue 455), the in-context leaves in
+// lower case, as their RM attribute names, and the merged ACTION node's
+// `Careflow_step` and `Current_state`, which the reference capitalises. The
+// leaves of an archetyped transition step are left out: the builder keeps the
+// step beside the merged node where the reference's filter drops it
+// (deviations.md, "Per-careflow-step ism_transition[atNNNN] nodes are kept"),
+// so the golden has no node there; they are named as
+// TestREQ106NodesWithoutNodeIDAreNamedByTheirAttribute says. The older
+// goldens capitalise every in-context leaf, so they are not compared here.
 func TestREQ106InContextNamesMatchTestAllTypes(t *testing.T) {
-	ref := map[string]string{}
+	type names struct{ name, localized string }
+	ref := map[string]names{}
 	walkRefTree(refTree(t, loadReferenceStem(t, actionParityStem)), func(m map[string]any) {
 		if refStr(m, "nodeId") == "" {
-			ref[refStr(m, "aqlPath")+" "+refStr(m, "id")] = refStr(m, "name")
+			ref[refStr(m, "aqlPath")+" "+refStr(m, "id")] = names{refStr(m, "name"), refStr(m, "localizedName")}
 		}
 	})
 	compared := map[string]bool{}
 	walkOurTree(buildOPT(t, readFile(t, testAllTypesOPT)).Tree, func(n *webtemplate.Node) {
-		if n.NodeID != "" || n.Name == "" {
+		if n.NodeID != "" || strings.Contains(n.AQLPath, "/ism_transition[") {
 			return
 		}
 		key := n.AQLPath + " " + n.ID
@@ -116,12 +122,13 @@ func TestREQ106InContextNamesMatchTestAllTypes(t *testing.T) {
 			t.Errorf("%s: named %q, but the golden has no node there", key, n.Name)
 			return
 		}
-		if n.Name != want {
-			t.Errorf("%s: name = %q, want the golden's %q", key, n.Name, want)
+		if got := (names{n.Name, n.LocalizedName}); got != want {
+			t.Errorf("%s: name, localizedName = %+v, want the golden's %+v", key, got, want)
 		}
 		compared[n.ID] = true
 	})
 	for _, id := range []string{
+		"category", "context",
 		"language", "territory", "composer", "start_time", "setting", "encoding", "subject", "time", "time_1",
 		"narrative", "expiry_time", "timing", "action_archetype_id",
 		"ism_transition", "careflow_step", "current_state", "transition",

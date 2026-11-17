@@ -60,7 +60,7 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 		ID:      idOf(root, "", text),
 	}
 	setOccurrences(tree, root)
-	setNames(tree, root, text, cfg)
+	setNames(tree, root, text, "", cfg)
 	tree.Children = childrenOf(root, "", cfg)
 	dedupeSiblingIDs(tree)
 	if err := checkIDCollisions(tree); err != nil {
@@ -603,7 +603,7 @@ func newNode(c *templatecompile.CompiledNode, aqlPath string, attr *templatecomp
 		ID:      idOf(c, attr.Name(), text),
 	}
 	setOccurrences(node, c)
-	setNames(node, c, text, cfg)
+	setNames(node, c, text, attr.Name(), cfg)
 	return node
 }
 
@@ -629,8 +629,19 @@ func setOccurrences(node *Node, c *templatecompile.CompiledNode) {
 // name. The description is always the term's. A compiled template carries
 // one set of terms, in its default language, so every language reads the
 // same name and description, which are looked up once.
-func setNames(node *Node, c *templatecompile.CompiledNode, text string, cfg *config) {
+//
+// A node with no node id that neither names takes attrName, the RM attribute
+// that holds it, as its name and localized name, with no localized names or
+// descriptions, as the reference names it (OPTParser.buildNode); [idOf]
+// derives its id from the same attribute. attrName is "" for the root, which
+// the reference would name by its RM type: the root keeps an empty name
+// there, so FLAT decode still names a composition after its template id.
+func setNames(node *Node, c *templatecompile.CompiledNode, text, attrName string, cfg *config) {
 	name := cmp.Or(c.NodeName(), text)
+	if name == "" && c.NodeID() == "" {
+		node.Name, node.LocalizedName = attrName, attrName
+		return
+	}
 	node.Name = name
 	node.LocalizedName = name
 	desc, _ := impl.RootTermItem(c, c.NodeID(), "description")

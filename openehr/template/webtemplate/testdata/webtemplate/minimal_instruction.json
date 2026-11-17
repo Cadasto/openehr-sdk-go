@@ -23,6 +23,8 @@
     "children": [
       {
         "id": "category",
+        "name": "category",
+        "localizedName": "category",
         "rmType": "DV_CODED_TEXT",
         "min": 1,
         "max": 1,

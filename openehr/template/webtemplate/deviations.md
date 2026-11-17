@@ -35,7 +35,12 @@ in this builder's spelling (§ Duplicate sibling ids).
   `Current_state`, below). The older `constrain_test`, `Corona_Anamnese` and `GECCO_Diagnose`
   goldens, from the reference's Better-era test resources, capitalise those names
   (`Start_time`); the builder follows the reference's code, which the
-  `test_all_types` golden, regenerated from it, shows.
+  `test_all_types` golden, regenerated from it, shows. The same holds for every
+  other node whose constraint carries no node id, such as `category`, `context`
+  and an archetyped transition step's `current_state`: it is named by its RM
+  attribute, with that name as its `localizedName` and no `localizedNames`, as
+  `test_all_types` names `category` and `context`, where the older goldens give it
+  no name (issue 455).
 - **inContext coverage** — the fixed RM-attribute leaf table covers COMPOSITION,
   EVENT_CONTEXT, the ENTRY types, the EVENT variants (INTERVAL_EVENT adds
   `math_function` / `width`), INSTRUCTION (`narrative` / `expiry_time`), ACTIVITY
