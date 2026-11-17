@@ -293,9 +293,11 @@ Concretely:
   - at that shared precision when the two are written with one zone designator, or both with none;
   - as instants, each read in UTC by the `magnitude()` of [REQ-123](reference-model.md#req-123--temporal-data-value-helpers), in which a partial value stands for the start of the period it names, when both carry a zone and the designators differ;
   - as XML Schema 1.0 Part 2 §3.2.7.4 orders a `dateTime` when one carries a zone and the other does not: the one with a zone is read in UTC and the other at `+14:00` and at `-14:00`, a partial value covering the whole period it names, and the two are ordered only where both readings agree.
+    The one with a zone is equal to the other where it lies inside the other's period at both readings, as two values equal on every field they share are.
 
   Where the two readings disagree, the value and the bound lie within 14 hours of each other, an edge they share included, and are not ordered, so such a bound draws no `CodeOutOfRange`.
-  So a `CDateTime` with the range `2020-01-01T00:00..2021-12-31T23:59` refuses `2022-11-02T19:32:40Z`, more than 14 hours past its upper bound at either reading, and one with the range `<=2030` admits `2030-06-01T10:00Z`, inside the year 2030 at either reading, as it admits `2030-06-01T10:00`.
+  So a `CDateTime` with the range `2020-01-01T00:00..2021-12-31T23:59` refuses `2022-11-02T19:32:40Z`, more than 14 hours past its upper bound at either reading.
+  A `CDateTime` with the range `<=2030` admits `2030-06-01T10:00Z`, which lies inside the year 2030 at both readings, as it admits `2030-06-01T10:00`, and one with the range `<2030` refuses both.
   A `CTime` with the range `>09:30:00+02:00` admits `08:00:00Z`, which is 10:00 at `+02:00`, and `09:00:00`, which has no zone and lies within 14 hours of the bound.
   ADL 1.4 asks a closed interval to give a zone on both bounds or on neither (*Intervals*); the SDK does not check that, and orders the value against each bound on its own.
   The compile step reads a bound that the ISO 8601 parse of the constrained type refuses as [§ REQ-111](#req-111--public-compiled-template-bridge) *What the compile step tolerates* says; on a `TemporalRange` built in code, such a bound on a side that is not unbounded is malformed (below).
@@ -1178,7 +1180,7 @@ The pairs it can compare are:
 - and two DV_DURATION values the REQ-123 parse accepts, by the magnitude it gives, as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* orders them.
 
 The same holds in a `DV_INTERVAL<DV_ORDERED>` whose two bounds are one of those types.
-No other pair is one it can compare, for example, a zoned against a zoneless time or date-time within 14 hours of each other, or a value the REQ-123 parse refuses.
+No other pair is one it can compare, for example, a zoned against a zoneless time or date-time within 14 hours of the start or end of the zoneless one, or a value the REQ-123 parse refuses.
 
 #### Precedence
 
@@ -1974,7 +1976,7 @@ Two DV_TIME or two DV_DATE_TIME values that both carry a zone, with designators 
 A zoned DV_TIME or DV_DATE_TIME and one without a zone are ordered as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* orders a time or a date-time against a bound when one carries a zone and the other does not.
 Equal `units` is only part of DV_QUANTITY's `is_strictly_comparable_to`, which also needs a matching `units_system` where one is set.
 The floor does not compare `units_system`, so it orders a same-units pair whatever its `units_system`, although the RM makes two different systems not strictly comparable.
-Of the pairs it reads as strictly comparable, it orders none that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, nor a zoned DV_TIME or DV_DATE_TIME against one without a zone within 14 hours of it, and reports none of them here (see *What the floor does not evaluate* below).
+Of the pairs it reads as strictly comparable, it orders none that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, nor a zoned DV_TIME or DV_DATE_TIME within 14 hours of the start or end of one without a zone, and reports none of them here (see *What the floor does not evaluate* below).
 
 #### Interval flags
 
