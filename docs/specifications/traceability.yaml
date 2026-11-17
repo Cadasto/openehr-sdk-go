@@ -1364,6 +1364,7 @@ requirements:
     packages:
       - internal/bmmtype
       - internal/templateinstance/rmwrite
+      - internal/templateinstance/builderseed
       - openehr/composition
       - openehr/internal/rmbind
       - openehr/internal/rmnames
@@ -1580,6 +1581,7 @@ requirements:
       - openehr/templatecompile
       - openehr/rm/rminfo
       - internal/templateinstance/rmwrite
+      - internal/templateinstance/builderseed
       - internal/rmroots
       - internal/rmlists
       - internal/cstringvalue
