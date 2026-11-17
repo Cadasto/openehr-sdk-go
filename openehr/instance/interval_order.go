@@ -3,8 +3,10 @@ package instance
 // interval_order.go: keeps the two bounds of a generated interval in order.
 
 import (
+	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -49,9 +51,13 @@ import (
 //     current bound instead, which a range open that way accepts; a
 //     proportion side that has no usable end there, whether its range is
 //     open or its type, denominator or precision rules the end out, takes
-//     that bound's ratio on its own denominator (proportionAdopt). At an exclusive real end the accepted extreme is
-//     the nearest float64 inside it, and for a proportion that needs whole
-//     numbers the nearest whole number it accepts;
+//     that bound's ratio on its own denominator (proportionAdopt). At an
+//     exclusive real end the accepted extreme is the nearest float64 inside
+//     it, and for a proportion that needs whole numbers the nearest whole
+//     number it accepts. For a date, a time, a date-time or a duration it
+//     is the value nearest the end of the range on the bound's value,
+//     written to the side's pattern and moved inside an excluded end, among
+//     the candidates temporalEnd reads;
 //   - for a proportion, the second pair with a side's denominator moved to
 //     the one the C_REAL on it gives that puts the side's ratio furthest
 //     toward its end (proportionWider): the lower side's alone, then the
@@ -97,16 +103,20 @@ import (
 // bound, which the other side's extreme does not pass; on a side whose bound
 // keeps a normal_range rule it is the extreme among the values that keep
 // the rule. For a proportion the third pair holds each side's extreme over
-// its denominators too. An in-order pair therefore exists only if the
-// second pair, or for a proportion the third, is in order: for a
-// proportion, among the pairs that keep each bound's type and take a
+// its denominators too. An in-order pair of those types therefore exists
+// only if the second pair, or for a proportion the third, is in order: for
+// a proportion, among the pairs that keep each bound's type and take a
 // denominator the C_REAL on its side lists or bounds on both sides away
-// from 0, or keep their own where the side has no such C_REAL. When none
-// is, the two sides' constraints admit no such ordered interval. The
-// generator has no error for a constraint it cannot satisfy (sampleValue,
-// for one, falls back to the example value without a signal), so the
-// bounds are then left as they are, and the interval breaks
-// Limits_consistent.
+// from 0, or keep their own where the side has no such C_REAL. For a date,
+// a time, a date-time or a duration the second pair holds the value nearest
+// each side's end among temporalEnd's candidates, which leave out a value
+// with a fraction of a second, one in another zone than the end, and a
+// duration in more than one designator other than the end itself, so an
+// in-order pair of those types can exist that no pair here finds. When no
+// pair is in order, the bounds are left as they are, and the interval
+// breaks Limits_consistent: the generator has no error for a constraint it
+// cannot satisfy (sampleValue, for one, falls back to the example value
+// without a signal).
 func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any) {
 	shareComparable(optNode, rmValue)
 	switch iv := rmValue.(type) {
@@ -601,14 +611,15 @@ func setOrderedQuantity(slot *rm.DVOrdered, k quantityKey) {
 
 // dateScale, timeScale and dateTimeScale order DV_DATE, DV_TIME and
 // DV_DATE_TIME bounds (temporalCompare says how), and durationScale
-// DV_DURATION bounds (compareDurations). They read no end from a C_DATE,
-// C_TIME, C_DATE_TIME or C_DURATION, not even from its range, so only a
-// swap repairs an inversion.
+// DV_DURATION bounds (compareDurations). Each reads a side's lowest and
+// highest value from the range of the C_DATE, C_TIME, C_DATE_TIME or
+// C_DURATION on the bound's value (temporalEnd), among the candidates
+// clockEnds or durationEnds gives.
 var (
-	dateScale     = temporalScale(temporalCompare(dateOrderRead))
-	timeScale     = temporalScale(temporalCompare(timeOrderRead))
-	dateTimeScale = temporalScale(temporalCompare(dateTimeOrderRead))
-	durationScale = temporalScale(compareDurations)
+	dateScale     = temporalScale(temporalCompare(dateOrderRead), clockEnds(dateParts))
+	timeScale     = temporalScale(temporalCompare(timeOrderRead), clockEnds(timeParts))
+	dateTimeScale = temporalScale(temporalCompare(dateTimeOrderRead), clockEnds(dateTimeParts))
+	durationScale = temporalScale(compareDurations, durationEnds)
 )
 
 // compareDurations compares two ISO 8601 durations by their length in
@@ -667,15 +678,268 @@ func durationKeyOf(d rm.DVDuration) string { return d.Value }
 
 func setDurationKey(d *rm.DVDuration, v string) { d.Value = v }
 
-func temporalScale(compare func(a, b string) (int, bool)) scale[string] {
+// temporalScale is the scale of one ISO 8601 type that compare orders, whose
+// OPT constraint is the one on the bound's value. A side's lowest and
+// highest value is the one temporalEnd reads from that constraint's range
+// among the candidates ends gives.
+func temporalScale(compare func(a, b string) (int, bool), ends func(r constraints.TemporalRange, low bool) []string) scale[string] {
+	end := func(node *tcimpl.CompiledNode, low bool) (string, bool) {
+		return temporalEnd(primitiveOf(bindingChild(node, "value")), compare, ends, low)
+	}
 	return scale[string]{
 		compare: compare,
 		fits: func(node *tcimpl.CompiledNode, v string) bool {
 			pc := primitiveOf(bindingChild(node, "value"))
 			return pc == nil || len(pc.Validate(v)) == 0
 		},
-		lowest:  func(*tcimpl.CompiledNode, string) (string, bool) { return "", false },
-		highest: func(*tcimpl.CompiledNode, string) (string, bool) { return "", false },
+		lowest:  func(node *tcimpl.CompiledNode, _ string) (string, bool) { return end(node, true) },
+		highest: func(node *tcimpl.CompiledNode, _ string) (string, bool) { return end(node, false) },
+	}
+}
+
+// temporalEnd returns the lowest (low) or highest value pc, the constraint
+// on a side's bound value, accepts among the candidates ends gives for its
+// range: the first it accepts, replaced by each later one that compare puts
+// further that way. It returns false where pc is no C_DATE, C_TIME,
+// C_DATE_TIME or C_DURATION, where its range has no end that way, and where
+// pc accepts no candidate.
+func temporalEnd(pc constraints.PrimitiveConstraint, compare func(a, b string) (int, bool), ends func(r constraints.TemporalRange, low bool) []string, low bool) (string, bool) {
+	r, ok := temporalRangeOf(pc)
+	if !ok || !r.IsBounded() || (low && r.LowerUnbounded) || (!low && r.UpperUnbounded) {
+		return "", false
+	}
+	var best string
+	found := false
+	for _, v := range ends(r, low) {
+		if len(pc.Validate(v)) != 0 {
+			continue
+		}
+		if !found {
+			best, found = v, true
+			continue
+		}
+		if c, ok := compare(v, best); ok && ((low && c < 0) || (!low && c > 0)) {
+			best = v
+		}
+	}
+	return best, found
+}
+
+// temporalRangeOf returns the range of a C_DATE, C_TIME, C_DATE_TIME or
+// C_DURATION, and false for any other constraint.
+func temporalRangeOf(pc constraints.PrimitiveConstraint) (constraints.TemporalRange, bool) {
+	switch c := pc.(type) {
+	case constraints.CDate:
+		return c.Range, true
+	case constraints.CTime:
+		return c.Range, true
+	case constraints.CDateTime:
+		return c.Range, true
+	case constraints.CDuration:
+		return c.Range, true
+	}
+	return constraints.TemporalRange{}, false
+}
+
+// durationEnds returns the candidates for the lowest (low) or highest
+// duration the range r admits: its end that way as r writes it, then, in
+// each designator in written order, the length 0 and the count of that
+// designator nearest the end inside r (durationCounts), as the sampler
+// writes a count, so a pattern that refuses the end's own designators
+// admits one of them.
+func durationEnds(r constraints.TemporalRange, low bool) []string {
+	out := []string{r.Upper}
+	if low {
+		out[0] = r.Lower
+	}
+	for _, d := range durationDesignators {
+		out = append(out, d.prefix+"0"+d.letter)
+		if lo, hi, ok := durationCounts(r, d.prefix, d.letter); ok {
+			n := hi
+			if low {
+				n = lo
+			}
+			out = append(out, fmt.Sprintf("%s%d%s", d.prefix, n, d.letter))
+		}
+	}
+	return out
+}
+
+// The fields of a clockParts, from the largest down.
+const (
+	clockYear = iota
+	clockMonth
+	clockDay
+	clockHour
+	clockMinute
+	clockSecond
+	clockFieldCount
+)
+
+// clockParts is a date, a time or a date-time read field by field, its
+// fraction of a second left out. f holds the year, the month, the day, the
+// hour, the minute and the second; the type has the fields from lo up to
+// hi, and the value carries those from lo up to n. zone is the designator
+// the value is written with, "" for none, which a value with no time does
+// not write.
+type clockParts struct {
+	f         [clockFieldCount]int
+	lo, hi, n int
+	zone      string
+}
+
+func dateParts(s string) (clockParts, bool) {
+	d, err := iso8601.ParseDate(s)
+	p := clockParts{lo: clockYear, hi: clockHour}
+	p.setDate(d)
+	return p, err == nil
+}
+
+func timeParts(s string) (clockParts, bool) {
+	t, err := iso8601.ParseTime(s)
+	p := clockParts{lo: clockHour, hi: clockFieldCount}
+	p.setTime(t)
+	return p, err == nil
+}
+
+// dateTimeParts reads a date-time, which carries a time exactly when its
+// text holds a "T", as dateTimeOrderRead says.
+func dateTimeParts(s string) (clockParts, bool) {
+	d, t, err := iso8601.ParseDateTime(s)
+	p := clockParts{lo: clockYear, hi: clockFieldCount}
+	p.setDate(d)
+	if strings.Contains(s, "T") {
+		p.setTime(t)
+	}
+	return p, err == nil
+}
+
+func (p *clockParts) setDate(d iso8601.Date) {
+	p.f[clockYear], p.n = d.Year, clockYear+1
+	if d.MonthKnown {
+		p.f[clockMonth], p.n = d.Month, clockMonth+1
+	}
+	if d.DayKnown {
+		p.f[clockDay], p.n = d.Day, clockDay+1
+	}
+}
+
+func (p *clockParts) setTime(t iso8601.Time) {
+	p.f[clockHour], p.n = t.Hour, clockHour+1
+	if t.MinuteKnown {
+		p.f[clockMinute], p.n = t.Minute, clockMinute+1
+	}
+	if t.SecondKnown {
+		p.f[clockSecond], p.n = t.Second, clockSecond+1
+	}
+	p.zone = t.Zone
+}
+
+// String writes p in the extended layout, with its zone after its time.
+func (p clockParts) String() string {
+	var b strings.Builder
+	for i := p.lo; i < p.n; i++ {
+		switch i {
+		case clockYear:
+			fmt.Fprintf(&b, "%04d", p.f[i])
+		case clockMonth, clockDay:
+			fmt.Fprintf(&b, "-%02d", p.f[i])
+		case clockHour:
+			if p.lo < clockHour {
+				b.WriteByte('T')
+			}
+			fmt.Fprintf(&b, "%02d", p.f[i])
+		default:
+			fmt.Fprintf(&b, ":%02d", p.f[i])
+		}
+	}
+	if p.n > clockHour {
+		b.WriteString(p.zone)
+	}
+	return b.String()
+}
+
+// withFields returns p written with m fields: cut after its m-th where it
+// carries more, and else filled out with the start of the period it names
+// (start) or the end of it, such as 2021-01-01 or 2021-12-31 for 2021.
+func (p clockParts) withFields(m int, start bool) clockParts {
+	for i := p.n; i < m; i++ {
+		switch {
+		case start && (i == clockMonth || i == clockDay):
+			p.f[i] = 1
+		case start:
+			p.f[i] = 0
+		case i == clockMonth:
+			p.f[i] = 12
+		case i == clockDay:
+			// Day 0 of the next month is the last day of this one.
+			p.f[i] = time.Date(p.f[clockYear], time.Month(p.f[clockMonth]+1), 0, 0, 0, 0, 0, time.UTC).Day()
+		case i == clockHour:
+			p.f[i] = 23
+		default:
+			p.f[i] = 59
+		}
+	}
+	p.n = m
+	return p
+}
+
+// moved returns p moved by step, 1 or -1, in its field at, and cut after
+// that field, so that it names the period next to the one p names at that
+// precision: 2021-06 and 2021-04 for 2021-05-03 at the month. It returns
+// false where the move takes a time out of its day.
+func (p clockParts) moved(at, step int) (clockParts, bool) {
+	f := p.withFields(at+1, true).withFields(clockFieldCount, true).f
+	if p.lo == clockHour {
+		f[clockYear], f[clockMonth], f[clockDay] = 2000, 1, 1
+	}
+	f[at] += step
+	t := time.Date(f[clockYear], time.Month(f[clockMonth]), f[clockDay], f[clockHour], f[clockMinute], f[clockSecond], 0, time.UTC)
+	if p.lo == clockHour && t.YearDay() != 1 {
+		return clockParts{}, false
+	}
+	q := p
+	q.f = [clockFieldCount]int{t.Year(), int(t.Month()), t.Day(), t.Hour(), t.Minute(), t.Second()}
+	q.n = at + 1
+	return q, true
+}
+
+// clockEnds returns the candidates for the lowest (low) or highest value a
+// range of dates, times or date-times, read by read, admits. They are its
+// end that way as the range writes it, and then the end written with each
+// number of fields its type has, from all down to one: cut after the last,
+// or filled out with the start of the period it names for the lowest and
+// the end of that period for the highest (withFields). Where the range
+// excludes the end, they are instead the end moved by one in each field it
+// carries, up for the lowest and down for the highest (moved), each so
+// written. Each is in the extended layout, with the end's zone and without
+// a fraction of a second.
+func clockEnds(read func(s string) (clockParts, bool)) func(r constraints.TemporalRange, low bool) []string {
+	return func(r constraints.TemporalRange, low bool) []string {
+		end, excluded, step := r.Upper, !r.UpperInclusive, -1
+		if low {
+			end, excluded, step = r.Lower, !r.LowerInclusive, 1
+		}
+		out := []string{end}
+		p, ok := read(end)
+		if !ok {
+			return out
+		}
+		seeds := []clockParts{p}
+		if excluded {
+			seeds = seeds[:0]
+			for at := p.lo; at < p.n; at++ {
+				if q, ok := p.moved(at, step); ok {
+					seeds = append(seeds, q)
+				}
+			}
+		}
+		for _, s := range seeds {
+			for m := s.hi; m > s.lo; m-- {
+				out = append(out, s.withFields(m, low).String())
+			}
+		}
+		return out
 	}
 }
 

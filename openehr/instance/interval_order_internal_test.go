@@ -319,9 +319,10 @@ func TestOrderIntervalBoundsOrdered(t *testing.T) {
 // DV_DATE, DV_TIME and DV_DATE_TIME bounds the generator writes: values in
 // one zone, or with none, compare at the precision they share
 // (TestREQ107_TemporalBoundsCompareAtSharedPrecision and
-// TestREQ107_TemporalBoundsCompareAsInstants pin the rest). A C_DATE,
-// C_TIME or C_DATE_TIME has no numeric end, so an inversion is repaired
-// by swapping, and a side the OPT leaves open is left alone.
+// TestREQ107_TemporalBoundsCompareAsInstants pin the rest). Bounds the OPT
+// does not constrain are swapped, and a side the OPT leaves open is left
+// alone; TestREQ107_TemporalBoundsTakeTheirRangeEnds pins the ends of a
+// C_DATE, C_TIME or C_DATE_TIME range.
 func TestOrderIntervalBoundsTemporal(t *testing.T) {
 	cases := []struct {
 		name         string

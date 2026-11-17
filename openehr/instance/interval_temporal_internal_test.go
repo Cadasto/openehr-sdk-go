@@ -1,8 +1,10 @@
 package instance
 
 import (
+	"fmt"
 	"testing"
 
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
@@ -288,4 +290,104 @@ func TestREQ107_TemporalBoundsCompareAtSharedPrecision(t *testing.T) {
 			t.Errorf("orderIntervalBounds = %q, want the pair left alone", got)
 		}
 	})
+}
+
+// TestREQ107_TemporalBoundsTakeTheirRangeEnds pins the REQ-107 Intervals
+// rule on DV_DATE, DV_TIME and DV_DATE_TIME bounds whose swap a side's
+// C_DATE, C_TIME or C_DATE_TIME refuses: each side takes the end of its
+// range nearest the other side, written to its pattern, where that pair is
+// in order. An end with fewer fields than the pattern asks for is filled out
+// to the start of the period it names on the lower side and to its end on
+// the upper side, and an excluded end moves one unit inside the range. A
+// pair the two ranges leave no order for is left as generated.
+func TestREQ107_TemporalBoundsTakeTheirRangeEnds(t *testing.T) {
+	opt := ReadVendoredOPT(t, CountIntervalOPT)
+	type kind struct{ rmType, primitive, item string }
+	var (
+		date     = kind{"DV_DATE", "DATE", "C_DATE"}
+		clock    = kind{"DV_TIME", "TIME", "C_TIME"}
+		dateTime = kind{"DV_DATE_TIME", "DATE_TIME", "C_DATE_TIME"}
+	)
+	ranged := func(pattern, lower string, lowerIncluded bool, upper string, upperIncluded bool) string {
+		return "<pattern>" + pattern + "</pattern>" + fmt.Sprintf("<range><lower_included>%t</lower_included><upper_included>%t</upper_included>"+
+			"<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>"+
+			"<lower>%s</lower><upper>%s</upper></range>", lowerIncluded, upperIncluded, lower, upper)
+	}
+	node := func(k kind, lowerBody, upperBody string) *tcimpl.CompiledNode {
+		t.Helper()
+		bound := func(body string) string { return TemporalBound(k.rmType, k.primitive, k.item, body) }
+		return intervalNode(t, RetargetInterval(t, opt, k.rmType, bound(lowerBody), bound(upperBody)))
+	}
+	order := func(k kind, n *tcimpl.CompiledNode, lower, upper string) [2]string {
+		switch k {
+		case date:
+			iv := &rm.DVInterval[rm.DVDate]{}
+			iv.Lower.Value, iv.Upper.Value = lower, upper
+			orderIntervalBounds(n, iv)
+			return [2]string{iv.Lower.Value, iv.Upper.Value}
+		case clock:
+			iv := &rm.DVInterval[rm.DVTime]{}
+			iv.Lower.Value, iv.Upper.Value = lower, upper
+			orderIntervalBounds(n, iv)
+			return [2]string{iv.Lower.Value, iv.Upper.Value}
+		}
+		iv := &rm.DVInterval[rm.DVDateTime]{}
+		iv.Lower.Value, iv.Upper.Value = lower, upper
+		orderIntervalBounds(n, iv)
+		return [2]string{iv.Lower.Value, iv.Upper.Value}
+	}
+	cases := []struct {
+		name         string
+		kind         kind
+		lowerBody    string
+		upperBody    string
+		lower, upper string
+		want         [2]string
+	}{
+		{
+			// 2020-11-01 lies above the upper side's range, which ends with
+			// the month 2020-03; the lower side's range starts with 2020.
+			name:      "date: ends with fewer fields than the pattern, filled out",
+			kind:      date,
+			lowerBody: ranged("yyyy-mm-dd", "2020", true, "2021", true),
+			upperBody: ranged("yyyy-mm-dd", "2019", true, "2020-03", true),
+			lower:     "2020-11-01", upper: "2020-02-01",
+			want: [2]string{"2020-01-01", "2020-03-31"},
+		},
+		{
+			name:      "date: no ordered pair, left as generated",
+			kind:      date,
+			lowerBody: ranged("yyyy-mm-dd", "2020-06", true, "2021", true),
+			upperBody: ranged("yyyy-mm-dd", "2019", true, "2020-03", true),
+			lower:     "2020-11-01", upper: "2020-02-01",
+			want: [2]string{"2020-11-01", "2020-02-01"},
+		},
+		{
+			// Both sides exclude their end nearest the other.
+			name:      "time: excluded ends moved a second inside",
+			kind:      clock,
+			lowerBody: ranged("hh:mm:ss", "08:00:00", false, "12:00:00", true),
+			upperBody: ranged("hh:mm:ss", "06:00:00", true, "09:00:00", false),
+			lower:     "11:00:00", upper: "07:00:00",
+			want: [2]string{"08:00:01", "08:59:59"},
+		},
+		{
+			// The upper side's end carries no seconds, which its pattern asks
+			// for: the last second of that minute, in its zone.
+			name:      "date-time: an end without seconds, filled out in its zone",
+			kind:      dateTime,
+			lowerBody: ranged("yyyy-mm-ddThh:mm:ss", "2020-01-01T00:00:00Z", true, "2020-12-31T23:59:59Z", true),
+			upperBody: ranged("yyyy-mm-ddThh:mm:ss", "2019-01-01T00:00:00Z", true, "2020-01-31T12:00Z", true),
+			lower:     "2020-06-01T00:00:00Z", upper: "2020-01-15T00:00:00Z",
+			want: [2]string{"2020-01-01T00:00:00Z", "2020-01-31T12:00:59Z"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := order(tc.kind, node(tc.kind, tc.lowerBody, tc.upperBody), tc.lower, tc.upper)
+			if got != tc.want {
+				t.Errorf("orderIntervalBounds(%q, %q) = %q, want %q", tc.lower, tc.upper, got, tc.want)
+			}
+		})
+	}
 }
