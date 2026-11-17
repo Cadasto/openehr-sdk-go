@@ -136,7 +136,8 @@ Concretely:
   `ErrUnsupportedDatatype` naming the key (since 2026-11-16), where it wrote none of them, so
   decode rebuilt the event as a POINT_EVENT. Since 2026-11-17 (issue 452) the Web Template
   folds in an event of any type that is its HISTORY's only event at `max == 1`, as the
-  reference does, so `webtemplate.Build` folds in no two events at one OBSERVATION. A folded
+  reference does, so `webtemplate.Build` folds two events into one OBSERVATION only where its
+  `data` and `state` HISTORYs each hold one. A folded
   INTERVAL_EVENT takes these keys too, and has its `math_function` and `width` as leaves of
   the OBSERVATION's node, at the event's own paths: encode writes each once, there, and
   decode rebuilds the event as an INTERVAL_EVENT whatever keys the body gives. A folded

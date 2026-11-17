@@ -1082,7 +1082,7 @@ Encode **MUST** write:
 
 Where an EVENT node, or the OBSERVATION node a folded event is spelled at, holds no leaf of the event's own for `math_function` or `width` and has a child whose `id` is that attribute's name, that key is the child's, which decode reads as the child, so encode refuses an INTERVAL_EVENT there, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
 Where the node holds the event's own leaf, as a folded INTERVAL_EVENT's does, encode writes the attribute at that leaf, whose `id` takes the duplicate-sibling suffix beside such a child (`width_1`, [clinical-modeling.md § *`id` generation*](clinical-modeling.md#id-generation-adr-0014)).
-An OBSERVATION that folds in two or more events, a Web Template neither this SDK nor the reference builds, gives the three keys to none of them: decode reads them there as unmatched content (§ REQ-170), and encode refuses an INTERVAL_EVENT among those events that holds any of the three, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+An OBSERVATION that folds in two or more events, as one whose `data` and `state` HISTORYs each hold one, gives the three keys to none of them: decode reads them there as unmatched content (§ REQ-170), and encode refuses an INTERVAL_EVENT among those events that holds any of the three, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
 Every other spelling of the four, such as `<event>/sample_count` or `<observation>|history_origin`, is unmatched content (§ REQ-170).
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 

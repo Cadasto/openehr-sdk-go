@@ -118,9 +118,10 @@ func intervalEventOf(parent, leaf *webtemplate.Node) (string, bool) {
 // typesPointEvent reports whether the template types the event at eventPath a
 // POINT_EVENT, which holds none of the INTERVAL_EVENT attributes the codec
 // reads ([codecLeaf], [sampleCountEvent]). eventPath is the event's Web
-// Template path, through its OBSERVATION's `data` and an `events[…]` segment.
-// The compiled template keys the event without the HISTORY's node id, as
-// `data` is single-valued ([buildTemplateIndex]). A nil index, the one of a
+// Template path, through one of its OBSERVATION's HISTORY attributes
+// ([isObservationHistory]) and an `events[…]` segment. The compiled template
+// keys the event without the HISTORY's node id, as both attributes are
+// single-valued ([buildTemplateIndex]). A nil index, the one of a
 // decode without the template, types no event: there the Web Template alone
 // cannot tell a folded POINT_EVENT from a folded abstract EVENT, since it
 // gives either one leaf of its own, its `time`, at the OBSERVATION.
@@ -130,14 +131,21 @@ func (x *templateIndex) typesPointEvent(eventPath string) bool {
 	}
 	segs := parseAQL(eventPath)
 	n := len(segs)
-	if n < 2 || segs[n-2].attr != "data" || segs[n-1].attr != "events" {
+	if n < 2 || !isObservationHistory(segs[n-2].attr) || segs[n-1].attr != "events" {
 		return false
 	}
 	start := 0
 	if n > 2 {
 		start = segs[n-3].end
 	}
-	return x.rmType(eventPath[:start]+"/data"+eventPath[segs[n-2].end:]) == "POINT_EVENT"
+	return x.rmType(eventPath[:start]+"/"+segs[n-2].attr+eventPath[segs[n-2].end:]) == "POINT_EVENT"
+}
+
+// isObservationHistory reports whether attr is an OBSERVATION attribute that
+// holds a HISTORY, `data` or `state`: the Web Template lifts the only event at
+// max 1 out of either into the OBSERVATION's node.
+func isObservationHistory(attr string) bool {
+	return attr == "data" || attr == "state"
 }
 
 // foldedEvent returns the event an OBSERVATION node folds in, where
@@ -180,12 +188,12 @@ func foldedEventPaths(obs *webtemplate.Node) []string {
 
 // foldedEventOf returns the path of the folded event that ch, a child of an
 // OBSERVATION node whose path has depth segments, sits below: the child's
-// path runs through the OBSERVATION's `data` and an `events[…]` segment with
-// more below it. It reports false for any other child, an event node of its
-// own among them.
+// path runs through one of the OBSERVATION's HISTORY attributes
+// ([isObservationHistory]) and an `events[…]` segment with more below it. It
+// reports false for any other child, an event node of its own among them.
 func foldedEventOf(depth int, ch *webtemplate.Node) (string, bool) {
 	segs := parseAQL(ch.AQLPath)
-	if len(segs) < depth+3 || segs[depth].attr != "data" || segs[depth+1].attr != "events" {
+	if len(segs) < depth+3 || !isObservationHistory(segs[depth].attr) || segs[depth+1].attr != "events" {
 		return "", false
 	}
 	return ch.AQLPath[:segs[depth+1].end], true
