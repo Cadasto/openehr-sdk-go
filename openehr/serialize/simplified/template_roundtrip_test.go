@@ -65,10 +65,15 @@ func compileTemplate(t *testing.T, id string, opt *aom14.OperationalTemplate) (*
 	return wt, compiled
 }
 
+// bmiObservation is the archetype of the BMI template's OBSERVATION whose
+// protocol the BMI tests read. The template's content also names a body
+// weight and a height OBSERVATION, which carry no protocol in the skeleton.
+const bmiObservation = "openEHR-EHR-OBSERVATION.body_mass_index.v1"
+
 // bmiTemplate builds the Web Template and the compiled template of the BMI
-// corpus OPT. Its OBSERVATION protocol is an ITEM_LIST of three ELEMENTs whose
-// FLAT ids (method, formula, comment) sort in the reverse of their template
-// order (at0006, at0010, at0011).
+// corpus OPT. The protocol of its bmiObservation is an ITEM_LIST of three
+// ELEMENTs whose FLAT ids (method, formula, comment) sort in the reverse of
+// their template order (at0006, at0010, at0011).
 func bmiTemplate(t *testing.T) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
 	return templateOf(t, "BMI")
@@ -138,7 +143,9 @@ func decodeAs(t *testing.T, format string, flat []byte, wt *webtemplate.WebTempl
 	return back
 }
 
-// bmiProtocol returns the canonical JSON of the BMI OBSERVATION's protocol.
+// bmiProtocol returns the canonical JSON of the protocol of the BMI
+// OBSERVATION comp holds: its one content item of archetype bmiObservation,
+// which must carry a protocol.
 func bmiProtocol(t *testing.T, comp *rm.Composition) map[string]any {
 	t.Helper()
 	b, err := canjson.Marshal(comp)
@@ -147,16 +154,23 @@ func bmiProtocol(t *testing.T, comp *rm.Composition) map[string]any {
 	}
 	var doc struct {
 		Content []struct {
-			Protocol map[string]any `json:"protocol"`
+			ArchetypeNodeID string         `json:"archetype_node_id"`
+			Protocol        map[string]any `json:"protocol"`
 		} `json:"content"`
 	}
 	if err := json.Unmarshal(b, &doc); err != nil {
 		t.Fatalf("unmarshal canonical JSON: %v", err)
 	}
-	if len(doc.Content) != 1 || doc.Content[0].Protocol == nil {
-		t.Fatalf("canonical JSON carries %d content items, want one OBSERVATION with a protocol", len(doc.Content))
+	var protocols []map[string]any
+	for _, c := range doc.Content {
+		if c.ArchetypeNodeID == bmiObservation {
+			protocols = append(protocols, c.Protocol)
+		}
 	}
-	return doc.Content[0].Protocol
+	if len(protocols) != 1 || protocols[0] == nil {
+		t.Fatalf("canonical JSON carries %d content items of %s among %d, want one OBSERVATION with a protocol", len(protocols), bmiObservation, len(doc.Content))
+	}
+	return protocols[0]
 }
 
 // memberIDs returns the archetype_node_id of each member of a structure's
@@ -174,9 +188,9 @@ func memberIDs(structure map[string]any) []string {
 
 // TestREQ053WithTemplateRoundTripValidatesBMI — REQ-053: the BMI skeleton,
 // written as FLAT or STRUCTURED and decoded with WithTemplate, validates
-// against the OPT. Its protocol comes back as the ITEM_LIST the template
-// names, not the ITEM_TREE the path alone would suggest, and its members in
-// the order they were written.
+// against the OPT. The BMI OBSERVATION's protocol comes back as the ITEM_LIST
+// the template names, not the ITEM_TREE the path alone would suggest, and its
+// members in the order they were written.
 func TestREQ053WithTemplateRoundTripValidatesBMI(t *testing.T) {
 	wt, compiled := bmiTemplate(t)
 	comp := bmiSkeleton(t, compiled)
@@ -623,11 +637,13 @@ func TestREQ053WithTemplateOrdinalTerminology(t *testing.T) {
 		}
 		return ord.Symbol.DefiningCode.TerminologyID.Value
 	}
-	// encode writes the skeleton of compiled as FLAT, and returns the body and
-	// the key of the ordinal, which the encoder writes as |raw.
+	// encode writes the Medium skeleton of compiled as FLAT, and returns the
+	// body and the key of the ordinal, which the encoder writes as |raw.
+	// Medium builds one member of each node that may repeat, so the body
+	// holds one ordinal, at valuePath.
 	encode := func(t *testing.T, wt *webtemplate.WebTemplate, compiled *templatecompile.Compiled) (map[string]any, string) {
 		t.Helper()
-		body, err := simplified.MarshalFlat(skeletonOf(t, compiled, instance.Large), wt)
+		body, err := simplified.MarshalFlat(skeletonOf(t, compiled, instance.Medium), wt)
 		if err != nil {
 			t.Fatalf("MarshalFlat: %v", err)
 		}

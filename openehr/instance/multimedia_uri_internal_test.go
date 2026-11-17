@@ -8,10 +8,11 @@ import (
 )
 
 // TestREQ107_MultimediaURIOnlyWhenEmpty is the REQ-107 check that
-// settleMultimedia gives a DV_MULTIMEDIA inline data, sized by its byte
-// count, unless the OPT prohibits data, and the uri default
-// http://example.com only where it then has neither uri nor data: a uri
-// or inline data it already has is kept, and no uri is added beside data.
+// settleMultimedia gives a DV_MULTIMEDIA of no media type yet, which
+// settleCoded makes text/plain, inline data, sized by its byte count,
+// unless the OPT prohibits data, and the uri default http://example.com,
+// with a fixed size, only where it then has neither uri nor data: a uri or
+// inline data it already has is kept, and no uri is added beside data.
 // It calls settleMultimedia directly, because a value Generate builds
 // never has data before it is settled: no AOM 1.4 constraint describes
 // data, an array of octets, so no OPT puts one there.
@@ -52,8 +53,8 @@ func TestREQ107_MultimediaURIOnlyWhenEmpty(t *testing.T) {
 	t.Run("neither, data prohibited: uri added", func(t *testing.T) {
 		m := &rm.DVMultimedia{}
 		settleMultimedia(noData, m)
-		if len(m.Data) != 0 || m.Size != 0 {
-			t.Errorf("settleMultimedia: data %q of size %d, want none of size 0", m.Data, m.Size)
+		if len(m.Data) != 0 || m.Size != multimediaURISize {
+			t.Errorf("settleMultimedia: data %q of size %d, want none of size %d", m.Data, m.Size, multimediaURISize)
 		}
 		if uri, ok := m.URI.(*rm.DVURI); !ok || uri.Value != "http://example.com" {
 			t.Errorf("settleMultimedia: uri = %#v, want http://example.com", m.URI)

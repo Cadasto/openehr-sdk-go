@@ -16,15 +16,23 @@
 // `WithValueFill`, `WithValueSource`, `WithUIDSource`) and the
 // path-assigning API.
 // With no WithPolicy, NewSkeleton builds instance.Medium, the instance
-// package's default: a skeleton with at most one optional archetype under
-// an attribute. `WithPolicy(instance.Required)` gives one with only what
-// the template makes mandatory and a composition's context, and
+// package's default: a skeleton with a member of each optional archetype
+// under an attribute, and of a further use of one only where that use
+// holds another archetype.
+// `WithPolicy(instance.Required)` gives one with what the template makes
+// mandatory, a composition's context and each entry the content names,
+// with only its mandatory parts, and
 // `WithPolicy(instance.Large)` one with a member of every optional
-// archetype. NewBuilder builds on instance.Large when no WithPolicy is
-// given, and refuses Medium and Required with [ErrUnsupportedPolicy],
-// because Set needs a member of every optional archetype, which only Large
-// builds. Both entry points refuse a Policy value the instance package does
-// not define with an error wrapping [ErrUnsupportedPolicy] and
+// archetype and of every use of one, two of each that may occur more than
+// once, and a fixed set of optional RM attributes the template does not
+// name. NewBuilder builds on instance.Large when no WithPolicy is given,
+// short of those second members and RM attributes: its skeleton holds one
+// member of every optional archetype and of every use of one, the nodes Set
+// routes values into. It refuses Medium and Required with
+// [ErrUnsupportedPolicy], because Set needs a member of every optional
+// archetype and of every use of one, which only Large builds. Both entry
+// points refuse a Policy value the instance package does not define with
+// an error wrapping [ErrUnsupportedPolicy] and
 // [instance.ErrUnsupportedPolicy]. There is no second OPT walker here: the
 // generated attribute access of `internal/rmaccess` (read side) and
 // `rmwrite` (write side) provide the closed-dispatch attribute access the

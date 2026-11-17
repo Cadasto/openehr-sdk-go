@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
 // orderSeeds is how many RandomFill seeds each order sweep draws.
@@ -127,26 +128,33 @@ func TestGenerateIntervalOrderKeepsEachSideInItsConstraint(t *testing.T) {
 	}
 	for _, tc := range cases {
 		c := compileSyntheticOPT(t, instance.EditCountBounds(t, opt, tc.lowerItem, tc.upperItem))
-		onlyInterval := func(t *testing.T, opts instance.Options) (lower, upper float64) {
+		// everyInterval returns the bounds of each DV_INTERVAL the generator
+		// builds under opts, as many as builtIntervals says.
+		everyInterval := func(t *testing.T, opts instance.Options) [][2]float64 {
 			t.Helper()
 			var found []map[string]any
 			walkIntervals(generateCanonical(t, c, opts), "", func(_ string, iv map[string]any) {
 				found = append(found, iv)
 			})
-			if len(found) != 1 {
-				t.Fatalf("generated %d DV_INTERVAL values, want 1", len(found))
+			if want := builtIntervals(opts.Policy); len(found) != want {
+				t.Fatalf("generated %d DV_INTERVAL values, want %d", len(found), want)
 			}
-			lower, upper, ok := boundedMagnitudes(found[0])
-			if !ok {
-				t.Fatalf("interval %v has no comparable bounded pair", found[0])
+			bounds := make([][2]float64, 0, len(found))
+			for _, iv := range found {
+				lower, upper, ok := boundedMagnitudes(iv)
+				if !ok {
+					t.Fatalf("interval %v has no comparable bounded pair", iv)
+				}
+				bounds = append(bounds, [2]float64{lower, upper})
 			}
-			return lower, upper
+			return bounds
 		}
 		for _, policy := range intervalPolicies {
 			t.Run(tc.name+"/ExampleFill/"+policy.String(), func(t *testing.T) {
-				lower, upper := onlyInterval(t, intervalOptions(policy))
-				if lower != tc.wantLower || upper != tc.wantUpper {
-					t.Errorf("bounds = [%v, %v], want [%v, %v]", lower, upper, tc.wantLower, tc.wantUpper)
+				for _, b := range everyInterval(t, intervalOptions(policy)) {
+					if b[0] != tc.wantLower || b[1] != tc.wantUpper {
+						t.Errorf("bounds = [%v, %v], want [%v, %v]", b[0], b[1], tc.wantLower, tc.wantUpper)
+					}
 				}
 			})
 		}
@@ -155,9 +163,10 @@ func TestGenerateIntervalOrderKeepsEachSideInItsConstraint(t *testing.T) {
 				opts := intervalOptions(instance.Large)
 				opts.ValueFill = instance.RandomFill
 				opts.ValueSource = rand.NewPCG(seed, 1)
-				lower, upper := onlyInterval(t, opts)
-				if lower > upper || !tc.lowerOK(lower) || !tc.upperOK(upper) {
-					t.Errorf("seed %d: bounds = [%v, %v], want lower <= upper, each inside its own side's constraint", seed, lower, upper)
+				for _, b := range everyInterval(t, opts) {
+					if lower, upper := b[0], b[1]; lower > upper || !tc.lowerOK(lower) || !tc.upperOK(upper) {
+						t.Errorf("seed %d: bounds = [%v, %v], want lower <= upper, each inside its own side's constraint", seed, lower, upper)
+					}
 				}
 			}
 		})
@@ -192,9 +201,9 @@ func boundedPair(iv map[string]any) (lower, upper map[string]any, ok bool) {
 // keeps a bounded interval in order for the bound types whose draws can
 // land either way round, and that the two sides of a DV_QUANTITY interval
 // share one unit when both constraints allow it. A date, time, date-time,
-// proportion or ordinal interval is built by editing the vendored DV_COUNT
-// interval OPT. No vendored OPT constrains date, time, proportion or
-// ordinal bounds, and the one that constrains date-time bounds,
+// duration, proportion or ordinal interval is built by editing the vendored
+// DV_COUNT interval OPT. No vendored OPT constrains date, time, duration,
+// proportion or ordinal bounds, and the one that constrains date-time bounds,
 // sdk_crosscheck_padded.v1 (at0006), gives them a pattern and no range. The
 // quantity case adds a second unit to the vendored DV_QUANTITY interval so
 // the two sides can otherwise draw different units.
@@ -204,6 +213,7 @@ func TestREQ107_RandomFillIntervalOrder(t *testing.T) {
 	date := instance.TemporalBound("DV_DATE", "DATE", "C_DATE", "<pattern>yyyy-mm-dd</pattern>")
 	clock := instance.TemporalBound("DV_TIME", "TIME", "C_TIME", "<pattern>hh:mm:ss</pattern>")
 	stamp := instance.TemporalBound("DV_DATE_TIME", "DATE_TIME", "C_DATE_TIME", "<pattern>yyyy-mm-ddThh:mm:ss</pattern>")
+	span := instance.TemporalBound("DV_DURATION", "DURATION", "C_DURATION", "")
 	ordinal := instance.OrdinalBound(0, 1, 2)
 	proportion := instance.ProportionBound(instance.RealRange(instance.Closed(0), instance.Closed(100)))
 	units := instance.QuantityEntry("Cel", instance.Closed(0), instance.Closed(100)) +
@@ -218,7 +228,9 @@ func TestREQ107_RandomFillIntervalOrder(t *testing.T) {
 		{name: "DV_DATE_TIME", opt: instance.RetargetInterval(t, count, "DV_DATE_TIME", stamp, stamp), check: isoInOrder("DV_DATE_TIME")},
 		{name: "DV_ORDINAL", opt: instance.RetargetInterval(t, count, "DV_ORDINAL", ordinal, ordinal), check: ordinalInOrder},
 		{name: "DV_PROPORTION", opt: instance.RetargetInterval(t, count, "DV_PROPORTION", proportion, proportion), check: proportionInOrder},
+		{name: "DV_DURATION", opt: instance.RetargetInterval(t, count, "DV_DURATION", span, span), check: durationInOrder},
 		{name: "DV_ORDERED dates", opt: instance.RetargetInterval(t, count, "DV_ORDERED", date, date), check: isoInOrder("DV_DATE")},
+		{name: "DV_ORDERED durations", opt: instance.RetargetInterval(t, count, "DV_ORDERED", span, span), check: durationInOrder},
 		{name: "DV_QUANTITY shared unit", opt: instance.EditQuantityBounds(t, quantity, units, units), check: quantitySameUnitInOrder},
 	}
 	for _, tc := range cases {
@@ -264,6 +276,31 @@ func isoInOrder(wantType string) func(t *testing.T, seed uint64, path string, iv
 		if ls > hs {
 			t.Errorf("seed %d, %s: %s %q > %q", seed, path, wantType, ls, hs)
 		}
+	}
+}
+
+// durationInOrder checks two DV_DURATION bounds by the order the RM floor
+// gives them, the magnitude of each parsed value.
+func durationInOrder(t *testing.T, seed uint64, path string, iv map[string]any) {
+	t.Helper()
+	lo, hi, ok := boundedPair(iv)
+	if !ok {
+		return
+	}
+	if lo["_type"] != "DV_DURATION" || hi["_type"] != "DV_DURATION" {
+		t.Errorf("seed %d, %s: bound types %v and %v, want DV_DURATION", seed, path, lo["_type"], hi["_type"])
+		return
+	}
+	lower := &rm.DVDuration{}
+	lower.Value, _ = lo["value"].(string)
+	upper := &rm.DVDuration{}
+	upper.Value, _ = hi["value"].(string)
+	if !lower.ValidISO8601() || !upper.ValidISO8601() {
+		t.Errorf("seed %d, %s: DV_DURATION bounds %q and %q, want two durations", seed, path, lower.Value, upper.Value)
+		return
+	}
+	if lower.Compare(*upper) > 0 {
+		t.Errorf("seed %d, %s: DV_DURATION %q > %q", seed, path, lower.Value, upper.Value)
 	}
 }
 

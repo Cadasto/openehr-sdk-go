@@ -84,7 +84,9 @@ func historyShape(t *testing.T, out any) string {
 // whose root breaks the rule (Exceptions and known gaps, An OPT that
 // contradicts itself). Under Large and Medium the walk writes an event
 // already where the event needs no undescribed content, and a summary the
-// OPT allows beside it. Every root but the last passes the RM floor and the
+// OPT allows beside it, and Large two events where the event may occur
+// any number of times (Members of a list). Every root but the last passes
+// the RM floor and the
 // template validator, under every policy, both value fills and both compile
 // modes.
 func TestREQ107_HistoryGetsAnEventOrASummary(t *testing.T) {
@@ -93,28 +95,31 @@ func TestREQ107_HistoryGetsAnEventOrASummary(t *testing.T) {
 		name string
 		opt  string
 		// want is what Required builds, and what Large and Medium build
-		// where visited is empty.
-		want, visited string
+		// where visited is empty; large, where set, is what Large builds.
+		want, visited, large string
 		// breaks names the one floor rule the root breaks, empty for none.
 		breaks string
 	}{
 		{
-			name: "optional events",
-			opt:  optTemplate("HISTORY", origin, guardMultiple("events", guardExistence01, historyEvent)),
-			want: "events=[at0002] summary=",
+			name:  "optional events",
+			opt:   optTemplate("HISTORY", origin, guardMultiple("events", guardExistence01, historyEvent)),
+			want:  "events=[at0002] summary=",
+			large: "events=[at0002 at0002] summary=",
 		},
 		{
 			name:    "optional events beside an optional summary",
 			opt:     optTemplate("HISTORY", origin, guardMultiple("events", guardExistence01, historyEvent), historySummaryHolding),
 			want:    "events=[at0002] summary=",
 			visited: "events=[at0002] summary=at0004",
+			large:   "events=[at0002 at0002] summary=at0004",
 		},
 		{
 			// The visit rule leaves out an optional summary that would hold
 			// no item, and the HISTORY keeps its event.
-			name: "optional events beside an optional summary that would hold no item",
-			opt:  optTemplate("HISTORY", origin, guardMultiple("events", guardExistence01, historyEvent), historySummary),
-			want: "events=[at0002] summary=",
+			name:  "optional events beside an optional summary that would hold no item",
+			opt:   optTemplate("HISTORY", origin, guardMultiple("events", guardExistence01, historyEvent), historySummary),
+			want:  "events=[at0002] summary=",
+			large: "events=[at0002 at0002] summary=",
 		},
 		{
 			name: "an optional summary, events not named",
@@ -186,6 +191,9 @@ func TestREQ107_HistoryGetsAnEventOrASummary(t *testing.T) {
 					want := tc.want
 					if tc.visited != "" && opts.Policy != instance.Required {
 						want = tc.visited
+					}
+					if tc.large != "" && opts.Policy == instance.Large {
+						want = tc.large
 					}
 					if got := historyShape(t, out); got != want {
 						t.Errorf("Generate built %s, want %s", got, want)

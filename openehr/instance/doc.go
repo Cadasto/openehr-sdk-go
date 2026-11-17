@@ -35,7 +35,8 @@
 // Under every policy an RM rule can need
 // more than the policy visits, such as an ELEMENT's value or null
 // flavour, or a DV_MULTIMEDIA's
-// uri where the template prohibits its data, which the generator then
+// uri where the template prohibits its data or its media type is not a
+// text one, which the generator then
 // builds as a visit does, from the attribute's first allowed template
 // child where it has one; and a visited multi-valued attribute is topped
 // up to its lower bound.
@@ -52,33 +53,59 @@
 //     template prohibits the list, or where the RM types its items as
 //     primitive values, such as a DV_MULTIMEDIA's data. A visited
 //     multi-valued attribute gets its members as under Large, except that
-//     an optional archetype after the first optional
-//     archetype of the attribute that holds more than content the
-//     template does not describe (below) gets none, whatever its
-//     archetype, and neither does an optional child whose identity a
-//     required or earlier sibling carries. So Medium builds at most one
-//     optional archetype under an attribute, the medium level. It is the
-//     zero value, and so the default.
+//     an optional child whose identity a required sibling, or an earlier
+//     one that gets a member of its own, carries gets none, unless it
+//     holds an archetype, as a root itself or below it, that none of those
+//     siblings holds. So Medium builds a member of each optional archetype
+//     under an attribute, and of a further use of one only where that use
+//     holds another archetype, the medium level. It is the zero value, and
+//     so the default.
 //   - Required: the required attributes, in the sense above, but not one
 //     that only its cardinality lower bound asks for, nor one merely
 //     because it has an allowed template child, except a composition's
 //     context, which it visits as Medium does, so the context every
-//     policy writes is built under the template's constraints. A visited multi-valued
-//     attribute gets each allowed child that is not a slot as many times
-//     as its occurrences lower bound says, so an optional child gets none.
-//     It builds the data points the template makes mandatory and a
-//     composition's context, the required level. An RM rule can still add
-//     a node, such as the null flavour of an element whose value the
-//     template leaves optional, so its tree is not always smaller than
-//     Medium's.
+//     policy writes is built under the template's constraints, and a
+//     composition's content or a section's items that hold an entry: an
+//     archetype root of an ENTRY class or GENERIC_ENTRY, or a section
+//     whose items hold one. A visited multi-valued attribute gets each
+//     allowed child that is not a slot as many times as its occurrences
+//     lower bound says, and one member of each optional entry, and of each
+//     optional section on the way to one, that Medium builds there; any
+//     other optional child gets none. So it builds the data points the
+//     template makes mandatory, a composition's context, and each entry
+//     the content names with only its mandatory parts, the required
+//     level. An RM rule can still add a node, such as the null flavour of
+//     an element whose value the template leaves optional, so its tree is
+//     not always smaller than Medium's.
 //   - Large: every attribute the visit rule allows, the optional ones the
 //     template names included. A visited multi-valued attribute gets at
 //     least one member of each allowed child that is not a slot, each
-//     use of one archetype, named or not, included. So Large builds a
-//     member of every optional archetype the template names, and of every
-//     use of one, except one that holds only content the template does
-//     not describe (below). It stops short of the complete level, every
-//     data point the template allows, which no level of its own builds yet.
+//     use of one archetype, named or not, included, and two of a child
+//     whose occurrences upper bound is above 1 or unbounded, within the
+//     attribute's cardinality. So Large builds a member of every optional
+//     archetype the template names, and of every use of one, except one
+//     that holds only content the template does not describe (below), and
+//     a second member of each that may repeat. It also writes a fixed set
+//     of optional RM attributes the template does not name, where the
+//     template does not prohibit them: a composition's feeder_audit, whose
+//     originating system audit has a system id and the clock as its time;
+//     an event context's end_time, from the clock, its
+//     health_care_facility, a PARTY_IDENTIFIED named example, and one
+//     participation; an entry's provider, a PARTY_SELF, and one other
+//     participation; and an activity's timing, an ISO 8601 recurring
+//     interval in the formalism ISO8601. Each participation has a
+//     PARTY_SELF performer, the mode openehr 193|not specified| and the
+//     function text unknown. An attribute the template names is built as
+//     the template says, or left out where the template prohibits it. Not
+//     written are an entry's workflow_id and guideline_id, a locatable's
+//     links, and a history's duration and period. Large is the SDK's
+//     complete level: every root it returns meets the template and the RM,
+//     apart from the exceptions this documentation names, so it can be
+//     committed, where the ITS-REST complete level, every data point the
+//     template allows, is reference guidance. The
+//     composition builder seeds a Builder with Large short of the second
+//     members and of these RM attributes, the nodes its Set routes values
+//     into.
 //
 // Under Large and Medium the generator builds an optional node only where
 // it holds more than content the template does not describe: a slot fill;
@@ -100,11 +127,11 @@
 // exists, so such a list is left out as Required leaves it out. A list with a child that makes it required
 // is visited, so that child gets its members although they hold only such
 // content. A composition's context is the exception: every policy writes
-// one, so the walk visits it whatever its members need. The first optional archetype Medium keeps is the first
-// that needs none. The check reads a node's own attributes only: below a
-// node the template or the RM requires, the walk builds what it always
-// builds, placeholders and slot fills included where something asks for a
-// member, so the described content around them is kept.
+// one, so the walk visits it whatever its members need. The check reads a
+// node's own attributes only: below a node the template or the RM
+// requires, the walk builds what it always builds, placeholders and slot
+// fills included where something asks for a member, so the described
+// content around them is kept.
 //
 // Under every policy, a visited multi-valued attribute gets no more
 // members than its cardinality upper bound, and within that bound the
@@ -127,15 +154,36 @@
 // is an archetype root, and its node id otherwise, and a sibling that is a
 // slot carries none.
 //
-// [Minimal] is another name for Required, and [Complete] for Large until
-// the complete level lands. [ParsePolicy] reads a policy from the names
+// [Minimal] is another name for Required, and [Complete] for Large, the
+// SDK's complete level. [ParsePolicy] reads a policy from the names
 // required, minimal, medium, large and complete, in any case. Generate
 // refuses any other Policy value with [ErrUnsupportedPolicy], before it
 // builds anything.
 //
 // Under every policy, every primitive leaf the walk reaches is valued as
 // [Options.ValueFill] says: the constraint's example value under
-// [ExampleFill], an in-constraint draw under [RandomFill]. Where an RM
+// [ExampleFill], an in-constraint draw under [RandomFill]. A quantity's
+// drawn magnitude is rounded to the template's precision, with no decimals
+// where the precision admits 0 alone and at most two otherwise, and lies
+// inside its range away from 0 and from the range's bounds, or from 1 to
+// 100 where the range is open; a proportion's drawn numerator and
+// denominator are rounded the same way; and a duration's drawn value is
+// not zero, a count of one designator its constraint accepts, such as P3Y
+// or PT7H, from 1 to 12 where the constraint has no range and spread across
+// the range where it has one, in a designator the range is written in where
+// the constraint accepts it. A duration whose value the template leaves
+// unconstrained is drawn under [RandomFill] too, from 1 to 12 of any
+// designator, and is P0D under [ExampleFill]. Where the template leaves a text
+// open, with no constraint of its own or a string constraint with neither
+// a list nor a pattern, both fills write a value that means something: a
+// plain DV_TEXT that is an ELEMENT's value takes the name of that ELEMENT,
+// or example where that name is only an RM type, and any other plain
+// DV_TEXT, such as a participation's function, takes example; a
+// DV_PARSABLE takes <example/> for an XML formalism, {} for a
+// JSON one and example for any other; and a DV_IDENTIFIER takes the id
+// ID-0001 and, where the template allows an issuer, the issuer Example
+// issuer. A coded text never takes such a value: its text is its code's,
+// as below. Where an RM
 // rule narrows what the constraint leaves open, the value is taken from
 // what is left: a PARTY_REF's type is a party class name, a TERM_MAPPING's
 // match one of >, =, < and ?, a magnitude_status one of =, <, >, <=, >=
@@ -162,10 +210,13 @@
 // is then settled to the rules of its kind, inside the template's
 // constraints on its parts: a unitary proportion over 1, a percent over
 // 100, a fraction or an integer fraction over whole numbers, any
-// proportion of precision 0 over whole numbers, and every kind over a
-// denominator that is not 0. Where the
-// drawn type cannot meet its rule there, another type the template allows
-// is taken, and where none can, the value stays as the walk wrote it. A
+// proportion of precision 0, or whose template pins is_integral to true,
+// over whole numbers, and every kind over a denominator that is not 0. A
+// fraction, an integer fraction and a proportion whose template pins
+// is_integral take the precision 0 wherever the template admits it. Where
+// the drawn type cannot meet its rule there, another type the template
+// allows is taken, and where none can, the value stays as the walk wrote
+// it. A
 // coded text whose code is in the openEHR terminology, on an attribute the
 // RM ties to a group of that terminology (a COMPOSITION's category, an
 // INTERVAL_EVENT's math function, a PARTY_RELATED's relationship, …),
@@ -188,17 +239,35 @@
 // text the pin admits, with that text, and it keeps the walk's code and
 // text where the pin admits no listed code's term text. A code whose term
 // text the pin admits, such as one [RandomFill] drew, stays. A
-// DV_MULTIMEDIA carries inline data, the seven bytes of the text
-// "example" under both value fills,
-// with that byte count as its size, unless the template prohibits data or
-// its constraint on size rejects that count; where the template prohibits
-// data and names no child for the uri, the uri is http://example.com. A
-// language, encoding or charset the template names with no code, on an
-// entry, a text or an encapsulated value, takes Options.Language in
-// ISO_639-1 or UTF-8 in IANA_character-sets, and a periodic time
-// specification's value keeps the formalism HL7:PIVL or HL7:EIVL the walk
-// wrote, else takes HL7:PIVL, or HL7:EIVL where the template rejects
-// HL7:PIVL.
+// DV_MULTIMEDIA of a text media type, text/plain by default, carries
+// inline data, the seven bytes of the text "example" under both value
+// fills, with that byte count as its size. One of any other media type
+// carries a uri instead, with the size 1024: the uri its template child
+// gives, or http://example.com where the template names no child for it.
+// Where the template prohibits the uri or requires the data, the value
+// carries the inline data, and where it prohibits the data, a uri. The
+// size the walk wrote stays where the template's constraint on size
+// rejects the generator's. A language, encoding or charset the template
+// names with no code, on an entry, a text or an encapsulated value, takes
+// Options.Language in ISO_639-1 or UTF-8 in IANA_character-sets, and a
+// periodic time specification's value keeps the formalism HL7:PIVL or
+// HL7:EIVL the walk wrote, else takes HL7:PIVL, or HL7:EIVL where the
+// template rejects HL7:PIVL.
+//
+// Under either value fill, a data value whose node the template's
+// constraints give a default value takes that default in place of the
+// value the fill wrote, where the default meets the node's constraints: the
+// node's own primitive constraint, an attribute the node requires, one it
+// prohibits, and the constraint of the allowed child each attribute value
+// matches. It takes the default only where the default also keeps the
+// Reference Model rules the generator keeps its own values to: each
+// attribute the Reference Model marks mandatory is there, on the default
+// and on each value it holds, and the default already meets the rules the
+// generator settles its own values by, such as a proportion's kind rules, a
+// percentage accuracy, a normal range and the code set of a coded attribute
+// like a text's language. A default that does not meet its node's
+// constraints, or breaks such a rule, leaves the fill's value. An assumed
+// value the template states on a primitive constraint is not read.
 //
 // # Trust model
 //
@@ -218,7 +287,8 @@
 // openehr/rm, openehr/rm/typereg, openehr/rm/rminfo, openehr/template,
 // openehr/template/constraints, openehr/terminology,
 // internal/templatecompile (engine node types),
-// internal/templateinstance/rmwrite, internal/bmmtype and
+// internal/templateinstance/rmwrite, internal/templateinstance/builderseed
+// (the composition builder's mark), internal/bmmtype and
 // internal/rmroots. It does not import openehr/serialize,
 // openehr/client, transport, auth, openehr/composition (which uses
 // this package, not the reverse), or openehr/validation.

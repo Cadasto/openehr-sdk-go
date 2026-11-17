@@ -2,8 +2,11 @@ package instance
 
 import (
 	"fmt"
+	"math"
 	mrand "math/rand/v2"
+	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
@@ -65,8 +68,9 @@ func (s sampler) between(lo, hi float64) float64 {
 //
 // It falls back to pc.ExampleValue() — silently, and identically on every
 // call — whenever the constraint carries nothing enumerable to sample
-// (unconstrained primitive, pattern-only CString, CDuration, a CDate,
-// CTime or CDateTime with a Range) or a drawn candidate fails pc.Validate.
+// (unconstrained primitive, pattern-only CString, a CDate, CTime or
+// CDateTime with a Range, a CDuration that accepts no count of one
+// designator but zero) or a drawn candidate fails pc.Validate.
 // Several *bounded* shapes therefore also degrade to the fixed example
 // with no signal: an empty list∩range intersection, a single-value range,
 // a collapsed exclusive-integer window, and the exclusive-lower real edge
@@ -150,13 +154,20 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 
 	case constraints.DvQuantity:
 		if len(c.Units) == 0 {
-			return nil
+			// Any magnitude in the example's units: the units of the
+			// property, or 1.
+			q, ok := c.ExampleValue().(constraints.QuantityValue)
+			if !ok {
+				return nil
+			}
+			q.Magnitude = s.quantityMagnitude(constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}, constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true})
+			return q
 		}
 		u, ok := quantityUnitEntry(c, s.quantityUnit)
 		if !ok {
 			u = c.Units[s.intN(len(c.Units))]
 		}
-		mag := sampleMagnitude(u.Magnitude, s)
+		mag := s.quantityMagnitude(u.Magnitude, u.Precision)
 		return constraints.QuantityValue{Magnitude: mag, Units: u.Units, Precision: -1}
 
 	case constraints.CDate:
@@ -165,9 +176,182 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 		return firstAccepted(pc, c.Range.IsBounded(), s.randomTime())
 	case constraints.CDateTime:
 		return firstAccepted(pc, c.Range.IsBounded(), s.randomDateTime())
+	case constraints.CDuration:
+		return s.duration(c)
 	}
-	// CDuration and any unknown constraint: ExampleValue sentinel.
+	// Any unknown constraint: ExampleValue sentinel.
 	return nil
+}
+
+// durationDesignators are the designators a drawn duration is written in,
+// in written order: a count goes between the prefix and the letter.
+var durationDesignators = [...]struct{ prefix, letter string }{
+	{"P", "Y"}, {"P", "M"}, {"P", "W"}, {"P", "D"}, {"PT", "H"}, {"PT", "M"}, {"PT", "S"},
+}
+
+// durationWindow is the largest count a drawn duration has of its one
+// designator where its constraint has no range, and how many counts it
+// draws among from the bound of a range bounded on one side.
+const durationWindow = 12
+
+// maxDurationCount is the largest count durationCounts gives, so a count
+// read from a very long bound stays an int64; Validate then judges it.
+const maxDurationCount = math.MaxInt32
+
+// duration draws a duration that is not zero for c, a count of one
+// designator c accepts it in. Where c has no range, the count is from 1 to
+// durationWindow, drawn, of the first designator c accepts it in, from one
+// drawn at random on in written order and round again, so the pattern
+// keeps it. Where c has a range, the count is drawn among those of the
+// designator inside it (durationInRange), so the draw spreads across the
+// range. Else the draw is the count 1 of the first designator c accepts, in
+// written order; else nil, so sampleValue falls back to c's example.
+func (s sampler) duration(c constraints.CDuration) any {
+	n, start := 1+s.intN(durationWindow), s.intN(len(durationDesignators))
+	if c.Range.IsBounded() {
+		if v, ok := s.durationInRange(c, start); ok {
+			return v
+		}
+	} else {
+		for i := range len(durationDesignators) {
+			d := durationDesignators[(start+i)%len(durationDesignators)]
+			if v := fmt.Sprintf("%s%d%s", d.prefix, n, d.letter); len(c.Validate(v)) == 0 {
+				return v
+			}
+		}
+	}
+	for _, d := range durationDesignators {
+		if v := d.prefix + "1" + d.letter; len(c.Validate(v)) == 0 {
+			return v
+		}
+	}
+	return nil
+}
+
+// durationInRange draws a duration inside c's range: a count of one
+// designator, drawn among the counts of it the range admits
+// (durationCounts), that c accepts. It tries first the designators the
+// range's bounds are written in, and then every designator, each set from
+// the one at start on in written order and round again, so a range in
+// years gives years where c's pattern admits them. It returns false where
+// no draw fits c.
+func (s sampler) durationInRange(c constraints.CDuration, start int) (string, bool) {
+	every := make([]int, len(durationDesignators))
+	for i := range every {
+		every[i] = i
+	}
+	for _, set := range [][]int{rangeDesignators(c.Range), every} {
+		for i := range len(set) {
+			d := durationDesignators[set[(start+i)%len(set)]]
+			lo, hi, ok := durationCounts(c.Range, d.prefix, d.letter)
+			if !ok {
+				continue
+			}
+			if v := fmt.Sprintf("%s%d%s", d.prefix, lo+s.int64N(hi-lo+1), d.letter); len(c.Validate(v)) == 0 {
+				return v, true
+			}
+		}
+	}
+	return "", false
+}
+
+// rangeDesignators returns the designators the bounds of r are written in,
+// as indexes into durationDesignators in written order: a letter before T
+// in a bound is a date designator, and one after it a time designator. An
+// unbounded side gives none.
+func rangeDesignators(r constraints.TemporalRange) []int {
+	var bounds []string
+	if !r.LowerUnbounded {
+		bounds = append(bounds, r.Lower)
+	}
+	if !r.UpperUnbounded {
+		bounds = append(bounds, r.Upper)
+	}
+	var out []int
+	for i, d := range durationDesignators {
+		for _, b := range bounds {
+			part, clock, _ := strings.Cut(b, "T")
+			if d.prefix == "PT" {
+				part = clock
+			}
+			if strings.Contains(part, d.letter) {
+				out = append(out, i)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// durationCounts returns the counts, from lo to hi, of a duration written
+// as one count of the designator letter after prefix that lie inside r and
+// are above 0: those between r's bounds where it has both; durationWindow
+// of them from its bound where it has one, up from a lower bound and down
+// from an upper one; and none where it is open, a bound does not parse, or
+// no such count lies inside it. A count at an excluded bound is not one.
+func durationCounts(r constraints.TemporalRange, prefix, letter string) (lo, hi int64, ok bool) {
+	if !r.IsBounded() {
+		return 0, 0, false
+	}
+	unit, ok := durationLength(prefix + "1" + letter)
+	if !ok {
+		return 0, 0, false
+	}
+	lo, hi = 1, durationWindow
+	if !r.LowerUnbounded {
+		length, ok := durationLength(r.Lower)
+		if !ok {
+			return 0, 0, false
+		}
+		lo = max(1, durationCount(math.Ceil(length/unit)))
+		hi = lo + durationWindow - 1
+	}
+	if !r.UpperUnbounded {
+		length, ok := durationLength(r.Upper)
+		if !ok {
+			return 0, 0, false
+		}
+		hi = durationCount(math.Floor(length / unit))
+		if r.LowerUnbounded {
+			lo = max(1, hi-durationWindow+1)
+		}
+	}
+	// A count at an excluded bound, or one float64 rounding put just past a
+	// bound, leaves the range: step inside it.
+	inside := func(n int64) bool {
+		return len(constraints.CDuration{Range: r}.Validate(fmt.Sprintf("%s%d%s", prefix, n, letter))) == 0
+	}
+	for range 2 {
+		if lo <= hi && !inside(lo) {
+			lo++
+		}
+		if lo <= hi && !inside(hi) {
+			hi--
+		}
+	}
+	return lo, hi, lo <= hi && inside(lo) && inside(hi)
+}
+
+// durationLength returns the length in seconds of the ISO 8601 duration s,
+// BASE Iso8601_duration.to_seconds as the range of a C_DURATION reads it,
+// and false where s does not parse.
+func durationLength(s string) (float64, bool) {
+	d, err := iso8601.ParseDuration(s)
+	if err != nil {
+		return 0, false
+	}
+	return d.ToSeconds(), true
+}
+
+// durationCount returns x as a count, held between 0 and maxDurationCount.
+func durationCount(x float64) int64 {
+	switch {
+	case math.IsNaN(x) || x < 0:
+		return 0
+	case x > maxDurationCount:
+		return maxDurationCount
+	}
+	return int64(x)
 }
 
 // firstAccepted returns the first of forms, one drawn value written in
@@ -204,13 +388,89 @@ func quantityUnitEntry(c constraints.DvQuantity, name string) (constraints.Quant
 	return constraints.QuantityUnit{}, false
 }
 
-// sampleMagnitude draws an in-range magnitude for a quantity unit,
-// falling back to the example magnitude for an unbounded range.
-func sampleMagnitude(r constraints.NumericRange, s sampler) float64 {
-	if lo, hi, ok := floatSampleBounds(r); ok {
-		return s.between(lo, hi)
+// quantityDraws is how many times quantityMagnitude draws before it falls
+// back to the middle of its window.
+const quantityDraws = 4
+
+// quantityMagnitude draws a magnitude for a quantity entry whose magnitude
+// range is r and whose precision range is precision. It draws from the
+// range's window (quantityWindow), inset by a tenth of the window's width
+// from each side the range bounds, and rounds the draw to the decimals
+// precision gives (quantityDecimals). A rounded draw that lands on 0, on a
+// bound of the range or outside it is drawn again, up to quantityDraws
+// times, and then the middle of the window, rounded, is tried. Where
+// neither suits, the last draw is kept unrounded, which the window keeps
+// inside the range; sampleValue then checks it against the constraint.
+func (s sampler) quantityMagnitude(r, precision constraints.NumericRange) float64 {
+	lo, hi := quantityWindow(r)
+	inset := float64(hi-lo) / 10
+	if !r.LowerUnbounded {
+		lo += inset
 	}
-	return exampleMagnitudeFallback(r)
+	if !r.UpperUnbounded {
+		hi -= inset
+	}
+	decimals := quantityDecimals(precision)
+	suits := func(v float64) bool {
+		return v != 0 && r.Contains(v) &&
+			(r.LowerUnbounded || v != r.Lower) && (r.UpperUnbounded || v != r.Upper)
+	}
+	var drawn float64
+	for range quantityDraws {
+		drawn = s.between(lo, hi)
+		if v := roundTo(drawn, decimals); suits(v) {
+			return v
+		}
+	}
+	if v := roundTo(float64(lo+hi)/2, decimals); suits(v) {
+		return v
+	}
+	return drawn
+}
+
+// quantityWindow returns the window a quantity magnitude is drawn from:
+// the range itself where it is bounded on both sides, sampleWindow from
+// its bound where it is bounded on one, and 1 to 100 where it is open.
+func quantityWindow(r constraints.NumericRange) (lo, hi float64) {
+	switch {
+	case !r.LowerUnbounded && !r.UpperUnbounded:
+		return r.Lower, r.Upper
+	case !r.LowerUnbounded:
+		return r.Lower, r.Lower + sampleWindow
+	case !r.UpperUnbounded:
+		return r.Upper - sampleWindow, r.Upper
+	}
+	return 1, sampleWindow
+}
+
+// maxQuantityDecimals is how many decimals a drawn magnitude keeps where
+// the template's precision does not ask for fewer.
+const maxQuantityDecimals = 2
+
+// quantityDecimals returns how many decimals a magnitude drawn under the
+// precision range precision keeps: the range's upper bound where it has
+// one below maxQuantityDecimals, so none where it admits 0 alone and one
+// where it admits up to 1, and maxQuantityDecimals otherwise. A precision
+// of -1 means no limit, so an upper bound below 0 asks for no fewer.
+func quantityDecimals(precision constraints.NumericRange) int {
+	if precision.UpperUnbounded {
+		return maxQuantityDecimals
+	}
+	upper := int(math.Floor(precision.Upper))
+	if !precision.UpperInclusive && float64(upper) == precision.Upper {
+		upper--
+	}
+	if upper < 0 || upper > maxQuantityDecimals {
+		return maxQuantityDecimals
+	}
+	return upper
+}
+
+// roundTo rounds v to decimals decimal places. The scale is a power of
+// ten, so a whole number comes back exact.
+func roundTo(v float64, decimals int) float64 {
+	scale := math.Pow10(decimals)
+	return math.Round(v*scale) / scale
 }
 
 // sampleWindow is how far from its bounded side the sampler draws from a
@@ -274,18 +534,6 @@ func floatSampleBounds(r constraints.NumericRange) (lo, hi float64, ok bool) {
 		return 0, 0, false
 	}
 	return lo, hi, true
-}
-
-// exampleMagnitudeFallback mirrors the constraints package's
-// example-magnitude rule for an unbounded quantity range.
-func exampleMagnitudeFallback(r constraints.NumericRange) float64 {
-	if !r.LowerUnbounded {
-		return r.Lower
-	}
-	if !r.UpperUnbounded {
-		return r.Upper
-	}
-	return 0
 }
 
 func filterInts(list []int64, r constraints.NumericRange) []int64 {

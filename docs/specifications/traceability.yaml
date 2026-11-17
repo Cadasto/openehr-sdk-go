@@ -1364,6 +1364,7 @@ requirements:
     packages:
       - internal/bmmtype
       - internal/templateinstance/rmwrite
+      - internal/templateinstance/builderseed
       - openehr/composition
       - openehr/internal/rmbind
       - openehr/internal/rmnames
@@ -1385,6 +1386,8 @@ requirements:
       - openehr/composition/typecheck_test.go
       - openehr/composition/typecheck_tiers_test.go
       - openehr/composition/uid_source_test.go
+      - openehr/instance/large_repeats_test.go
+      - openehr/instance/large_rm_attributes_test.go
       - openehr/instance/untyped_child_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
@@ -1578,6 +1581,7 @@ requirements:
       - openehr/templatecompile
       - openehr/rm/rminfo
       - internal/templateinstance/rmwrite
+      - internal/templateinstance/builderseed
       - internal/rmroots
       - internal/rmlists
       - internal/cstringvalue
@@ -1646,6 +1650,7 @@ requirements:
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/integer_draw_window_test.go
+      - openehr/instance/interval_duration_internal_test.go
       - openehr/instance/interval_expanded_bounds_test.go
       - openehr/instance/interval_expanded_internal_test.go
       - openehr/instance/interval_flags_test.go
@@ -1658,9 +1663,12 @@ requirements:
       - openehr/instance/interval_temporal_internal_test.go
       - openehr/instance/interval_zone_test.go
       - openehr/instance/items_rule_test.go
+      - openehr/instance/large_repeats_test.go
+      - openehr/instance/large_rm_attributes_test.go
       - openehr/instance/large_uses_test.go
       - openehr/instance/local_term_text_test.go
       - openehr/instance/locatable_name_test.go
+      - openehr/instance/medium_every_archetype_test.go
       - openehr/instance/multimedia_data_test.go
       - openehr/instance/multimedia_uri_internal_test.go
       - openehr/instance/node_id_internal_test.go
@@ -1685,6 +1693,7 @@ requirements:
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/instance/post_walk_binding_test.go
       - openehr/instance/prohibited_attribute_test.go
+      - openehr/instance/proportion_integral_test.go
       - openehr/instance/proportion_kind_test.go
       - openehr/instance/quantified_rules_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
@@ -1693,6 +1702,7 @@ requirements:
       - openehr/instance/reference_range_bounds_test.go
       - openehr/instance/reference_uid_internal_test.go
       - openehr/instance/reproducible_test.go
+      - openehr/instance/required_content_test.go
       - openehr/instance/required_context_test.go
       - openehr/instance/required_empty_list_test.go
       - openehr/instance/required_mandatory_child_test.go
@@ -1711,6 +1721,7 @@ requirements:
       - openehr/instance/string_attr_party_name_test.go
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
+      - openehr/instance/template_default_test.go
       - openehr/instance/topup_room_test.go
       - openehr/instance/uid_source_nil_internal_test.go
       - openehr/instance/uids_test.go
@@ -1720,6 +1731,8 @@ requirements:
       - openehr/instance/unsatisfiable_cardinality_test.go
       - openehr/instance/untyped_child_test.go
       - openehr/instance/valuefill_leaves_test.go
+      - openehr/instance/valuefill_meaningful_test.go
+      - openehr/instance/valuefill_rounding_test.go
       - openehr/instance/valuefill_test.go
       - openehr/instance/visit_rules_test.go
       - openehr/internal/rmbind/bind_test.go
@@ -1932,6 +1945,7 @@ requirements:
       - openehr/instance/coded_term_text_test.go
       - openehr/instance/coded_text_internal_test.go
       - openehr/instance/history_events_test.go
+      - openehr/instance/interval_duration_internal_test.go
       - openehr/instance/interval_shared_unit_test.go
       - openehr/instance/interval_temporal_internal_test.go
       - openehr/instance/phase4_test.go

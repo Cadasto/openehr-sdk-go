@@ -72,11 +72,13 @@ func itemsShape(items []rm.Item) string {
 // an optional child that needs undescribed content gets no member of its
 // own, an attribute that is not required and whose members would all be
 // undescribed or need it is not visited, a top-up takes a child that needs
-// none, and Medium's first optional archetype root is the first that needs
-// none. The rule reads a node's own attributes only, so a required node
-// below an optional one keeps its undescribed members and the optional
-// node is kept. Every root passes the RM floor and the template validator,
-// under every policy, both value fills and both compile modes.
+// none, and Medium and Required, which builds each entry the content
+// names, pass over an optional archetype root that needs some while they
+// build the ones after it. The rule reads a node's own
+// attributes only, so a required node below an optional one keeps its
+// undescribed members and the optional node is kept. Every root passes the
+// RM floor and the template validator, under every policy, both value
+// fills and both compile modes.
 func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing.T) {
 	const (
 		slotted   = "openEHR-EHR-OBSERVATION.slotted.v1"
@@ -207,10 +209,11 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 		},
 		{
 			// Both children carry at0002, and only the second needs no
-			// undescribed content. Under Large the second gets its own
-			// member, which the validator binds to it by trial, since the
-			// first's slot does not admit it. Under Medium the second
-			// yields to the first, whose identity it shares, and the
+			// undescribed content. Under Large and Medium the second gets
+			// its own member, since the first gets none of its own and so
+			// carries no identity, and the validator binds it to the
+			// second by trial, since the first's slot does not admit it.
+			// Under Required neither gets a member of its own, and the
 			// validator binds a member with node id at0002 to the first, so
 			// the top-up takes the first child that is not a slot rather
 			// than the second, and the RM requirement keeps its fill.
@@ -219,7 +222,7 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 				slotOnlyCluster("at0002", guardOccurrences01),
 				guardChild("C_COMPLEX_OBJECT", "CLUSTER", "at0002", guardOccurrences01, "",
 					optMultiple("items", optNode("ELEMENT", "at0003"))))),
-			large: "at0002(at0003)", medium: "at0002(" + stub + "(at0000))",
+			large: "at0002(at0003)", medium: "at0002(at0003)",
 			required: "at0002(" + stub + "(at0000))",
 		},
 		{
@@ -247,13 +250,13 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 		},
 		{
 			// The content is optional, so no top-up stands in for the root
-			// Medium keeps.
-			name: "first optional archetype root under Medium is the first that needs none",
+			// that needs undescribed content.
+			name: "optional archetype roots after one that needs undescribed content",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence01,
 				undescribedObservation(slotted, guardOccurrences01, describedHistory, slottedProtocol),
 				undescribedObservation(described, guardOccurrences01, describedHistory),
 				undescribedObservation(third, guardOccurrences01, describedHistory))),
-			large: described + "," + third, medium: described, required: "",
+			large: described + "," + third, medium: described + "," + third, required: described + "," + third,
 		},
 	}
 	for _, tc := range cases {

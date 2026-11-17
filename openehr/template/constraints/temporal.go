@@ -120,10 +120,21 @@ func (CTime) isPrimitive() {}
 // that keeps its zone moves as a date does, and a lower bound that loses a
 // fraction of a second moves up by a second. A bound read in UTC is ordered
 // as an instant, so a lower one also moves up by one unit of its last field
-// where writing it drops a part of it. Its sentinel is "12:00:00". No
-// candidate carries a fraction of a second or changes its zone, so a range
-// only such a time meets gives the sentinel, which Validate refuses: the
-// range above 23:59:59 gives "12:00:00", though "23:59:59.5" is valid.
+// where writing it drops a part of it. Its sentinel is "12:00:00".
+//
+// Where none of these is accepted, it tries the time halfway between the
+// bounds, with its fraction of a second where the pattern writes seconds: a
+// range open above takes the lower bound one second on, no later than the
+// end of the day, and one open below the upper bound one second back, no
+// earlier than its start. The range above 23:59:59 gives "23:59:59.5". A
+// time halfway that leaves its day, and then each bound that carries a
+// zone, are written with the clock and the zone an hour or more across,
+// which names the same instant, so the time is compared with the bound as
+// an instant: under "hh:mm:XX±hh:mm" the range above 23:59Z gives
+// "23:00-01:00". A range that only a time its bounds do not order meets, a
+// time with a zone where they carry none, gives the sentinel, which
+// Validate refuses: the range below 00:00:00 gives "12:00:00", though
+// "00:00:00Z" is valid.
 func (c CTime) ExampleValue() any {
 	return clockExample(clockTime, c.Pattern, c.Range, c.TimezoneValidity, "12:00:00")
 }
@@ -171,9 +182,14 @@ func (CDateTime) isPrimitive() {}
 // chosen as [CDate.ExampleValue] chooses a date, with the zone written and a
 // bound moved as [CTime.ExampleValue] says; a literal field after the year
 // can move a bound out of the range. Its sentinel is "2020-01-01T12:00:00Z".
-// No candidate carries a fraction of a second, so a range whose excluded
-// bounds are a second apart gives the sentinel. Where the bounds carry a
-// zone, Validate refuses it as out of range; where they carry none, the
+// Where none of these is accepted, it tries the date-time halfway between
+// the bounds, and each bound in a zone an hour across, as
+// [CTime.ExampleValue] does: the range between 2021-05-15T10:00:00Z and
+// 2021-05-15T10:00:01Z, both excluded, gives "2021-05-15T10:00:00.5Z". A
+// range that only a date-time its bounds do not order meets, one with no
+// zone where they carry one, gives the sentinel, which Validate refuses:
+// under "yyyy-mm-ddThh:mm:XX" that range gives it, though
+// "2021-05-15T10:00" is valid. Where the bounds carry no zone, the
 // sentinel, which carries one, is not ordered against them, so Validate
 // does not refuse it for the range.
 func (c CDateTime) ExampleValue() any {
@@ -223,12 +239,12 @@ func (CDuration) isPrimitive() {}
 // designator when it names no days ("P0D", "P0Y", "PT0M"); the range's
 // lower bound as written, then that length counted in each designator the
 // pattern names, rounded up and moved past an excluded end; the upper bound
-// likewise, rounded down. When none passes, as when no duration meets both
-// the pattern and the range, or the pattern or a bound is malformed, it
-// returns "P0D", which Validate then refuses. No candidate carries a
-// fraction of a second, so it returns "P0D" too where only such a duration
-// meets the range: the range between PT0S and PT0.5S, both excluded,
-// though "PT0.25S" is valid.
+// likewise, rounded down; and the length halfway between the two bounds,
+// in seconds with its fraction to the microsecond, where the pattern names
+// seconds, so the range between PT0S and PT0.5S, both excluded, gives
+// "PT0.25S". When none passes, as when no duration meets both the pattern
+// and the range, or the pattern or a bound is malformed, it returns "P0D",
+// which Validate then refuses.
 func (c CDuration) ExampleValue() any {
 	allowed := allDesignators
 	if c.Pattern != "" {
@@ -273,8 +289,38 @@ func (c CDuration) exampleCandidates(allowed uint8) []string {
 				out = appendCounts(out, hi, allowed, false, !r.UpperInclusive)
 			}
 		}
+		out = append(out, durationMidway(r, allowed))
 	}
 	return out
+}
+
+// durationMidway returns the duration halfway between the two bounds of r,
+// in seconds with its fraction to the microsecond, such as "PT0.25S"
+// between PT0S and PT0.5S and "PT0.15S" between PT0.1S and PT0.2S, or to
+// the digit it needs where that rounding would reach a bound; and "" where
+// r lacks a bound, a bound is malformed, the bounds leave no room between
+// them, or allowed does not hold the seconds, the one designator that
+// takes a fraction.
+func durationMidway(r TemporalRange, allowed uint8) string {
+	if r.LowerUnbounded || r.UpperUnbounded || allowed&designatorSeconds == 0 {
+		return ""
+	}
+	lo, loOK := durationSeconds(r.Lower)
+	hi, hiOK := durationSeconds(r.Upper)
+	if !loOK || !hiOK || hi <= lo {
+		return ""
+	}
+	mid := lo + (hi-lo)/2
+	// The fraction to the microsecond, as midway writes a clock's, so that
+	// the float64 sum writes no digits past it.
+	text := strings.TrimRight(strings.TrimRight(strconv.FormatFloat(mid, 'f', 6, 64), "0"), ".")
+	if v, err := strconv.ParseFloat(text, 64); err != nil || v <= lo || v >= hi {
+		text = strconv.FormatFloat(mid, 'f', -1, 64)
+	}
+	if abs, negative := strings.CutPrefix(text, "-"); negative {
+		return "-PT" + abs + "S"
+	}
+	return "PT" + text + "S"
 }
 
 // Validate accepts a Go string that rm.DVDuration.ValidISO8601 accepts as
@@ -900,6 +946,8 @@ func clockExample(k clockKind, pattern string, r TemporalRange, tz ValidityKind,
 				candidates = append(candidates, p.fit(k, v, tz, -1, !r.UpperInclusive))
 			}
 		}
+		candidates = append(candidates, p.midway(k, r, tz))
+		candidates = append(candidates, p.inAnotherZone(k, r, tz)...)
 	}
 	for _, s := range candidates {
 		if s != "" && len(validateClock(k, pattern, r, tz, s)) == 0 {
@@ -907,6 +955,222 @@ func clockExample(k clockKind, pattern string, r TemporalRange, tz ValidityKind,
 		}
 	}
 	return sentinel
+}
+
+// secondsPerDay is the length of a day, which a time of day stays inside.
+const secondsPerDay = 86400
+
+// midway returns the value of kind k halfway between the edges of the
+// range r, with the fraction of a second it has, written to the pattern in
+// the zone [clockPattern.zoneOf] gives the lower bound, or the upper where r
+// has no lower. An edge is a bound; a range with no upper bound takes the
+// lower one second on, and a time no later than the end of its day, and one
+// with no lower bound the upper one second back, and a time no earlier than
+// the start of its day. An upper bound in another zone than the lower is
+// read in the lower's zone. A time halfway that leaves its day is written
+// with its clock and its zone moved by whole hours, so that it names the
+// same instant inside the day (zoneAcross). midway returns "" for a date,
+// for a pattern that leaves out the seconds, for a bound that carries no
+// seconds, so that it stands for a whole period, for bounds that are not
+// ordered against each other, one carrying a zone and the other none, for
+// edges that leave no room between them, and for a time that cannot be so
+// written.
+func (p clockPattern) midway(k clockKind, r TemporalRange, tz ValidityKind) string {
+	if k == clockDate || p.fields[fieldSecond].validity == fieldDisallowed {
+		return ""
+	}
+	var bounds []clockValue
+	for _, b := range []struct {
+		text      string
+		unbounded bool
+	}{{r.Lower, r.LowerUnbounded}, {r.Upper, r.UpperUnbounded}} {
+		if b.unbounded {
+			bounds = append(bounds, clockValue{})
+			continue
+		}
+		v, ok := parseClock(k, b.text)
+		if !ok || !v.hasTime || !v.time.SecondKnown {
+			return ""
+		}
+		bounds = append(bounds, v)
+	}
+	lower, upper := bounds[0], bounds[1]
+	ref := lower
+	if r.LowerUnbounded {
+		ref = upper
+	}
+	lo, hi := lower.magnitude(k), upper.magnitude(k)
+	switch {
+	case r.LowerUnbounded:
+		lo = hi - 1
+		if k == clockTime && hi > 0 {
+			lo = max(lo, 0)
+		}
+	case r.UpperUnbounded:
+		hi = lo + 1
+		if k == clockTime && lo < secondsPerDay {
+			hi = min(hi, secondsPerDay)
+		}
+	case lower.zone() != upper.zone():
+		lowerOffset, lowerZoned := zoneOffset(lower.zone())
+		upperOffset, upperZoned := zoneOffset(upper.zone())
+		if !lowerZoned || !upperZoned {
+			return ""
+		}
+		hi += float64(lowerOffset - upperOffset)
+	}
+	if hi <= lo {
+		return ""
+	}
+	zone, shift := p.zoneOf(ref, tz)
+	mid := lo + (hi-lo)/2 + float64(shift)
+	if k == clockTime && (mid < 0 || mid >= secondsPerDay) {
+		var hours int
+		if zone, hours = p.zoneAcross(zone, tz, mid); hours == 0 {
+			return ""
+		}
+		mid -= float64(hours) * 3600
+	}
+	whole := floor(mid)
+	// The fraction to the microsecond, so that a sum of float64 seconds
+	// writes no digits past it.
+	micros := int64((mid-float64(whole))*1e6 + 0.5)
+	if micros >= 1e6 {
+		whole, micros = whole+1, 0
+	}
+	var f [fieldCount]int
+	secs := whole
+	if k == clockDateTime {
+		days := floorDiv(whole, secondsPerDay)
+		setDate(&f, int(days))
+		secs -= days * secondsPerDay
+	}
+	f[fieldHour], f[fieldMinute], f[fieldSecond] = int(secs/3600), int(secs%3600/60), int(secs%60)
+	lo2, hi2 := k.span()
+	for i := lo2; i < hi2; i++ {
+		if lit := p.fields[i].literal; lit >= 0 {
+			f[i] = lit
+		}
+	}
+	digits := ""
+	if micros > 0 {
+		digits = strings.TrimRight(fmt.Sprintf(".%06d", micros), "0")
+	}
+	return formatClock(k, f, hi2, digits, zone)
+}
+
+// floor returns the largest whole number not above x, which lies inside
+// the range of an int64.
+func floor(x float64) int64 {
+	n := int64(x)
+	if float64(n) > x {
+		n--
+	}
+	return n
+}
+
+// floorDiv returns a divided by b, which is above 0, rounded down.
+func floorDiv(a, b int64) int64 {
+	q := a / b
+	if a%b != 0 && a < 0 {
+		q--
+	}
+	return q
+}
+
+// inAnotherZone returns the candidates of kind k in the range r written in
+// another zone than their bound: each bound that carries a zone, with its
+// clock and its zone moved an hour, back for the lower bound and on for the
+// upper, so that it names the same instant, then moved past the bound as
+// [clockPattern.fit] moves it. Such a value is compared with the bound as an
+// instant, not at the precision the two share, so it can lie past a bound
+// the pattern cannot write to its precision, and a time can lie past the
+// end of its bound's day, or before its start. It returns none for a date,
+// or where tz disallows a zone or the pattern requires Z, and leaves out a
+// time whose moved clock leaves the day.
+func (p clockPattern) inAnotherZone(k clockKind, r TemporalRange, tz ValidityKind) []string {
+	if k == clockDate || tz == ValidityDisallowed || p.zone == zoneUTC {
+		return nil
+	}
+	var out []string
+	for _, b := range []struct {
+		text      string
+		unbounded bool
+		included  bool
+		toward    int
+	}{{r.Lower, r.LowerUnbounded, r.LowerInclusive, 1}, {r.Upper, r.UpperUnbounded, r.UpperInclusive, -1}} {
+		if b.unbounded {
+			continue
+		}
+		v, ok := parseClock(k, b.text)
+		offset, zoned := zoneOffset(v.zone())
+		if !ok || !zoned || !v.hasTime {
+			continue
+		}
+		zone, ok := formatZone(offset - b.toward*3600)
+		if !ok {
+			continue
+		}
+		hour := v.time.Hour - b.toward
+		switch {
+		case hour >= 0 && hour <= 23:
+		case k == clockTime:
+			continue
+		default:
+			v.date = iso8601.DateOfMagnitude(v.date.Magnitude() - b.toward)
+			hour = (hour + 24) % 24
+		}
+		v.time.Hour, v.time.Zone = hour, zone
+		out = append(out, p.fit(k, v, tz, b.toward, !b.included))
+	}
+	return out
+}
+
+// zoneAcross returns the zone a time whose clock in zone, mid seconds from
+// the start of its day, leaves the day is written in instead, and the hours
+// its clock moves by to come back inside the day: zone moved by those hours,
+// back for a time after the day and on for one before it, so the time names
+// the same instant. hours is 0 where zone is none, tz disallows a zone, the
+// pattern requires Z, or the moved zone is out of the range of a zone
+// designator.
+func (p clockPattern) zoneAcross(zone string, tz ValidityKind, mid float64) (string, int) {
+	offset, zoned := zoneOffset(zone)
+	if !zoned || tz == ValidityDisallowed || p.zone == zoneUTC {
+		return zone, 0
+	}
+	var hours int
+	if mid >= secondsPerDay {
+		hours = int(floor((mid-secondsPerDay)/3600)) + 1
+	} else {
+		hours = -int(floor(-mid/3600)) - 1
+	}
+	moved, ok := formatZone(offset - hours*3600)
+	if !ok {
+		return zone, 0
+	}
+	return moved, hours
+}
+
+// zoneOffset returns the offset from UTC, in seconds, of the zone
+// designator zone, and false for none or one ParseZone refuses.
+func zoneOffset(zone string) (int, bool) {
+	if zone == "" {
+		return 0, false
+	}
+	offset, err := iso8601.ParseZone(zone)
+	return offset, err == nil
+}
+
+// formatZone writes an offset from UTC, in seconds, as ±hh:mm, and reports
+// false for one ParseZone would refuse.
+func formatZone(offset int) (string, bool) {
+	sign := '+'
+	if offset < 0 {
+		sign, offset = '-', -offset
+	}
+	zone := fmt.Sprintf("%c%02d:%02d", sign, offset/3600, offset%3600/60)
+	_, err := iso8601.ParseZone(zone)
+	return zone, err == nil
 }
 
 // fit writes the value v of kind k with the fields the pattern allows,
@@ -985,7 +1249,7 @@ func (p clockPattern) fit(k clockKind, v clockValue, tz ValidityKind, toward int
 			f[i] = lit
 		}
 	}
-	return formatClock(k, f, cut, zone)
+	return formatClock(k, f, cut, "", zone)
 }
 
 // zoneOf returns the zone a value written to the pattern carries under the
@@ -1062,8 +1326,9 @@ func setDate(f *[fieldCount]int, days int) {
 }
 
 // formatClock writes the fields of f before cut in the extended layout of
-// kind k, and zone after them when they reach the hour.
-func formatClock(k clockKind, f [fieldCount]int, cut int, zone string) string {
+// kind k, then fraction, the fraction of a second with its point or "",
+// where they reach the second, and zone where they reach the hour.
+func formatClock(k clockKind, f [fieldCount]int, cut int, fraction, zone string) string {
 	lo, _ := k.span()
 	var sb strings.Builder
 	for i := lo; i < cut; i++ {
@@ -1075,6 +1340,9 @@ func formatClock(k clockKind, f [fieldCount]int, cut int, zone string) string {
 		} else {
 			fmt.Fprintf(&sb, "%02d", f[i])
 		}
+	}
+	if cut > fieldSecond {
+		sb.WriteString(fraction)
 	}
 	if cut > fieldHour {
 		sb.WriteString(zone)

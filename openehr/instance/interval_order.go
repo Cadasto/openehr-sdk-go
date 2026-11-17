@@ -3,8 +3,10 @@ package instance
 // interval_order.go: keeps the two bounds of a generated interval in order.
 
 import (
+	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -27,18 +29,20 @@ import (
 // lower.is_strictly_comparable_to(upper), can hold.
 //
 // It orders DV_COUNT, DV_QUANTITY, DV_DATE, DV_TIME, DV_DATE_TIME,
-// DV_PROPORTION and DV_ORDINAL bounds, in a DV_INTERVAL of that type and
-// in a DV_INTERVAL<DV_ORDERED> whose two bounds are the same one of those
-// types. Quantities are ordered only when both bounds share their units,
-// since magnitudes in different units do not compare. Proportions are
-// ordered by the ratio numerator/denominator, and only when both bounds
+// DV_DURATION, DV_PROPORTION and DV_ORDINAL bounds, in a DV_INTERVAL of that
+// type and in a DV_INTERVAL<DV_ORDERED> whose two bounds are the same one of
+// those types. Quantities are ordered only when both bounds share their
+// units, since magnitudes in different units do not compare. Proportions
+// are ordered by the ratio numerator/denominator, and only when both bounds
 // share their type (proportionScale). Dates, times and date-times are
 // ordered as the RM floor orders them: at the precision the two share, and
 // two times or date-times written with different zone designators as
-// instants (temporalCompare). A pair that does not compare is left alone.
+// instants (temporalCompare). Durations are ordered by their length in
+// seconds, as the RM floor orders them (compareDurations). A pair that does
+// not compare is left alone.
 //
-// An inverted pair is replaced by the first of these two pairs that is in
-// order and fits each side's OPT constraint:
+// An inverted pair is replaced by the first of these pairs that is in order
+// and fits each side's OPT constraint:
 //
 //   - the two bounds swapped, which keeps the values RandomFill drew;
 //   - the lowest value the lower side's constraint accepts, with the
@@ -47,23 +51,37 @@ import (
 //     current bound instead, which a range open that way accepts; a
 //     proportion side that has no usable end there, whether its range is
 //     open or its type, denominator or precision rules the end out, takes
-//     that bound's ratio on its own denominator (proportionAdopt). At an exclusive real end the accepted extreme is
-//     the nearest float64 inside it, and for a proportion that needs whole
-//     numbers the nearest whole number it accepts.
+//     that bound's ratio on its own denominator (proportionAdopt). At an
+//     exclusive real end the accepted extreme is the nearest float64 inside
+//     it, and for a proportion that needs whole numbers the nearest whole
+//     number it accepts. For a date, a time, a date-time or a duration it
+//     is the value nearest the end of the range on the bound's value,
+//     written to the side's pattern and moved inside an excluded end, among
+//     the candidates temporalEnd reads;
+//   - for a proportion, the second pair with a side's denominator moved to
+//     the one the C_REAL on it gives that puts the side's ratio furthest
+//     toward its end (proportionWider): the lower side's alone, then the
+//     upper side's alone, then both;
+//   - for a proportion, a side's bound moved to meet the other side's
+//     bound in the second or third pair, over the denominator that puts its
+//     ratio there (proportionReach): the lower side's, then the upper
+//     side's.
 //
 // In a swap a proportion bound's precision moves with its numerator and
 // denominator, which were settled under it. In the second pair each
-// proportion bound keeps its type and denominator and takes a precision
-// its own side admits, one that needs no more whole numbers than its type
-// does wherever the side admits one (proportionPrecision), so its
-// numerator is rounded only where its type, or every precision its side
-// admits, needs whole numbers. A pair fits a side only where that side's
-// constraint on precision admits the precision of its bound, so every
-// bound written keeps the whole numbers its precision needs. An ordinal
-// bound the second pair replaces takes the symbol its side lists for the
-// new value, with the text the nearest archetype root's term gives a code
-// in any terminology other than openehr (useTermText), as the walk writes
-// it.
+// proportion bound keeps its type and denominator, and in the third and
+// fourth its type; in each it takes a precision its own side admits, one
+// that needs no more whole numbers than its type does wherever the side
+// admits one (proportionPrecision), so its numerator is rounded only where
+// its type, an is_integral its side pins to true, or every precision its
+// side admits, needs whole numbers. A pair fits a side only where that
+// side's constraint on precision admits the precision of its bound, so
+// every bound written keeps the whole numbers its precision needs. A
+// denominator the third or fourth pair moves is a whole number where the
+// bound needs whole numbers, and stays where its kind fixes it. An ordinal bound the second pair replaces takes
+// the symbol its side lists for the new value, with the text the nearest
+// archetype root's term gives a code in any terminology other than openehr
+// (useTermText), as the walk writes it.
 //
 // The OPT may constrain a quantity or an ordinal bound as one C_DV_QUANTITY
 // or C_DV_ORDINAL on the bound node, or, where it builds the bound as a
@@ -88,14 +106,21 @@ import (
 // on a side with no end that way a value at the other side's current
 // bound, which the other side's extreme does not pass; on a side whose bound
 // keeps a normal_range rule it is the extreme among the values that keep
-// the rule. An in-order pair therefore exists only if the second pair is in
-// order: for a proportion, among the pairs that keep each bound's type and
-// denominator. When it is not, the two sides' constraints admit no such
-// ordered interval. The
-// generator has no error for a constraint it cannot satisfy (sampleValue,
-// for one, falls back to the example value without a signal), so the
-// bounds are then left as they are, and the interval breaks
-// Limits_consistent.
+// the rule. An in-order pair of two counts, quantities or ordinals
+// therefore exists only if the second pair is in order. For a proportion
+// the third pair holds each side's extreme over the denominators the C_REAL
+// on its side lists or bounds on both sides away from 0 too, and the fourth
+// a ratio at the other side's bound over a denominator no such C_REAL need
+// give, from the side's own numerator or an end of the C_REAL on it. For a
+// date, a time, a date-time or a duration the second pair holds the value
+// nearest each side's end among temporalEnd's candidates, which leave out a
+// value with a fraction of a second, one in another zone than the end, and
+// a duration in more than one designator other than the end itself. So for
+// a proportion and for those types an in-order pair can exist that no pair
+// here finds. When no pair is in order, the bounds are left as they are,
+// and the interval breaks Limits_consistent: the generator has no error for
+// a constraint it cannot satisfy (sampleValue, for one, falls back to the
+// example value without a signal).
 func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any) {
 	shareComparable(optNode, rmValue)
 	switch iv := rmValue.(type) {
@@ -109,6 +134,8 @@ func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any) {
 		orderConcrete(&iv.Interval, optNode, timeScale, timeKeyOf, setTimeKey)
 	case *rm.DVInterval[rm.DVDateTime]:
 		orderConcrete(&iv.Interval, optNode, dateTimeScale, dateTimeKeyOf, setDateTimeKey)
+	case *rm.DVInterval[rm.DVDuration]:
+		orderConcrete(&iv.Interval, optNode, durationScale, durationKeyOf, setDurationKey)
 	case *rm.DVInterval[rm.DVProportion]:
 		orderConcrete(&iv.Interval, optNode, proportionScale, proportionKeyOf, setProportionKey)
 	case *rm.DVInterval[rm.DVOrdinal]:
@@ -155,6 +182,9 @@ func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrder
 		return
 	}
 	if orderOrderedAs(iv, optNode, dateTimeScale, asDateTime, dateTimeKeyOf, setDateTimeKey, setOrderedDateTime) {
+		return
+	}
+	if orderOrderedAs(iv, optNode, durationScale, asDuration, durationKeyOf, setDurationKey, setOrderedDuration) {
 		return
 	}
 	if orderOrderedAs(iv, optNode, proportionScale, asProportion, proportionKeyOf, setProportionKey, setOrderedProportion) {
@@ -222,6 +252,21 @@ type scale[K any] struct {
 	// the side's bound node accepts the rest is for fits. It returns false
 	// when there is none. A nil adopt takes other as it is.
 	adopt func(node *tcimpl.CompiledNode, like, other K, low bool) (K, bool)
+	// wider returns the lowest (low) or highest value a side's bound node
+	// accepts where the value may change more of like than lowest and
+	// highest change, as proportionWider changes a proportion's
+	// denominator, and false when there is none. orderPair tries it only
+	// where the pairs lowest and highest give are not in order. A nil wider
+	// gives none.
+	wider func(node *tcimpl.CompiledNode, like K, low bool) (K, bool)
+	// reach returns a value a side's bound node accepts at other, the other
+	// side's bound in a pair orderPair tries, or past it on the side's own
+	// side (below it for the lower side, low), where the value may change
+	// more of like than adopt changes, as proportionReach changes a
+	// proportion's denominator, and false when there is none. orderPair
+	// tries it only where no pair lowest, highest and wider give is in order.
+	// A nil reach gives none.
+	reach func(node *tcimpl.CompiledNode, like, other K, low bool) (K, bool)
 }
 
 // adopted is s.adopt, or other where s has no adopt.
@@ -292,6 +337,58 @@ func orderPair[K any](lower, upper K, lowerSide, upperSide orderSide[K], s scale
 	if loOK && hiOK {
 		if lo, hi, ok := fitsInOrder(lo, hi); ok {
 			return lo, hi, true
+		}
+	}
+	type bound struct {
+		k  K
+		ok bool
+	}
+	var wideLo, wideHi bound
+	if s.wider != nil {
+		// A side changes more of its bound only where that puts the pair in
+		// order: the lower side alone, then the upper side alone, then both.
+		wideLo.k, wideLo.ok = s.wider(lowerSide.node, lower, true)
+		wideHi.k, wideHi.ok = s.wider(upperSide.node, upper, false)
+		for _, pair := range []struct {
+			lo, hi K
+			ok     bool
+		}{
+			{wideLo.k, hi, wideLo.ok && hiOK},
+			{lo, wideHi.k, loOK && wideHi.ok},
+			{wideLo.k, wideHi.k, wideLo.ok && wideHi.ok},
+		} {
+			if !pair.ok {
+				continue
+			}
+			if lo, hi, ok := fitsInOrder(pair.lo, pair.hi); ok {
+				return lo, hi, true
+			}
+		}
+	}
+	if s.reach == nil {
+		return lower, upper, false
+	}
+	// A side moves its bound to meet the other side's bound in the pairs
+	// above: the lower side to the upper's, then the upper side to the
+	// lower's.
+	for _, other := range []bound{{hi, hiOK}, wideHi} {
+		if !other.ok {
+			continue
+		}
+		if met, ok := s.reach(lowerSide.node, lower, other.k, true); ok {
+			if lo, hi, ok := fitsInOrder(met, other.k); ok {
+				return lo, hi, true
+			}
+		}
+	}
+	for _, other := range []bound{{lo, loOK}, wideLo} {
+		if !other.ok {
+			continue
+		}
+		if met, ok := s.reach(upperSide.node, upper, other.k, false); ok {
+			if lo, hi, ok := fitsInOrder(other.k, met); ok {
+				return lo, hi, true
+			}
 		}
 	}
 	return lower, upper, false
@@ -555,13 +652,31 @@ func setOrderedQuantity(slot *rm.DVOrdered, k quantityKey) {
 }
 
 // dateScale, timeScale and dateTimeScale order DV_DATE, DV_TIME and
-// DV_DATE_TIME bounds (temporalCompare says how). A C_DATE, C_TIME or
-// C_DATE_TIME has no numeric end, so only a swap repairs an inversion.
+// DV_DATE_TIME bounds (temporalCompare says how), and durationScale
+// DV_DURATION bounds (compareDurations). Each reads a side's lowest and
+// highest value from the range of the C_DATE, C_TIME, C_DATE_TIME or
+// C_DURATION on the bound's value (temporalEnd), among the candidates
+// clockEnds or durationEnds gives.
 var (
-	dateScale     = temporalScale(temporalCompare(dateOrderRead))
-	timeScale     = temporalScale(temporalCompare(timeOrderRead))
-	dateTimeScale = temporalScale(temporalCompare(dateTimeOrderRead))
+	dateScale     = temporalScale(temporalCompare(dateOrderRead), clockEnds(dateParts))
+	timeScale     = temporalScale(temporalCompare(timeOrderRead), clockEnds(timeParts))
+	dateTimeScale = temporalScale(temporalCompare(dateTimeOrderRead), clockEnds(dateTimeParts))
+	durationScale = temporalScale(compareDurations, durationEnds)
 )
+
+// compareDurations compares two ISO 8601 durations by their length in
+// seconds, BASE Iso8601_duration.to_seconds, which is the magnitude the
+// REQ-123 parse gives and the order the RM floor puts two DV_DURATION
+// bounds in (REQ-112 DV_INTERVAL). A value the parse refuses does not
+// compare.
+func compareDurations(a, b string) (int, bool) {
+	da, errA := iso8601.ParseDuration(a)
+	db, errB := iso8601.ParseDuration(b)
+	if errA != nil || errB != nil {
+		return 0, false
+	}
+	return compareOrdered(da.ToSeconds(), db.ToSeconds()), true
+}
 
 // temporalRead reads an ISO 8601 value of one type as the order of its
 // type reads it: its fields as written, the zone not applied
@@ -601,15 +716,272 @@ func dateTimeKeyOf(d rm.DVDateTime) string { return d.Value }
 
 func setDateTimeKey(d *rm.DVDateTime, v string) { d.Value = v }
 
-func temporalScale(compare func(a, b string) (int, bool)) scale[string] {
+func durationKeyOf(d rm.DVDuration) string { return d.Value }
+
+func setDurationKey(d *rm.DVDuration, v string) { d.Value = v }
+
+// temporalScale is the scale of one ISO 8601 type that compare orders, whose
+// OPT constraint is the one on the bound's value. A side's lowest and
+// highest value is the one temporalEnd reads from that constraint's range
+// among the candidates ends gives.
+func temporalScale(compare func(a, b string) (int, bool), ends func(r constraints.TemporalRange, low bool) []string) scale[string] {
+	end := func(node *tcimpl.CompiledNode, low bool) (string, bool) {
+		return temporalEnd(primitiveOf(bindingChild(node, "value")), compare, ends, low)
+	}
 	return scale[string]{
 		compare: compare,
 		fits: func(node *tcimpl.CompiledNode, v string) bool {
 			pc := primitiveOf(bindingChild(node, "value"))
 			return pc == nil || len(pc.Validate(v)) == 0
 		},
-		lowest:  func(*tcimpl.CompiledNode, string) (string, bool) { return "", false },
-		highest: func(*tcimpl.CompiledNode, string) (string, bool) { return "", false },
+		lowest:  func(node *tcimpl.CompiledNode, _ string) (string, bool) { return end(node, true) },
+		highest: func(node *tcimpl.CompiledNode, _ string) (string, bool) { return end(node, false) },
+	}
+}
+
+// temporalEnd returns the lowest (low) or highest value pc, the constraint
+// on a side's bound value, accepts among the candidates ends gives for its
+// range: the first it accepts, replaced by each later one that compare puts
+// further that way. It returns false where pc is no C_DATE, C_TIME,
+// C_DATE_TIME or C_DURATION, where its range has no end that way, and where
+// pc accepts no candidate.
+func temporalEnd(pc constraints.PrimitiveConstraint, compare func(a, b string) (int, bool), ends func(r constraints.TemporalRange, low bool) []string, low bool) (string, bool) {
+	r, ok := temporalRangeOf(pc)
+	if !ok || !r.IsBounded() || (low && r.LowerUnbounded) || (!low && r.UpperUnbounded) {
+		return "", false
+	}
+	var best string
+	found := false
+	for _, v := range ends(r, low) {
+		if len(pc.Validate(v)) != 0 {
+			continue
+		}
+		if !found {
+			best, found = v, true
+			continue
+		}
+		if c, ok := compare(v, best); ok && ((low && c < 0) || (!low && c > 0)) {
+			best = v
+		}
+	}
+	return best, found
+}
+
+// temporalRangeOf returns the range of a C_DATE, C_TIME, C_DATE_TIME or
+// C_DURATION, and false for any other constraint.
+func temporalRangeOf(pc constraints.PrimitiveConstraint) (constraints.TemporalRange, bool) {
+	switch c := pc.(type) {
+	case constraints.CDate:
+		return c.Range, true
+	case constraints.CTime:
+		return c.Range, true
+	case constraints.CDateTime:
+		return c.Range, true
+	case constraints.CDuration:
+		return c.Range, true
+	}
+	return constraints.TemporalRange{}, false
+}
+
+// durationEnds returns the candidates for the lowest (low) or highest
+// duration the range r admits: its end that way as r writes it, then, in
+// each designator in written order, the length 0 and the count of that
+// designator nearest the end inside r (durationCounts), as the sampler
+// writes a count, so a pattern that refuses the end's own designators
+// admits one of them.
+func durationEnds(r constraints.TemporalRange, low bool) []string {
+	out := []string{r.Upper}
+	if low {
+		out[0] = r.Lower
+	}
+	for _, d := range durationDesignators {
+		out = append(out, d.prefix+"0"+d.letter)
+		if lo, hi, ok := durationCounts(r, d.prefix, d.letter); ok {
+			n := hi
+			if low {
+				n = lo
+			}
+			out = append(out, fmt.Sprintf("%s%d%s", d.prefix, n, d.letter))
+		}
+	}
+	return out
+}
+
+// The fields of a clockParts, from the largest down.
+const (
+	clockYear = iota
+	clockMonth
+	clockDay
+	clockHour
+	clockMinute
+	clockSecond
+	clockFieldCount
+)
+
+// clockParts is a date, a time or a date-time read field by field, its
+// fraction of a second left out. f holds the year, the month, the day, the
+// hour, the minute and the second; the type has the fields from lo up to
+// hi, and the value carries those from lo up to n. zone is the designator
+// the value is written with, "" for none, which a value with no time does
+// not write.
+type clockParts struct {
+	f         [clockFieldCount]int
+	lo, hi, n int
+	zone      string
+}
+
+func dateParts(s string) (clockParts, bool) {
+	d, err := iso8601.ParseDate(s)
+	p := clockParts{lo: clockYear, hi: clockHour}
+	p.setDate(d)
+	return p, err == nil
+}
+
+func timeParts(s string) (clockParts, bool) {
+	t, err := iso8601.ParseTime(s)
+	p := clockParts{lo: clockHour, hi: clockFieldCount}
+	p.setTime(t)
+	return p, err == nil
+}
+
+// dateTimeParts reads a date-time, which carries a time exactly when its
+// text holds a "T", as dateTimeOrderRead says.
+func dateTimeParts(s string) (clockParts, bool) {
+	d, t, err := iso8601.ParseDateTime(s)
+	p := clockParts{lo: clockYear, hi: clockFieldCount}
+	p.setDate(d)
+	if strings.Contains(s, "T") {
+		p.setTime(t)
+	}
+	return p, err == nil
+}
+
+func (p *clockParts) setDate(d iso8601.Date) {
+	p.f[clockYear], p.n = d.Year, clockYear+1
+	if d.MonthKnown {
+		p.f[clockMonth], p.n = d.Month, clockMonth+1
+	}
+	if d.DayKnown {
+		p.f[clockDay], p.n = d.Day, clockDay+1
+	}
+}
+
+func (p *clockParts) setTime(t iso8601.Time) {
+	p.f[clockHour], p.n = t.Hour, clockHour+1
+	if t.MinuteKnown {
+		p.f[clockMinute], p.n = t.Minute, clockMinute+1
+	}
+	if t.SecondKnown {
+		p.f[clockSecond], p.n = t.Second, clockSecond+1
+	}
+	p.zone = t.Zone
+}
+
+// String writes p in the extended layout, with its zone after its time.
+func (p clockParts) String() string {
+	var b strings.Builder
+	for i := p.lo; i < p.n; i++ {
+		switch i {
+		case clockYear:
+			fmt.Fprintf(&b, "%04d", p.f[i])
+		case clockMonth, clockDay:
+			fmt.Fprintf(&b, "-%02d", p.f[i])
+		case clockHour:
+			if p.lo < clockHour {
+				b.WriteByte('T')
+			}
+			fmt.Fprintf(&b, "%02d", p.f[i])
+		default:
+			fmt.Fprintf(&b, ":%02d", p.f[i])
+		}
+	}
+	if p.n > clockHour {
+		b.WriteString(p.zone)
+	}
+	return b.String()
+}
+
+// withFields returns p written with m fields: cut after its m-th where it
+// carries more, and else filled out with the start of the period it names
+// (start) or the end of it, such as 2021-01-01 or 2021-12-31 for 2021.
+func (p clockParts) withFields(m int, start bool) clockParts {
+	for i := p.n; i < m; i++ {
+		switch {
+		case start && (i == clockMonth || i == clockDay):
+			p.f[i] = 1
+		case start:
+			p.f[i] = 0
+		case i == clockMonth:
+			p.f[i] = 12
+		case i == clockDay:
+			// Day 0 of the next month is the last day of this one.
+			p.f[i] = time.Date(p.f[clockYear], time.Month(p.f[clockMonth]+1), 0, 0, 0, 0, 0, time.UTC).Day()
+		case i == clockHour:
+			p.f[i] = 23
+		default:
+			p.f[i] = 59
+		}
+	}
+	p.n = m
+	return p
+}
+
+// moved returns p moved by step, 1 or -1, in its field at, and cut after
+// that field, so that it names the period next to the one p names at that
+// precision: 2021-06 and 2021-04 for 2021-05-03 at the month. It returns
+// false where the move takes a time out of its day.
+func (p clockParts) moved(at, step int) (clockParts, bool) {
+	f := p.withFields(at+1, true).withFields(clockFieldCount, true).f
+	if p.lo == clockHour {
+		f[clockYear], f[clockMonth], f[clockDay] = 2000, 1, 1
+	}
+	f[at] += step
+	t := time.Date(f[clockYear], time.Month(f[clockMonth]), f[clockDay], f[clockHour], f[clockMinute], f[clockSecond], 0, time.UTC)
+	if p.lo == clockHour && t.YearDay() != 1 {
+		return clockParts{}, false
+	}
+	q := p
+	q.f = [clockFieldCount]int{t.Year(), int(t.Month()), t.Day(), t.Hour(), t.Minute(), t.Second()}
+	q.n = at + 1
+	return q, true
+}
+
+// clockEnds returns the candidates for the lowest (low) or highest value a
+// range of dates, times or date-times, read by read, admits. They are its
+// end that way as the range writes it, and then the end written with each
+// number of fields its type has, from all down to one: cut after the last,
+// or filled out with the start of the period it names for the lowest and
+// the end of that period for the highest (withFields). Where the range
+// excludes the end, they are instead the end moved by one in each field it
+// carries, up for the lowest and down for the highest (moved), each so
+// written. Each is in the extended layout, with the end's zone and without
+// a fraction of a second.
+func clockEnds(read func(s string) (clockParts, bool)) func(r constraints.TemporalRange, low bool) []string {
+	return func(r constraints.TemporalRange, low bool) []string {
+		end, excluded, step := r.Upper, !r.UpperInclusive, -1
+		if low {
+			end, excluded, step = r.Lower, !r.LowerInclusive, 1
+		}
+		out := []string{end}
+		p, ok := read(end)
+		if !ok {
+			return out
+		}
+		seeds := []clockParts{p}
+		if excluded {
+			seeds = seeds[:0]
+			for at := p.lo; at < p.n; at++ {
+				if q, ok := p.moved(at, step); ok {
+					seeds = append(seeds, q)
+				}
+			}
+		}
+		for _, s := range seeds {
+			for m := s.hi; m > s.lo; m-- {
+				out = append(out, s.withFields(m, low).String())
+			}
+		}
+		return out
 	}
 }
 
@@ -684,16 +1056,21 @@ func setProportionKey(p *rm.DVProportion, k proportionKey) {
 
 // proportionScale orders DV_PROPORTION bounds by numerator/denominator
 // when their types match. The extreme replacement keeps the bound's type
-// and denominator, takes a precision its side admits (proportionPrecision)
-// and moves the numerator to the end its C_REAL accepts, which is the low
-// or high ratio while that denominator stays positive. A negative
+// and denominator, and the wider one its type alone (proportionWider); each
+// takes a precision its side admits (proportionPrecision) and moves the
+// numerator to the end its C_REAL accepts, which is the low or high ratio
+// while that denominator stays positive. A negative
 // denominator reverses which numerator end is the low ratio. A bound that
 // needs whole numbers, as a fraction or a bound of precision 0 does, takes
 // the whole number nearest that end its C_REAL accepts, so the
-// replacement keeps the rules of its kind (settleProportion). Where
+// replacement keeps the rules of its kind (settleProportion); so does a
+// bound whose side pins is_integral to true (sideWhole). Where
 // proportionEnd gives a side no bound, for whatever reason, the side takes
 // the other bound's ratio on its own type and denominator instead
 // (proportionAdopt), kept only where its constraints accept the result.
+// Where no such pair is in order, a side keeps its type and takes a
+// denominator that puts its ratio at the other bound's (proportionReach),
+// which no C_REAL on its denominator need list or bound.
 var proportionScale = scale[proportionKey]{
 	compare: compareProportions,
 	fits:    proportionFits,
@@ -704,6 +1081,8 @@ var proportionScale = scale[proportionKey]{
 		return proportionEnd(node, like, false)
 	},
 	adopt: proportionAdopt,
+	wider: proportionWider,
+	reach: proportionReach,
 }
 
 func compareProportions(a, b proportionKey) (int, bool) {
@@ -727,12 +1106,14 @@ func proportionRatio(k proportionKey) (float64, bool) {
 
 // proportionFits reports whether k suits a side's bound node: its
 // numerator, denominator, type and precision each fit the node's own
-// constraint on that attribute.
+// constraint on that attribute, and its numerator and denominator are
+// whole numbers where the node pins is_integral to true (integralPinned).
 func proportionFits(node *tcimpl.CompiledNode, k proportionKey) bool {
 	return componentFits(bindingChild(node, "numerator"), k.numerator) &&
 		componentFits(bindingChild(node, "denominator"), k.denominator) &&
 		componentFits(bindingChild(node, "type"), k.kind) &&
-		precisionFits(node, k.precision)
+		precisionFits(node, k.precision) &&
+		(!integralPinned(node) || (math.Trunc(k.numerator) == k.numerator && math.Trunc(k.denominator) == k.denominator))
 }
 
 // precisionFits reports whether a side's bound node admits precision, nil
@@ -757,11 +1138,12 @@ func componentFits(node *tcimpl.CompiledNode, v any) bool {
 
 // proportionEnd returns the lowest (low) or highest ratio a side accepts
 // while keeping like's type and denominator, with the precision
-// proportionPrecision gives and a whole numerator where that precision or
-// the type needs whole numbers. It returns false when the numerator
-// constraint has no end in the direction that moves the ratio that way,
-// or no whole number toward that end where one is needed, or when the
-// side does not admit like's type or denominator, or admits no precision.
+// proportionPrecision gives and a whole numerator where that precision,
+// the type or the side's is_integral pin needs whole numbers (sideWhole).
+// It returns false when the numerator constraint has no end in the
+// direction that moves the ratio that way, or no whole number toward that
+// end where one is needed, or when the side does not admit like's type or
+// denominator, or admits no precision.
 func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (proportionKey, bool) {
 	if like.denominator == 0 || !componentFits(bindingChild(node, "type"), like.kind) || !componentFits(bindingChild(node, "denominator"), like.denominator) {
 		return proportionKey{}, false
@@ -774,11 +1156,130 @@ func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (pro
 	if like.denominator < 0 {
 		numLow = !low
 	}
-	n, ok := realEndOf(bindingChild(node, "numerator"), numLow, wholeOperands(like.kind, precision))
+	n, ok := realEndOf(bindingChild(node, "numerator"), numLow, sideWhole(node, like.kind, precision))
 	if !ok {
 		return proportionKey{}, false
 	}
 	return proportionKey{numerator: n, denominator: like.denominator, kind: like.kind, precision: precision}, true
+}
+
+// proportionWider returns the lowest (low) or highest ratio a side accepts
+// while keeping like's type, over like's denominator and over each
+// denominator the C_REAL on the side's denominator gives: the members of
+// its list, or the ends of its range (realEndOf). Each denominator takes
+// the numerator proportionEnd gives over it, and the ratio furthest toward
+// that end wins, like's own denominator where two tie. A denominator is a
+// whole number where the precision proportionPrecision gives, the type or
+// the side's is_integral pin needs whole numbers (sideWhole), and stays as
+// like has it for a unitary proportion or a percent, whose kind fixes it
+// at 1 or 100. A numerator over a denominator of fixed sign is linear in
+// both, so the ends of a range that does not hold 0 bound the ratios over
+// it; one that holds 0 is read at its ends alone. It returns false where
+// proportionEnd gives no bound over any of them.
+func proportionWider(node *tcimpl.CompiledNode, like proportionKey, low bool) (proportionKey, bool) {
+	precision, ok := proportionPrecision(node, like)
+	if !ok {
+		return proportionKey{}, false
+	}
+	whole := sideWhole(node, like.kind, precision)
+	denominators := []float64{like.denominator}
+	if like.kind != pkUnitary && like.kind != pkPercent {
+		denominatorNode := bindingChild(node, "denominator")
+		if c, ok := primitiveOf(denominatorNode).(constraints.CReal); ok && len(c.List) > 0 {
+			denominators = append(denominators, c.List...)
+		} else {
+			for _, end := range []bool{true, false} {
+				if d, ok := realEndOf(denominatorNode, end, whole); ok {
+					denominators = append(denominators, d)
+				}
+			}
+		}
+	}
+	var best proportionKey
+	found := false
+	for _, d := range denominators {
+		if whole && math.Trunc(d) != d {
+			continue
+		}
+		over := like
+		over.denominator = d
+		k, ok := proportionEnd(node, over, low)
+		if !ok {
+			continue
+		}
+		if c, _ := compareProportions(k, best); !found || (low && c < 0) || (!low && c > 0) {
+			best, found = k, true
+		}
+	}
+	return best, found
+}
+
+// proportionReach returns the bound a side takes to meet other, the other
+// side's bound in a pair orderPair tries, where no denominator
+// proportionWider reads puts the pair in order: like's type, the precision
+// proportionPrecision gives, and a numerator over the denominator that puts
+// its ratio at other's. Where float64 or a whole denominator leaves that
+// ratio off, the denominator moves to put the ratio past other's on the
+// side's own side, below it for the lower side (low): away from 0 or toward
+// it, whichever moves the ratio that way, by rounding to a whole number where
+// the precision, the type or the side's is_integral pin needs whole numbers
+// (sideWhole), and then by one step, at most four times, of one float64 or
+// one whole number. The numerator is like's own, else the low end, else the
+// high end the C_REAL on the side's numerator accepts (realEndOf), the first
+// over which the bound fits the side (proportionFits). It returns false for
+// a unitary proportion or a percent, whose kind fixes the denominator, where
+// other's ratio is 0 or does not compare, where node admits no precision,
+// and where no numerator gives a bound that fits.
+func proportionReach(node *tcimpl.CompiledNode, like, other proportionKey, low bool) (proportionKey, bool) {
+	target, ok := proportionRatio(other)
+	if like.kind == pkUnitary || like.kind == pkPercent || !ok || target == 0 {
+		return proportionKey{}, false
+	}
+	precision, ok := proportionPrecision(node, like)
+	if !ok {
+		return proportionKey{}, false
+	}
+	whole := sideWhole(node, like.kind, precision)
+	numerators := []float64{like.numerator}
+	for _, end := range []bool{true, false} {
+		if n, ok := realEndOf(bindingChild(node, "numerator"), end, whole); ok {
+			numerators = append(numerators, n)
+		}
+	}
+	// A denominator further from 0 puts the ratio nearer 0, which lowers a
+	// positive ratio and raises a negative one.
+	away := low == (target > 0)
+	round := func(d float64) float64 {
+		switch {
+		case !whole:
+			return d
+		case away:
+			return math.Copysign(math.Ceil(math.Abs(d)), d)
+		}
+		return math.Trunc(d)
+	}
+	for _, n := range numerators {
+		if n == 0 || (whole && math.Trunc(n) != n) {
+			continue
+		}
+		k := proportionKey{numerator: n, denominator: round(n * other.denominator / other.numerator), kind: like.kind, precision: precision}
+		for range 4 {
+			if c, ok := compareProportions(k, other); !ok || (low && c <= 0) || (!low && c >= 0) {
+				break
+			}
+			toward := 0.0
+			if away {
+				toward = math.Copysign(math.Inf(1), k.denominator)
+			}
+			k.denominator = round(math.Nextafter(k.denominator, toward))
+		}
+		c, ok := compareProportions(k, other)
+		if !ok || math.IsInf(k.denominator, 0) || (low && c > 0) || (!low && c < 0) || !proportionFits(node, k) {
+			continue
+		}
+		return k, true
+	}
+	return proportionKey{}, false
 }
 
 // proportionPrecision returns the precision a bound of like's type takes
@@ -786,10 +1287,11 @@ func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (pro
 // side, like being the bound that side drew, and false when node admits
 // none. It tries like's own precision, none, the members of the C_INTEGER
 // on precision, 1 and -1, in that order, and takes the first node admits
-// that needs no more whole numbers than the type does, so the numerator
-// need not be rounded. Only where node admits no such precision does it
-// take the first node admits, which is then 0. It never takes a precision
-// below -1, which the RM floor rejects (-1 is no limit).
+// that needs no more whole numbers than the type, or an is_integral node
+// pins to true, does (sideWhole), so the numerator need not be rounded.
+// Only where node admits no such precision does it take the first node
+// admits, which is then 0. It never takes a precision below -1, which the
+// RM floor rejects (-1 is no limit).
 func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Integer, bool) {
 	candidates := []*rm.Integer{like.precision, nil}
 	if c, ok := primitiveOf(bindingChild(node, "precision")).(constraints.CInteger); ok {
@@ -798,13 +1300,13 @@ func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Int
 		}
 	}
 	candidates = append(candidates, new(rm.Integer(1)), new(rm.Integer(-1)))
-	typeWhole := wholeOperands(like.kind, nil)
+	typeWhole := sideWhole(node, like.kind, nil)
 	for _, rounded := range []bool{false, true} {
 		for _, p := range candidates {
 			if p != nil && *p < -1 {
 				continue
 			}
-			if (rounded || wholeOperands(like.kind, p) == typeWhole) && precisionFits(node, p) {
+			if (rounded || sideWhole(node, like.kind, p) == typeWhole) && precisionFits(node, p) {
 				return p, true
 			}
 		}
@@ -812,11 +1314,20 @@ func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Int
 	return nil, false
 }
 
+// sideWhole reports whether a bound of kind with precision on a side's
+// bound node needs a whole-number numerator and denominator: where its kind
+// or its precision does (wholeOperands), and wherever the node pins
+// is_integral to true (integralPinned).
+func sideWhole(node *tcimpl.CompiledNode, kind int64, precision *rm.Integer) bool {
+	return wholeOperands(kind, precision) || integralPinned(node)
+}
+
 // proportionAdopt returns the bound a side takes at other, the other
 // side's current bound, where proportionEnd gave it none, low naming the
 // lower side: like's type and denominator, the precision
 // proportionPrecision gives, and the numerator that puts its ratio at
-// other's. Where that precision or the type needs whole numbers, the
+// other's. Where that precision, the type or the side's is_integral pin
+// needs whole numbers (sideWhole), the
 // numerator is the whole number next to that one on the side's own side of
 // other, down for the lower side over a positive denominator. float64 can
 // leave the ratio just past other's where the two denominators differ, so
@@ -840,7 +1351,7 @@ func proportionAdopt(node *tcimpl.CompiledNode, like, other proportionKey, low b
 	if low == (like.denominator > 0) {
 		round, away = math.Floor, math.Inf(-1)
 	}
-	whole := wholeOperands(like.kind, precision)
+	whole := sideWhole(node, like.kind, precision)
 	if whole {
 		k.numerator = round(k.numerator)
 	}
@@ -1063,6 +1574,18 @@ func asDateTime(v rm.DVOrdered) (rm.DVDateTime, bool) {
 	return rm.DVDateTime{}, false
 }
 
+func asDuration(v rm.DVOrdered) (rm.DVDuration, bool) {
+	switch x := v.(type) {
+	case rm.DVDuration:
+		return x, true
+	case *rm.DVDuration:
+		if x != nil {
+			return *x, true
+		}
+	}
+	return rm.DVDuration{}, false
+}
+
 func asProportion(v rm.DVOrdered) (rm.DVProportion, bool) {
 	switch x := v.(type) {
 	case rm.DVProportion:
@@ -1112,6 +1635,16 @@ func setOrderedDateTime(slot *rm.DVOrdered, value string) {
 	case *rm.DVDateTime:
 		x.Value = value
 	case rm.DVDateTime:
+		x.Value = value
+		*slot = x
+	}
+}
+
+func setOrderedDuration(slot *rm.DVOrdered, value string) {
+	switch x := (*slot).(type) {
+	case *rm.DVDuration:
+		x.Value = value
+	case rm.DVDuration:
 		x.Value = value
 		*slot = x
 	}
@@ -1337,7 +1870,7 @@ func asKind(node *tcimpl.CompiledNode, p rm.DVProportion, kind int64) (rm.DVProp
 	if int64(p.Type) == kind {
 		return p, true
 	}
-	if p.NormalRange != nil || !settleProportionAs(node, &p, kind) {
+	if p.NormalRange != nil || !settleProportionAs(node, &p, kind, integralPinned(node)) {
 		return p, false
 	}
 	return p, true

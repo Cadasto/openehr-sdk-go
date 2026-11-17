@@ -74,15 +74,22 @@ func WithNow(t time.Time) Option {
 // WithPolicy selects the instance.Policy NewSkeleton passes to
 // instance.Generate, which decides which nodes the skeleton holds.
 // NewSkeleton's default is the instance package's, instance.Medium, which
-// builds at most one optional archetype under an attribute.
+// builds a member of each optional archetype under an attribute, and of a
+// further use of one only where that use holds another archetype.
 // instance.Large builds a member of every optional archetype the template
-// names, the nodes Set needs to route a value into, and instance.Required
-// builds only what the template makes mandatory and a composition's
-// context; instance.Complete and instance.Minimal are other names for
-// Large and Required. NewSkeleton accepts the three. NewBuilder builds on
+// names and of every use of one, two of each that may occur more than
+// once, and a fixed set of optional RM attributes the template does not
+// name, and instance.Required builds what the template makes mandatory, a
+// composition's context and each entry the content names, with only its
+// mandatory parts; instance.Complete and
+// instance.Minimal are other names for Large and Required. NewSkeleton
+// accepts the three. NewBuilder builds on
 // Large when no WithPolicy is given and accepts only Large, since Set does
 // not build a node the skeleton lacks: it refuses an explicit
-// WithPolicy(instance.Medium), though Medium is the zero value. Each
+// WithPolicy(instance.Medium), though Medium is the zero value. Its
+// skeleton is Large short of the second members and those RM attributes:
+// one member of every optional archetype and of every use of one, the nodes
+// Set routes a value into. Each
 // returns ErrUnsupportedPolicy for a Policy value it does not accept, and
 // for one the instance package does not define an error that also wraps
 // instance.ErrUnsupportedPolicy.
@@ -96,7 +103,9 @@ func WithPolicy(p instance.Policy) Option {
 // WithValueFill selects how primitive leaves are valued. The default
 // (instance.ExampleFill) emits each constraint's representative example
 // value; instance.RandomFill draws in-constraint values that vary per
-// call. Seed it with WithValueSource for reproducibility.
+// call. Seed it with WithValueSource for reproducibility. Under either, a
+// data value the template's constraints give a default value takes that
+// default where it meets the node's constraints.
 func WithValueFill(f instance.ValueFill) Option {
 	return func(c *config) { c.valueFill = f }
 }

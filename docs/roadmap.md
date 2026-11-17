@@ -34,7 +34,7 @@ Each stage groups several deliverables, and a stage is only as done as its weake
 | **2 — Clinical building blocks** | ADL 1.4 operational template reader + compiled-template foundation | **Landed** |
 | | Composition builder | **Landed** |
 | | Validation: template-driven, non-COMPOSITION roots, RM floor | **Landed** (RM floor: partial, see open work) |
-| | OPT → RM instance synthesis | **Landed** (`complete` detail level open) |
+| | OPT → RM instance synthesis | **Landed** |
 | | AQL: builders, parsed AST, static lint | **Landed** |
 | | Simplified formats (FLAT / STRUCTURED) + WebTemplate export | **Landed** |
 | **3 — Deployment & adoption** | Application SMART (`smart/` AppContext) on discovery | **Partial** |
@@ -58,7 +58,6 @@ Everything below is `Partial`, `Planned`, `In delivery` or `Deferred`. Gaps that
 | Core | AOM 2.4 | **Deferred** | — | The BMM is pinned in `resources/bmm/`, with no codegen and no package yet (stage 4) |
 | Core | Template-less RM validation floor | **Partial** | `openehr/validation/` REQ-112 | `ValidateRM` validates any RM root without a template, but does not report a bound beside its own open flag ([known gap](specifications/clinical-modeling.md#known-gap--a-bound-beside-its-own-open-flag)), nor tell an omitted by-value mandatory member of a value built in Go from a present one ([Value-typed mandatory presence](specifications/clinical-modeling.md#value-typed-mandatory-presence)) |
 | Core | Validation during decode; validator policy options | **Deferred** | `openehr/validation/`, `openehr/serialize/` REQ-171 | Out of [REQ-171](specifications/clinical-modeling.md#req-171--validation-engine)'s scope: unmatched members captured on the value ([STRAND-15](specifications/research-strands.md#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types)), and descent under refused content, a severity per rule or a partial-instance mode ([STRAND-16](specifications/research-strands.md#strand-16--validator-policy-beyond-the-limits)) |
-| Core | Synthesis `complete`/`detail_level` level | **Planned** | `openehr/instance/` REQ-107 | The ITS-REST `detail_level=complete`, every data point the template allows; until it lands, `instance.Complete` is an alias of `Large` |
 | Core | LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
 | Core | EHR Extract RM | **Deferred** | — | Out of v1 scope |
 | Core | `bmm.Load` context | **Deferred** | `openehr/bmm/` | `Load` and `LoadAll` take no `context.Context`, and adding one changes the API, so it waits for the pre-1.0 API review |

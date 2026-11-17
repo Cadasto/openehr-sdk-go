@@ -77,39 +77,58 @@ var corpusCompileFailures = []string{}
 
 // requiredBodies names the compiling vendored templates whose body holds
 // at least one ELEMENT under Required, under every value fill and seed:
-// the hollow-body floor under that policy. Required builds only what the
-// template makes mandatory and gives an optional child no member of its
-// own (REQ-107 Visit rule, What a visit writes), so a template that
-// requires no ELEMENT gets a body with none by design: the other 74
-// compiling COMPOSITION templates, whose ELEMENTs all sit below an
-// optional attribute or child (an optional content, or a required entry
-// whose items are optional), and Address.v2, which is ADDRESS-rooted, has
-// no content attribute, and leaves its details optional. An optional
-// content that only its cardinality asks a member of, at existence 0..1
-// and cardinality 1..* over optional archetype roots, is one Required
-// leaves out, as body_weight, clinical_notes.v0 and GECCO_Diagnose have
-// it. A listed template that becomes hollow under Required fails the
+// the hollow-body floor under that policy. Required builds each entry
+// archetype the content names, and each SECTION on the way to one, to its
+// mandatory parts only (REQ-107 What each policy visits), so a body holds
+// an ELEMENT only where the template makes one mandatory. The other 58
+// compiling templates get a body with none by design: COMPOSITION templates
+// whose entries leave every ELEMENT optional, such as social, nested.en.v1
+// and the minimal_* and Test_dv_* templates; generic_ehr_status.v1 and
+// generic_folder.v1, which constrain no ELEMENT; and Address.v2, which is
+// ADDRESS-rooted and leaves its details optional. The list is the shorter
+// side. A listed template that becomes hollow under Required fails the
 // ratchet, and so does an unlisted one that stops being hollow, as a
 // listed row that now passes does.
 var requiredBodies = []string{
+	"definition/body_weight",
+	"ehrbase-service/IDCR  - Generic MDT Output Report.v0",
+	"ehrbase-service/IDCR  - Laboratory Order.v0",
+	"ehrbase-service/IDCR - Procedures List.v1",
+	"ehrbase-service/IDCR - Service Request.v0",
+	"ehrbase-service/careplan.v1",
+	"templates/BMI",
+	"templates/IDCR -  Adverse Reaction List.v1",
+	"templates/IDCR - Laboratory Test Report.v0",
+	"templates/IDCR - Vital Signs Encounter - updated.v1",
+	"templates/IDCR - Vital Signs Encounter.v1",
+	"templates/IDCR Problem List.v1",
+	"templates/Referral Request.v1",
 	"templates/TestPerson.v2",
+	"templates/Vital signs CKM",
+	"templates/Vital signs monitoring",
+	"templates/blood_pressure_strict_existence",
+	"templates/body_weight",
+	"templates/clinical_content_validation",
+	"templates/clinical_notes.v0",
+	"templates/family_history.v.1.2.3",
+	"templates/test_template_rename_node",
 	"templates/test_template_rename_node_2",
+	"templates/vital_signs",
+	"webtemplate/Corona_Anamnese",
+	"webtemplate/GECCO_Diagnose",
 }
 
 // mediumHollowBodies names the compiling vendored templates of which a root
 // Generate returns under Medium, under some value fill or seed, holds no
 // ELEMENT: the hollow-body floor under that policy. Medium gives a
-// multi-valued attribute at most one optional archetype, its first optional
-// archetype root in OPT order that needs no undescribed content (REQ-107
-// What a visit writes), so a template whose kept optional archetype holds
-// no ELEMENT gets a body with none by design: clinical_content_validation,
-// whose content builds only that root, a SECTION.validation_section_test.v0
-// with no items. generic_ehr_status.v1 and generic_folder.v1 constrain no
-// ELEMENT at all, so their body is hollow under every policy. A listed
-// template that stops being hollow under Medium fails the ratchet, and so
-// does an unlisted one that becomes hollow, as an unlisted row does.
+// multi-valued attribute a member of each optional archetype that needs no
+// undescribed content (REQ-107 What a visit writes), so only a template
+// that constrains no ELEMENT at all gets a body with none:
+// generic_ehr_status.v1 and generic_folder.v1, whose body is hollow under
+// every policy. A listed template that stops being hollow under Medium
+// fails the ratchet, and so does an unlisted one that becomes hollow, as an
+// unlisted row does.
 var mediumHollowBodies = []string{
-	"templates/clinical_content_validation",
 	"templates/generic_ehr_status.v1",
 	"templates/generic_folder.v1",
 }
@@ -125,33 +144,41 @@ var mediumHollowBodies = []string{
 // and path, or JSON path).
 //
 // Large rows: under Large every optional child that needs no undescribed
-// content gets its member, each use of one archetype, named or not,
-// included (REQ-107 What a visit writes). So Large builds a member of each
-// optional archetype use under an attribute, and reaches the TestPerson.v2
-// identifier clusters, the clinical_content_validation EVALUATION and each
-// of the four named SECTION.adhoc.v1 roots of Corona_Anamnese, whose roots
-// all validate. Under Large no template's body is hollow but those of
-// generic_ehr_status.v1 and generic_folder.v1, which constrain no ELEMENT by
-// design and have their hollow_body rows: any other hollow_body failure
-// there fails the ratchet.
-// The builder builds on Large when no WithPolicy is given, so its rows are
-// Large rows, under either fill. It has none: every COMPOSITION root it
-// builds passes under both fills and every seed, and each row below is on a
-// root it does not build (TestPerson.v2 is PERSON-rooted, the two generic
+// content gets its members, each use of one archetype, named or not,
+// included, and two of each child that may occur more than once (REQ-107
+// What a visit writes); a fixed set of optional RM attributes the template
+// does not name is written too (What each policy visits). So Large builds
+// members of each optional archetype use under an attribute, and reaches
+// the TestPerson.v2 identifier clusters, two of each, the
+// clinical_content_validation EVALUATION and each of the four named
+// SECTION.adhoc.v1 roots of Corona_Anamnese, whose roots all validate. The
+// two members of each identifier cluster stand side by side among the
+// details' items, so the floor names them by position. Under Large no
+// template's body is hollow but those of generic_ehr_status.v1 and
+// generic_folder.v1, which constrain no ELEMENT by design and have their
+// hollow_body rows: any other hollow_body failure there fails the ratchet.
+// The builder builds on Large when no WithPolicy is given, short of its
+// repeats and its optional RM attributes (REQ-101), so its rows are Large
+// rows, under either fill. It has none: every COMPOSITION root it builds
+// passes under both fills and every seed, and each row below is on a root
+// it does not build (TestPerson.v2 is PERSON-rooted, the two generic
 // templates EHR_STATUS- and FOLDER-rooted).
 //
-// Medium rows: Medium gives an attribute at most one optional archetype,
-// its first optional archetype root. The TestPerson.v2 identifier clusters
-// and the clinical_content_validation EVALUATION come after the first
-// optional root of their attribute, so Medium builds neither and has no row
-// there. Under Medium the hollow-body floor is the mediumHollowBodies list
-// instead of a row.
+// Medium rows: Medium gives an attribute a member of each optional
+// archetype, and of a further use of one only where that use holds
+// another archetype. So it reaches the TestPerson.v2 identifier clusters,
+// each of another archetype, and has their floor_coded rows, the
+// clinical_content_validation EVALUATION and the four SECTION.adhoc.v1
+// roots of Corona_Anamnese, which each hold other entries, whose roots
+// validate. Under Medium the hollow-body floor is the mediumHollowBodies
+// list instead of a row.
 //
-// Required rows: none. Required visits only the attributes the template
-// makes mandatory and gives an optional child no member of its own
-// (REQ-107 Visit rule, What a visit writes), so it reaches none of the
-// optional archetypes the rows here fail in. Under Required the
-// hollow-body floor is the requiredBodies list instead of a row.
+// Required rows: none. Required gives an optional child a member of its
+// own only where it is an entry the content names or a SECTION on the way
+// to one, each built to its mandatory parts (REQ-107 What each policy
+// visits), so it reaches none of the optional CLUSTERs the rows here fail
+// in, and every entry it builds validates. Under Required the hollow-body
+// floor is the requiredBodies list instead of a row.
 //
 // No slot_fill rows: family_history.v.1.2.3's slot no example can fill sits
 // in the optional CLUSTER at0024, whose required items admit only slots, so
@@ -172,10 +199,18 @@ var corpusRatchet = []ratchetFailure{
 	{template: "templates/generic_ehr_status.v1", entry: "generate", policy: "large", fill: "random", reason: "hollow_body:/"},
 	{template: "templates/generic_folder.v1", entry: "generate", policy: "large", fill: "example", reason: "hollow_body:/"},
 	{template: "templates/generic_folder.v1", entry: "generate", policy: "large", fill: "random", reason: "hollow_body:/"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[18]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[19]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[20]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[21]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[18]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[19]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[20]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[21]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "medium", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
 }
 
 func TestREQ107_CorpusRatchet(t *testing.T) {

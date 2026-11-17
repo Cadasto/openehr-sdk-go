@@ -309,11 +309,12 @@ func TestREQ107_MultimediaTakesTextPlainAndSizedData(t *testing.T) {
 }
 
 // TestREQ107_MultimediaKeepsPinnedMediaType is the REQ-107 check that a
-// media type code the OPT gives a DV_MULTIMEDIA is kept, while the data
-// and size defaults still apply. One pin lists text/plain beside image/png, so the
-// OPT admits the default and only the rule that keeps a given code stops
-// it: under ExampleFill the walk gives the first code, image/png, and
-// under RandomFill one of the two.
+// media type code the OPT gives a DV_MULTIMEDIA is kept, while the content
+// defaults still apply: a uri and a fixed size for image/png, and the
+// sized example data for text/plain. One pin lists text/plain beside
+// image/png, so the OPT admits the default and only the rule that keeps a
+// given code stops it: under ExampleFill the walk gives the first code,
+// image/png, and under RandomFill one of the two.
 func TestREQ107_MultimediaKeepsPinnedMediaType(t *testing.T) {
 	for _, codes := range [][]string{{"image/png"}, {"image/png", "text/plain"}} {
 		pinned := []string{optSingle("media_type", optCodePhrase("IANA_media-types", codes...))}
@@ -336,7 +337,11 @@ func TestREQ107_MultimediaKeepsPinnedMediaType(t *testing.T) {
 						case !slices.Contains(codes, got):
 							t.Errorf("DV_MULTIMEDIA.media_type code = %q, want one of the pinned %q", got, codes)
 						}
-						checkSizedData(t, mm)
+						if mm.MediaType.CodeString == "text/plain" {
+							checkSizedData(t, mm)
+						} else {
+							checkURIOnly(t, mm, "http://example.com")
+						}
 						noFloorErrors(t, out)
 					})
 				}
@@ -350,7 +355,8 @@ func TestREQ107_MultimediaKeepsPinnedMediaType(t *testing.T) {
 // OPT's C_CODE_PHRASE names: the generated value must satisfy the OPT's
 // primitive constraints, and text/plain in IANA_media-types does not
 // satisfy a C_CODE_PHRASE that names the terminology openEHR. The media
-// type keeps that terminology and the data and size defaults still apply. The
+// type keeps that terminology, and its placeholder code at0000, which is
+// not a text media type, so the value takes the uri and the fixed size. The
 // template validator finds no error apart from the RM floor's one
 // code_not_in_value_set on the media type: no openEHR code is an IANA media
 // type, which REQ-107 § Exceptions and known gaps excepts.
@@ -366,10 +372,10 @@ func TestREQ107_MultimediaMediaTypeKeepsTheOPTTerminology(t *testing.T) {
 						t.Fatalf("Generate: %v", err)
 					}
 					mm := place.multimedia(t, out)
-					if got := mm.MediaType.TerminologyID.Value; got != "openEHR" {
-						t.Errorf("DV_MULTIMEDIA.media_type = %+v, want the OPT's terminology openEHR", mm.MediaType)
+					if got := mm.MediaType; got.TerminologyID.Value != "openEHR" || got.CodeString != "at0000" {
+						t.Errorf("DV_MULTIMEDIA.media_type = %+v, want the placeholder at0000 in the OPT's terminology openEHR", mm.MediaType)
 					}
-					checkSizedData(t, mm)
+					checkURIOnly(t, mm, "http://example.com")
 					var coded int
 					for _, iss := range validation.Validate(out, c).Issues {
 						if iss.Severity != validation.Error {

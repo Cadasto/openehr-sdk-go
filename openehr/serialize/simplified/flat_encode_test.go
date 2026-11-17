@@ -23,9 +23,17 @@ import (
 
 const minimalObsOPT = "../../../testkit/corpus/templates/minimal_observation.en.v1.opt"
 
-// genComposition compiles an OPT, builds its Web Template, and synthesises an
+// genComposition compiles an OPT, builds its Web Template, and synthesises a
 // composition under the Large policy against it (REQ-107).
 func genComposition(t *testing.T, optPath string) (*rm.Composition, *webtemplate.WebTemplate) {
+	t.Helper()
+	return genCompositionUnder(t, optPath, instance.Large)
+}
+
+// genCompositionUnder is genComposition under policy. A test that reads one
+// member of a node takes Medium, which builds one member of each node that
+// may repeat, where Large builds two.
+func genCompositionUnder(t *testing.T, optPath string, policy instance.Policy) (*rm.Composition, *webtemplate.WebTemplate) {
 	t.Helper()
 	opt, err := readOPTFile(optPath)
 	if err != nil {
@@ -41,7 +49,7 @@ func genComposition(t *testing.T, optPath string) (*rm.Composition, *webtemplate
 	}
 	composer := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Large,
+		Policy:    policy,
 		Territory: "NL",
 		Composer:  &rm.PartyIdentified{Name: &composer},
 		Now:       time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -122,8 +130,10 @@ func deepCopyComposition(t *testing.T, comp *rm.Composition) *rm.Composition {
 // ":1") that the codec's own decoder rejects as phantom gap-fill — breaking
 // MarshalFlat -> UnmarshalFlat on a valid composition. The empty instance is
 // instead omitted and later indexes close ranks (documented in deviations.md).
+// The fixture is the Medium composition, which holds one OBSERVATION for the
+// test to repeat around an emptied copy.
 func TestEncodeSkipsEmptyRepeatInstances(t *testing.T) {
-	comp, wt := genComposition(t, minimalObsOPT)
+	comp, wt := genCompositionUnder(t, minimalObsOPT, instance.Medium)
 	if len(comp.Content) != 1 {
 		t.Fatalf("fixture: want 1 content item, got %d", len(comp.Content))
 	}
@@ -328,7 +338,8 @@ func leafNode(t *testing.T, wt *webtemplate.WebTemplate, id string) *webtemplate
 // carries nothing the suffix form cannot hold. The leaf is absent, as a nil
 // one would be, and every other key of the composition is unchanged. It is
 // checked at a DV_CODED_TEXT leaf and at a DV_TEXT leaf, where DV_CODED_TEXT
-// is the spec-sanctioned substitution.
+// is the spec-sanctioned substitution, each in the Medium composition, which
+// holds one ELEMENT at the leaf's path.
 func TestMarshalFlatZeroCodedTextWritesNoKeys(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -340,7 +351,7 @@ func TestMarshalFlatZeroCodedTextWritesNoKeys(t *testing.T) {
 		{"DV_TEXT leaf", "../../../testkit/corpus/templates/minimal_observation.en.v1.opt", "text", "DV_TEXT"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			comp, wt := genComposition(t, tc.opt)
+			comp, wt := genCompositionUnder(t, tc.opt, instance.Medium)
 			leaf := leafNode(t, wt, tc.leafID)
 			if leaf.RMType != tc.wantType {
 				t.Fatalf("leaf %q is a %s, want %s", tc.leafID, leaf.RMType, tc.wantType)

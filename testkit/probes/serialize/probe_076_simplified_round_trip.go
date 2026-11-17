@@ -232,9 +232,32 @@ type Probe076Exclusion struct {
 // skeleton under Medium, word for word.
 const probe076ReusedSiblingTwin = `simplified: FLAT id "twin" is one of several reused siblings sharing the path "/context/other_context[at0001]/items[at0002]/value" — not yet encodable (see deviations.md): rmpath: path resolves to multiple items`
 
+// probe076ReusedSiblingObservation is the encode refusal of the
+// sdk_crosscheck_siblings skeleton under Required, word for word.
+const probe076ReusedSiblingObservation = `simplified: FLAT id "sdk_sibling" is one of several reused siblings sharing the path "/content[openEHR-EHR-OBSERVATION.sdk_sibling.v1]" — not yet encodable (see deviations.md): rmpath: path resolves to multiple items`
+
+// probe076ReusedSiblingsRegistered is where the encode refusal of reused
+// siblings no name tells apart is registered.
+const probe076ReusedSiblingsRegistered = "openehr/serialize/simplified/deviations.md § Conformance, Archetype-reuse siblings, residual, Encode"
+
+// probe076CodedNameRegistered is where a coded name the template leaves open
+// is registered.
+const probe076CodedNameRegistered = "openehr/serialize/simplified/deviations.md § Deviations, LOCATABLE.name on decode, Registered format limit"
+
 // Probe076SkeletonExclusions are the findings the skeleton leg expects over
 // the vendored corpus, each matched exactly and each in both formats.
 var Probe076SkeletonExclusions = slices.Concat(
+	probe076InBothFormats(
+		Probe076Finding{
+			Template: "sdk_crosscheck_siblings.v1",
+			Policy:   instance.Required,
+			Stage:    probe076StageEncode,
+			Error:    probe076ReusedSiblingObservation,
+		},
+		"Required builds an OBSERVATION sdk_sibling.v1 in the content, where two OBSERVATIONs of that archetype pin no name and so share one bare path; "+
+			"encode refuses data at a reused sibling rather than write it under every sibling's FLAT id.",
+		probe076ReusedSiblingsRegistered,
+	),
 	probe076InBothFormats(
 		Probe076Finding{
 			Template: "sdk_crosscheck_siblings.v1",
@@ -242,10 +265,10 @@ var Probe076SkeletonExclusions = slices.Concat(
 			Stage:    probe076StageEncode,
 			Error:    probe076ReusedSiblingTwin,
 		},
-		"Medium fills the two ELEMENTs of node at0002 in the context's other_context, which pin no name and so share one bare path; "+
+		"Medium fills an ELEMENT at0002 in the context's other_context, where two ELEMENTs at0002 pin no name and so share one bare path; "+
 			"encode refuses data at a reused sibling rather than write it under every sibling's FLAT id. "+
-			"Under Required the skeleton holds no data there, and the pair passes.",
-		"openehr/serialize/simplified/deviations.md § Conformance, Archetype-reuse siblings, residual, Encode",
+			"It refuses the context first, so the content's OBSERVATION, refused under Required, is not reached.",
+		probe076ReusedSiblingsRegistered,
 	),
 	probe076InBothFormats(
 		Probe076Finding{
@@ -258,9 +281,58 @@ var Probe076SkeletonExclusions = slices.Concat(
 		"The annotation's name is a DV_CODED_TEXT whose code comes from an external reference set the template lists no code of. "+
 			"FLAT and STRUCTURED have no key for a node's name below the root, and decode invents no code, "+
 			"so the name comes back as DV_TEXT.",
-		"openehr/serialize/simplified/deviations.md § Deviations, LOCATABLE.name on decode, Registered format limit",
+		probe076CodedNameRegistered,
+	),
+	probe076InBothFormats(
+		Probe076Finding{
+			Template: "Vital signs monitoring",
+			Policy:   instance.Medium,
+			Stage:    probe076StageValidate,
+			Code:     "rm_type_mismatch",
+			Path:     "/content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1023]/name",
+		},
+		"The pulse interpretation's name is a DV_CODED_TEXT the template lets take either of two local codes, at1057 or at1058, and pins no text. "+
+			"FLAT and STRUCTURED have no key for a node's name below the root, and decode invents no code, "+
+			"so the name comes back as DV_TEXT.",
+		probe076CodedNameRegistered,
+	),
+	probe076InBothFormats(
+		Probe076Finding{
+			Template: "clinical_content_validation",
+			Policy:   instance.Required,
+			Stage:    probe076StageValidate,
+			Code:     "required",
+			Path:     probe076UnconstrainedItemSingle,
+		},
+		probe076UnconstrainedItemSingleReason,
+		probe076ItemSingleRegistered,
+	),
+	probe076InBothFormats(
+		Probe076Finding{
+			Template: "clinical_content_validation",
+			Policy:   instance.Medium,
+			Stage:    probe076StageValidate,
+			Code:     "required",
+			Path:     probe076UnconstrainedItemSingle,
+		},
+		probe076UnconstrainedItemSingleReason,
+		probe076ItemSingleRegistered,
 	),
 )
+
+// probe076UnconstrainedItemSingle is the data of the clinical_content_validation
+// EVALUATION that the template constrains as an ITEM_SINGLE and nothing below it.
+const probe076UnconstrainedItemSingle = "/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0]/data"
+
+// probe076UnconstrainedItemSingleReason says why the round trip loses the
+// data at probe076UnconstrainedItemSingle.
+const probe076UnconstrainedItemSingleReason = "The EVALUATION's data is an ITEM_SINGLE whose item the template leaves unconstrained, so the Web Template has no node for it, " +
+	"and FLAT and STRUCTURED have no key for the ELEMENT the generator writes there. " +
+	"Decode rebuilds no ITEM_SINGLE, since the RM requires its item, so the data comes back absent."
+
+// probe076ItemSingleRegistered is where the loss of an ITEM_SINGLE whose item
+// the template leaves unconstrained is registered.
+const probe076ItemSingleRegistered = "openehr/serialize/simplified/deviations.md § Deviations, RM-mandatory attributes not carried by FLAT, Registered format limit"
 
 // probe076InBothFormats returns the exclusion of f, with reason and
 // registered, in each simplified format.

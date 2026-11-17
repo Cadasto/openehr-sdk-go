@@ -35,11 +35,11 @@ func compileRealWorldFixture(t *testing.T, name string) *templatecompile.Compile
 // its members, and a cardinality of 0..*, over six optional archetype roots
 // of six different archetypes. They all carry the node id at0000, but an
 // optional child yields only to an earlier optional sibling with its
-// identity, and an archetype root's identity is its archetype id. So Large
-// emits one content entry of each archetype, in OPT order. Medium builds at
-// most one optional archetype under an attribute, so it emits the first
-// alone. Large and Medium must each contain at least one ELEMENT; a hollow
-// tree passes the content check and both validators.
+// identity, and an archetype root's identity is its archetype id. So Medium
+// emits one content entry of each archetype, in OPT order, and Large two of
+// each, since each root may occur any number of times (Members of a list).
+// Large and Medium must each contain at least one ELEMENT; a hollow tree
+// passes the content check and both validators.
 func TestREQ107_GenerateSocialContentArchetypes(t *testing.T) {
 	opt, err := readOPTFile(fixtures.TemplateOptForName("social"))
 	if err != nil {
@@ -58,16 +58,29 @@ func TestREQ107_GenerateSocialContentArchetypes(t *testing.T) {
 			policy: instance.Large,
 			want: []string{
 				"openEHR-EHR-OBSERVATION.livingsituation.v1",
+				"openEHR-EHR-OBSERVATION.livingsituation.v1",
+				"openEHR-EHR-OBSERVATION.languageproficiency.v1",
+				"openEHR-EHR-OBSERVATION.languageproficiency.v1",
+				"openEHR-EHR-OBSERVATION.participationinsociety.v1",
+				"openEHR-EHR-OBSERVATION.participationinsociety.v1",
+				"openEHR-EHR-OBSERVATION.helpfromothers.v1",
+				"openEHR-EHR-OBSERVATION.helpfromothers.v1",
+				"openEHR-EHR-EVALUATION.familysituation.v1",
+				"openEHR-EHR-EVALUATION.familysituation.v1",
+				"openEHR-EHR-EVALUATION.education_summary.v1",
+				"openEHR-EHR-EVALUATION.education_summary.v1",
+			},
+		},
+		{
+			policy: instance.Medium,
+			want: []string{
+				"openEHR-EHR-OBSERVATION.livingsituation.v1",
 				"openEHR-EHR-OBSERVATION.languageproficiency.v1",
 				"openEHR-EHR-OBSERVATION.participationinsociety.v1",
 				"openEHR-EHR-OBSERVATION.helpfromothers.v1",
 				"openEHR-EHR-EVALUATION.familysituation.v1",
 				"openEHR-EHR-EVALUATION.education_summary.v1",
 			},
-		},
-		{
-			policy: instance.Medium,
-			want:   []string{"openEHR-EHR-OBSERVATION.livingsituation.v1"},
 		},
 	} {
 		t.Run(tc.policy.String(), func(t *testing.T) {

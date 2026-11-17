@@ -370,13 +370,21 @@ Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a mini
 For bounded constraints (closed lists, bounded ranges, enumerated units, a property's units) that admit a value, `Validate(c.ExampleValue())` **MUST** return an empty `Violation` slice.
 An unbounded primitive, and a temporal constraint for which no candidate is accepted, **SHOULD** give a fixed sentinel of its type (e.g. `"example"`, `int64(0)`; for the temporal types `"2020-01-01"`, `"12:00:00"`, `"2020-01-01T12:00:00Z"` and `"P0D"`), so the example is a well-formed value of its type that stays the same from call to call.
 A constraint that admits no value has no example `Validate` accepts and is outside the first rule: a closed `CString` list whose `Pattern` matches no entry gives its first entry (§ *Validate contract*), and a temporal constraint that no value satisfies gives its sentinel.
-A temporal constraint is bounded by its `Pattern`, its `Range` and, for a time or a date-time, its `TimezoneValidity`: its `ExampleValue` is the first value `Validate` accepts of its sentinel written to the pattern, then each bound of the range, written to the pattern and moved inside the range, as each method's documentation says, and else the sentinel.
+A temporal constraint is bounded by its `Pattern`, its `Range` and, for a time or a date-time, its `TimezoneValidity`.
+Its `ExampleValue` is the first value `Validate` accepts of these, in this order, as each method's documentation says, and else the sentinel:
+
+- its sentinel, written to the pattern;
+- each bound of the range, written to the pattern and moved inside the range;
+- the value halfway between the bounds, with its fraction of a second, where the pattern allows seconds; for a time, a range open on one side reads as ending one second past its bound, within the day, so the range above `23:59:59` gives `"23:59:59.5"`;
+- for a time or a date-time, each bound that carries a zone, written with its clock and its zone an hour across, so that it names the same instant and `Validate` compares it with the bound as an instant.
+
 Two cases are exceptions to the rule for bounded constraints, where the example is the sentinel `Validate` refuses although a valid value exists:
 
 - a pattern that writes a field after the first as a literal number, beside a range, which can move a bound written to it out of the range (`CDate{Pattern: "yyyy-06-dd"}` with the range `<=2004-05-20` gives `"2020-01-01"`, though `"2003-06-01"` is valid).
   The ITS-XML pattern grammars admit no literal number, so only an OPT that breaks that schema, or a constraint built in code, reaches it;
-- a range that only a value with a fraction of a second, or, for a `CTime`, only a time in another zone, satisfies, since no candidate carries a fraction or changes its zone (`CTime` with the range `>23:59:59` gives `"12:00:00"`, though `"23:59:59.5"` is valid).
-  An OPT reaches it through an excluded bound less than a second from the other bound or from the end of the day.
+- a range that only a value its bounds do not order satisfies, a time with a zone where the bounds carry none, or a date-time with no zone where they carry one, since a candidate takes or drops a zone only where the pattern or the `TimezoneValidity` asks it to.
+  `CTime` with the range `<00:00:00` gives `"12:00:00"`, though `"00:00:00Z"` is valid.
+  An OPT reaches it where neither the pattern nor a `timezone_validity` constrains the zone, through an excluded bound that reaches the end of the day, such as `23:59`, or lies at its start, for a time, or through two bounds closer together than the last field the pattern writes.
 
 The factory is the leaf primitive of the REQ-107 template-driven instance generator and stays on the sealed interface so the closed type-switch remains the only entry point for new primitive shapes, with no reflection ([idiom.md § Generics and reflection](idiom.md#generics-and-reflection)).
 See § REQ-107 for the generator contract.
@@ -728,9 +736,9 @@ package instance
 type Policy int
 
 const (
-    Medium   Policy = iota // the default: required attributes and those with an allowed OPT child, one optional archetype per attribute
-    Required               // required attributes and a composition's context, each OPT child up to its occurrences lower bound
-    Large                  // every attribute the visit rule allows, a member of each optional archetype and of each use of one
+    Medium   Policy = iota // the default: required attributes and those with an allowed OPT child, a member of each optional archetype
+    Required               // required attributes, a composition's context, a member of each entry the content names at its mandatory parts
+    Large                  // every attribute the visit rule allows, a member of each optional archetype and of each use of one, two of each repeating node, a few optional RM attributes
 
     Minimal  = Required // alias
     Complete = Large    // alias
@@ -835,21 +843,28 @@ A structure the RM or the OPT requires, as the BMM requires `EVENT.data`, or as 
 
 ##### What each policy visits
 
-Of the attributes the rules above leave, `Generate` **MUST** visit those this table gives for the policy in force and no other, and write a `COMPOSITION`'s `context` under every policy, the one exception to the table, built under the OPT's constraints as `Medium` does:
+Of the attributes the rules above leave, `Generate` **MUST** visit those the table below gives for the policy in force and no other, with three exceptions:
+
+- a `COMPOSITION`'s `context`, which it writes under every policy, built under the OPT's constraints as `Medium` does;
+- the optional RM attributes `Large` writes where the OPT does not name them (*Optional RM attributes under `Large`*);
+- the optional attributes *Leaf values*, *RM defaults* and § [Precedence](#precedence) 4 write under every policy: a `DV_IDENTIFIER`'s `issuer`, a `DV_PROPORTION`'s `precision` of 0 and a `DV_MULTIMEDIA`'s `uri`.
 
 | Policy | `Generate` visits |
 |---|---|
 | `Large` | every attribute the compiled node carries |
 | `Medium` | every attribute that is required or that has an allowed OPT child |
-| `Required` | every attribute that is required, except one that only its cardinality lower bound requires, and none for its allowed OPT child alone |
+| `Required` | every attribute that is required, except one that only its cardinality lower bound requires, and none for its allowed OPT child alone unless that child leads to an entry (*Members of a list*) |
 
 A cardinality lower bound counts the members of a container that exists and does not ask for the container, which its existence decides ([§ REQ-111 *Template terms*](#template-terms)).
-So `Required` leaves out an optional list that only its cardinality asks a member of, such as a `COMPOSITION`'s `content` at existence `0..1` and cardinality `1..*` whose children are all optional, and the bound counts the members of a list `Required` visits for another reason (*What a visit writes*).
+So `Required` leaves out an optional list that only its cardinality asks a member of, such as an `ITEM_TREE`'s `items` at existence `0..1` and cardinality `1..*` whose children are all optional, and the bound counts the members of a list `Required` visits for another reason (*What a visit writes*).
 The three follow the levels of the ITS-REST template example's `detail_level` ([`definition-validation.openapi.yaml`](../../resources/its-rest/definition-validation.openapi.yaml)):
 
-- `Required` builds its `required` level, the data points the template makes mandatory and a composition's `context`;
-- `Medium` its `medium` level, with at most one optional archetype under an attribute (*What a visit writes*);
-- `Large` a member of every optional archetype the template names that needs no undescribed content (§ [Slot fills](#slot-fills)), and of every use of one, named or not, short of the `complete` level (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *The `Complete` level*).
+- `Required` builds its `required` level, the data points the template makes mandatory, a composition's `context`, and a member of each entry the content names, at its mandatory parts (*Members of a list*);
+- `Medium` its `medium` level, with a member of each optional archetype under an attribute, and of a further use of one only where that use holds another archetype (*Sibling identity*);
+- `Large` the SDK's own `complete` level (§ [Primitive-leaf value fill](#primitive-leaf-value-fill), *The `Complete` level*):
+  - a member of every optional archetype the template names that needs no undescribed content (§ [Slot fills](#slot-fills)), and of every use of one, named or not;
+  - two members of each node that may occur more than once (*Members of a list*);
+  - the optional RM attributes *Optional RM attributes under `Large`* lists.
 
 An attribute the BMM marks mandatory that a compiled node does not carry, as under `templatecompile.WithoutImplicitAttributes`, is visited as if the node carried it with no OPT child.
 
@@ -870,24 +885,49 @@ When the attribute has no allowed OPT child, it takes a value built from its BMM
 
 A visited multi-valued attribute gets, in OPT order, these members of each allowed OPT child that is not a slot:
 
-- under `Large` and `Medium`, `max(occurrences.lower, 1)`, except an optional child (occurrences lower bound 0) that needs undescribed content (§ [Slot fills](#slot-fills)), which gets none;
-- under `Required`, `occurrences.lower`, so that an optional child gets none of its own there;
+- under `Large`, `max(occurrences.lower, 2)` of a child whose occurrences lower bound is bounded and whose upper bound is above 1 or unbounded, and `max(occurrences.lower, 1)` of any other;
+- under `Medium`, and in the skeleton the composition builder seeds a `Builder` with under `Large` ([§ REQ-101](#req-101--generic-opt-driven-composition-builder)), `max(occurrences.lower, 1)`;
+- under `Large` and `Medium` alike, none of an optional child (occurrences lower bound 0) that needs undescribed content (§ [Slot fills](#slot-fills));
+- under `Required`, `occurrences.lower`, so that an optional child gets none of its own there, except one that leads to an entry (below) and that the `Medium` rule below does not skip, which gets one;
 - under every policy, one of a child the OPT gives no occurrences, or occurrences with an unbounded lower bound, which is not optional.
 
 It gets no more members in all than its `cardinality.upper` when that is bounded.
-Within that bound the room goes first to the members asked for by the children whose occurrences lower bound is bounded and at least 1, which fit wherever § [Errors](#errors) does not refuse the list: any other child, before or after them, gets only the room they leave, and the members still stand in OPT order.
-So `CLUSTER.items` at cardinality `0..1` over an optional `at0001` and a required `at0002` holds the `at0002` member alone.
-Under `Medium`, an optional child (occurrences lower bound 0) whose identity (*Sibling identity*) a required sibling, before or after it, or an earlier optional sibling carries gets no member of its own; the top-up below can still build one.
-Under `Large`, such a child gets its members as any other optional child does, so a `Large` root holds a member of every sibling of one identity that needs no undescribed content, whether the OPT pins a name on it or not, within the cardinality bound above.
+Within that bound the room goes first to the members asked for by the children whose occurrences lower bound is bounded and at least 1, as many of each as that bound, which fit wherever § [Errors](#errors) does not refuse the list.
+Any other member gets only the room they leave, whether it is of a child before or after them, of an optional child, or the second member `Large` gives a child whose lower bound is 1.
+That room goes child by child in OPT order, so a child's second `Large` member takes it before a later child's first.
+The members still stand in OPT order.
+So `CLUSTER.items` at cardinality `0..1` over an optional `at0001` and a required `at0002` holds the `at0002` member alone, and under `Large`, at cardinality `0..2` over an optional `at0001` that may occur any number of times and a required `at0002`, one member of each.
+Under `Medium`, an optional child (occurrences lower bound 0) gets no member of its own where both hold, though the top-up below can still build one:
+
+- a sibling that gets a member of its own carries its identity (*Sibling identity*): a required sibling, before or after it, or an earlier optional sibling that gets one;
+- every archetype it holds (*Sibling identity*) is one such a sibling holds.
+
+An optional sibling that gets no member of its own, such as one that needs undescribed content, carries no identity and holds no archetype for this rule.
+Under `Large`, an optional child whose identity a sibling carries gets its members as any other optional child does, so a `Large` root holds a member of every sibling of one identity that needs no undescribed content, whether the OPT pins a name on it or not, within the cardinality bound above.
 The validator binds those members by room and by trial ([§ REQ-102](#req-102--composition-validation) *Structural — binding items*), each to the sibling whose constraints built it wherever that sibling comes first among those with room (§ *Exceptions and known gaps*).
 An optional multi-valued attribute with no allowed OPT child gets no member, so nothing archetype-rooted appears without its `archetype_details`.
+
+A child *leads to an entry* where it is not a slot, is not an optional child that needs undescribed content (§ [Slot fills](#slot-fills)), and is one of:
+
+- an archetype root of an `ENTRY` class or of `GENERIC_ENTRY`;
+- a `SECTION` whose `items` hold a child that leads to an entry.
+
+Only a `COMPOSITION`'s `content` and a `SECTION`'s `items` hold such a child.
+So under `Required` the content holds a member of each entry archetype `Medium` builds there, and of each `SECTION` on the way to one, and `Required`'s own rule builds only the mandatory parts inside each member.
 
 ##### Sibling identity
 
 A child's identity is its archetype id when it is an archetype root and its `node_id` otherwise, and a child with neither has no identity and is never skipped.
 A sibling other than a slot carries an identity when it is that sibling's archetype id or `node_id`, as [§ REQ-102](#req-102--composition-validation) *Structural — binding items* binds a LOCATABLE member.
-So under `Medium` an optional child that is not an archetype root gets no member when an archetype root before it has its `node_id`, while under `Large` the optional archetype roots under one attribute each get their members, of one archetype or of several.
-Under `Medium`, an optional archetype root after the first optional archetype root of the attribute that needs no undescribed content, in OPT order, gets no member of its own either, whatever its archetype, so the attribute holds at most one optional archetype.
+A child holds the archetype it is a root of, and that of each root in its template subtree that `Large` and `Medium` build, which a search reaches:
+
+- through the allowed children of each attribute but those no policy visits (*Attributes no policy visits*);
+- through only the child a single-valued attribute binds its value to (*Single-valued attributes*);
+- through no slot, and no optional child that needs undescribed content (§ [Slot fills](#slot-fills)).
+
+So under `Medium` an optional child that is not an archetype root gets no member when an archetype root before it that gets one has its `node_id`, unless it holds an archetype that no sibling with a member of its own holds.
+Optional archetype roots of different archetypes under one attribute each get their members under `Medium` and `Large` alike.
+A further use of one archetype gets a member under `Medium` only where it holds another archetype, as four uses of one SECTION archetype that each hold other entries each do; only `Large` gives a member to every use (*Members of a list*).
 A name the OPT pins on a child is not part of this identity, although the validator also tells siblings apart by it.
 
 ##### Top-up
@@ -945,11 +985,23 @@ Under every policy, a primitive leaf the generator writes for an OPT primitive c
 
 - an RM rule narrows it or keeps it within a set (§ [Precedence](#precedence) 3 and 4);
 - the constraint lists no code or ordinal to choose from, where *Placeholders* below decides;
-- it is the text of a coded value, which takes the rubric or term text of its code where the OPT's constraint on the text admits that text (*RM defaults*, *The text of a coded value*), under either `ValueFill`.
+- it is the text of a coded value, which takes the rubric or term text of its code where the OPT's constraint on the text admits that text (*RM defaults*, *The text of a coded value*), under either `ValueFill`;
+- the template's `<constraints>` set a default value that validates on the data value that holds it and keeps the RM rules § *Trust model* names, which takes that default under either `ValueFill` (§ *Trust model*);
+- the OPT leaves it open, where the list below decides.
+
+Under either `ValueFill`, where the OPT leaves one of these values open, with no constraint of its own or a `C_STRING` that has neither a list nor a pattern, the generator writes a value that carries a meaning:
+
+- the `value` of a plain `DV_TEXT` that is an ELEMENT's `value`: the name the generator writes for that ELEMENT, or `example` where that name is only the RM type of an ELEMENT the OPT gives no term;
+- the `value` of any other plain `DV_TEXT`, such as a PARTICIPATION's `function`, an ISM_TRANSITION's `reason` or a REFERENCE_RANGE's `meaning`: `example`, except the `function` of a participation *Optional RM attributes under `Large`* writes; a `DV_CODED_TEXT` keeps the text the third bullet of the list above gives it;
+- a `DV_PARSABLE`'s `value`: `<example/>` where its `formalism` is an XML media type (`text/xml`, `application/xml` or one with the `+xml` suffix), `{}` where it is a JSON one (`application/json`, `text/json` or one with the `+json` suffix), and `example` otherwise;
+- a `DV_IDENTIFIER`'s `id`: `ID-0001`, a fixed identifier of a recognisable shape;
+- a `DV_IDENTIFIER`'s `issuer`, wherever the OPT does not prohibit it: `Example issuer`, or, where the OPT's `C_STRING` on the issuer rejects that, the example that `C_STRING` gives.
+
+A `C_STRING` with a list or a pattern gives its own example, a list member or a string the pattern builds, which `ExampleFill` writes and from which `RandomFill` draws.
 
 #### Clock
 
-Every `DV_DATE_TIME` the generator writes whose OPT node carries no primitive constraint and gets no OPT value, `HISTORY.origin`, `EVENT.time`, `ACTION.time` and `EVENT_CONTEXT.start_time` included, **MUST** take its value from `Options.Now`, written in UTC as RFC 3339.
+Every `DV_DATE_TIME` the generator writes whose OPT node carries no primitive constraint and gets no OPT value, `HISTORY.origin`, `EVENT.time`, `ACTION.time` and `EVENT_CONTEXT.start_time` and `end_time` included, **MUST** take its value from `Options.Now`, written in UTC as RFC 3339.
 
 #### Placeholders
 
@@ -959,7 +1011,7 @@ Where neither the OPT nor an RM default below gives a value, the generator **SHO
 - the code `at0000` on a coded text, a code phrase, or an ordinal or scale symbol, that code in the terminology the OPT names for it where the OPT names one and lists no code (a `C_CODE_PHRASE` with an empty code list), under either `ValueFill`, and in `local` otherwise;
 - and the URI `ehr://example` on a `DV_EHR_URI`.
 
-Any other value the generator writes without a constraint, a placeholder or a default here is the implementation's choice, within § Contract *Output*.
+Any other value the generator writes without a constraint, a placeholder, a default here or a value *Leaf values* gives is the implementation's choice, within § Contract *Output*.
 
 #### RM defaults
 
@@ -988,9 +1040,32 @@ A `COMPOSITION`'s `context` is written under every policy, `Required` included, 
 - a `TERM_MAPPING`'s `match`: `?`, so that `Match_valid` holds; its `purpose`: `openehr` `669|public health|`, so that `Purpose_valid` holds;
 - a `DV_PERIODIC_TIME_SPECIFICATION`'s `value`: a `DV_PARSABLE` whose `formalism` is `HL7:PIVL`, so that `Value_valid` holds;
 - an ELEMENT with no `value`: the `null_flavour` `openehr` `271|no information|`;
-- a `DV_MULTIMEDIA`'s `media_type`: `text/plain` in `IANA_media-types`, so that `Media_type_valid` holds; and its `uri`, where § [Precedence](#precedence) 2 has it written and the OPT names no allowed child for it: `http://example.com`.
+- a `DV_MULTIMEDIA`'s `media_type`: `text/plain` in `IANA_media-types`, so that `Media_type_valid` holds; and its `uri`, where § [Precedence](#precedence) 2 or the content rule below has it written and the OPT names no allowed child for it: `http://example.com`.
 
-Every `DV_MULTIMEDIA` the generator writes **SHOULD** carry inline `data`, a non-empty example payload that is the same under both `ValueFill` values, unless the OPT prohibits `data`, and a `size` that is the number of bytes of that `data`, which the RM defines as the original size of the unencoded data, unless the OPT's constraint on `size` rejects that number, when the size the walk wrote stays (§ [Precedence](#precedence) 1): the value then carries its content and meets DV_MULTIMEDIA `Not_empty` without a URI to resolve.
+Every `DV_MULTIMEDIA` the generator writes **SHOULD** carry the content its settled `media_type` suits, so that it meets DV_MULTIMEDIA `Not_empty`:
+
+- where the OPT prohibits `data`: a `uri`, which `Not_empty` then needs (§ [Precedence](#precedence) 2), with the fixed size below;
+- else, inline `data`, a non-empty example payload that is the same under both `ValueFill` values, and a `size` that is the number of bytes of that `data`, which the RM defines as the original size of the unencoded data, for one:
+  - of a text media type (`text/` and a subtype);
+  - of another media type, where the OPT prohibits the `uri` or requires the `data`;
+- else: a `uri` and no `data`, and the `size` 1024, a fixed positive number, since the generator cannot read the content at the `uri`.
+
+The `uri` is built from its first allowed OPT child where the OPT names one, under every policy, and is the default `http://example.com` above otherwise.
+Where the OPT's constraint on `size` rejects the number, the size the walk wrote stays (§ [Precedence](#precedence) 1).
+
+##### Optional RM attributes under `Large`
+
+Under `Large`, `Generate` **MUST** write the optional RM attributes below where the OPT node of the object that holds one does not name it, or no OPT node describes that object, as for the `context` *RM defaults* writes where the OPT names none:
+
+- a `COMPOSITION`'s `feeder_audit`: a `FEEDER_AUDIT` whose `originating_system_audit` has a `system_id` and a `time` *Clock* gives;
+- an `EVENT_CONTEXT`'s `end_time`, which *Clock* gives, its `health_care_facility`, a `PARTY_IDENTIFIED` whose `name` is `example`, and one member of its `participations`;
+- an ENTRY's `provider`, a `PARTY_SELF`, and one member of its `other_participations`;
+- an `ACTIVITY`'s `timing`: a `DV_PARSABLE` whose `formalism` is `ISO8601` and whose `value` is an ISO 8601 recurring interval, `R/`, the date-time *Clock* gives and `/P1D`, the form the RM prefers for it (RM `ACTIVITY.timing`: "the preferred syntax is ISO8601 'R' format").
+
+Each participation has a `PARTY_SELF` performer, the `mode` `openehr` `193|not specified|` with its rubric, and a `function` that is a plain `DV_TEXT` whose `value` is `unknown`, the rubric of its RM default `253`, since FLAT's `|function` key carries only a plain `DV_TEXT` ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes)) and `Function_valid` binds only a coded `function`.
+An attribute the OPT node names is the visit's: `Large` builds it under the OPT's constraints where the OPT allows it, a `feeder_audit` excepted (*Known gap: attributes the generator cannot write*), and leaves it out where the OPT prohibits it.
+Beyond those *Leaf values*, *RM defaults* and § [Precedence](#precedence) 4 write under every policy, `Large` writes no other optional RM attribute the OPT does not name, such as an ENTRY's `workflow_id` or `guideline_id`, a LOCATABLE's `links`, or a `HISTORY`'s `duration` or `period`.
+The skeleton the composition builder seeds a `Builder` with under `Large` holds none of them ([§ REQ-101](#req-101--generic-opt-driven-composition-builder)).
 
 ##### The text of a coded value
 
@@ -1085,7 +1160,7 @@ The type is chosen in the same way, among the lower bound's type, then the upper
 A side whose bound carries a `normal_range` of its own admits only its bound's own units and type.
 Where the two sides admit no one unit or type, the generator leaves the pair as generated; it leaves two bounds of different classes as generated too.
 
-When both sides of an interval are bounded, the generator puts the two bounds in order (BASE `Interval.Limits_consistent`) where it can compare them and an ordered pair fits both sides' OPT constraints, and leaves any other pair as generated.
+When both sides of an interval are bounded, the generator puts the two bounds in order (BASE `Interval.Limits_consistent`) where it can compare them and finds an ordered pair that fits both sides' OPT constraints among the pairs it tries, and leaves any other pair as generated (*Known gap: interval pairs the generator does not try*).
 A bound that carries a `normal_range` and a `normal_status` of its own fits its side only with a value that keeps its own `Normal_range_and_status_consistency` (§ [Precedence](#precedence) 3).
 The pairs it can compare are:
 
@@ -1093,10 +1168,11 @@ The pairs it can compare are:
 - two DV_QUANTITY with equal `units`;
 - two DV_PROPORTION of one `type`, by ratio;
 - two DV_ORDINAL, by `value`;
-- and two DV_DATE, two DV_TIME or two DV_DATE_TIME values the REQ-123 parse accepts, in the order [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* gives them: at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it, and two times or date-times written with different zone designators as instants.
+- two DV_DATE, two DV_TIME or two DV_DATE_TIME values the REQ-123 parse accepts, in the order [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* gives them: at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it, and two times or date-times written with different zone designators as instants;
+- and two DV_DURATION values the REQ-123 parse accepts, by the magnitude it gives, as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* orders them.
 
 The same holds in a `DV_INTERVAL<DV_ORDERED>` whose two bounds are one of those types.
-No other pair is one it can compare, for example, a zoned against a zoneless time or date-time, a value the REQ-123 parse refuses, or two DV_DURATION.
+No other pair is one it can compare, for example, a zoned against a zoneless time or date-time, or a value the REQ-123 parse refuses.
 
 #### Precedence
 
@@ -1134,7 +1210,7 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
    - `Match_valid` narrows a TERM_MAPPING `match` to `>`, `=`, `<` or `?`;
    - `Magnitude_status_valid` narrows a `magnitude_status` to `=`, `<`, `>`, `<=`, `>=` or `~`;
    - `Accuracy_is_percent_validity` with `Accuracy_validity` narrows a percentage `accuracy` to more than 0 and at most 100, or, where the OPT admits no such accuracy, its `accuracy_is_percent` to false where the OPT admits that;
-   - `Normal_range_and_status_consistency` narrows an ordered value whose `normal_status` is `N` into its `normal_range` and one with another `normal_status` out of it, where the value and the range's bounds are a pair § Contract *Intervals* says the generator can compare;
+   - `Normal_range_and_status_consistency` narrows an ordered value whose `normal_status` is `N` into its `normal_range` and one with another `normal_status` out of it, where the value and the range's bounds are a pair § Contract *Intervals* says the generator can compare, other than two DV_DURATION;
    - the lower bound -1 of a `DV_QUANTITY`'s or `DV_PROPORTION`'s `precision` ([§ REQ-112](#req-112--template-less-reference-model-validation-floor)) narrows a precision range that reaches below it;
    - `Scheme_valid` narrows a `DV_EHR_URI`'s `value` to the `ehr` scheme.
      The value § Contract *Leaf values* gives stays where it has that scheme.
@@ -1152,6 +1228,9 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
    - and for a DV_PROPORTION the first kind, in code order, whose rules the OPT's constraints on its parts let it meet.
 
    Where there is none, the value the walk wrote stays and the root breaks the rule (§ [Exceptions and known gaps](#exceptions-and-known-gaps)), as it does where the OPT admits a coded value of the set that it does not list.
+   A DV_PROPORTION whose OPT pins `is_integral` to true, with a `C_BOOLEAN` that admits `true` alone, takes a whole-number `numerator` and `denominator` whatever its kind, under either `ValueFill`.
+   Such a proportion, a fraction and an integer fraction take the `precision` 0 wherever the OPT admits 0, whether or not the walk wrote a precision.
+   So `Fraction_validity` holds under both readings of `is_integral`: whole-number operands, as the RM floor reads it, and a `precision` of 0, as the BMM defines it ("integers, i.e. if precision is 0").
 
 #### Errors
 
@@ -1186,13 +1265,13 @@ An error `Generate` returns **MUST NOT** wrap more than one of `ErrArchetypeIDMi
 A root `Generate` returns can break § Contract's output rule in these cases, and in no other:
 
 - **An interval pair left as generated** (§ Contract *Intervals*) can break `DV_INTERVAL.Limits_consistent`, which the floor reports for a pair it orders whose bounds are out of order and for a pair it reads as not strictly comparable (§ REQ-112 *DV_INTERVAL*): bounds of two classes, and two DV_QUANTITY or two DV_PROPORTION whose two sides admit no one unit or type.
-  An ordered value that forms no pair § Contract *Intervals* lists with the bounds of its `normal_range` is left as generated too (§ [Precedence](#precedence) 3), so it can break `Normal_range_and_status_consistency`.
+  An ordered value that forms no pair § Contract *Intervals* lists with the bounds of its `normal_range`, and a DV_DURATION whatever its `normal_range`, is left as generated too (§ [Precedence](#precedence) 3), so it can break `Normal_range_and_status_consistency`.
 - **An OPT constraint that admits no value an RM rule accepts**, where § [Precedence](#precedence) 3 does not name that rule, or that admits a coded value a rule of § [Precedence](#precedence) 4 accepts without listing it, such as an RM default that yields to the OPT (§ [Precedence](#precedence) 1), or a PARTICIPATION `mode` the OPT codes in `local`, breaks that RM rule.
 - **An OPT that contradicts itself** in a way § [Errors](#errors) does not refuse, such as one that requires a single-valued attribute and prohibits every child of it, or requires a list and gives it a cardinality upper bound of 0, gets whichever side § Contract writes.
   One whose `HISTORY` allows none of the events and summaries § [Precedence](#precedence) 2 tries gets neither, and breaks `Events_valid`.
   One whose list's cardinality lower bound exceeds the members its allowed children's occurrences upper bounds admit, none of them a slot, gets the members its top-up adds past its first allowed child's occurrences (§ Contract *What a visit writes*).
   One whose children's occurrences lower bounds add up past the cardinality upper bound of their list gets no root where the walk visits that list (§ [Errors](#errors)).
-  Where the walk does not, as under `Required`, which builds no member of an optional child that holds the list, the root holds no instance of the list and the contradiction does not reach it.
+  Where the walk does not, as under `Required` where the optional child that holds the list leads to no entry (§ Contract *Members of a list*), the root holds no instance of the list and the contradiction does not reach it.
 - **A value the caller supplies** through `Options` (a language, a territory, a composer, a uid from `UIDSource`) is written as given, valid or not.
 - **An RM invariant that relates the object to another**, such as PARTY `Relationships_validity` or PARTY_RELATIONSHIP `Source_valid` and `Target_valid`, which a single generated object cannot meet, is not kept.
 - **A placeholder code on an attribute an RM rule ties to a code set or terminology group** for which § Contract gives no default, such as a `normal_status`, or a DV_MULTIMEDIA `compression_algorithm` or `integrity_check_algorithm`, can break that rule.
@@ -1201,27 +1280,30 @@ A root `Generate` returns can break § Contract's output rule in these cases, an
 - **An earlier sibling with room that carries a later, required one's identity, where neither pins a name** (§ Contract *What a visit writes*): the validator binds an item to the first of them that has room and under whose constraints it validates ([§ REQ-102](#req-102--composition-validation) *Structural — binding items*).
   So the earlier sibling takes the member built for the later one wherever that member validates under it.
   Under `Medium` an optional earlier sibling gets no member of its own and takes the later one's.
-  Under `Large` it gets a member of its own, unless the list's cardinality upper bound leaves it no room once the later sibling has its members (§ Contract *What a visit writes*): it then gets none and takes the later one's, as under `Medium`, as an optional `at0001` before a required `at0001` in `CLUSTER.items` at cardinality `1..1` does.
-  Its own member fills it where its occurrences upper bound is 1; where that occurrences bound leaves it room for a second member, as a bound above 1, or none, does, it takes the later one's as well.
+  Under `Large` it gets members of its own, two where its occurrences upper bound is above 1, unless the list's cardinality upper bound leaves it no room once the later sibling has its members (§ Contract *What a visit writes*).
+  It then gets none and takes the later one's, as under `Medium`, as an optional `at0001` before a required `at0001` in `CLUSTER.items` at cardinality `1..1` does.
+  Its own members fill it where its occurrences upper bound is 1 or 2; where that occurrences bound leaves it room for another member, as a bound above 2, or none, does, it takes the later one's as well.
   A required earlier sibling with no occurrences upper bound always has room and takes the later one's member beside its own, under every policy.
   A root can then fail the template validator by the later sibling's occurrences.
 - **A `PARTY` without a `uid`** (§ Contract *Identity*): the generator writes a `PARTY`'s `uid` only where the OPT requires it, so a `PARTY` it writes otherwise breaks `PARTY.Uid_mandatory`, which the floor does not evaluate ([§ REQ-112](#req-112--template-less-reference-model-validation-floor) *What the floor does not evaluate*).
   The object the server stores meets the rule once the server assigns its id.
 - **A list the OPT requires by its existence that canonical JSON cannot carry empty**, which the walk gives no member, is left out, and the template validator reports it `required` (*Known gap: required lists canonical JSON cannot carry empty* below).
+- **A template default that breaks an RM rule the default check does not read** (§ *Trust model*): an interval's flags or order (`Lower_included_valid`, `Limits_consistent`), a DV_MULTIMEDIA's `Not_empty`, a coded rule on a value below the default's own, or a rule § [Precedence](#precedence) 3 applies only to a value the walk draws, such as a `magnitude_status` or a `DV_EHR_URI`'s scheme, is written as the template sets it, and breaks that rule.
 - **A slot whose occurrences the OPT constrains** (below) can be filled where the OPT prohibits it, or left empty where the OPT requires it.
 
 The known gaps below describe the generator as it is; they are informative.
 
 #### Known gap: attributes the generator cannot write
 
-The generator has no writer for a LOCATABLE's `links` and `feeder_audit`, for an EHR_ACCESS's `settings`, whose RM type ACCESS_CONTROL_SETTINGS has no concrete class, or for a list whose items the RM types as primitive values other than a DV_MULTIMEDIA's `data`, such as its `integrity_check`; the RM requires none of them.
+The generator has no writer for a LOCATABLE's `links`, for a `feeder_audit` the OPT names, for an EHR_ACCESS's `settings`, whose RM type ACCESS_CONTROL_SETTINGS has no concrete class, or for a list whose items the RM types as primitive values other than a DV_MULTIMEDIA's `data`, such as its `integrity_check`; the RM requires none of them.
+The one `feeder_audit` it writes is the `COMPOSITION`'s that `Large` writes where the OPT does not name it (§ Contract *Optional RM attributes under `Large`*), which no OPT constraint reaches.
 So `Generate` leaves such an attribute unwritten, whatever the OPT puts under it, as § Contract *Visit rule* says.
 Where the visit rule does not, as for an optional `links` that holds a mandatory LINK, the node that holds the attribute needs undescribed content (§ [Slot fills](#slot-fills)), and `Generate` returns `ErrConstraintUnsatisfiable` and no root (§ [Errors](#errors)) only where the walk builds that node all the same:
 
 - where the OPT or the RM requires it;
 - or where it is the member a top-up takes.
 
-A DV_MULTIMEDIA's `data` is an array of octets that no OPT child describes, so the walk does not visit it, and the inline `data` § Contract gives a DV_MULTIMEDIA is written instead.
+A DV_MULTIMEDIA's `data` is an array of octets that no OPT child describes, so the walk does not visit it, and the inline `data` § Contract gives a DV_MULTIMEDIA of a text media type is written instead.
 
 #### Known gap: required lists canonical JSON cannot carry empty
 
@@ -1233,6 +1315,17 @@ Validators report such a list `required` ([§ REQ-102](#req-102--composition-val
 
 An OPT node whose `rm_type_name` is a generic type other than a `DV_INTERVAL` instantiation, such as `POINT_EVENT<ITEM_TREE>` or `REFERENCE_RANGE<DV_QUANTITY>`, cannot be built, and `Generate` returns an error.
 Nor can a `DV_INTERVAL` over a type that is no `DV_ORDERED` class, such as `DV_INTERVAL<DV_TEXT>`, which the RM does not admit as its parameter; a `DV_INTERVAL` over an abstract `DV_ORDERED` class is built as *Generic and untyped types* above says.
+
+#### Known gap: interval pairs the generator does not try
+
+Where swapping two bounds does not fit, the generator tries each side's range ends, written to the side's pattern, and, for a DV_PROPORTION, a denominator that brings one side's ratio to the other's.
+It does not try:
+
+- a date, time or date-time with a fraction of a second, or in a zone other than its range end's;
+- a DV_DURATION in more than one designator, other than a range end as written;
+- a DV_PROPORTION pair whose order needs both denominators moved.
+
+An interval whose only ordered pairs are of these kinds is left as generated, as § *Exceptions and known gaps* allows; no vendored OPT has one.
 
 #### Known gap: slot occurrences
 
@@ -1250,6 +1343,15 @@ The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill`
 
 - `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue`, a single representative value, byte-identical across calls for one OPT.
 - `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls.
+  A `DV_DURATION`'s `value` under a `C_DURATION` is a duration that is not zero: a count of one designator the constraint accepts it in, drawn, such as `P3Y` or `PT7H`.
+  Where the constraint has no range, the count is from 1 to 12; where it has one, it is drawn among the counts of that designator inside the range, between its bounds or twelve from its one bound, a designator a bound is written in tried first.
+  Else the value is the count 1 of the first designator, in written order, the constraint accepts, and else its `ExampleValue`.
+  A `DV_DURATION` whose `value` the OPT leaves unconstrained, naming none or a `C_PRIMITIVE_OBJECT` with no item, is drawn as one under an empty `C_DURATION`.
+  It rounds what it draws where a precision applies, and keeps a draw unrounded where the rounded one would leave the constraint:
+  - a `DV_QUANTITY`'s `magnitude`: to as many decimals as its precision allows where that is 0 or 1, so to none where the precision admits 0 alone, and to two otherwise.
+    Its precision is the upper bound of the precision range of the `C_DV_QUANTITY` entry it is drawn in, or the `precision` the walk wrote where the OPT builds the quantity attribute by attribute.
+    A `C_DV_QUANTITY` entry's `magnitude` is drawn inside the entry's range, away from 0 and from the range's bounds, or from 1 to 100 where the range is open;
+  - a `DV_PROPORTION`'s `numerator` and `denominator`: to whole numbers where its kind or a `precision` of 0 asks for them (§ Contract *Precedence* 4), and otherwise as a magnitude is, to its `precision` up to two decimals.
 
 `RandomFill` reproducibility is caller-controlled via **`Options.ValueSource`** (a `math/rand/v2.Source`): a fixed source makes leaf values byte-reproducible (§ Contract *Reproducible uids*); `nil`, or a typed-nil source such as a nil `*rand.PCG`, draws from the auto-seeded package global so successive calls differ — mirroring the `UIDSource` determinism seam.
 A `Source` is not safe for concurrent use, so each concurrent `Generate` takes its own source, or leaves it `nil` for the concurrency-safe global.
@@ -1257,14 +1359,29 @@ The composition builder surfaces the seam as `composition.WithValueFill` / `comp
 
 #### The `Complete` level
 
-The ITS-REST `detail_level=complete` level, every data point the template allows as reference guidance and not expected to be committable, is not part of the `Policy` contract.
+`Complete` is `Large`, the SDK's own `complete` level.
+It differs from the ITS-REST `detail_level=complete` level, every data point the template allows, which that level gives as reference guidance not expected to be committable.
+Every root `Large` builds meets § Contract *Output*, so it can be committed, and it holds the optional RM attributes *Optional RM attributes under `Large`* lists, not every one the RM allows.
 
 ### Trust model
 
 The compiled OPT is **authoritative for structure**.
 The RM graph is assembled attribute-by-attribute from compiled metadata; the generator never guesses paths from an empty composition.
 Primitive leaves are valued from their constraint as § [Primitive-leaf value fill](#primitive-leaf-value-fill) says; REQ-103 guarantees `Validate(ExampleValue()) == nil` for bounded constraints.
-Compile captures an OPT `<assumed_value>` into the constraint's `Default` field, but the generator does not read it: the value the `ValueFill` gives stands.
+Under either `ValueFill`, a data value whose node carries a default value from the template's `<constraints>` (`CompiledNode.DefaultValue`, [§ REQ-111](#req-111--public-compiled-template-bridge)) takes that default in place of the value the `ValueFill` gives, where the default validates under the node's constraints and keeps the RM rules below.
+It validates where it is of the RM type the walk builds for the node and meets these, which the walk holds without the template validator:
+
+- the node's own primitive constraint, such as a `C_DV_QUANTITY`, a `C_DV_ORDINAL` or a `C_CODE_PHRASE`;
+- the existence of each attribute the node names: one it requires is there, and one it prohibits is not;
+- for each value an attribute holds, one of the attribute's allowed children: its primitive constraint, for an AOM 1.4 primitive such as `STRING`, and otherwise these same rules, on a value of its RM type.
+
+It keeps the RM rules where:
+
+- each attribute the BMM marks mandatory is present on it and on each value it holds, as the RM floor reads presence;
+- the settles § [Precedence](#precedence) 3 and 4 run on the walk's own value (a percentage `accuracy`, a DV_PROPORTION's kind, a DV_PERIODIC_TIME_SPECIFICATION's formalism, a coded attribute's group or code set, and `Normal_range_and_status_consistency`) leave it as it is.
+
+A default that does not validate, or breaks such a rule, leaves the value the `ValueFill` gives.
+Compile captures an OPT `<assumed_value>` into the constraint's `Default` field, but the generator does not read it.
 
 The generator is **sound** (every root it returns meets § Contract's output rule, apart from § [Exceptions and known gaps](#exceptions-and-known-gaps)), not **complete** (it does not enumerate every valid instance — different policies may produce different but equally valid trees).
 Sound × validator-aligned ⇒ PROBE-027 cross-checks the contract.
@@ -1321,9 +1438,9 @@ The builder adds the composition options and the path-first API to the generator
 
 Two entry points:
 
-1. **`NewSkeleton(ctx, c, opts...) (*rm.Composition, error)`** — produces a structurally-conformant default composition whose leaves hold REQ-107's example values.
+1. **`NewSkeleton(ctx, c, opts...) (*rm.Composition, error)`** — produces a structurally-conformant default composition whose leaves hold REQ-107's example values, and, where the template sets a default value that validates, that default ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *Trust model*).
    Delegates to `instance.Generate` with the policy `WithPolicy` selects, `Medium`, the instance package's default, when none is given, and unwraps the root via `instance.AsComposition`.
-2. **`NewBuilder(ctx, c, opts...) (*Builder, error)`** — seeds a `Builder` from a `Large` skeleton, then accepts `Set(path, value)` calls.
+2. **`NewBuilder(ctx, c, opts...) (*Builder, error)`** — seeds a `Builder` from a `Large` skeleton short of its repeats and its optional RM attributes (*Skeleton policy* below), then accepts `Set(path, value)` calls.
    `Build()` returns the populated graph and aggregates per-path errors.
 
 ### Contract
@@ -1336,6 +1453,11 @@ Two entry points:
 - **Skeleton policy** — `WithPolicy(p)` selects the [§ REQ-107](#req-107--template-driven-rm-instance-example-generator) `instance.Policy` the entry point passes to `instance.Generate`.
   With no `WithPolicy`, `NewSkeleton` **SHOULD** use `Medium`, the zero value, so a skeleton holds what `instance.Generate` builds from default `Options`, and `NewBuilder` `Large`, the one policy it accepts, for the reason below.
   `Set` routes a value into a node the skeleton already holds and does not build a missing one, so it needs a member of every optional archetype and of every named use of one, which only `Large` builds.
+  `NewBuilder` **MUST** seed a `Builder` with what `Large` builds short of two parts ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator)):
+  - the second member `Large` gives a node that may occur more than once, so each node gets `max(occurrences.lower, 1)` members (*Members of a list*);
+  - the optional RM attributes `Large` writes where the OPT does not name them (*Optional RM attributes under `Large`*).
+
+  No field of `instance.Options` and no composition option selects that skeleton.
   A later use of one identity that pins no name ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *What a visit writes*: its archetype id or `node_id`) has the compiled path of the first, so `Set` reaches the first use's member alone, and the member `Large` builds for the later use keeps the values the skeleton gave it.
   `NewSkeleton` and `NewBuilder` **MUST** accept and refuse the policy `WithPolicy` gives as this table says, a refusal returning no skeleton or `Builder`, before either builds a skeleton:
 

@@ -17,6 +17,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/rmlists"
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/builderseed"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -53,13 +54,14 @@ import (
 // A list whose children's occurrences lower bounds add up past its
 // cardinality upper bound, where the walk visits it, an attribute the
 // template requires that the generator has no writer for, such as a
-// LOCATABLE's feeder_audit or links, other than a list that only its
-// existence or its cardinality asks a member of, and the two bounds of a
-// DV_INTERVAL over an abstract ordered class where they name types no one
-// interval holds, make Generate return an error wrapping
-// [ErrConstraintUnsatisfiable] and no root. A list that sits
+// LOCATABLE's feeder_audit or links where the template names it, other
+// than a list that only its existence or its cardinality asks a member
+// of, and the two bounds of a DV_INTERVAL over an abstract ordered class
+// where they name types no one interval holds, make Generate return an
+// error wrapping [ErrConstraintUnsatisfiable] and no root. A list that sits
 // in an optional node the policy builds no member of, as Required builds
-// none of an optional child, is not visited, and the root leaves it out. An
+// none of an optional child other than an entry or a SECTION on the way to
+// one, is not visited, and the root leaves it out. An
 // optional node that holds such an attribute is content the template does
 // not describe, so no policy builds a member of it unless a top-up has no
 // other child to take. Where the template leaves such an attribute
@@ -117,6 +119,9 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	g := &generator{
 		compiled: c,
 		opts:     opts,
+		// The composition builder seeds a Builder with Large short of its
+		// repeats and optional RM attributes (builderseed).
+		fullLarge: opts.Policy == Large && !builderseed.Asked(ctx),
 	}
 	if opts.ValueFill == RandomFill {
 		g.valueSampler = newSampler(opts.ValueSource)
@@ -154,6 +159,12 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 type generator struct {
 	compiled *templatecompile.Compiled
 	opts     Options
+	// fullLarge is set under Large, except on the call that seeds the
+	// composition builder: a child that may occur more than once then gets
+	// a second member (ownMembers), and a fixed set of optional RM
+	// attributes the template does not name is written
+	// (writeOptionalRMAttributes).
+	fullLarge bool
 	// valueSampler draws in-constraint leaf values when opts.ValueFill
 	// is RandomFill; the zero value (used under ExampleFill) is never
 	// consulted. REQ-107.
@@ -161,12 +172,28 @@ type generator struct {
 	// nowText is opts.Now as dateTimeDefault writes it, formatted on first
 	// use; "" until then.
 	nowText string
+	// enclosing is the locatable the walk is in, the nearest one that
+	// encloses whatever it builds now, or nil outside any. enclosingType is
+	// the RM type its OPT node names, the name setLocatableIdentity falls
+	// back to where the OPT gives the node no term. elementValue is the
+	// value the walk built as the value of enclosing, where that is an
+	// ELEMENT, or nil before it builds one: a plain DV_TEXT that is this
+	// value takes the ELEMENT's name (textDefault). openText is that value
+	// where its text is the open default textDefault wrote and no
+	// constraint has written one since, so settleElement writes it again
+	// from the name the ELEMENT ends with (noteOpenText).
+	enclosing     rm.Locatable
+	enclosingType string
+	elementValue  any
+	openText      *rm.DVText
 	// undescribed holds, per template node, whether it needs content the
-	// template does not describe (needsUndescribed), and locatableTypes,
-	// per RM type, whether the value built for it is a LOCATABLE
-	// (buildsLocatable). Both are filled on first use.
+	// template does not describe (needsUndescribed), locatableTypes, per
+	// RM type, whether the value built for it is a LOCATABLE
+	// (buildsLocatable), and held, per template node, the archetypes it
+	// holds (heldArchetypes). All are filled on first use.
 	undescribed    map[*tcimpl.CompiledNode]bool
 	locatableTypes map[string]bool
+	held           map[*tcimpl.CompiledNode][]string
 }
 
 // nextUID returns the next LOCATABLE.uid pointer. Honours
@@ -187,6 +214,13 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	if optNode == nil || rmValue == nil {
 		return nil
 	}
+	if l, ok := rmValue.(rm.Locatable); ok && !rm.IsTypedNil(rmValue) {
+		saved, savedType, savedValue, savedText := g.enclosing, g.enclosingType, g.elementValue, g.openText
+		g.enclosing, g.enclosingType, g.elementValue, g.openText = l, strings.TrimSpace(optNode.RMTypeName()), nil, nil
+		defer func() {
+			g.enclosing, g.enclosingType, g.elementValue, g.openText = saved, savedType, savedValue, savedText
+		}()
+	}
 	// Slots are leaf fill-points: the slot body is not in this OPT, and
 	// the caller composes it via REQ-101 builder Set calls. A slot the
 	// walk must fill has been stamped by stampSlotFill with an archetype
@@ -195,13 +229,16 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	// the defaults an attribute the OPT leaves silent gets, so it passes
 	// the RM floor: an entry's language, encoding, subject and its own
 	// mandatory attributes. The fill holds only its identity here, which
-	// the BMM fill skips, so nothing is filled twice. A CLUSTER or ELEMENT
-	// fill takes finishNode's item defaults alone: one placeholder
+	// the BMM fill skips, so nothing is filled twice. No OPT node describes
+	// the fill, so under Large an ENTRY fill gets the optional RM
+	// attributes Large writes on an object none describes. A CLUSTER or
+	// ELEMENT fill takes finishNode's item defaults alone: one placeholder
 	// element in CLUSTER.items, its only mandatory attribute, and a null
 	// flavour on an ELEMENT, which has none.
 	if optNode.IsSlot() {
 		if _, isItem := rmValue.(rm.Item); !isItem {
 			g.populateBMMRequiredAttrs(rmValue, concreteFor(optNode.RMTypeName()), 0)
+			g.writeOptionalRMAttributes(nil, rmValue)
 		}
 		g.finishNode(optNode, rmValue)
 		return nil
@@ -262,6 +299,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		}
 	}
 	g.fillUncarriedRequired(optNode, rmValue)
+	g.writeOptionalRMAttributes(optNode, rmValue)
 	if err := g.writeRMNeeded(optNode, rmValue); err != nil {
 		return err
 	}
@@ -331,8 +369,9 @@ func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue 
 // or its value where the OPT prohibits the null_flavour and allows the
 // value, a PARTY_IDENTIFIED's or PARTY_RELATED's name when it has no name,
 // identifiers or external_ref, and a DV_MULTIMEDIA's uri when it has no
-// uri and the OPT prohibits its data, which it then never gets (RM
-// Not_empty). finishNode then gives each the RM default it gives a visited
+// uri and gets no data (takesURI): the OPT prohibits its data, which RM
+// Not_empty then needs the uri for, or its media type is not a text one.
+// finishNode then gives each the RM default it gives a visited
 // one, and builds one with no allowed OPT child from its BMM type; a uri
 // with none takes the default settleMultimedia writes. A HISTORY with
 // neither events nor a summary gets one of them (writeEventOrSummary):
@@ -346,7 +385,13 @@ func (g *generator) writeRMNeeded(optNode *tcimpl.CompiledNode, rmValue any) err
 		}
 		return g.writeEventOrSummary(optNode, v)
 	case *rm.DVMultimedia:
-		if (v.URI != nil && !rm.IsTypedNil(v.URI)) || len(v.Data) > 0 || !prohibited(optNode, "data") {
+		if (v.URI != nil && !rm.IsTypedNil(v.URI)) || len(v.Data) > 0 {
+			return nil
+		}
+		// The media type decides between inline data and a uri, so it is
+		// settled first; finishNode settles it again, which keeps it.
+		g.settleCoded(optNode, v)
+		if !takesURI(optNode, v) {
 			return nil
 		}
 		return g.visitNeeded(optNode, "uri", v)
@@ -585,7 +630,10 @@ func multimediaData(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute
 // whose RM type ACCESS_CONTROL_SETTINGS has no concrete class, and a list
 // whose items the pinned RM types as primitive values (primitiveList), such
 // as a DV_MULTIMEDIA's integrity_check, other than its data, which
-// walkSkips leaves to settleMultimedia. The RM requires none of them.
+// walkSkips leaves to settleMultimedia. The RM requires none of them. The
+// feeder_audit writeOptionalRMAttributes gives a COMPOSITION under Large is
+// written only where the template does not name the attribute, so it never
+// meets a constraint of the template's.
 func noWriter(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	class := nodeClass(optNode)
 	switch name := attr.Name(); name {
@@ -718,18 +766,21 @@ func attrProhibited(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute
 // lower bound is bounded and at least 1, or it is a list with an allowed
 // child, not a slot, whose occurrences lower bound is bounded and at least
 // 1 (holdsRequiredChild, which leaves out a list the OPT prohibits and one
-// of primitive values), and no other: a cardinality lower bound alone does
-// not make Required visit a list, since it counts the members of a list
-// that exists and does not ask for the list. Under Medium: every attribute that is required in
+// of primitive values), and an attribute with an allowed child that leads
+// to an entry (holdsEntry), which only a COMPOSITION's content and a
+// SECTION's items have, so that Required builds each entry the template
+// names there. A cardinality lower bound alone does not make Required
+// visit a list, since it counts the members of a list that exists and
+// does not ask for the list. Under Medium: every attribute that is required in
 // the wider sense of visitRequired, which a cardinality lower bound of 1
 // or more also meets, OR that has OPT-pinned children the OPT does not
 // prohibit. The "has OPT children" arm captures the case where the OPT
 // explicitly constrains a structurally optional attribute (e.g. COMPOSITION.content
 // with archetype-root pins): under Medium the act of pinning is itself
 // a signal that the resulting tree should carry those children. Required
-// does not take that arm, so it builds only what the template makes
-// mandatory, except on a COMPOSITION's context, which it visits as
-// Medium does: applyCompositionDefaults writes a context under every
+// does not take that arm, so beyond the entries it builds only what the
+// template makes mandatory, except on a COMPOSITION's context, which it
+// visits as Medium does: applyCompositionDefaults writes a context under every
 // policy, so the walk builds it under the OPT's constraints (a pinned
 // setting, a required other_context) rather than leaving it bare. Inside
 // the context Required's own rule applies. Under Large and Medium, an
@@ -751,7 +802,7 @@ func attrProhibited(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute
 func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	isContext := compositionContext(optNode, attr)
 	if g.opts.Policy == Required && !isContext {
-		return isRequired(optNode, attr)
+		return isRequired(optNode, attr) || g.holdsEntry(optNode, attr)
 	}
 	if isRequired(optNode, attr) {
 		return true
@@ -832,7 +883,8 @@ func (g *generator) holdsNoItem(attr *tcimpl.CompiledAttribute) bool {
 // cardinality lower bound is bounded and at least 1. Cardinality lower and
 // existence are separate, so a 1..* list is required when existence does
 // not say so. Required leaves out a list only that cardinality requires,
-// and so do Large and Medium where every member it would get is
+// unless an allowed child of it leads to an entry (holdsEntry), and so do
+// Large and Medium where every member it would get is
 // undescribed or needs undescribed content (shouldVisit). Whether a node
 // needs undescribed content (needsUndescribed) reads this wider sense under
 // every policy.
@@ -841,8 +893,9 @@ func visitRequired(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute)
 }
 
 // compositionContext reports whether attr is the context of a
-// COMPOSITION, the one attribute Required visits as Medium does and the
-// one the rule on undescribed content never keeps the walk out of.
+// COMPOSITION, which Required visits as Medium does whatever it holds, and
+// the one attribute the rule on undescribed content never keeps the walk
+// out of.
 func compositionContext(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	return attr.Name() == "context" && bmmtype.Class(optNode.RMTypeName()) == "COMPOSITION"
 }
@@ -1324,6 +1377,9 @@ func (g *generator) materialiseImplicitSingle(
 		return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
 			ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
 	}
+	if _, ok := parentRM.(*rm.Element); ok && attr.Name() == "value" {
+		g.elementValue = rmChild
+	}
 	// Stamp documented sentinel values on DV primitives so the
 	// validator's "required attribute absent" check passes for
 	// BMM-mandatory implicit attrs the OPT did not constrain.
@@ -1480,11 +1536,14 @@ func attrType(parentType, declared string) string {
 // id, uid and references (fillPartyRelationship), and a HISTORY's event,
 // built from its BMM type, which RM Events_valid needs where the HISTORY
 // has no summary either (REQ-107 Precedence 2: no OPT node names a child
-// under its events). attr is the attribute v is built for, which decides
-// the type of a reference. No attribute of the pinned RM has the type
-// PARTY_RELATED, so the BMM alone never builds one, and its relationship
-// is finishNode's alone.
+// under its events). Under Large it also gets the optional RM attributes
+// Large writes on an object no OPT node describes
+// (writeOptionalRMAttributes), such as an ACTIVITY's timing. attr is the
+// attribute v is built for, which decides the type of a reference. No
+// attribute of the pinned RM has the type PARTY_RELATED, so the BMM alone
+// never builds one, and its relationship is finishNode's alone.
 func (g *generator) settleBuilt(v any, attr string) {
+	g.writeOptionalRMAttributes(nil, v)
 	switch b := v.(type) {
 	case *rm.History[rm.ItemStructure]:
 		if len(b.Events) == 0 && (b.Summary == nil || rm.IsTypedNil(b.Summary)) {
@@ -1493,8 +1552,9 @@ func (g *generator) settleBuilt(v any, attr string) {
 	case *rm.IsmTransition:
 		g.settleCoded(nil, b)
 	case *rm.DVMultimedia:
-		settleMultimedia(nil, b)
+		// The media type decides between inline data and a uri.
 		g.settleCoded(nil, b)
+		settleMultimedia(nil, b)
 	case *rm.PartyIdentified:
 		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
 	case *rm.PartyRelated:
@@ -1543,7 +1603,8 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	}
 	switch v := rmValue.(type) {
 	case *rm.DVText:
-		v.Value = "example"
+		v.Value = g.textDefault(v)
+		g.noteOpenText(v, true)
 	case *rm.DVCodedText:
 		v.Value = "example"
 		v.DefiningCode = rm.CodePhrase{
@@ -1583,11 +1644,125 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	case *rm.DVEHRURI:
 		v.Value = ehrURIPlaceholder
 	case *rm.DVIdentifier:
-		v.ID = "example"
+		v.ID = identifierExample
+		v.Issuer = new(issuerExample)
 	case *rm.DVParsable:
 		v.Value = "example"
 		v.Formalism = "text/plain"
 	}
+}
+
+// exampleText is the text the generator writes where nothing gives a
+// string a meaning: the open-string example of a C_STRING.
+const exampleText = "example"
+
+// textDefault is the text v, a plain DV_TEXT, takes where the template
+// leaves its value open: the name of the ELEMENT the walk is in where v is
+// that ELEMENT's value (elementValue), and exampleText otherwise, as a
+// PARTICIPATION's function, an ISM_TRANSITION's reason or a
+// REFERENCE_RANGE's meaning has. A name that is only the RM type
+// setLocatableIdentity falls back to, where the OPT gives the ELEMENT no
+// term, names no concept, so it gives exampleText too. A DV_CODED_TEXT
+// never takes it: its text is its code's (useCodedText). Where the OPT
+// lists the ELEMENT's value before its name, the name read here is the
+// one the ELEMENT is built with, so settleElement writes the text again
+// once the walk has written the name (noteOpenText).
+func (g *generator) textDefault(v *rm.DVText) string {
+	if g.enclosing == nil || g.elementValue != any(v) {
+		return exampleText
+	}
+	name := g.enclosing.GetName()
+	if name == nil || rm.IsTypedNil(name) {
+		return exampleText
+	}
+	switch text := name.GetValue(); text {
+	case "", g.enclosingType, rmTypeOf(g.enclosing):
+		return exampleText
+	default:
+		return text
+	}
+}
+
+// noteOpenText records whether the text the walk has just written on v
+// is the open default textDefault gives the plain DV_TEXT value of the
+// ELEMENT the walk is in (open), or the example of a constraint of its
+// own, which stays. Any other value is not recorded.
+func (g *generator) noteOpenText(v any, open bool) {
+	text, ok := v.(*rm.DVText)
+	if !ok || text == nil || g.elementValue != any(text) {
+		return
+	}
+	switch {
+	case open:
+		g.openText = text
+	case g.openText == text:
+		g.openText = nil
+	}
+}
+
+// openString reports whether cs leaves a string open: it lists no string
+// and has no pattern, so it gives no example of its own.
+func openString(cs constraints.CString) bool {
+	return len(cs.List) == 0 && cs.Pattern == ""
+}
+
+// identifierExample is the id a DV_IDENTIFIER takes where the template
+// leaves it open: a fixed identifier of a recognisable shape, a prefix and
+// a zero-padded number, the same under both value fills.
+const identifierExample = "ID-0001"
+
+// issuerExample is the issuer a DV_IDENTIFIER takes where the template
+// allows one and leaves it open.
+const issuerExample = "Example issuer"
+
+// openStringDefault returns the value attr of rmValue takes where the
+// template leaves it open, and whether it has one of its own rather than
+// the open-string example: a plain DV_TEXT's value (textDefault), and a
+// DV_IDENTIFIER's id and issuer. attr is "" for a C_STRING on the value
+// itself, which constrains its main string attribute (mainStringAttr).
+func (g *generator) openStringDefault(rmValue any, attr string) (string, bool) {
+	if attr == "" {
+		attr = mainStringAttr(rmValue)
+	}
+	switch v := rmValue.(type) {
+	case *rm.DVText:
+		if attr == "value" {
+			return g.textDefault(v), true
+		}
+	case *rm.DVIdentifier:
+		switch attr {
+		case "id":
+			return identifierExample, true
+		case "issuer":
+			return issuerExample, true
+		}
+	}
+	return "", false
+}
+
+// settleIssuer keeps the issuer of id, a DV_IDENTIFIER whose OPT node is
+// opt, within the OPT: populatePrimitiveDefault gives every DV_IDENTIFIER
+// issuerExample, and the walk replaces it where it visits a C_STRING on
+// the issuer. An issuer the OPT prohibits is left out. One the OPT's
+// C_STRING rejects, as where the policy does not visit an optional issuer
+// the OPT lists values for, takes the C_STRING's own example
+// (stringForConstraint), and is left out where the C_STRING admits no
+// string the generator can build.
+func settleIssuer(opt *tcimpl.CompiledNode, id *rm.DVIdentifier) {
+	if prohibited(opt, "issuer") {
+		id.Issuer = nil
+		return
+	}
+	cs, ok := primitiveOf(bindingChild(opt, "issuer")).(constraints.CString)
+	if !ok || id.Issuer == nil || len(cs.Validate(*id.Issuer)) == 0 {
+		return
+	}
+	s, err := stringForConstraint(cs, cs.ExampleValue())
+	if err != nil {
+		id.Issuer = nil
+		return
+	}
+	id.Issuer = &s
 }
 
 // dateTimeDefault is the ISO 8601 form Options.Now contributes to
@@ -2105,12 +2280,12 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 
 // materialiseMultiple synthesises and appends children under a
 // C_MULTIPLE_ATTRIBUTE. Per-child counts honour each OPT child's
-// occurrences.lower: max(occurrences.lower, 1) under Large and Medium,
-// and occurrences.lower under Required, so an optional child (bounded
-// occurrences with a lower bound of 0) gets none of its own there; a child
-// with no occurrences, or an unbounded lower, counts as required
-// (childRequired) and gets one under every policy. Under Large and Medium a
-// child ownMemberSkipped names gets none of its own either. The overall attribute's
+// occurrences.lower: max(occurrences.lower, 1), except a child
+// ownMemberSkipped names, which gets none of its own: under Required that
+// is an optional child (bounded occurrences with a lower bound of 0) other
+// than one that leads to an entry. A child with no occurrences, or an
+// unbounded lower, counts as required (childRequired) and gets one under
+// every policy. The overall attribute's
 // cardinality.upper (default unbounded) caps the total. Within that cap the
 // members the children that ask the list for members want (askedMembers)
 // get the room first: any other child, before or after them, takes only
@@ -2197,19 +2372,22 @@ func (p memberPlan) members() int { return len(p.own) + len(p.topUp) }
 // planMembers returns the members the walk builds for attr, a visited list
 // of optNode whose allowed children are children, without building any.
 // Each allowed child that is not a slot and that the policy does not skip
-// (ownMemberSkipped) gets max(occurrences.lower, 1) members under Large and
-// Medium, and occurrences.lower under Required, within the cardinality
-// upper bound (memberCap), where the children that ask for members
-// (asksMember) take the room first and any other child only the room they
-// leave. The top-up then adds the members the attribute still needs
-// (remainingLowerNeeded), within the same bound, one at a time, each from
-// the child topUpSeed names given the members built so far, and stops where
-// it names none.
+// (ownMemberSkipped) gets the members ownMembers gives it, within the
+// cardinality upper bound (memberCap), where the members the children ask
+// for (asksMember, their occurrences lower bounds) take the room first and
+// any other member only the room they leave. The top-up then adds the
+// members the attribute still needs (remainingLowerNeeded), within the same
+// bound, one at a time, each from the child topUpSeed names given the
+// members built so far, and stops where it names none.
 func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode) memberPlan {
 	var plan memberPlan
 	upperBound := memberCap(optNode, attr)
 	reserved := askedMembers(children)
 	total := 0
+	// own[i] reports whether children[i] gets a member of its own, as far
+	// as the policy decides it; ownMemberSkipped reads it for the children
+	// before the one it decides.
+	own := make([]bool, len(children))
 	for i, child := range children {
 		// Slots are caller-filled; the synthesiser does not invent
 		// archetype roots to fill them and instead leaves the count
@@ -2218,39 +2396,34 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 		if child.IsSlot() {
 			continue
 		}
-		if g.ownMemberSkipped(children, i) {
+		if g.ownMemberSkipped(children, i, own) {
 			continue
 		}
-		asks := asksMember(child)
-		childCount := 1
-		if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() {
-			if occ.Lower() > 0 || g.opts.Policy == Required {
-				childCount = occ.Lower()
-			}
-			// occ.Lower()==0 → under Large and Medium, still produce one
-			// fill so the resulting tree carries each child the policy
-			// keeps at least once (ownMemberSkipped above drops the
-			// others). Under Required an optional child gets none: only
-			// the top-up below can build one, to meet the attribute's
-			// lower bound.
+		own[i] = true
+		// The members a child asks for are its occurrences lower bound
+		// (asksMember); any further one, such as an optional child's one
+		// member or Large's second member, asks for none.
+		asked := 0
+		if asksMember(child) {
+			asked = child.Occurrences().Lower()
 		}
-		for range childCount {
-			// A child that asks for no member leaves the room the others
+		for k := range g.ownMembers(child) {
+			// A member the child does not ask for leaves the room the others
 			// still need to them.
-			if room := upperBound - total; upperBound >= 0 && (room <= 0 || !asks && room <= reserved) {
+			if room := upperBound - total; upperBound >= 0 && (room <= 0 || k >= asked && room <= reserved) {
 				break
 			}
 			plan.own = append(plan.own, child)
 			total++
-			if asks {
+			if k < asked {
 				reserved--
 			}
 		}
 	}
 	// Top-up to the count the attribute needs when the members planned
 	// so far fall short of it, under every policy (e.g. Large or Medium
-	// skipped a child the lower bound still needs, or Required built no
-	// member of an optional child). Where the BMM, the cardinality or a
+	// skipped a child the lower bound still needs, or Required skipped an
+	// optional child). Where the BMM, the cardinality or a
 	// child's occurrences asks for the member (not existenceOnly) and
 	// no child that is not a slot has room, the seed is the first slot, and
 	// buildChild synthesises a slot-shaped fill: an RM value of the slot's
@@ -2276,6 +2449,29 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 		built[i]++
 	}
 	return plan
+}
+
+// ownMembers returns the number of members child, an allowed child that is
+// not a slot and that gets members of its own, gets before the cardinality
+// upper bound caps the list: max(occurrences.lower, 1), or, where the
+// generator builds repeats (Large, but for the composition builder's seed)
+// and child's occurrences upper bound is above 1 or unbounded,
+// max(occurrences.lower, 2). A child that states no occurrences, or whose
+// lower bound is unbounded, gets one. An optional child the policy keeps
+// (occurrences lower bound 0) so gets at least one member and the tree
+// carries it; ownMemberSkipped drops the others, under Required every
+// optional child but one that leads to an entry. Only the top-up can build a
+// member of a dropped child, to meet the attribute's lower bound.
+func (g *generator) ownMembers(child *tcimpl.CompiledNode) int {
+	occ := child.Occurrences()
+	if occ == nil || occ.LowerUnbounded() {
+		return 1
+	}
+	least := 1
+	if g.fullLarge && (occ.UpperUnbounded() || occ.Upper() > 1) {
+		least = 2
+	}
+	return max(occ.Lower(), least)
 }
 
 // builtPerChild returns, for each of children, the number of entries of own
@@ -2361,11 +2557,17 @@ func asksMember(child *tcimpl.CompiledNode) bool {
 // gets the archetype id of its fill (stampSlotFill), and is refused with
 // ErrSlotFillUnsupported when none can be derived. Every attribute builds
 // its OPT children here, so a child built to make up a lower bound is the
-// same as one built for its own occurrences.
+// same as one built for its own occurrences. Where the template's
+// <constraints> set a default value on child that validates under child's
+// constraints, that default is returned in place of the value built, under
+// either value fill (templateDefault).
 func (g *generator) buildChild(child *tcimpl.CompiledNode) (any, error) {
 	rmChild, err := g.makeChild(child)
 	if err != nil {
 		return nil, err
+	}
+	if valuesElement(child) {
+		g.elementValue = rmChild
 	}
 	g.populatePrimitiveDefault(rmChild)
 	if child.IsSlot() && !g.stampSlotFill(rmChild, child) {
@@ -2374,7 +2576,22 @@ func (g *generator) buildChild(child *tcimpl.CompiledNode) (any, error) {
 	if err := g.walkNode(child, rmChild); err != nil {
 		return nil, err
 	}
+	if def := g.templateDefault(child, rmChild); def != nil {
+		return def, nil
+	}
 	return rmChild, nil
+}
+
+// valuesElement reports whether child is an alternative of the value
+// attribute of an ELEMENT, so that the value built from it is the value of
+// the ELEMENT the walk is in.
+func valuesElement(child *tcimpl.CompiledNode) bool {
+	parent := child.Parent()
+	if parent == nil || builtRMType(parent) != "ELEMENT" {
+		return false
+	}
+	value := parent.Attribute("value")
+	return value != nil && slices.Contains(value.Children(), child)
 }
 
 // stampSlotFill overrides the archetype_node_id and archetype_details
@@ -2811,6 +3028,16 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		ex = sampleValue(pc, g.valueSampler)
 	}
 	if cs, ok := pc.(constraints.CString); ok {
+		if def, ok := g.openStringDefault(rmValue, attr); ok {
+			// A C_STRING that gives no example of its own leaves the
+			// string open, so it takes the value populatePrimitiveDefault
+			// gives.
+			open := openString(cs)
+			if open {
+				ex = def
+			}
+			g.noteOpenText(rmValue, open)
+		}
 		return applyStringLeaf(leaf, rmValue, attr, cs, ex)
 	}
 	if routedPrimitive(rmValue, attr) {
@@ -3008,19 +3235,25 @@ const (
 // taken. Where none can, the value stays as the walk wrote it. A numerator
 // or a denominator that already meets the rules is kept, and a new one is
 // the first of a fixed list of candidates (proportionOperand), so nothing
-// is drawn and the value is as reproducible as the walk's. The precision is
-// never changed. The walk writes each attribute from its own OPT
-// constraint, or, where the OPT says nothing, leaves its placeholder: 1
-// for the numerator and the denominator, 0 (a ratio) for the type, and no
-// precision. So the kind is settled here, once all of them are written.
-// opt is the OPT node of p.
+// is drawn and the value is as reproducible as the walk's. A value whose
+// OPT pins is_integral to true (integralPinned) takes whole numbers too,
+// whatever its kind. Such a value, a fraction and an integer fraction take
+// the precision 0 wherever the OPT admits 0 (zeroPrecisionAdmitted), which
+// meets Fraction_validity whether is_integral is read as whole-number
+// operands, as the RM floor reads it, or as a precision of 0, as the BMM
+// defines it; any other precision is never changed. The walk writes each
+// attribute from its own OPT constraint, or, where the OPT says nothing,
+// leaves its placeholder: 1 for the numerator and the denominator, 0 (a
+// ratio) for the type, and no precision. So the kind is settled here, once
+// all of them are written. opt is the OPT node of p.
 func settleProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
 	walked := int64(p.Type)
-	if settleProportionAs(opt, p, walked) {
+	integral := integralPinned(opt)
+	if settleProportionAs(opt, p, walked, integral) {
 		return
 	}
 	for kind := range int64(pkIntegerFraction + 1) {
-		if kind != walked && settleProportionAs(opt, p, kind) {
+		if kind != walked && settleProportionAs(opt, p, kind, integral) {
 			return
 		}
 	}
@@ -3028,13 +3261,15 @@ func settleProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
 
 // settleProportionAs settles p as a proportion of kind where the OPT admits
 // that type and the rules of kind can be met inside the OPT's constraints
-// on numerator and denominator, and reports whether it did. It leaves p
-// alone when it did not.
-func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64) bool {
+// on numerator and denominator, and reports whether it did. integral says
+// the OPT pins is_integral to true, so the numerator and the denominator
+// are whole numbers whatever the kind. It leaves p alone when it did not.
+func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64, integral bool) bool {
 	if kind < pkRatio || kind > pkIntegerFraction || !componentFits(bindingChild(opt, "type"), kind) {
 		return false
 	}
-	whole := wholeOperands(kind, p.Precision)
+	integral = integral || wholeOperands(kind, nil)
+	whole := integral || wholeOperands(kind, p.Precision)
 	denominator, ok := proportionDenominator(bindingChild(opt, "denominator"), float64(p.Denominator), kind, whole)
 	if !ok {
 		return false
@@ -3046,7 +3281,64 @@ func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64
 	p.Type = rm.Integer(kind)
 	p.Numerator = rm.Real(numerator)
 	p.Denominator = rm.Real(denominator)
+	if integral && zeroPrecisionAdmitted(opt) {
+		p.Precision = new(rm.Integer(0))
+	}
 	return true
+}
+
+// drawnDecimals is how many decimals a value RandomFill draws keeps under
+// precision, the precision of the quantity or the proportion that holds
+// it: precision where it is 0 or more and below maxQuantityDecimals, and
+// maxQuantityDecimals otherwise, as where it is nil or -1 (no limit).
+func drawnDecimals(precision *rm.Integer) int {
+	if precision != nil && *precision >= 0 && int(*precision) < maxQuantityDecimals {
+		return int(*precision)
+	}
+	return maxQuantityDecimals
+}
+
+// roundQuantity rounds the magnitude RandomFill drew for q, a DV_QUANTITY
+// the OPT builds attribute by attribute, to the decimals its precision
+// gives (drawnDecimals). The magnitude keeps its draw where the OPT's
+// constraint on it, opt being the OPT node of q, rejects the rounded value.
+func roundQuantity(opt *tcimpl.CompiledNode, q *rm.DVQuantity) {
+	if v := roundTo(float64(q.Magnitude), drawnDecimals(q.Precision)); componentFits(bindingChild(opt, "magnitude"), v) {
+		q.Magnitude = rm.Real(v)
+	}
+}
+
+// roundProportion rounds the numerator and the denominator RandomFill drew
+// for p, as a quantity's magnitude is rounded, to the decimals its
+// precision gives (drawnDecimals). An operand
+// keeps its draw where the OPT's constraint on it, opt being the OPT node
+// of p, rejects the rounded value, and a denominator where it would round
+// to 0. settleProportion then makes whole numbers of them where the kind
+// or a precision of 0 asks for them.
+func roundProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
+	decimals := drawnDecimals(p.Precision)
+	if v := roundTo(float64(p.Numerator), decimals); componentFits(bindingChild(opt, "numerator"), v) {
+		p.Numerator = rm.Real(v)
+	}
+	if v := roundTo(float64(p.Denominator), decimals); v != 0 && componentFits(bindingChild(opt, "denominator"), v) {
+		p.Denominator = rm.Real(v)
+	}
+}
+
+// integralPinned reports whether the OPT pins is_integral of opt, a
+// DV_PROPORTION, to true: a C_BOOLEAN on it that admits true alone. The
+// pinned RM has is_integral as a function, not an attribute, so the walk
+// writes nothing for it, and the pin decides the operands here.
+func integralPinned(opt *tcimpl.CompiledNode) bool {
+	c, ok := primitiveOf(bindingChild(opt, "is_integral")).(constraints.CBoolean)
+	return ok && c.TrueValid && !c.FalseValid
+}
+
+// zeroPrecisionAdmitted reports whether the OPT admits the precision 0 on
+// opt, a DV_PROPORTION: it does not prohibit precision, and its constraint
+// on precision, where it has one, accepts 0.
+func zeroPrecisionAdmitted(opt *tcimpl.CompiledNode) bool {
+	return !prohibited(opt, "precision") && componentFits(bindingChild(opt, "precision"), int64(0))
 }
 
 // wholeOperands reports whether a proportion of kind with precision needs
@@ -3159,6 +3451,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 		// gets the RM default, 238|other care|, where the OPT admits it.
 		c.Context = &rm.EventContext{}
 		g.settleCoded(contextNode, c.Context)
+		g.writeOptionalRMAttributes(contextNode, c.Context)
 	}
 	if c.Context.StartTime.Value == "" && !prohibited(contextNode, "start_time") {
 		c.Context.StartTime = rm.DVDateTime{Value: g.dateTimeDefault()}
@@ -3234,98 +3527,209 @@ func newHierObjectID() *rm.HierObjectID {
 }
 
 // ownMemberSkipped reports whether children[i], an allowed child that is
-// not a slot, gets no member of its own under the policy in force. Under
+// not a slot, gets no member of its own under the policy in force, given
+// own, which says for each child before it whether it gets one. Under
 // Large and Medium, an optional child that needs content the OPT does not
 // describe gets none (optionalUndescribed). Under Medium, neither does a
-// child whose identity a sibling carries (identityTaken), nor an optional
-// archetype root after the first optional archetype root of the attribute
-// that needs no such content (laterOptionalArchetype), so the attribute
-// holds at most one optional archetype. Under Large every other child gets
-// its members, each named or unnamed use of one archetype included, which
-// the validator binds by room and by trial. Required skips no child here:
-// it sizes each child by its occurrences lower bound, which gives an
-// optional child no member. The top-up to the attribute's lower bound can
-// still build a member of a skipped child.
-func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int) bool {
+// child whose identity a sibling that gets a member of its own carries
+// (identityTaken), unless it holds an archetype that no such sibling holds
+// (addsArchetype). So the attribute holds a member of every optional
+// archetype, and of a later use of one only where that use holds other
+// archetypes, not one of each use. Under Large every other child gets its
+// members, each named or unnamed use of one archetype included, which the
+// validator binds by room and by trial. Under Required an optional child
+// gets none unless it leads to an entry (leadsToEntry) and Medium would
+// build it (repeatsUse), so the content holds a member of each entry and
+// of each SECTION on the way to one that Medium builds there, and no other
+// optional child. The top-up to the attribute's lower bound can still
+// build a member of a skipped child.
+func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int, own []bool) bool {
 	switch g.opts.Policy {
 	case Large:
 		return g.optionalUndescribed(children[i])
 	case Medium:
-		return g.optionalUndescribed(children[i]) || identityTaken(children, i) || g.laterOptionalArchetype(children, i)
+		return g.optionalUndescribed(children[i]) || g.repeatsUse(children, i, own)
 	case Required:
-		return false
+		return !childRequired(children[i]) && (!g.leadsToEntry(children[i]) || g.repeatsUse(children, i, own))
 	}
 	// Unreachable: Generate refuses any other Policy value first.
 	return false
 }
 
-// laterOptionalArchetype reports whether children[i] is an optional
-// archetype root that comes after another optional archetype root among
-// its siblings, in OPT order, whatever the archetype of either, that needs
-// no content the OPT does not describe. Such an earlier root counts even
-// where identityTaken skips it, and a slot is not an archetype root.
-func (g *generator) laterOptionalArchetype(children []*tcimpl.CompiledNode, i int) bool {
-	return optionalArchetypeRoot(children[i]) && slices.ContainsFunc(children[:i], func(c *tcimpl.CompiledNode) bool {
-		return optionalArchetypeRoot(c) && !g.needsUndescribed(c)
-	})
+// repeatsUse reports whether children[i] is a further use that Medium
+// gives no member of its own: a sibling that gets a member of its own
+// carries its identity (identityTaken), and it holds no archetype that no
+// such sibling holds (addsArchetype). Required skips such a child too
+// where it leads to an entry (leadsToEntry).
+func (g *generator) repeatsUse(children []*tcimpl.CompiledNode, i int, own []bool) bool {
+	return identityTaken(children, i, own) && !g.addsArchetype(children, i, own)
 }
 
-// optionalArchetypeRoot reports whether child is an archetype root the OPT
-// leaves optional: it names an archetype id, is not a slot, and its
-// occurrences have a bounded lower bound of 0 (childRequired). A root with
-// no occurrences, or with an unbounded lower bound, counts as required.
-func optionalArchetypeRoot(child *tcimpl.CompiledNode) bool {
-	return !child.IsSlot() && child.ArchetypeID() != "" && !childRequired(child)
+// leadsToEntry reports whether child, an allowed child of a list, is one
+// Required gives a member of its own for the entries it leads to: it is
+// not a slot, it is not optional with undescribed content
+// (optionalUndescribed), and it is an entry root (entryRoot) or a SECTION
+// whose items hold such a child (holdsEntry). The RM holds a SECTION or an
+// entry only in a COMPOSITION's content or a SECTION's items, so only
+// those lists have such a child.
+func (g *generator) leadsToEntry(child *tcimpl.CompiledNode) bool {
+	if child.IsSlot() {
+		return false
+	}
+	switch {
+	case entryRoot(child):
+	case nodeClass(child) == "SECTION":
+		if items := child.Attribute("items"); items == nil || !g.holdsEntry(child, items) {
+			return false
+		}
+	default:
+		return false
+	}
+	return !g.optionalUndescribed(child)
 }
 
-// identityTaken reports whether children[i] is optional and a sibling
-// carries its identity: a required sibling before or after it, or an
-// optional sibling before it. Under Medium such a child gets no member of
-// its own, so the attribute holds one member of an identity where the
+// holdsEntry reports whether attr of node, an attribute the walk does not
+// skip (walkSkips), has an allowed child that leads to an entry
+// (leadsToEntry): any of them for a list, and for a single-valued
+// attribute the child it binds its value to (bindingAlternative). Required
+// visits such an attribute although it is optional.
+func (g *generator) holdsEntry(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	children := tcimpl.AllowedChildNodes(attr)
+	if len(children) == 0 || walkSkips(node, attr) {
+		return false
+	}
+	if attr.Cardinality() == template.Single {
+		return g.leadsToEntry(bindingAlternative(children, builtRMType(children[0])))
+	}
+	return slices.ContainsFunc(children, g.leadsToEntry)
+}
+
+// entryRoot reports whether node is an entry the template names: it names
+// an archetype id, and the class the walk builds for it (nodeClass) is an
+// ENTRY class or GENERIC_ENTRY.
+func entryRoot(node *tcimpl.CompiledNode) bool {
+	if node.ArchetypeID() == "" {
+		return false
+	}
+	class := nodeClass(node)
+	return class == "GENERIC_ENTRY" || descendsFrom(class, "ENTRY")
+}
+
+// identityTaken reports whether children[i] is optional and a sibling that
+// gets a member of its own (siblingOwnsMember, given own) carries its
+// identity: a required sibling before or after it, or an optional sibling
+// before it that the policy does not skip. An optional sibling that gets
+// no member of its own, as one that needs undescribed content, carries
+// none. Under Medium, and under Required where it leads to an entry, such
+// a child gets no member of its own unless it adds an archetype
+// (repeatsUse), so the attribute holds one member of an identity where the
 // template asks for no more, though the top-up to the attribute's lower
-// bound can still build one, from the child it takes (materialiseMultiple);
-// a required child is always built. A slot does not count as a sibling. A
-// sibling carries an identity as the validator binds a member by it
+// bound can still build one, from the child it takes (materialiseMultiple); a required
+// child is always built. A slot does not count as a sibling. A sibling
+// carries an identity as the validator binds a member by it
 // (carriesIdentity), so an archetype root also carries its node id: an
 // optional child that is not a root gets no member after a root with its
 // node id, while optional archetype roots of different archetypes are not
-// skipped here, since a root's identity is its archetype id
-// (childIdentity); Medium skips the later ones by another rule
-// (laterOptionalArchetype). A child with no identity is never skipped. A
-// name the OPT pins on a child is not part of it. Optional and required
-// are as childRequired reads them: a child with no occurrences, or with an
-// unbounded lower bound, counts as required.
-func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
+// skipped, since a root's identity is its archetype id (childIdentity). A
+// child with no identity is never skipped. A name the OPT pins on a child
+// is not part of it. Optional and required are as childRequired reads
+// them: a child with no occurrences, or with an unbounded lower bound,
+// counts as required.
+func identityTaken(children []*tcimpl.CompiledNode, i int, own []bool) bool {
 	child := children[i]
 	if childRequired(child) {
 		return false
-	}
-	if identityCarriedBefore(children, i) {
-		return true
 	}
 	id := childIdentity(child)
 	if id == "" {
 		return false
 	}
-	for _, sib := range children[i+1:] {
-		if !sib.IsSlot() && childRequired(sib) && carriesIdentity(sib, id) {
+	for j, sib := range children {
+		if siblingOwnsMember(children, i, j, own) && carriesIdentity(sib, id) {
 			return true
 		}
 	}
 	return false
 }
 
-// identityCarriedBefore reports whether a sibling before children[i], other
-// than a slot, carries its identity (childIdentity, carriesIdentity). A
-// child with no identity is never carried.
-func identityCarriedBefore(children []*tcimpl.CompiledNode, i int) bool {
-	id := childIdentity(children[i])
-	if id == "" {
-		return false
+// siblingOwnsMember reports whether children[j], a sibling of children[i],
+// gets a member of its own as the identity rule reads it: one before it
+// that own says gets one, or one after it that is required and not a slot.
+// A child is not its own sibling.
+func siblingOwnsMember(children []*tcimpl.CompiledNode, i, j int, own []bool) bool {
+	switch {
+	case j < i:
+		return own[j]
+	case j > i:
+		return !children[j].IsSlot() && childRequired(children[j])
 	}
-	return slices.ContainsFunc(children[:i], func(sib *tcimpl.CompiledNode) bool {
-		return !sib.IsSlot() && carriesIdentity(sib, id)
-	})
+	return false
+}
+
+// addsArchetype reports whether children[i] holds an archetype
+// (heldArchetypes) that no sibling that gets a member of its own
+// (siblingOwnsMember, given own) holds. Under Medium, and under Required
+// where it leads to an entry, such a child gets its member although a
+// sibling carries its identity (identityTaken), so a later use of one
+// archetype is built where it holds archetypes the uses before it do not,
+// and skipped where it adds none.
+func (g *generator) addsArchetype(children []*tcimpl.CompiledNode, i int, own []bool) bool {
+	held := make(map[string]bool)
+	for j, sib := range children {
+		if siblingOwnsMember(children, i, j, own) {
+			for _, id := range g.heldArchetypes(sib) {
+				held[id] = true
+			}
+		}
+	}
+	return slices.ContainsFunc(g.heldArchetypes(children[i]), func(id string) bool { return !held[id] })
+}
+
+// heldArchetypes returns the archetype ids node holds, sorted and without
+// repeats: its own, where it is an archetype root, and those of the
+// archetype roots in its template subtree that the walk under Large and
+// Medium builds. The search goes through the allowed children of each
+// attribute the walk does not skip (walkSkips), only the child a
+// single-valued attribute binds its value to (bindingAlternative), and
+// passes no slot and no optional child that needs undescribed content
+// (optionalUndescribed), which gets no member of its own. A slot holds no
+// archetype. The answer does not depend on the policy, and it is kept per
+// node for the call, so the caller must not change the slice. Required
+// reads it too, for an entry or a SECTION on the way to one, though it
+// builds fewer of those roots, such as no optional CLUSTER in an entry: a
+// later use that holds one gets its member there as under Medium.
+func (g *generator) heldArchetypes(node *tcimpl.CompiledNode) []string {
+	if node.IsSlot() {
+		return nil
+	}
+	if ids, seen := g.held[node]; seen {
+		return ids
+	}
+	var ids []string
+	if id := node.ArchetypeID(); id != "" {
+		ids = append(ids, id)
+	}
+	for _, attr := range tcimpl.NodeAttributes(node) {
+		children := tcimpl.AllowedChildNodes(attr)
+		if len(children) == 0 || walkSkips(node, attr) {
+			continue
+		}
+		if attr.Cardinality() == template.Single {
+			children = []*tcimpl.CompiledNode{bindingAlternative(children, builtRMType(children[0]))}
+		}
+		for _, c := range children {
+			if !c.IsSlot() && !g.optionalUndescribed(c) {
+				ids = append(ids, g.heldArchetypes(c)...)
+			}
+		}
+	}
+	slices.Sort(ids)
+	ids = slices.Compact(ids)
+	if g.held == nil {
+		g.held = make(map[*tcimpl.CompiledNode][]string)
+	}
+	g.held[node] = ids
+	return ids
 }
 
 // childRequired reports whether child counts as required: every child does
@@ -3363,21 +3767,53 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	// a group or a code set of the openEHR terminology is settled there,
 	// the RM default included, where the OPT's constraint admits a member.
 	g.settleCoded(opt, rmValue)
+	// After the media type is settled, which decides between inline data
+	// and a uri.
+	if m, ok := rmValue.(*rm.DVMultimedia); ok {
+		settleMultimedia(opt, m)
+	}
 }
 
 // finishValue fills the RM-mandatory fields of rmValue, whose OPT node is
 // opt, that the OPT walk left empty, but for its coded attributes, which
-// finishNode settles next (settleCoded).
+// finishNode settles next (settleCoded), and a DV_MULTIMEDIA's content,
+// which it settles after them (settleMultimedia). Under RandomFill it also
+// draws a DV_DURATION's value that the OPT leaves unconstrained.
 func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	switch v := rmValue.(type) {
-	case *rm.DVMultimedia:
-		settleMultimedia(opt, v)
+	case *rm.DVIdentifier:
+		settleIssuer(opt, v)
+	case *rm.DVParsable:
+		settleParsable(opt, v)
 	case *rm.DVPeriodicTimeSpecification:
 		fillPeriodicFormalism(opt, v)
+	case *rm.DVQuantity:
+		// A C_DV_QUANTITY's draw is rounded where it is drawn
+		// (quantityMagnitude); one built attribute by attribute is rounded
+		// here.
+		if g.opts.ValueFill == RandomFill && primitiveOf(opt) == nil {
+			roundQuantity(opt, v)
+		}
 	case *rm.DVProportion:
 		// A bound of an interval is settled here too, before the interval's
 		// own walk puts its two bounds in order.
+		if g.opts.ValueFill == RandomFill {
+			roundProportion(opt, v)
+		}
 		settleProportion(opt, v)
+	case *rm.DVDuration:
+		// REQ-107 Primitive-leaf value fill: a value the OPT leaves
+		// unconstrained, naming none or a C_PRIMITIVE_OBJECT with no item,
+		// holds the sentinel populatePrimitiveDefault wrote; RandomFill
+		// draws it as under an empty C_DURATION. The draw is made here,
+		// after the walk, so a template without such a duration keeps its
+		// seeded draws. A bound of an interval is drawn before the
+		// interval's walk puts its two bounds in order.
+		if g.opts.ValueFill == RandomFill && primitiveOf(bindingChild(opt, "value")) == nil {
+			if s, ok := g.valueSampler.duration(constraints.CDuration{}).(string); ok {
+				v.Value = s
+			}
+		}
 	case *rm.DVCodedText:
 		// Any coded text the OPT builds as a node of its own: an ELEMENT's
 		// value or null flavour, a locatable's name, an INTERVAL_EVENT's
@@ -3433,6 +3869,39 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	}
 }
 
+// settleParsable gives p, a DV_PARSABLE whose OPT node is opt, a value
+// that fits its formalism (parsableContent) where the OPT leaves the value
+// open: p holds exampleText, the value populatePrimitiveDefault writes,
+// and the OPT puts no C_STRING on the value or one that gives no example
+// of its own (openString). A C_STRING with a list or a pattern keeps the
+// value it gives. The formalism is the walk's, so a formalism RandomFill
+// draws gets content that fits it.
+func settleParsable(opt *tcimpl.CompiledNode, p *rm.DVParsable) {
+	if p.Value != exampleText {
+		return
+	}
+	if cs, ok := primitiveOf(bindingChild(opt, "value")).(constraints.CString); ok && !openString(cs) {
+		return
+	}
+	p.Value = parsableContent(p.Formalism)
+}
+
+// parsableContent is the content a DV_PARSABLE of formalism takes:
+// <example/> for an XML media type (text/xml, application/xml or one with
+// the +xml suffix), {} for a JSON one (application/json, text/json or one
+// with the +json suffix), and exampleText for any other formalism, such as
+// text/plain. Letter case does not matter.
+func parsableContent(formalism string) string {
+	f := strings.ToLower(strings.TrimSpace(formalism))
+	switch {
+	case f == "text/xml" || f == "application/xml" || strings.HasSuffix(f, "+xml"):
+		return "<example/>"
+	case f == "application/json" || f == "text/json" || strings.HasSuffix(f, "+json"):
+		return "{}"
+	}
+	return exampleText
+}
+
 // periodicFormalisms are the two formalisms RM Value_valid admits on a
 // DV_PERIODIC_TIME_SPECIFICATION's value, the RM default HL7:PIVL first.
 var periodicFormalisms = [...]string{"HL7:PIVL", "HL7:EIVL"}
@@ -3474,33 +3943,69 @@ func openehrCoded(group *terminology.Group, code string) rm.DVCodedText {
 }
 
 // multimediaExample is the inline data the generator gives a
-// DV_MULTIMEDIA: the seven bytes of the text "example", which suits the
-// text/plain media type it defaults to. It is fixed, so the data is the
-// same under both value fills.
+// DV_MULTIMEDIA of a text media type: the seven bytes of the text
+// "example", which suits the text/plain media type it defaults to. It is
+// fixed, so the data is the same under both value fills.
 const multimediaExample = "example"
 
-// settleMultimedia gives a DV_MULTIMEDIA the RM defaults the OPT left it
-// without, where the OPT's own constraint admits them, but for its coded
-// attributes, its media type among them, which settleCoded settles. A
-// value with no data gets multimediaExample as its data, unless the OPT
-// prohibits data, and a value with data takes the number of its bytes as
-// its size, the size of the data before any encoding, as the RM defines
-// it, unless the OPT's constraint on size rejects that number, where the
-// size the walk wrote stays. A value with neither uri nor data, because the OPT
-// prohibits data and names no allowed child for uri to build it from
-// (writeRMNeeded), gets the uri http://example.com, so RM Not_empty holds,
-// where the OPT prohibits uri too: the RM rule wins over the prohibition.
-// opt is the OPT node of m, or nil for one built from the BMM alone, such
-// as a thumbnail the OPT names with no child.
+// multimediaURI is the uri the generator gives a DV_MULTIMEDIA that gets
+// no inline data and whose OPT names no allowed child for its uri: the RM
+// default http://example.com.
+const multimediaURI = "http://example.com"
+
+// multimediaURISize is the size the generator gives a DV_MULTIMEDIA that
+// carries a uri and no inline data: a fixed positive byte count, since the
+// content at the uri has none the generator can read.
+const multimediaURISize = 1024
+
+// textMediaType reports whether mt, a DV_MULTIMEDIA's media type, is a
+// text one, of the IANA top-level type text, or is empty, as before
+// settleCoded gives it its default, text/plain.
+func textMediaType(mt rm.CodePhrase) bool {
+	code := strings.ToLower(mt.CodeString)
+	return code == "" || strings.HasPrefix(code, "text/")
+}
+
+// takesURI reports whether m, a DV_MULTIMEDIA whose OPT node is opt, gets a
+// uri rather than inline data: its OPT prohibits the data, or its media
+// type is not a text one and its OPT neither prohibits the uri nor
+// requires the data. opt is nil for one built from the BMM alone.
+func takesURI(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) bool {
+	if prohibited(opt, "data") {
+		return true
+	}
+	return !textMediaType(m.MediaType) && !prohibited(opt, "uri") && !requiresAttr(opt, "data")
+}
+
+// settleMultimedia gives a DV_MULTIMEDIA the content the OPT left it
+// without, where the OPT's own constraint admits it, once settleCoded has
+// settled its coded attributes, its media type among them. A value of a
+// text media type gets multimediaExample as its data, and so does one of
+// another media type whose OPT prohibits the uri or requires the data,
+// unless the OPT prohibits data; a uri the OPT requires beside the data
+// is the walk's. Any other value with no uri, of another media type or
+// whose OPT prohibits data, gets the uri multimediaURI, where the walk
+// built none from the uri's OPT child (writeRMNeeded); RM Not_empty wins
+// over a prohibition of the uri too. A value with data takes the number of its
+// bytes as its size, the size of the data before any encoding, as the RM
+// defines it, and one with a uri alone multimediaURISize; the size the walk
+// wrote stays where the OPT's constraint on size rejects that number. opt
+// is the OPT node of m, or nil for one built from the BMM alone, such as a
+// thumbnail the OPT names with no child.
 func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
-	if len(m.Data) == 0 && !prohibited(opt, "data") {
+	hasURI := m.URI != nil && !rm.IsTypedNil(m.URI)
+	if len(m.Data) == 0 && !takesURI(opt, m) {
 		m.Data = []byte(multimediaExample)
 	}
-	if size := int64(len(m.Data)); size > 0 && componentFits(bindingChild(opt, "size"), size) {
-		m.Size = rm.Integer(size)
+	if !hasURI && len(m.Data) == 0 {
+		m.URI = &rm.DVURI{Value: multimediaURI}
 	}
-	if (m.URI == nil || rm.IsTypedNil(m.URI)) && len(m.Data) == 0 {
-		m.URI = &rm.DVURI{Value: "http://example.com"}
+	size := int64(len(m.Data))
+	if size == 0 {
+		size = multimediaURISize
+	}
+	if componentFits(bindingChild(opt, "size"), size) {
+		m.Size = rm.Integer(size)
 	}
 }
 
@@ -3647,9 +4152,14 @@ func (g *generator) placeholderElement() *rm.Element {
 // child admits. A null flavour with a code keeps it, with the text the
 // walk gave it: the rubric of that code in the openEHR null flavours
 // group, where the OPT's constraint on its text admits the rubric
-// (useCodedText). opt is the OPT node of e, or nil for an ELEMENT built
-// from the BMM alone.
+// (useCodedText). A plain DV_TEXT value whose text is still the open
+// default textDefault wrote (openText) takes it again from the name the
+// walk has now written for e, which the OPT can list after the value. opt
+// is the OPT node of e, or nil for an ELEMENT built from the BMM alone.
 func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
+	if text, ok := e.Value.(*rm.DVText); ok && text != nil && text == g.openText {
+		text.Value = g.textDefault(text)
+	}
 	if e.Value != nil && !rm.IsTypedNil(e.Value) {
 		if !valueGivesWay(opt) {
 			e.NullFlavour = nil
@@ -3708,16 +4218,22 @@ func valueGivesWay(opt *tcimpl.CompiledNode) bool {
 // requiresAttr reports whether opt names attrName as required
 // (isRequired): the BMM marks it mandatory, its existence lower bound is
 // at least 1, or a child asks the list for a member (holdsRequiredChild).
+// opt is nil for a value built from the BMM alone, which no OPT
+// constrains.
 func requiresAttr(opt *tcimpl.CompiledNode, attrName string) bool {
+	if opt == nil {
+		return false
+	}
 	attr := opt.Attribute(attrName)
 	return attr != nil && isRequired(opt, attr)
 }
 
 // fillElementValue gives e the value the generator builds for an
 // ELEMENT.value the OPT leaves silent: a default of the attribute's BMM
-// type. A value the OPT names an allowed child for is built from that
-// child instead (writeRMNeeded), so it never gets here. It reports whether
-// it wrote one.
+// type, a plain DV_TEXT, which takes the name of e where the walk is in e
+// (textDefault). A value the OPT names an allowed child for is built from
+// that child instead (writeRMNeeded), so it never gets here. It reports
+// whether it wrote one.
 func (g *generator) fillElementValue(e *rm.Element) bool {
 	rmType, ok := rminfo.Default.AttributeRMType("ELEMENT", "value")
 	if !ok {
@@ -3726,6 +4242,9 @@ func (g *generator) fillElementValue(e *rm.Element) bool {
 	value, known := newRMIfKnown(rmType)
 	if !known {
 		return false
+	}
+	if g.enclosing == rm.Locatable(e) {
+		g.elementValue = value
 	}
 	g.populatePrimitiveDefault(value)
 	g.populateBMMRequiredAttrs(value, concreteFor(rmType), 0)

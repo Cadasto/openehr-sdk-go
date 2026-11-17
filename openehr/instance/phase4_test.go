@@ -22,10 +22,14 @@ var floorGapExceptions = map[string][]string{
 	// text/plain default, and Media_type_valid breaks (REQ-112 Coded
 	// invariants). REQ-107 excepts it: "An OPT constraint that admits no
 	// value an RM rule accepts, such as an RM default that yields to the OPT
-	// (§ Precedence 1)".
+	// (§ Precedence 1)". Both clusters may occur more than once, so Large
+	// builds two members of each (REQ-107 Members of a list), and the floor
+	// names the four by position among the details' items.
 	"templates/TestPerson.v2": {
-		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type",
-		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
+		"code_not_in_value_set /details/items[18]/items[at0001]/value/media_type",
+		"code_not_in_value_set /details/items[19]/items[at0001]/value/media_type",
+		"code_not_in_value_set /details/items[20]/items[at0006]/value/media_type",
+		"code_not_in_value_set /details/items[21]/items[at0006]/value/media_type",
 	},
 }
 

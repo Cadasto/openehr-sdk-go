@@ -402,10 +402,12 @@ partially or silently accepted.
   **Registered format limit:** FLAT has no key for a node's name below the root, so a coded name
   the template leaves open (a code from an external reference set, several codes and no pinned
   text, a code with no term text) comes back as `DV_TEXT`, and the round trip reports
-  `rm_type_mismatch` on that name: decode invents no code. The corpus instance is
+  `rm_type_mismatch` on that name: decode invents no code. The corpus instances are
   `Referral Request.v1`, whose annotation name
   (`/context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]/name`) takes
-  its code from an external reference set (`C_CODE_REFERENCE`, no code listed). **The
+  its code from an external reference set (`C_CODE_REFERENCE`, no code listed), and
+  `Vital signs monitoring`, whose pulse interpretation name (`…/items[at1023]/name` in
+  `openEHR-EHR-OBSERVATION.pulse.v2`) lists two local codes and pins no text. **The
   composition's own name** travels as `<root>/_name` (REQ-140, since 2026-10-15), in both modes: decode sets the COMPOSITION's `name` from it, in the DV_TEXT leaf grammar
   (`\|formatting` beside a bare name, a coded name in the `\|code` + `\|value` +
   `\|terminology` substitution form, a name the suffixes cannot carry as `_name\|raw`), and a
@@ -544,7 +546,15 @@ partially or silently accepted.
   A structure with no member that nothing requires is still dropped. Pinned by
   `TestREQ053WithTemplateRebuildsEmptyRequiredStructure`,
   `TestREQ053WithTemplateRebuildsRequiredEmptyList` and
-  `TestREQ053EmptyStructureRebuildRules`. Without `WithTemplate`, decode omits names,
+  `TestREQ053EmptyStructureRebuildRules`.
+  **Registered format limit:** an `ITEM_SINGLE` always holds a member, its RM-mandatory
+  `item`, so decode rebuilds none. Where the template leaves that `item` unconstrained, the
+  Web Template has no node for it, and FLAT and STRUCTURED have no key for the `ELEMENT`
+  the generator writes there. The round trip then loses the `ITEM_SINGLE` and reports
+  `required` at the attribute that held it. The corpus instance is
+  `clinical_content_validation`, whose EVALUATION `validation_evaliation_test.v0`
+  constrains its `data` as an `ITEM_SINGLE` and nothing below it.
+  Without `WithTemplate`, decode omits names,
   defaults and empty structures entirely (format-idempotent only). **One completion is
   visible on re-encode** (since
   2026-08-05, the amended REQ-053): the synthesised `EVENT_CONTEXT.setting` default
@@ -735,12 +745,18 @@ partially or silently accepted.
 itself OPT-valid, a `WithTemplate` decode must also validate against the OPT. The conformance
 leg catches dropped/mistyped leaves that idempotence alone (a symmetric omission) would miss.
 Its **skeleton leg** builds the `instance.Required` and `instance.Medium` skeletons of every
-COMPOSITION OPT in the corpus (75 templates, 150 pairs) and requires each to validate again
-after a FLAT and a STRUCTURED round trip under `WithTemplate` and `WithStrict`, except two
-named exclusions: the encode refusal of reused siblings no name tells apart (§ Archetype-reuse
-siblings below, residual) and
-the coded name a template leaves open (§ `LOCATABLE.name` on decode, registered format limit).
-It does **not** compare emitted FLAT/STRUCTURED against vendored upstream simplified
+COMPOSITION OPT in the corpus (80 templates, 160 pairs) and requires each to validate again
+after a FLAT and a STRUCTURED round trip under `WithTemplate` and `WithStrict`, except three
+named exclusions:
+
+- the encode refusal of reused siblings no name tells apart (§ Archetype-reuse siblings
+  below, residual);
+- the coded name a template leaves open (§ `LOCATABLE.name` on decode, registered format
+  limit);
+- the `ITEM_SINGLE` whose item a template leaves unconstrained (§ RM-mandatory attributes not
+  carried by FLAT, registered format limit).
+
+PROBE-076 does **not** compare emitted FLAT/STRUCTURED against vendored upstream simplified
 output — that comparison is **PROBE-086** (Implemented, Sandbox): its harness at
 `testkit/conformance/webtemplate/` round-trips the corpus vendored at
 `testkit/corpus/flat-conformance/` over the modelled subset, with the refusal

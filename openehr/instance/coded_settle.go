@@ -43,7 +43,7 @@ var (
 	ruleEventMathFunction    = codedRule{class: "INTERVAL_EVENT", invariant: "Math_function_validity", attr: "math_function", group: terminology.EventMathFunction, def: openehrDefault("146")}
 	ruleISMCurrentState      = codedRule{class: "ISM_TRANSITION", invariant: "Current_state_valid", attr: "current_state", group: terminology.InstructionStates, def: openehrDefault("524")}
 	ruleISMTransition        = codedRule{class: "ISM_TRANSITION", invariant: "Transition_valid", attr: "transition", group: terminology.InstructionTransitions, def: transitionDefault}
-	ruleParticipationFunc    = codedRule{class: "PARTICIPATION", invariant: "Function_valid", attr: "function", group: terminology.ParticipationFunction, def: openehrDefault("253")}
+	ruleParticipationFunc    = codedRule{class: "PARTICIPATION", invariant: "Function_valid", attr: "function", group: terminology.ParticipationFunction, def: openehrDefault(participationFunctionDefault)}
 	ruleParticipationMode    = codedRule{class: "PARTICIPATION", invariant: "Mode_valid", attr: "mode", group: terminology.ParticipationMode, def: openehrDefault("193")}
 	rulePartyRelationship    = codedRule{class: "PARTY_RELATED", invariant: "Relationship_valid", attr: "relationship", group: terminology.SubjectRelationship, def: openehrDefault("253")}
 	ruleTermMappingPurpose   = codedRule{class: "TERM_MAPPING", invariant: "Purpose_valid", attr: "purpose", group: terminology.TermMappingPurpose, def: openehrDefault("669")}

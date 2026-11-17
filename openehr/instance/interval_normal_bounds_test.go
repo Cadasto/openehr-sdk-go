@@ -295,9 +295,9 @@ func TestREQ107_IntervalOrderKeepsEachBoundsNormalRange(t *testing.T) {
 			want: "[DV_QUANTITY 5 mm .. DV_QUANTITY 5 mm] | " +
 				"lower DV_QUANTITY 5 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 9 mm] | " +
 				"upper DV_QUANTITY 5 mm; normal_status none; normal_range none",
-			wantRandom: "[DV_QUANTITY 5 mm .. DV_QUANTITY 6.764556596678251 mm] | " +
+			wantRandom: "[DV_QUANTITY 5 mm .. DV_QUANTITY 6.76 mm] | " +
 				"lower DV_QUANTITY 5 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 9 mm] | " +
-				"upper DV_QUANTITY 6.764556596678251 mm; normal_status none; normal_range none",
+				"upper DV_QUANTITY 6.76 mm; normal_status none; normal_range none",
 			ordered: true,
 		},
 		{
@@ -307,9 +307,9 @@ func TestREQ107_IntervalOrderKeepsEachBoundsNormalRange(t *testing.T) {
 			want: "[DV_QUANTITY 5 mm .. DV_QUANTITY 0 mm] | " +
 				"lower DV_QUANTITY 5 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 9 mm] | " +
 				"upper DV_QUANTITY 0 mm; normal_status none; normal_range none",
-			wantRandom: "[DV_QUANTITY 6.764556596678251 mm .. DV_QUANTITY 1.0145450855238398 mm] | " +
-				"lower DV_QUANTITY 6.764556596678251 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 9 mm] | " +
-				"upper DV_QUANTITY 1.0145450855238398 mm; normal_status none; normal_range none",
+			wantRandom: "[DV_QUANTITY 6.76 mm .. DV_QUANTITY 1.01 mm] | " +
+				"lower DV_QUANTITY 6.76 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 9 mm] | " +
+				"upper DV_QUANTITY 1.01 mm; normal_status none; normal_range none",
 			unordered: true,
 		},
 	}, func(q rm.DVQuantity) float64 { return float64(q.Magnitude) })

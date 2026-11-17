@@ -281,6 +281,17 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 				"normal_range (DV_PROPORTION 1/1 type 1 .. DV_PROPORTION 2/1 type 1)" + noRefs,
 		},
 		{
+			// The template pins is_integral and admits the precision 2
+			// alone, so the lower bound 3/2 rebased on the denominator 1 is
+			// the whole number 2, not 1.5.
+			name: "DV_PROPORTION ratio pinned is_integral, precision 2, numerator 0..100, range [3/2..9/2], N",
+			value: optNode("DV_PROPORTION", "", optIntegralPinned(), optSingle("numerator", realFrom(0, 100)),
+				optSingle("denominator", dvReal("1")), optSingle("type", dvInteger("0")), optSingle("precision", dvInteger("2")),
+				normalRangeOver("DV_PROPORTION", ratioBound("3", "2"), ratioBound("9", "2")), normalStatus("N")),
+			want: "DV_PROPORTION 2/1 type 0; normal_status openehr_normal_statuses::N; " +
+				"normal_range [DV_PROPORTION 3/2 type 0 .. DV_PROPORTION 9/2 type 0]" + noRefs,
+		},
+		{
 			name: "DV_ORDINAL value 1..3 with a symbol of its own, range [2..3], N",
 			value: optNode("DV_ORDINAL", "", optSingle("value", integerFrom(1, 3)),
 				optSingle("symbol", optCodedText("local", "at0001", "at0002", "at0003")),
@@ -330,8 +341,8 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(6, 30)), optSingle("units", guardString("mm")),
 				normalRangeOver("DV_QUANTITY", expandedQuantity(realFrom(5, 10)), expandedQuantity(realFrom(0, 20))), normalStatus("H")),
 			want: "DV_QUANTITY 21 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 20 mm]" + noRefs,
-			wantRandom: "DV_QUANTITY 22.2349358320278 mm; normal_status openehr_normal_statuses::H; " +
-				"normal_range [DV_QUANTITY 7.542736988380132 mm .. DV_QUANTITY 15.956046987772261 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 22.23 mm; normal_status openehr_normal_statuses::H; " +
+				"normal_range [DV_QUANTITY 7.54 mm .. DV_QUANTITY 15.96 mm]" + noRefs,
 		},
 		{
 			// As above for a DV_ORDINAL: the swapped pair would hand the lower
@@ -353,7 +364,7 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(0, 100)), optSingle("units", guardString("mm")),
 				normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("9")), normalStatus("H")),
 			want:       "DV_QUANTITY 10 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 9 mm]" + noRefs,
-			wantRandom: "DV_QUANTITY 67.6455659667825 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 9 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 67.65 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 9 mm]" + noRefs,
 		},
 		{
 			name: "DV_PROPORTION unitary numerator 0..100, range [0/1..9/1], H",
@@ -361,7 +372,7 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 				optSingle("denominator", dvReal("1")), optSingle("type", dvInteger("1")),
 				normalRangeOver("DV_PROPORTION", proportionValue("0"), proportionValue("9")), normalStatus("H")),
 			want:       "DV_PROPORTION 10/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 0/1 type 1 .. DV_PROPORTION 9/1 type 1]" + noRefs,
-			wantRandom: "DV_PROPORTION 67.6455659667825/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 0/1 type 1 .. DV_PROPORTION 9/1 type 1]" + noRefs,
+			wantRandom: "DV_PROPORTION 67.65/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 0/1 type 1 .. DV_PROPORTION 9/1 type 1]" + noRefs,
 		},
 		{
 			// The OPT lists 5 and 20. The bounds of the range, the values a
@@ -439,7 +450,7 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 					optNode("DV_QUANTITY", "", optSingle("magnitude", dvReal("9")), optSingle("units", guardString("cm")))),
 				normalStatus("N")),
 			want:        "DV_QUANTITY 0 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
-			wantRandom:  "DV_QUANTITY 67.6455659667825 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
+			wantRandom:  "DV_QUANTITY 67.65 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
 			asGenerated: true,
 		},
 		{
@@ -457,11 +468,15 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			asGenerated: true,
 		},
 		{
-			name: "DV_DURATION range [P0D..P0D], H, left as generated",
+			// The value and the bounds leave their value unconstrained:
+			// the sentinel P0D under ExampleFill, drawn under RandomFill.
+			name: "DV_DURATION with unconstrained bounds, H, left as generated",
 			value: optNode("DV_DURATION", "",
 				normalRangeOver("DV_DURATION", optNode("DV_DURATION", ""), optNode("DV_DURATION", "")), normalStatus("H")),
 			want: "DV_DURATION P0D; normal_status openehr_normal_statuses::H; " +
 				"normal_range [*DV_DURATION P0D .. *DV_DURATION P0D]" + noRefs,
+			wantRandom: "DV_DURATION P1D; normal_status openehr_normal_statuses::H; " +
+				"normal_range [*DV_DURATION PT10M .. *DV_DURATION PT10H]" + noRefs,
 			asGenerated: true,
 		},
 	}

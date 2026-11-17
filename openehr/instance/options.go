@@ -30,58 +30,78 @@ import (
 type Policy int
 
 const (
-	// Medium builds at most one optional archetype under an attribute,
-	// what the ITS-REST template example calls detail_level=medium. It
-	// visits the required attributes, and those with an allowed OPT
-	// child: an attribute the BMM marks mandatory, one whose existence or
-	// cardinality lower bound is bounded and at least 1, and one with an
-	// OPT child whose occurrences upper bound is not 0. A visited
-	// multi-valued attribute gets its members as under Large, except that
-	// an optional archetype root after the first optional archetype root
-	// of the attribute, in OPT order, that holds more than content the
-	// template does not describe (see the package documentation) gets
-	// none of its own, whatever its archetype, and neither does an
-	// optional child whose identity a required sibling, or an earlier
-	// optional one, carries. Medium is the zero value, so Options with no
-	// Policy builds it.
+	// Medium builds a member of each optional archetype under an
+	// attribute, and of a further use of one only where that use holds
+	// another archetype, what the ITS-REST template example calls
+	// detail_level=medium. It visits the required
+	// attributes, and those with an allowed OPT child: an attribute the
+	// BMM marks mandatory, one whose existence or cardinality lower bound
+	// is bounded and at least 1, and one with an OPT child whose
+	// occurrences upper bound is not 0. A visited multi-valued attribute
+	// gets its members as under Large, except that an optional child
+	// whose identity a required sibling, or an earlier optional one that
+	// gets a member of its own, carries gets none of its own, unless it
+	// holds an archetype, as a root itself or below it, that none of those
+	// siblings holds. A child's identity is its archetype id when it is an
+	// archetype root, and its node id otherwise. Medium is the zero value,
+	// so Options with no Policy builds it.
 	Medium Policy = iota
-	// Required builds only the data points the template makes mandatory
-	// and a composition's context, what the ITS-REST template example
-	// calls detail_level=required. It visits only the required
-	// attributes: an attribute the BMM marks mandatory, one whose
-	// existence lower bound is bounded and at least 1, or a multi-valued
-	// one holding an allowed OPT child that is not a slot and whose
-	// occurrences lower bound is at least 1; a cardinality lower bound
-	// alone does not make it visit an attribute, and nor does an allowed
-	// OPT child, except a COMPOSITION's context, which it visits as Medium
-	// does, so the context every policy writes is built under the OPT's
-	// constraints. A visited multi-valued attribute gets
-	// occurrences.lower members of each allowed OPT child that is not a
-	// slot, so an optional child gets none of its own. The top-up to the
-	// attribute's lower bound and the RM rules, such as an ELEMENT's
-	// value or null_flavour, still apply. An RM rule can add a node, such
-	// as the null_flavour of an ELEMENT whose value the template leaves
-	// optional, so its tree is not always smaller than Medium's.
+	// Required builds the data points the template makes mandatory, a
+	// composition's context and a member of each entry the content names,
+	// what the ITS-REST template example calls detail_level=required. It
+	// visits the required attributes: an attribute the BMM marks
+	// mandatory, one whose existence lower bound is bounded and at least
+	// 1, or a multi-valued one holding an allowed OPT child that is not a
+	// slot and whose occurrences lower bound is at least 1. A cardinality
+	// lower bound alone does not make it visit an attribute, and nor does
+	// an allowed OPT child, with two exceptions:
+	//   - a COMPOSITION's context, which it visits as Medium does, so the
+	//     context every policy writes is built under the OPT's constraints;
+	//   - a COMPOSITION's content and a SECTION's items that hold an
+	//     entry, an archetype root of an ENTRY class or GENERIC_ENTRY, or
+	//     a SECTION whose items hold one.
+	//
+	// A visited multi-valued attribute gets occurrences.lower members of
+	// each allowed OPT child that is not a slot, and one member of each
+	// optional entry, and of each optional SECTION on the way to one, that
+	// Medium builds there; any other optional child gets none of its own.
+	// So each entry holds only its mandatory parts. The top-up to the
+	// attribute's lower bound and the RM rules, such as an ELEMENT's value
+	// or null_flavour, still apply. An RM rule can add a node, such as the
+	// null_flavour of an ELEMENT whose value the template leaves optional,
+	// so its tree is not always smaller than Medium's.
 	Required
 	// Large builds a member of every optional archetype the template
 	// names, and of every use of one, that holds more than content the
-	// template does not describe (see the package documentation). It
-	// visits every attribute the visit rule allows: every attribute the
-	// compiled node carries, the optional ones the OPT names included. A
-	// visited multi-valued attribute gets at least one member of each
-	// allowed OPT child that is not a slot, except an optional child that
-	// holds only such content: optional archetype roots each get theirs,
-	// of one archetype or of several, whether the template tells them
-	// apart by a name or not, and so do optional siblings of one node id.
-	// It stops short of the ITS-REST template example's
-	// detail_level=complete (every data point the template allows), which
-	// no level of its own builds yet.
+	// template does not describe (see the package documentation), and
+	// two members of each node that may occur more than once. It visits
+	// every attribute the visit rule allows: every attribute the compiled
+	// node carries, the optional ones the OPT names included. A visited
+	// multi-valued attribute gets max(occurrences.lower, 1) members of
+	// each allowed OPT child that is not a slot, and
+	// max(occurrences.lower, 2) of one whose occurrences upper bound is
+	// above 1 or unbounded, within the attribute's cardinality, except an
+	// optional child that holds only such content: optional archetype
+	// roots each get theirs, of one archetype or of several, whether the
+	// template tells them apart by a name or not, and so do optional
+	// siblings of one node id. Large also writes a fixed set of optional
+	// RM attributes where the template does not name them: a
+	// COMPOSITION's feeder_audit, an EVENT_CONTEXT's end_time,
+	// health_care_facility and one participation, an ENTRY's provider and
+	// one other participation, and an ACTIVITY's timing. It is the SDK's
+	// complete level: unlike the ITS-REST template example's
+	// detail_level=complete, every data point the template allows, as
+	// reference guidance, every root it returns meets the template and the
+	// RM, apart from the exceptions the package documentation names, such
+	// as a coded attribute whose template admits no code of the set the
+	// RM keeps it in, so it can be committed. The composition builder
+	// seeds a Builder with Large short of the second members and those RM
+	// attributes.
 	Large
 
 	// Minimal is another name for Required.
 	Minimal = Required
-	// Complete is another name for Large, until a level of its own
-	// builds the ITS-REST template example's detail_level=complete.
+	// Complete is another name for Large, the SDK's complete level.
 	Complete = Large
 )
 
@@ -127,7 +147,9 @@ var policyNames = [...]struct {
 }
 
 // ValueFill controls how primitive leaves are valued, orthogonally to
-// [Policy] (which controls which nodes are materialised).
+// [Policy] (which controls which nodes are materialised). Under either
+// fill, a value the template's constraints give a default value of its own
+// takes that default where it meets the node's constraints.
 type ValueFill int
 
 const (
