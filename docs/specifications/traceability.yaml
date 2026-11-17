@@ -1485,6 +1485,7 @@ requirements:
     probes: [PROBE-024, PROBE-025, PROBE-074]
     tests:
       - internal/iso8601/magnitude_test.go
+      - internal/iso8601/order_test.go
       - internal/iso8601/precision_test.go
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/node_primitive_test.go
@@ -1511,6 +1512,7 @@ requirements:
       - openehr/template/constraints/temporal_parity_test.go
       - openehr/template/constraints/temporal_range_precision_test.go
       - openehr/template/constraints/temporal_validate_test.go
+      - openehr/template/constraints/temporal_zone_order_test.go
       - openehr/template/constraints/value_free_test.go
       - openehr/template/webtemplate/inputs_test.go
       - openehr/templatecompile/compile_readings_test.go
