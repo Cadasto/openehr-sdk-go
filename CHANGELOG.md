@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **`parse.ClassExpr.ParsedPredicate` and `aql.IdentifiedPath.ParsedPredicate`** give a `FROM` / `CONTAINS` class bracket and a path's alias-root bracket the parsed predicate a path step has, a name's escapes resolved (REQ-113, PROBE-095).
+
+### Changed
+
+- **Breaking: Web Template ids and FLAT and STRUCTURED keys** drop a sole event's segment, whatever its type, and follow a name fixed by one code, `heart_rate` for `rate` (REQ-106, REQ-111, REQ-053).
+- **Breaking: `MarshalStructured`** writes a bare value beside a leaf's members as the reference's `|value`, and decode reads the bare-value, proportion, ordinal, folded-event and instruction-details spellings EHRbase and FerroEHR write (REQ-053, REQ-140).
+- **Breaking: the RM floor** decides `LOCATABLE.Archetyped_valid` per instance, so a FOLDER or nested root without `archetype_details`, or naming another archetype than its node id (`archetype_root_id`), now fails (REQ-112).
+- **Breaking: `CTime.Validate`, `CDateTime.Validate` and the RM floor's interval order** compare a zoned value with a zoneless one as XML Schema does, refusing one over 14 hours outside a zoneless bound (REQ-103, REQ-112).
+- **The instance generator** builds each detail level as the ITS-REST template example names it, `Large` as the complete level, with leaf values that carry a meaning; `NewBuilder`'s skeleton keeps its shape (REQ-107).
+- **A FLAT or STRUCTURED decode with `WithTemplate`** reads a coded name the template leaves open as the `DV_CODED_TEXT` the generator writes, where it gave the archetype's `DV_TEXT` (REQ-053).
+- **`parse.ClassExpr.Archetype`** also carries the archetype of a named class bracket, `[archetype-id, name]`, and AQL lint reads every archetype a class names, inside an `AND` / `OR` bracket too (REQ-113, REQ-109).
+- **Validation with a missing-member report** writes each absent member's path once, allocating less with identical results (REQ-112).
+
 ## [0.49.1] - 2026-11-15
 
 First `v0.49` patch: a seeded `RandomFill` gives the same values on Apple Silicon as on amd64, the Makefile and scripts run on a stock Mac, and the auth dependencies take upstream bug-fix releases.
