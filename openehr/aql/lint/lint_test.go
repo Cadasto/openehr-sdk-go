@@ -322,6 +322,45 @@ func TestLintArchetypeNotInTemplate(t *testing.T) {
 	}
 }
 
+// REQ-113: the named archetype form `[hrid, name]` sets ClassExpr.Archetype,
+// so every Archetype reader sees the archetype the class names. These three
+// pin the readers: the identifiable-scope check, template membership and
+// path resolution.
+const namedBloodPressure = "OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1, 'Blood pressure']"
+
+func TestREQ113_NamedArchetypeIsIdentifiableScope(t *testing.T) {
+	r := lint.LintString("SELECT o/data FROM "+namedBloodPressure, nil)
+	if has(r, "aql_from_archetype") {
+		t.Fatalf("a class naming an archetype with a name must not warn aql_from_archetype, got %v", codes(r))
+	}
+}
+
+func TestREQ113_NamedArchetypeNotInTemplate(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	r := lint.LintString(
+		"SELECT o/data FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1, 'Lab']",
+		&lint.Options{Compiled: c},
+	)
+	if count(r, "aql_archetype_not_in_template") != 1 {
+		t.Fatalf("want one aql_archetype_not_in_template for the absent named archetype, got %v", codes(r))
+	}
+}
+
+func TestREQ113_PathResolvesUnderNamedArchetype(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	bad := lint.LintString("SELECT o/data[at0001]/eventz/value FROM "+namedBloodPressure, &lint.Options{Compiled: c})
+	if !has(bad, "aql_path_not_in_template") {
+		t.Errorf("a path under a named archetype must resolve against it and warn on eventz, got %v", codes(bad))
+	}
+	good := lint.LintString(
+		"SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude FROM "+namedBloodPressure,
+		&lint.Options{Compiled: c},
+	)
+	if has(good, "aql_path_not_in_template") {
+		t.Errorf("a valid path under a named archetype must not warn, got %v", codes(good))
+	}
+}
+
 // REQ-109 Layer 3: [$arch] is bind-time scope, not a missing HRID.
 func TestLintParamArchetypeNotInTemplateClean(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
