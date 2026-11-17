@@ -336,6 +336,15 @@ func TestREQ107_LocalCodedTextTakesTheTermText(t *testing.T) {
 			want:  []string{termOne, termTwo},
 		},
 		{
+			name: "DV_ORDINAL symbol with the concept code the OPT lists",
+			opt: optTemplate("ELEMENT", optTerms, `<term_definitions code="at0000"><items id="text">Concept</items></term_definitions>`,
+				optSingle("value", `<children xsi:type="C_DV_ORDINAL"><rm_type_name>DV_ORDINAL</rm_type_name><node_id></node_id>`+
+					`<list><value>0</value><symbol><value></value><defining_code><terminology_id><value>local</value></terminology_id><code_string>at0000</code_string></defining_code></symbol></list>`+
+					`</children>`)),
+			coded: func(t *testing.T, out any) rm.DVCodedText { return rootValueAs[*rm.DVOrdinal](t, out).Symbol },
+			want:  []string{"Concept"},
+		},
+		{
 			name: "LOCATABLE name",
 			opt:  optTemplate("ELEMENT", optTerms, optSingle("name", optCodedText("local", "at0003"))),
 			coded: func(t *testing.T, out any) rm.DVCodedText {

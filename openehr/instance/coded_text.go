@@ -178,15 +178,20 @@ func placeholderCode(node *tcimpl.CompiledNode, code string) bool {
 	return noCode(code) && !listsCode(node, code)
 }
 
-// listsCode reports whether the code-phrase constraint node puts on a coded
-// text lists code: a C_CODE_PHRASE, or the one a C_CODE_REFERENCE carries,
-// on node itself, or on its defining_code as the walk builds it
-// (bindingChild).
+// listsCode reports whether the constraint node puts on a coded text lists
+// code: a C_CODE_PHRASE, or the one a C_CODE_REFERENCE carries, on node
+// itself, or on its defining_code as the walk builds it (bindingChild), or,
+// for an ordinal's symbol, the C_DV_ORDINAL node, whose list gives each
+// symbol's code.
 func listsCode(node *tcimpl.CompiledNode, code string) bool {
 	if node == nil {
 		return false
 	}
-	if cp, ok := constraints.CodePhraseOf(node.PrimitiveConstraint()); ok {
+	pc := node.PrimitiveConstraint()
+	if ordinal, ok := pc.(constraints.CDvOrdinal); ok {
+		return slices.ContainsFunc(ordinal.Values, func(o constraints.OrdinalSymbol) bool { return o.Symbol.CodeString == code })
+	}
+	if cp, ok := constraints.CodePhraseOf(pc); ok {
 		return slices.Contains(cp.CodeList, code)
 	}
 	return listsCode(bindingChild(node, "defining_code"), code)
