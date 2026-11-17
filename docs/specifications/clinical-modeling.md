@@ -375,7 +375,7 @@ Its `ExampleValue` is the first value `Validate` accepts of these, in this order
 
 - its sentinel, written to the pattern;
 - each bound of the range, written to the pattern and moved inside the range;
-- the value halfway between the bounds, with its fraction of a second, where the pattern allows seconds;
+- the value halfway between the bounds, with its fraction of a second, where the pattern allows seconds; for a time, a range open on one side reads as ending one second past its bound, within the day, so the range above `23:59:59` gives `"23:59:59.5"`;
 - for a time or a date-time, each bound that carries a zone, written with its clock and its zone an hour across, so that it names the same instant and `Validate` compares it with the bound as an instant.
 
 Two cases are exceptions to the rule for bounded constraints, where the example is the sentinel `Validate` refuses although a valid value exists:
@@ -847,7 +847,7 @@ Of the attributes the rules above leave, `Generate` **MUST** visit those the tab
 
 - a `COMPOSITION`'s `context`, which it writes under every policy, built under the OPT's constraints as `Medium` does;
 - the optional RM attributes `Large` writes where the OPT does not name them (*Optional RM attributes under `Large`*);
-- the optional attributes *Leaf values* and *RM defaults* write under every policy: a `DV_IDENTIFIER`'s `issuer`, a `DV_PROPORTION`'s `precision` of 0 and a `DV_MULTIMEDIA`'s `uri`.
+- the optional attributes *Leaf values*, *RM defaults* and § [Precedence](#precedence) 4 write under every policy: a `DV_IDENTIFIER`'s `issuer`, a `DV_PROPORTION`'s `precision` of 0 and a `DV_MULTIMEDIA`'s `uri`.
 
 | Policy | `Generate` visits |
 |---|---|
@@ -894,6 +894,7 @@ A visited multi-valued attribute gets, in OPT order, these members of each allow
 It gets no more members in all than its `cardinality.upper` when that is bounded.
 Within that bound the room goes first to the members asked for by the children whose occurrences lower bound is bounded and at least 1, as many of each as that bound, which fit wherever § [Errors](#errors) does not refuse the list.
 Any other member gets only the room they leave, whether it is of a child before or after them, of an optional child, or the second member `Large` gives a child whose lower bound is 1.
+That room goes child by child in OPT order, so a child's second `Large` member takes it before a later child's first.
 The members still stand in OPT order.
 So `CLUSTER.items` at cardinality `0..1` over an optional `at0001` and a required `at0002` holds the `at0002` member alone, and under `Large`, at cardinality `0..2` over an optional `at0001` that may occur any number of times and a required `at0002`, one member of each.
 Under `Medium`, an optional child (occurrences lower bound 0) gets no member of its own where both hold, though the top-up below can still build one:
@@ -991,7 +992,7 @@ Under every policy, a primitive leaf the generator writes for an OPT primitive c
 Under either `ValueFill`, where the OPT leaves one of these values open, with no constraint of its own or a `C_STRING` that has neither a list nor a pattern, the generator writes a value that carries a meaning:
 
 - the `value` of a plain `DV_TEXT` that is an ELEMENT's `value`: the name the generator writes for that ELEMENT, or `example` where that name is only the RM type of an ELEMENT the OPT gives no term;
-- the `value` of any other plain `DV_TEXT`, such as a PARTICIPATION's `function`, an ISM_TRANSITION's `reason` or a REFERENCE_RANGE's `meaning`: `example`; a `DV_CODED_TEXT` keeps the text the third bullet of the list above gives it;
+- the `value` of any other plain `DV_TEXT`, such as a PARTICIPATION's `function`, an ISM_TRANSITION's `reason` or a REFERENCE_RANGE's `meaning`: `example`, except the `function` of a participation *Optional RM attributes under `Large`* writes; a `DV_CODED_TEXT` keeps the text the third bullet of the list above gives it;
 - a `DV_PARSABLE`'s `value`: `<example/>` where its `formalism` is an XML media type (`text/xml`, `application/xml` or one with the `+xml` suffix), `{}` where it is a JSON one (`application/json`, `text/json` or one with the `+json` suffix), and `example` otherwise;
 - a `DV_IDENTIFIER`'s `id`: `ID-0001`, a fixed identifier of a recognisable shape;
 - a `DV_IDENTIFIER`'s `issuer`, wherever the OPT does not prohibit it: `Example issuer`, or, where the OPT's `C_STRING` on the issuer rejects that, the example that `C_STRING` gives.
@@ -1060,8 +1061,8 @@ Under `Large`, `Generate` **MUST** write the optional RM attributes below where 
 - an `ACTIVITY`'s `timing`: a `DV_PARSABLE` whose `formalism` is `ISO8601` and whose `value` is an ISO 8601 recurring interval, `R/`, the date-time *Clock* gives and `/P1D`, the form the RM prefers for it (RM `ACTIVITY.timing`: "the preferred syntax is ISO8601 'R' format").
 
 Each participation has a `PARTY_SELF` performer, the `mode` `openehr` `193|not specified|` with its rubric, and a `function` that is a plain `DV_TEXT` whose `value` is `unknown`, the rubric of its RM default `253`, since FLAT's `|function` key carries only a plain `DV_TEXT` ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes)) and `Function_valid` binds only a coded `function`.
-An attribute the OPT node names is the visit's: `Large` builds it under the OPT's constraints where the OPT allows it, and leaves it out where the OPT prohibits it.
-Beyond those *Leaf values* and *RM defaults* write under every policy, `Large` writes no other optional RM attribute the OPT does not name, such as an ENTRY's `workflow_id` or `guideline_id`, a LOCATABLE's `links`, or a `HISTORY`'s `duration` or `period`.
+An attribute the OPT node names is the visit's: `Large` builds it under the OPT's constraints where the OPT allows it, a `feeder_audit` excepted (*Known gap: attributes the generator cannot write*), and leaves it out where the OPT prohibits it.
+Beyond those *Leaf values*, *RM defaults* and § [Precedence](#precedence) 4 write under every policy, `Large` writes no other optional RM attribute the OPT does not name, such as an ENTRY's `workflow_id` or `guideline_id`, a LOCATABLE's `links`, or a `HISTORY`'s `duration` or `period`.
 The skeleton the composition builder seeds a `Builder` with under `Large` holds none of them ([§ REQ-101](#req-101--generic-opt-driven-composition-builder)).
 
 ##### The text of a coded value
@@ -1207,7 +1208,7 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
    - `Match_valid` narrows a TERM_MAPPING `match` to `>`, `=`, `<` or `?`;
    - `Magnitude_status_valid` narrows a `magnitude_status` to `=`, `<`, `>`, `<=`, `>=` or `~`;
    - `Accuracy_is_percent_validity` with `Accuracy_validity` narrows a percentage `accuracy` to more than 0 and at most 100, or, where the OPT admits no such accuracy, its `accuracy_is_percent` to false where the OPT admits that;
-   - `Normal_range_and_status_consistency` narrows an ordered value whose `normal_status` is `N` into its `normal_range` and one with another `normal_status` out of it, where the value and the range's bounds are a pair § Contract *Intervals* says the generator can compare;
+   - `Normal_range_and_status_consistency` narrows an ordered value whose `normal_status` is `N` into its `normal_range` and one with another `normal_status` out of it, where the value and the range's bounds are a pair § Contract *Intervals* says the generator can compare, other than two DV_DURATION;
    - the lower bound -1 of a `DV_QUANTITY`'s or `DV_PROPORTION`'s `precision` ([§ REQ-112](#req-112--template-less-reference-model-validation-floor)) narrows a precision range that reaches below it;
    - `Scheme_valid` narrows a `DV_EHR_URI`'s `value` to the `ehr` scheme.
      The value § Contract *Leaf values* gives stays where it has that scheme.
@@ -1437,7 +1438,7 @@ Two entry points:
   - the second member `Large` gives a node that may occur more than once, so each node gets `max(occurrences.lower, 1)` members (*Members of a list*);
   - the optional RM attributes `Large` writes where the OPT does not name them (*Optional RM attributes under `Large`*).
 
-  It asks the generator for that skeleton through a switch only this module's packages can set, so neither `instance.Options` nor the composition options carry it.
+  No field of `instance.Options` and no composition option selects that skeleton.
   A later use of one identity that pins no name ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator) *What a visit writes*: its archetype id or `node_id`) has the compiled path of the first, so `Set` reaches the first use's member alone, and the member `Large` builds for the later use keeps the values the skeleton gave it.
   `NewSkeleton` and `NewBuilder` **MUST** accept and refuse the policy `WithPolicy` gives as this table says, a refusal returning no skeleton or `Builder`, before either builds a skeleton:
 
