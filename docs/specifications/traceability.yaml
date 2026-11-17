@@ -1379,6 +1379,7 @@ requirements:
       - openehr/composition/attribute_hold_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/builder_test.go
+      - openehr/composition/coded_name_path_test.go
       - openehr/composition/named_sibling_test.go
       - openehr/composition/optional_content_test.go
       - openehr/composition/set_binding_test.go
@@ -1681,6 +1682,7 @@ requirements:
       - openehr/instance/party_related_relationship_test.go
       - openehr/instance/party_relationship_uid_test.go
       - openehr/instance/phase4_test.go
+      - openehr/instance/pinned_name_test.go
       - openehr/instance/placeholder_exact_test.go
       - openehr/instance/placeholder_test.go
       - openehr/instance/policy_names_test.go
@@ -1870,8 +1872,10 @@ requirements:
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/aom/aom14/read_tokens_internal_test.go
       - openehr/aom/aom14/read_tolerant_test.go
+      - openehr/composition/coded_name_path_test.go
       - openehr/composition/named_sibling_test.go
       - openehr/instance/local_term_text_test.go
+      - openehr/instance/pinned_name_test.go
       - openehr/rm/rminfo/lookup_test.go
       - openehr/serialize/canxml/not_well_formed_test.go
       - openehr/serialize/simplified/coded_name_internal_test.go
