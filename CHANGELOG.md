@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-11-17
+
+Fiftieth `v0.x` minor: the generator builds each detail level as ITS-REST names it, FLAT and STRUCTURED read the spellings EHRbase and FerroEHR write, the RM floor checks archetype roots per node, and parsed AQL class brackets carry their predicate. **Breaking:** Web Template ids and FLAT and STRUCTURED keys change for sole events and code-fixed names, `MarshalStructured` writes `|value`, and the RM floor and time constraints refuse more.
+
 ### Added
 
 - **`parse.ClassExpr.ParsedPredicate` and `aql.IdentifiedPath.ParsedPredicate`** give a `FROM` / `CONTAINS` class bracket and a path's alias-root bracket the parsed predicate a path step has, a name's escapes resolved (REQ-113, PROBE-095).
