@@ -282,6 +282,38 @@ func TestValidateRM_REQ112_IntervalOrderAtSharedPrecision(t *testing.T) {
 		rm.DVDateTime{Value: "2021-05-20T10:30+00:00"}, rm.DVDateTime{Value: "2021-05-20T10Z"}, [2]float64{63757103400, 63757101600})
 }
 
+// REQ-112 — a DV_TIME or DV_DATE_TIME with a zone and one without are ordered
+// as the REQ-103 temporal range check orders a value against a bound of the
+// other zoned-ness, after XML Schema 1.0 Part 2 §3.2.7.4: the one with a zone
+// read in UTC, the one without at +14:00 and at -14:00, a partial value
+// covering the whole period it names, and ordered only where both readings
+// agree. Each pair below lies more than 14 hours out of order, so it draws
+// Limits_consistent, and reversed it is in order. Value holds the bound with
+// a zone read in UTC and the one without on its clock, each at the start of
+// the period it names. The pairs within 14 hours of each other, which are not
+// ordered, are rows of [TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs].
+func TestValidateRM_REQ112_IntervalOrderAcrossZone(t *testing.T) {
+	t.Parallel()
+	checkOrder(t, "DV_DATE_TIME with a zone, two years after one without", "DV_DATE_TIME",
+		rm.DVDateTime{Value: "2022-01-01T00:00Z"}, rm.DVDateTime{Value: "2020-01-01T00:00"}, [2]float64{63776592000, 63713433600})
+	// 10:00-05:00 is 15:00Z, 15 hours after 00:00 on the same date.
+	checkOrder(t, "DV_DATE_TIME with a zone, 15 hours after one without", "DV_DATE_TIME",
+		rm.DVDateTime{Value: "2025-01-02T10:00:00-05:00"}, rm.DVDateTime{Value: "2025-01-02T00:00:00"}, [2]float64{63871426800, 63871372800})
+	checkOrder(t, "DV_DATE_TIME without a zone, 15 hours after one with", "DV_DATE_TIME",
+		rm.DVDateTime{Value: "2025-01-02T00:00:00"}, rm.DVDateTime{Value: "2025-01-01T09:00:00Z"}, [2]float64{63871372800, 63871318800})
+	// The year 2030 ends at 2031-01-01T00:00, 15 hours before the lower bound.
+	checkOrder(t, "DV_DATE_TIME with a zone, 15 hours after the year without one ends", "DV_DATE_TIME",
+		rm.DVDateTime{Value: "2031-01-01T15:00Z"}, rm.DVDateTime{Value: "2030"}, [2]float64{64060642800, 64029052800})
+	checkOrder(t, "DV_TIME with a zone, 15 hours after one without", "DV_TIME",
+		rm.DVTime{Value: "23:00:00Z"}, rm.DVTime{Value: "08:00:00"}, [2]float64{82800, 28800})
+	// 20:00-05:00 is 25:00Z, 15 hours after 10:00.
+	checkOrder(t, "DV_TIME with a zone west of UTC, 15 hours after one without", "DV_TIME",
+		rm.DVTime{Value: "20:00:00-05:00"}, rm.DVTime{Value: "10:00:00"}, [2]float64{90000, 36000})
+	// 11:00+02:00 is 09:00Z, 14 hours and a half before 23:30.
+	checkOrder(t, "DV_TIME without a zone, 14 hours and a half after one with", "DV_TIME",
+		rm.DVTime{Value: "23:30:00"}, rm.DVTime{Value: "11:00:00+02:00"}, [2]float64{84600, 32400})
+}
+
 // REQ-112, REQ-171 — the floor neither orders nor reports a pair it reads as
 // strictly comparable but has no order for: one whose bound has no magnitude
 // to order, and a DV_TIME or DV_DATE_TIME with a time zone against one
