@@ -33,10 +33,23 @@ const (
 	labTestName = "/content[openEHR-EHR-OBSERVATION.laboratory_test.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0005]/value"
 )
 
+// labHistories are the OBSERVATION attributes the laboratory test report's
+// HISTORY is tried under: its own `data`, and `state`, an OBSERVATION's other
+// HISTORY, whose only event at max 1 the Web Template lifts as it lifts
+// data's.
+var labHistories = []string{"data", "state"}
+
 // labReportTarget builds the Web Template and the compiled template of the
 // corpus laboratory test report, whose OBSERVATION's one event is a
 // POINT_EVENT at 0..1, with that event's RM type replaced by eventType.
 func labReportTarget(t *testing.T, eventType string) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
+	t.Helper()
+	return labReportTargetIn(t, eventType, "data")
+}
+
+// labReportTargetIn is [labReportTarget] with the OBSERVATION's HISTORY held
+// by its attribute history, `data` as the template has it or `state`.
+func labReportTargetIn(t *testing.T, eventType, history string) (*webtemplate.WebTemplate, *templatecompile.Compiled) {
 	t.Helper()
 	raw, err := os.ReadFile(fixtures.TemplateOpt("IDCR - Laboratory Test Report.v0"))
 	if err != nil {
@@ -47,6 +60,18 @@ func labReportTarget(t *testing.T, eventType string) (*webtemplate.WebTemplate, 
 		t.Fatalf("the laboratory test report names POINT_EVENT %d times, want once — fixture changed?", n)
 	}
 	raw = bytes.Replace(raw, point, []byte("<rm_type_name>"+eventType+"</rm_type_name>"), 1)
+	if history != "data" {
+		// The OBSERVATION's own `data` is the first attribute of that name
+		// after its type name.
+		data := []byte("<rm_attribute_name>data</rm_attribute_name>")
+		obs := bytes.Index(raw, []byte("<rm_type_name>OBSERVATION</rm_type_name>"))
+		at := bytes.Index(raw[max(obs, 0):], data)
+		if obs < 0 || at < 0 {
+			t.Fatal("the laboratory test report has no OBSERVATION data attribute — fixture changed?")
+		}
+		at += obs
+		raw = slices.Concat(raw[:at], []byte("<rm_attribute_name>"+history+"</rm_attribute_name>"), raw[at+len(data):])
+	}
 	opt, err := fixtures.ReadOperationalTemplate(raw)
 	if err != nil {
 		t.Fatalf("ReadOperationalTemplate: %v", err)
@@ -95,6 +120,20 @@ func labTestNameOf(t *testing.T, comp *rm.Composition) string {
 	return text.Value
 }
 
+// labEvent returns the one event comp's laboratory test OBSERVATION holds
+// in its HISTORY at history, `data` or `state`.
+func labEvent(t *testing.T, wt *webtemplate.WebTemplate, comp *rm.Composition, history string) rm.Event {
+	t.Helper()
+	if history == "data" {
+		return onlyEvent(t, wt, comp, "laboratory_test")
+	}
+	obs := observationOf(t, wt, comp, "laboratory_test")
+	if obs.State == nil || len(obs.State.Events) != 1 {
+		t.Fatalf("the OBSERVATION's state holds no single event: %+v", obs.State)
+	}
+	return obs.State.Events[0]
+}
+
 // TestREQ053LiftedEventKeysDecode — REQ-053, issue 452. A strict decode of
 // the reference's keys for the laboratory test report, FLAT and STRUCTURED,
 // with and without the template, holds every key and rebuilds the event as
@@ -128,42 +167,54 @@ func TestREQ053LiftedEventKeysDecode(t *testing.T) {
 // with no segment for the event, the INTERVAL_EVENT's width and math_function
 // once, at their Web Template leaves, and a strict decode of the FLAT and the
 // STRUCTURED it writes, with and without the template, gives back the event's
-// RM type, time, width, math_function and sample_count.
+// RM type, time, width, math_function and sample_count. The event is lifted
+// out of the OBSERVATION's `data` HISTORY or out of its `state` one.
 func TestREQ053LiftedEventRoundTrips(t *testing.T) {
-	for _, tc := range []struct {
-		eventType string
-		extra     map[string]any
-	}{
-		{eventType: "POINT_EVENT"},
-		{eventType: "INTERVAL_EVENT", extra: labIntervalKeys()},
-	} {
-		t.Run(tc.eventType, func(t *testing.T) {
-			wt, compiled := labReportTarget(t, tc.eventType)
-			comp := decodeWith(t, wt, labBody(tc.extra), simplified.WithStrict(), simplified.WithTemplate(compiled))
-			flat := flatOf(t, comp, wt)
-			for key, v := range labBody(tc.extra) {
-				if strings.HasPrefix(key, "ctx/") {
-					continue
-				}
-				if flat[key] != v {
-					t.Errorf("MarshalFlat wrote %q = %#v, want %#v", key, flat[key], v)
-				}
-			}
-			for key := range flat {
-				if strings.Contains(key, "any_event") {
-					t.Errorf("MarshalFlat wrote %q, a segment for the lifted event", key)
-				}
-			}
-			for _, mode := range shorthandModes(compiled) {
-				opts := append([]simplified.Option{simplified.WithStrict()}, mode.opts...)
-				for _, format := range []string{"FLAT", "STRUCTURED"} {
-					back := decodeAs(t, format, mustJSON(t, flat), wt, opts...)
-					assertLabEvent(t, mode.name+"/"+format, tc.eventType, onlyEvent(t, wt, back, "laboratory_test"))
-				}
-			}
-			assertLabEvent(t, "MarshalStructured", tc.eventType, onlyEvent(t, wt, structuredRoundTrip(t, comp, wt), "laboratory_test"))
-		})
+	for _, history := range labHistories {
+		for _, tc := range []struct {
+			eventType string
+			extra     map[string]any
+		}{
+			{eventType: "POINT_EVENT"},
+			{eventType: "INTERVAL_EVENT", extra: labIntervalKeys()},
+		} {
+			t.Run(history+"/"+tc.eventType, func(t *testing.T) {
+				testLiftedEventRoundTrips(t, history, tc.eventType, tc.extra)
+			})
+		}
 	}
+}
+
+// testLiftedEventRoundTrips is one case of [TestREQ053LiftedEventRoundTrips]:
+// the event of eventType lifted out of the HISTORY at history, its body's
+// keys labBody(extra).
+func testLiftedEventRoundTrips(t *testing.T, history, eventType string, extra map[string]any) {
+	t.Helper()
+	wt, compiled := labReportTargetIn(t, eventType, history)
+	comp := decodeWith(t, wt, labBody(extra), simplified.WithStrict(), simplified.WithTemplate(compiled))
+	assertLabEvent(t, "UnmarshalFlat", eventType, labEvent(t, wt, comp, history))
+	flat := flatOf(t, comp, wt)
+	for key, v := range labBody(extra) {
+		if strings.HasPrefix(key, "ctx/") {
+			continue
+		}
+		if flat[key] != v {
+			t.Errorf("MarshalFlat wrote %q = %#v, want %#v", key, flat[key], v)
+		}
+	}
+	for key := range flat {
+		if strings.Contains(key, "any_event") {
+			t.Errorf("MarshalFlat wrote %q, a segment for the lifted event", key)
+		}
+	}
+	for _, mode := range shorthandModes(compiled) {
+		opts := append([]simplified.Option{simplified.WithStrict()}, mode.opts...)
+		for _, format := range []string{"FLAT", "STRUCTURED"} {
+			back := decodeAs(t, format, mustJSON(t, flat), wt, opts...)
+			assertLabEvent(t, mode.name+"/"+format, eventType, labEvent(t, wt, back, history))
+		}
+	}
+	assertLabEvent(t, "MarshalStructured", eventType, labEvent(t, wt, structuredRoundTrip(t, comp, wt), history))
 }
 
 // assertLabEvent checks that ev, decoded in the way named how, is an event of
@@ -200,22 +251,25 @@ func assertLabEvent(t *testing.T, how, eventType string, ev rm.Event) {
 // INTERVAL_EVENT whose body spells neither its width nor its math_function
 // still decodes as the INTERVAL_EVENT the template gives, without the
 // template and with it; with it, the two take their defaults, the openEHR
-// 640|actual and PT0S.
+// 640|actual and PT0S. The event is lifted out of the OBSERVATION's `data`
+// HISTORY or out of its `state` one.
 func TestREQ053LiftedIntervalEventKeepsItsType(t *testing.T) {
-	wt, compiled := labReportTarget(t, "INTERVAL_EVENT")
-	for _, mode := range shorthandModes(compiled) {
-		for _, format := range []string{"FLAT", "STRUCTURED"} {
-			t.Run(mode.name+"/"+format, func(t *testing.T) {
-				opts := append([]simplified.Option{simplified.WithStrict()}, mode.opts...)
-				comp := decodeAs(t, format, mustJSON(t, labBody(nil)), wt, opts...)
-				iv := intervalEvent(t, onlyEvent(t, wt, comp, "laboratory_test"))
-				if mode.opts == nil {
-					return
-				}
-				if iv.MathFunction.DefiningCode.CodeString != "640" || iv.Width.Value != "PT0S" {
-					t.Errorf("math_function = %+v, width = %q; want the 640|actual and PT0S defaults", iv.MathFunction, iv.Width.Value)
-				}
-			})
+	for _, history := range labHistories {
+		wt, compiled := labReportTargetIn(t, "INTERVAL_EVENT", history)
+		for _, mode := range shorthandModes(compiled) {
+			for _, format := range []string{"FLAT", "STRUCTURED"} {
+				t.Run(history+"/"+mode.name+"/"+format, func(t *testing.T) {
+					opts := append([]simplified.Option{simplified.WithStrict()}, mode.opts...)
+					comp := decodeAs(t, format, mustJSON(t, labBody(nil)), wt, opts...)
+					iv := intervalEvent(t, labEvent(t, wt, comp, history))
+					if mode.opts == nil {
+						return
+					}
+					if iv.MathFunction.DefiningCode.CodeString != "640" || iv.Width.Value != "PT0S" {
+						t.Errorf("math_function = %+v, width = %q; want the 640|actual and PT0S defaults", iv.MathFunction, iv.Width.Value)
+					}
+				})
+			}
 		}
 	}
 }
@@ -242,13 +296,24 @@ func labIntervalAttrs() map[string]map[string]any {
 // `|sample_count` as unmatched content; the default decode reports each
 // unmatched, drops it and keeps the POINT_EVENT. Without the template a
 // folded POINT_EVENT cannot be told from a folded abstract EVENT, so a strict
-// decode reads each and builds an INTERVAL_EVENT.
+// decode reads each and builds an INTERVAL_EVENT. The event is lifted out of
+// the OBSERVATION's `data` HISTORY or out of its `state` one.
 func TestREQ053LiftedPointEventReadsNoIntervalAttributes(t *testing.T) {
-	wt, compiled := labReportTarget(t, "POINT_EVENT")
+	for _, history := range labHistories {
+		testLiftedPointEventReadsNoIntervalAttributes(t, history)
+	}
+}
+
+// testLiftedPointEventReadsNoIntervalAttributes is
+// [TestREQ053LiftedPointEventReadsNoIntervalAttributes] for the event lifted
+// out of the HISTORY at history.
+func testLiftedPointEventReadsNoIntervalAttributes(t *testing.T, history string) {
+	t.Helper()
+	wt, compiled := labReportTargetIn(t, "POINT_EVENT", history)
 	for _, attr := range slices.Sorted(maps.Keys(labIntervalAttrs())) {
 		keys := labIntervalAttrs()[attr]
 		for _, format := range cdrFormats {
-			t.Run(attr+"/"+format, func(t *testing.T) {
+			t.Run(history+"/"+attr+"/"+format, func(t *testing.T) {
 				_, err := decodeFormat(t, format, wt, labBody(keys), simplified.WithStrict(), simplified.WithTemplate(compiled))
 				if !errors.Is(err, simplified.ErrUnknownPath) || !strings.Contains(err.Error(), "unmatched content") {
 					t.Errorf("strict decode with the template = %v, want it refused as unmatched content", err)
@@ -260,7 +325,7 @@ func TestREQ053LiftedPointEventReadsNoIntervalAttributes(t *testing.T) {
 				if err != nil {
 					t.Fatalf("decode with the template = %v", err)
 				}
-				if ev := onlyEvent(t, wt, comp, "laboratory_test"); !isPointEvent(ev) {
+				if ev := labEvent(t, wt, comp, history); !isPointEvent(ev) {
 					t.Errorf("decode with the template: event is a %T, want *rm.PointEvent[rm.ItemStructure]", ev)
 				}
 				if len(unmatched) == 0 {
@@ -279,7 +344,7 @@ func TestREQ053LiftedPointEventReadsNoIntervalAttributes(t *testing.T) {
 				if err != nil {
 					t.Fatalf("strict decode without the template = %v", err)
 				}
-				intervalEvent(t, onlyEvent(t, wt, comp, "laboratory_test"))
+				intervalEvent(t, labEvent(t, wt, comp, history))
 			})
 		}
 	}
