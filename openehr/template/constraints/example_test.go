@@ -399,6 +399,11 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 		{name: "date-time, minutes, bounds a second apart, in another zone", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: constraints.TemporalRange{Lower: "2021-05-15T10:00:00+02:00", Upper: "2021-05-15T10:00:01+02:00", LowerInclusive: true}, TimezoneValidity: constraints.ValidityMandatory}, want: "2021-05-15T09:00+01:00"},
 		{name: "duration, excluded bounds half a second apart", c: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", Upper: "PT0.5S"}}, want: "PT0.25S"},
 		{name: "duration, excluded bounds either side of zero", c: constraints.CDuration{Range: constraints.TemporalRange{Lower: "-PT1S", Upper: "PT0S"}}, want: "-PT0.5S"},
+		// The value halfway is written to the microsecond, with no digit
+		// the float64 sum leaves past it, unless that reaches a bound.
+		{name: "duration, excluded bounds a tenth of a second apart", c: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0.1S", Upper: "PT0.2S"}}, want: "PT0.15S"},
+		{name: "duration, excluded bounds a tenth of a second apart below zero", c: constraints.CDuration{Range: constraints.TemporalRange{Lower: "-PT0.2S", Upper: "-PT0.1S"}}, want: "-PT0.15S"},
+		{name: "duration, excluded bounds a microsecond apart", c: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", Upper: "PT0.000001S"}}, want: "PT0.0000005S"},
 		// The exception the spec names: only a value the bounds do not
 		// order meets the range, 00:00:00Z here, and 2021-05-15T10:00 below.
 		{name: "time, only a zoned time meets a range with no zone", c: constraints.CTime{Range: upTo("00:00:00", false)}, want: "12:00:00", unsatisfiable: true},

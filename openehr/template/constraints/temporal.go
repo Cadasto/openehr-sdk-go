@@ -240,11 +240,11 @@ func (CDuration) isPrimitive() {}
 // lower bound as written, then that length counted in each designator the
 // pattern names, rounded up and moved past an excluded end; the upper bound
 // likewise, rounded down; and the length halfway between the two bounds,
-// in seconds with its fraction, where the pattern names seconds, so the
-// range between PT0S and PT0.5S, both excluded, gives "PT0.25S". When none
-// passes, as when no duration meets both the pattern and the range, or the
-// pattern or a bound is malformed, it returns "P0D", which Validate then
-// refuses.
+// in seconds with its fraction to the microsecond, where the pattern names
+// seconds, so the range between PT0S and PT0.5S, both excluded, gives
+// "PT0.25S". When none passes, as when no duration meets both the pattern
+// and the range, or the pattern or a bound is malformed, it returns "P0D",
+// which Validate then refuses.
 func (c CDuration) ExampleValue() any {
 	allowed := allDesignators
 	if c.Pattern != "" {
@@ -295,10 +295,12 @@ func (c CDuration) exampleCandidates(allowed uint8) []string {
 }
 
 // durationMidway returns the duration halfway between the two bounds of r,
-// in seconds with the fraction it has, such as "PT0.25S" between PT0S and
-// PT0.5S, and "" where r lacks a bound, a bound is malformed, the bounds
-// leave no room between them, or allowed does not hold the seconds, the
-// one designator that takes a fraction.
+// in seconds with its fraction to the microsecond, such as "PT0.25S"
+// between PT0S and PT0.5S and "PT0.15S" between PT0.1S and PT0.2S, or to
+// the digit it needs where that rounding would reach a bound; and "" where
+// r lacks a bound, a bound is malformed, the bounds leave no room between
+// them, or allowed does not hold the seconds, the one designator that
+// takes a fraction.
 func durationMidway(r TemporalRange, allowed uint8) string {
 	if r.LowerUnbounded || r.UpperUnbounded || allowed&designatorSeconds == 0 {
 		return ""
@@ -309,11 +311,16 @@ func durationMidway(r TemporalRange, allowed uint8) string {
 		return ""
 	}
 	mid := lo + (hi-lo)/2
-	sign := ""
-	if mid < 0 {
-		sign, mid = "-", -mid
+	// The fraction to the microsecond, as midway writes a clock's, so that
+	// the float64 sum writes no digits past it.
+	text := strings.TrimRight(strings.TrimRight(strconv.FormatFloat(mid, 'f', 6, 64), "0"), ".")
+	if v, err := strconv.ParseFloat(text, 64); err != nil || v <= lo || v >= hi {
+		text = strconv.FormatFloat(mid, 'f', -1, 64)
 	}
-	return sign + "PT" + strconv.FormatFloat(mid, 'f', -1, 64) + "S"
+	if abs, negative := strings.CutPrefix(text, "-"); negative {
+		return "-PT" + abs + "S"
+	}
+	return "PT" + text + "S"
 }
 
 // Validate accepts a Go string that rm.DVDuration.ValidISO8601 accepts as
