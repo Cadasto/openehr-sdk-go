@@ -986,7 +986,7 @@ Under every policy, a primitive leaf the generator writes for an OPT primitive c
 - an RM rule narrows it or keeps it within a set (§ [Precedence](#precedence) 3 and 4);
 - the constraint lists no code or ordinal to choose from, where *Placeholders* below decides;
 - it is the text of a coded value, which takes the rubric or term text of its code where the OPT's constraint on the text admits that text (*RM defaults*, *The text of a coded value*), under either `ValueFill`;
-- the template's `<constraints>` set a default value that validates on the data value that holds it, which takes that default under either `ValueFill` (§ *Trust model*);
+- the template's `<constraints>` set a default value that validates on the data value that holds it and keeps the RM rules § *Trust model* names, which takes that default under either `ValueFill` (§ *Trust model*);
 - the OPT leaves it open, where the list below decides.
 
 Under either `ValueFill`, where the OPT leaves one of these values open, with no constraint of its own or a `C_STRING` that has neither a list nor a pattern, the generator writes a value that carries a meaning:
@@ -1288,6 +1288,7 @@ A root `Generate` returns can break § Contract's output rule in these cases, an
 - **A `PARTY` without a `uid`** (§ Contract *Identity*): the generator writes a `PARTY`'s `uid` only where the OPT requires it, so a `PARTY` it writes otherwise breaks `PARTY.Uid_mandatory`, which the floor does not evaluate ([§ REQ-112](#req-112--template-less-reference-model-validation-floor) *What the floor does not evaluate*).
   The object the server stores meets the rule once the server assigns its id.
 - **A list the OPT requires by its existence that canonical JSON cannot carry empty**, which the walk gives no member, is left out, and the template validator reports it `required` (*Known gap: required lists canonical JSON cannot carry empty* below).
+- **A template default that breaks an RM rule the default check does not read** (§ *Trust model*): an interval's flags or order (`Lower_included_valid`, `Limits_consistent`), a DV_MULTIMEDIA's `Not_empty`, a coded rule on a value below the default's own, or a rule § [Precedence](#precedence) 3 applies only to a value the walk draws, such as a `magnitude_status` or a `DV_EHR_URI`'s scheme, is written as the template sets it, and breaks that rule.
 - **A slot whose occurrences the OPT constrains** (below) can be filled where the OPT prohibits it, or left empty where the OPT requires it.
 
 The known gaps below describe the generator as it is; they are informative.
@@ -1356,14 +1357,19 @@ Every root `Large` builds meets § Contract *Output*, so it can be committed, an
 The compiled OPT is **authoritative for structure**.
 The RM graph is assembled attribute-by-attribute from compiled metadata; the generator never guesses paths from an empty composition.
 Primitive leaves are valued from their constraint as § [Primitive-leaf value fill](#primitive-leaf-value-fill) says; REQ-103 guarantees `Validate(ExampleValue()) == nil` for bounded constraints.
-Under either `ValueFill`, a data value whose node carries a default value from the template's `<constraints>` (`CompiledNode.DefaultValue`, [§ REQ-111](#req-111--public-compiled-template-bridge)) takes that default in place of the value the `ValueFill` gives, where the default validates under the node's constraints.
+Under either `ValueFill`, a data value whose node carries a default value from the template's `<constraints>` (`CompiledNode.DefaultValue`, [§ REQ-111](#req-111--public-compiled-template-bridge)) takes that default in place of the value the `ValueFill` gives, where the default validates under the node's constraints and keeps the RM rules below.
 It validates where it is of the RM type the walk builds for the node and meets these, which the walk holds without the template validator:
 
 - the node's own primitive constraint, such as a `C_DV_QUANTITY`, a `C_DV_ORDINAL` or a `C_CODE_PHRASE`;
 - the existence of each attribute the node names: one it requires is there, and one it prohibits is not;
 - for each value an attribute holds, one of the attribute's allowed children: its primitive constraint, for an AOM 1.4 primitive such as `STRING`, and otherwise these same rules, on a value of its RM type.
 
-A default that does not validate leaves the value the `ValueFill` gives.
+It keeps the RM rules where:
+
+- each attribute the BMM marks mandatory is present on it and on each value it holds, as the RM floor reads presence;
+- the settles § [Precedence](#precedence) 3 and 4 run on the walk's own value (a percentage `accuracy`, a DV_PROPORTION's kind, a DV_PERIODIC_TIME_SPECIFICATION's formalism, a coded attribute's group or code set, and `Normal_range_and_status_consistency`) leave it as it is.
+
+A default that does not validate, or breaks such a rule, leaves the value the `ValueFill` gives.
 Compile captures an OPT `<assumed_value>` into the constraint's `Default` field, but the generator does not read it.
 
 The generator is **sound** (every root it returns meets § Contract's output rule, apart from § [Exceptions and known gaps](#exceptions-and-known-gaps)), not **complete** (it does not enumerate every valid instance — different policies may produce different but equally valid trees).
