@@ -2,7 +2,6 @@ package instance
 
 import (
 	"slices"
-	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -156,58 +155,39 @@ func useListedCode(node *tcimpl.CompiledNode, v *rm.DVCodedText) {
 
 // termText returns the text of the term that node's own archetype, its
 // nearest enclosing archetype root, defines for code, as
-// tcimpl.RootTermItem reads it: under termKey, else, for a code of a
-// terminology other than local whose code string is not an at-code
-// (atCode), under that code string alone, the key some OPTs give such a
-// term. An at-code under its bare key names a term of the archetype's own,
-// whatever terminology the code phrase names. ok is false where neither
-// key gives a text.
+// tcimpl.CodeTermText reads it for a coded name or value: under the code
+// string for a local code, else under "<terminology id>::<code string>", or
+// under the code string alone where that is no at-code. ok is false for an
+// openehr code, whose text is its rubric (useCodedText), a code with no
+// terminology, a code that is no real code (placeholderCode), and where no
+// term gives a text.
 func termText(node *tcimpl.CompiledNode, code rm.CodePhrase) (string, bool) {
-	key, ok := termKey(code)
-	if !ok {
-		return "", false
-	}
-	if text, ok := tcimpl.RootTermItem(node, key, "text"); ok && text != "" {
-		return text, true
-	}
-	if code.TerminologyID.Value == "local" || atCode(code.CodeString) {
-		return "", false
-	}
-	text, ok := tcimpl.RootTermItem(node, code.CodeString, "text")
-	return text, ok && text != ""
-}
-
-// termKey returns the key under which an OPT's archetype defines the term
-// for code: the code string of a local code, and
-// "<terminology id>::<code string>" for a code of any terminology other
-// than openehr, such as "SNOMED-CT::248152002", which termText also reads
-// under the code string alone. It reports false for an openehr code, a
-// code with no terminology, and a code with no code string or the
-// placeholder at0000 (noCode).
-func termKey(code rm.CodePhrase) (string, bool) {
 	tid := code.TerminologyID.Value
-	switch {
-	case noCode(code.CodeString), tid == "", tid == terminology.ID:
+	if tid == "" || tid == terminology.ID || placeholderCode(node, code.CodeString) {
 		return "", false
-	case tid == "local":
-		return code.CodeString, true
-	default:
-		return tid + "::" + code.CodeString, true
 	}
+	return tcimpl.CodeTermText(node, tid, code.CodeString)
 }
 
-// atCode reports whether code is an archetype term code: "at" followed by
-// digits, with any dot extensions of digits for a specialisation, such as
-// at0010 or at0010.2 (ADL 1.4, Node Identification).
-func atCode(code string) bool {
-	rest, ok := strings.CutPrefix(code, "at")
-	if !ok {
+// placeholderCode reports whether code, the code string of a coded text the
+// walk built under node, is no real code (noCode): empty, or the placeholder
+// at0000 the walk writes where the OPT lists no code. An at0000 the OPT's
+// own code list names is the archetype's concept code, a real code
+// (listsCode).
+func placeholderCode(node *tcimpl.CompiledNode, code string) bool {
+	return noCode(code) && !listsCode(node, code)
+}
+
+// listsCode reports whether the code-phrase constraint node puts on a coded
+// text lists code: a C_CODE_PHRASE, or the one a C_CODE_REFERENCE carries,
+// on node itself, or on its defining_code as the walk builds it
+// (bindingChild).
+func listsCode(node *tcimpl.CompiledNode, code string) bool {
+	if node == nil {
 		return false
 	}
-	for part := range strings.SplitSeq(rest, ".") {
-		if part == "" || strings.Trim(part, "0123456789") != "" {
-			return false
-		}
+	if cp, ok := constraints.CodePhraseOf(node.PrimitiveConstraint()); ok {
+		return slices.Contains(cp.CodeList, code)
 	}
-	return true
+	return listsCode(bindingChild(node, "defining_code"), code)
 }

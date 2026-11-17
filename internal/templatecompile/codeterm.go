@@ -1,9 +1,9 @@
 package templatecompile
 
 // codeterm.go: the term text of a code a template lists, as a coded name or
-// value reads it. The compile step names a node by it, and the FLAT and
-// STRUCTURED decode completes a coded value with it, so the rule has this one
-// home.
+// value reads it. The compile step names a node by it, the FLAT and
+// STRUCTURED decode completes a coded value with it, and the generator gives
+// a coded text the text of its code with it, so the rule has this one home.
 
 import (
 	"strings"
