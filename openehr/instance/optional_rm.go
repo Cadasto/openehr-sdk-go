@@ -28,7 +28,8 @@ const (
 // (fullLarge), the optional RM attributes of rmValue that Large adds and
 // that opt, the OPT node of rmValue, does not name: opt is nil for a value
 // no OPT node describes, such as the EVENT_CONTEXT applyCompositionDefaults
-// builds where the template names no context. They are:
+// builds where the template names no context, an ENTRY that fills a slot,
+// or an ACTIVITY built from its BMM type (settleBuilt). They are:
 //
 //   - a COMPOSITION's feeder_audit, whose originating_system_audit has the
 //     system_id exampleSystemID and the clock as its time;

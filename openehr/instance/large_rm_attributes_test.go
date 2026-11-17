@@ -262,3 +262,104 @@ func TestREQ107_LargeWritesActivityTiming(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_LargeWritesOptionalRMAttributesWhereNoOPTNodeDescribes is the
+// REQ-107 check of Optional RM attributes under Large that Large writes them
+// on an object no OPT node describes, as on one whose OPT node does not name
+// them: the OBSERVATION that fills a required slot gets its provider and
+// one other participation, the EVENT_CONTEXT built for a context the
+// template names with no child gets its end_time, health_care_facility and
+// one participation, and the ACTIVITY built from
+// the BMM type of activities the template requires with no child gets its
+// timing. Medium writes none of them, nor does the composition builder's
+// seed (REQ-101). Every root passes the template validator and the RM
+// floor, under both value fills.
+func TestREQ107_LargeWritesOptionalRMAttributesWhereNoOPTNodeDescribes(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+		// written reports, for each optional RM attribute the case checks,
+		// whether the generated root holds it.
+		written func(t *testing.T, out any) map[string]bool
+	}{
+		{
+			name: "slot-filled OBSERVATION",
+			opt:  optTemplate("COMPOSITION", optMultiple("content", optSlot("OBSERVATION", "at0001"))),
+			written: func(t *testing.T, out any) map[string]bool {
+				t.Helper()
+				comp, err := instance.AsComposition(out)
+				if err != nil {
+					t.Fatalf("AsComposition: %v", err)
+				}
+				if len(comp.Content) != 1 {
+					t.Fatalf("content holds %d members, want 1", len(comp.Content))
+				}
+				obs, ok := comp.Content[0].(*rm.Observation)
+				if !ok {
+					t.Fatalf("content member is %T, want *rm.Observation", comp.Content[0])
+				}
+				if len(obs.OtherParticipations) == 1 {
+					checkExampleParticipation(t, "OBSERVATION other participation", obs.OtherParticipations[0])
+				}
+				_, self := obs.Provider.(*rm.PartySelf)
+				return map[string]bool{"provider": self, "other_participations": len(obs.OtherParticipations) == 1}
+			},
+		},
+		{
+			name: "EVENT_CONTEXT of a context named with no child",
+			opt:  optTemplate("COMPOSITION", optSingle("context")),
+			written: func(t *testing.T, out any) map[string]bool {
+				t.Helper()
+				comp, err := instance.AsComposition(out)
+				if err != nil {
+					t.Fatalf("AsComposition: %v", err)
+				}
+				ctx := comp.Context
+				if ctx == nil {
+					t.Fatal("context is absent")
+				}
+				if len(ctx.Participations) == 1 {
+					checkExampleParticipation(t, "context participation", ctx.Participations[0])
+				}
+				hcf, named := ctx.HealthCareFacility.(*rm.PartyIdentified)
+				return map[string]bool{
+					"end_time":             ctx.EndTime != nil,
+					"health_care_facility": named && hcf.Name != nil && *hcf.Name == "example",
+					"participations":       len(ctx.Participations) == 1,
+				}
+			},
+		},
+		{
+			name: "ACTIVITY built from its BMM type",
+			opt: optTemplate("INSTRUCTION", append(entryAttrs,
+				optSingle("narrative", optNode("DV_TEXT", "")), optMultiple("activities"))...),
+			written: func(t *testing.T, out any) map[string]bool {
+				t.Helper()
+				timing := onlyActivity(t, out).Timing
+				return map[string]bool{"timing": timing != nil && timing.Formalism == "ISO8601"}
+			},
+		},
+	}
+	for _, tc := range cases {
+		c := compileOPTText(t, tc.opt, true)
+		for _, run := range rmAttributeRuns {
+			for _, opts := range corpusOptions(run.policy) {
+				t.Run(fmt.Sprintf("%s/%s/%v", tc.name, run.name, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(run.ctx(t.Context()), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					for attr, wrote := range tc.written(t, out) {
+						if wrote != run.writes {
+							t.Errorf("Generate(%s) wrote %s: %t, want %t", run.name, attr, wrote, run.writes)
+						}
+					}
+					for _, iss := range templateErrors(out, c) {
+						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+					noFloorErrors(t, out)
+				})
+			}
+		}
+	}
+}

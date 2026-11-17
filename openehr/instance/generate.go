@@ -223,13 +223,16 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	// the defaults an attribute the OPT leaves silent gets, so it passes
 	// the RM floor: an entry's language, encoding, subject and its own
 	// mandatory attributes. The fill holds only its identity here, which
-	// the BMM fill skips, so nothing is filled twice. A CLUSTER or ELEMENT
-	// fill takes finishNode's item defaults alone: one placeholder
+	// the BMM fill skips, so nothing is filled twice. No OPT node describes
+	// the fill, so under Large an ENTRY fill gets the optional RM
+	// attributes Large writes on an object none describes. A CLUSTER or
+	// ELEMENT fill takes finishNode's item defaults alone: one placeholder
 	// element in CLUSTER.items, its only mandatory attribute, and a null
 	// flavour on an ELEMENT, which has none.
 	if optNode.IsSlot() {
 		if _, isItem := rmValue.(rm.Item); !isItem {
 			g.populateBMMRequiredAttrs(rmValue, concreteFor(optNode.RMTypeName()), 0)
+			g.writeOptionalRMAttributes(nil, rmValue)
 		}
 		g.finishNode(optNode, rmValue)
 		return nil
@@ -1527,11 +1530,14 @@ func attrType(parentType, declared string) string {
 // id, uid and references (fillPartyRelationship), and a HISTORY's event,
 // built from its BMM type, which RM Events_valid needs where the HISTORY
 // has no summary either (REQ-107 Precedence 2: no OPT node names a child
-// under its events). attr is the attribute v is built for, which decides
-// the type of a reference. No attribute of the pinned RM has the type
-// PARTY_RELATED, so the BMM alone never builds one, and its relationship
-// is finishNode's alone.
+// under its events). Under Large it also gets the optional RM attributes
+// Large writes on an object no OPT node describes
+// (writeOptionalRMAttributes), such as an ACTIVITY's timing. attr is the
+// attribute v is built for, which decides the type of a reference. No
+// attribute of the pinned RM has the type PARTY_RELATED, so the BMM alone
+// never builds one, and its relationship is finishNode's alone.
 func (g *generator) settleBuilt(v any, attr string) {
+	g.writeOptionalRMAttributes(nil, v)
 	switch b := v.(type) {
 	case *rm.History[rm.ItemStructure]:
 		if len(b.Events) == 0 && (b.Summary == nil || rm.IsTypedNil(b.Summary)) {
