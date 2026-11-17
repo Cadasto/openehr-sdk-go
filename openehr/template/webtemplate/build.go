@@ -721,7 +721,9 @@ func isDroppedContainer(rmType string) bool {
 // another event stays a node, whatever its subtype. The vendored goldens
 // agree: corona lifts 14 sole EVENTs at max=1 and keeps 2 at max=-1, and
 // constrain_test keeps an INTERVAL_EVENT `a24_hour_average` at max=1 beside
-// three repeating EVENTs.
+// three repeating EVENTs. The parent's type goes unchecked, as in the
+// reference: HISTORY.events is the only RM attribute an event can fill, so in
+// a template that meets the RM the parent is a HISTORY.
 func isCollapsedEvent(c *templatecompile.CompiledNode) bool {
 	if !isEventType(c.RMTypeName()) || c.Parent() == nil {
 		return false
