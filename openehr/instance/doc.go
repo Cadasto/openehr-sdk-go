@@ -100,8 +100,9 @@
 //     written are an entry's workflow_id and guideline_id, a locatable's
 //     links, and a history's duration and period. Large is the SDK's
 //     complete level: every root it returns meets the template and the RM,
-//     so it can be committed, where the ITS-REST complete level, every
-//     data point the template allows, is reference guidance. The
+//     apart from the exceptions this documentation names, so it can be
+//     committed, where the ITS-REST complete level, every data point the
+//     template allows, is reference guidance. The
 //     composition builder seeds a Builder with Large short of the second
 //     members and of these RM attributes, the nodes its Set routes values
 //     into.

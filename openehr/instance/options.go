@@ -92,8 +92,11 @@ const (
 	// complete level: unlike the ITS-REST template example's
 	// detail_level=complete, every data point the template allows, as
 	// reference guidance, every root it returns meets the template and the
-	// RM, so it can be committed. The composition builder seeds a Builder
-	// with Large short of the second members and those RM attributes.
+	// RM, apart from the exceptions the package documentation names, such
+	// as a coded attribute whose template admits no code of the set the
+	// RM keeps it in, so it can be committed. The composition builder
+	// seeds a Builder with Large short of the second members and those RM
+	// attributes.
 	Large
 
 	// Minimal is another name for Required.

@@ -235,8 +235,8 @@ func TestREQ101_REQ107_NewSkeletonAcceptsRequired(t *testing.T) {
 // every use of one, which only REQ-107's Large builds. NewBuilder refuses
 // Medium, whose skeleton holds no further use of one archetype under an
 // attribute that holds no other archetype, also given explicitly as the
-// zero value it is, and Required,
-// whose skeleton holds no optional archetype, and so Minimal, with an
+// zero value it is, and Required, whose skeleton holds each entry but no
+// optional archetype inside one, and so Minimal, with an
 // error wrapping ErrUnsupportedPolicy that names the policy, and no
 // Builder. That error does not wrap instance.ErrUnsupportedPolicy, since
 // REQ-107 defines both levels. It accepts Large, and so Complete. The
