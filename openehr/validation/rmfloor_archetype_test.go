@@ -306,18 +306,19 @@ func TestValidateRM_NestedArchetypeRootsAndArchetyped(t *testing.T) {
 	}
 }
 
-// TestValidateJSON_ArchetypedValidPerInstance checks LOCATABLE.Archetyped_valid
-// per instance (REQ-112 Archetype roots, REQ-171 Finding identity) on the four
-// bodies of issue 466 and their controls, each decoded with its report of
-// missing members. A FOLDER, which no class invariant makes a root, is one
-// when its archetype_node_id is an archetype id, so it must carry
-// archetype_details, at the root and nested; on any root, by class or by node
-// id, archetype_details must name the archetype archetype_node_id names, and
-// so must the details an at-code node carries. A class root without details
-// draws its class rule alone, an archetype_node_id that only looks like an
-// archetype id draws nothing, and an empty id draws only its `required`. No
-// issue names a submitted id but by the path's node predicate (REQ-168).
-func TestValidateJSON_ArchetypedValidPerInstance(t *testing.T) {
+// TestValidateJSON_REQ112_REQ171_ArchetypedValidPerInstance checks
+// LOCATABLE.Archetyped_valid per instance (REQ-112 Archetype roots, REQ-171
+// Finding identity) on the four bodies of issue 466 and their controls, each
+// decoded with its report of missing members. A FOLDER, which no class
+// invariant makes a root, is one when its archetype_node_id is an archetype
+// id, so it must carry archetype_details, at the root and nested; on any
+// root, by class or by node id, archetype_details must name the archetype
+// archetype_node_id names, and so must the details an at-code node carries.
+// A class root without details draws its class rule alone, an
+// archetype_node_id that only looks like an archetype id draws nothing, and
+// an empty id draws only its `required`. No issue names a submitted id but
+// by the path's node predicate, and no Detail names one at all.
+func TestValidateJSON_REQ112_REQ171_ArchetypedValidPerInstance(t *testing.T) {
 	t.Parallel()
 	const (
 		name    = `"name":{"_type":"DV_TEXT","value":"x"}`
@@ -424,18 +425,19 @@ func TestValidateJSON_ArchetypedValidPerInstance(t *testing.T) {
 	}
 }
 
-// TestValidateRM_ArchetypeRootPerInstanceOnEveryLocatable sweeps every
-// registered LOCATABLE concrete (REQ-112 Archetype roots, REQ-171 Finding
-// identity). Whatever its class, a node whose archetype_node_id is an
-// archetype id and that carries no archetype_details draws one
-// `is_archetype_root` at /archetype_details: under the Is_archetype_root
-// invariant its class declares or inherits on a root class, and under
-// LOCATABLE.Archetyped_valid on any other. One whose archetype_details names
-// another archetype, or that carries details under an at-code, draws one
-// `archetype_root_id` at /archetype_details/archetype_id/value; one whose
-// details name its archetype draws neither. Under an at-code with no
-// details, only a root class draws its rule.
-func TestValidateRM_ArchetypeRootPerInstanceOnEveryLocatable(t *testing.T) {
+// TestValidateRM_REQ112_REQ171_ArchetypeRootPerInstanceOnEveryLocatable
+// sweeps every registered LOCATABLE concrete (REQ-112 Archetype roots,
+// REQ-171 Finding identity). Whatever its class, a node whose
+// archetype_node_id is an archetype id and that carries no
+// archetype_details draws one `is_archetype_root` at /archetype_details:
+// under the Is_archetype_root invariant its class declares or inherits on a
+// root class, and under LOCATABLE.Archetyped_valid on any other. One whose
+// archetype_details names another archetype, or that carries details under
+// an at-code, draws one `archetype_root_id` at
+// /archetype_details/archetype_id/value; one whose details name its
+// archetype draws neither. Under an at-code with no details, only a root
+// class draws its rule.
+func TestValidateRM_REQ112_REQ171_ArchetypeRootPerInstanceOnEveryLocatable(t *testing.T) {
 	t.Parallel()
 	declarers, err := archetypeRootDeclarers()
 	if err != nil {
