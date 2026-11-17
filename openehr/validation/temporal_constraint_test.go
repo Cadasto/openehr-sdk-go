@@ -195,6 +195,12 @@ type orderCase struct {
 	// zoned reports whether s carries a time zone; nil for a type with
 	// no zones.
 	zoned func(s string) bool
+	// holds maps each sample with no zone to the samples with one that lie
+	// inside the period it names at both readings, +14:00 and -14:00, and
+	// so are equal to it, worked out by hand; nil for a type whose samples
+	// with no zone name no period long enough, a month at least, to hold
+	// one.
+	holds map[string][]string
 	// shared compares a with b at the precision the two share
 	// (iso8601.Fields.Compare) and reports ok when they are written with one
 	// zone designator, or both with none, the pairs the range and the floor
@@ -232,6 +238,12 @@ func clockDateTime(s string) float64 {
 	return iso8601.DateTimeMagnitude(d, t)
 }
 
+// heldAcrossZone reports whether one of a and b, the one with a zone, lies
+// inside the period the other names at both readings, as tc.holds lists.
+func heldAcrossZone(tc orderCase, a, b string) bool {
+	return slices.Contains(tc.holds[a], b) || slices.Contains(tc.holds[b], a)
+}
+
 // sharedOrder is tc.shared of a and b, or not ok for a type that has none.
 func sharedOrder(tc orderCase, a, b string) (int, bool) {
 	if tc.shared == nil {
@@ -256,24 +268,30 @@ func limitsBroken[T rm.DVOrdered](lower, upper T) bool {
 // without a zone are ordered on both sides as XML Schema 1.0 Part 2 §3.2.7.4
 // orders a dateTime: the zoned one read in UTC, the other at +14:00 and at
 // -14:00, a partial value covering its whole period, and ordered only where
-// the two readings agree. Such a pair is never equal, so where the floor puts
-// neither above the other it has not ordered the pair, which lies within 14
-// hours, and each range admits a. The samples hold pairs of mixed zoned-ness
-// within 14 hours and beyond them, so a range check or a floor that dropped
-// the 14 hours, reading the value without a zone at one offset, orders a pair
-// the other side leaves unordered, and fails the test. The range compares a
-// date, a time or a date-time with a bound written with one zone designator,
-// or both with none, at the precision the two share, and the floor orders two
-// such bounds the same way: a pair equal there, as 2004-05 and 2004-05-20
-// are, is one neither puts above the other, so the ranges from b and up to b,
-// included, admit a and the excluded ones refuse it. The floor is held to
-// that order too, so a floor that read a partial value as the start of its
-// period fails the test, and the samples must hold such a pair. The samples
-// mix full and partial values, both layouts, zones on neither, one or both
-// sides, a leap second, and the to_seconds averages of a year and a month.
-// For times and date-times some pairs with different zone designators order
-// one way by their clocks and the other as instants, so a clock-local range
-// check fails the test.
+// the two readings agree. Such a pair is equal where the one with a zone lies
+// inside the other's period at both readings, as 2004-05-20T09:00:00Z lies
+// inside 2004-05: the floor puts neither above the other, and the ranges read
+// it as the equal pair at the shared precision below. holds lists those
+// pairs by hand, 2004-05-31T12:00Z among them, which the year 2004 holds and
+// the month 2004-05 does not, and the date-time samples must hold at least
+// one. Where the floor puts neither of any other mixed pair above the other
+// it has not ordered the pair, which lies within 14 hours of where one starts
+// or ends, and each range admits a. The samples hold pairs of mixed
+// zoned-ness within 14 hours and beyond them, so a range check or a floor
+// that dropped the 14 hours, reading the value without a zone at one offset,
+// orders a pair the other side leaves unordered, and fails the test. The
+// range compares a date, a time or a date-time with a bound written with one
+// zone designator, or both with none, at the precision the two share, and
+// the floor orders two such bounds the same way: a pair equal there, as
+// 2004-05 and 2004-05-20 are, is one neither puts above the other, so the
+// ranges from b and up to b, included, admit a and the excluded ones refuse
+// it. The floor is held to that order too, so a floor that read a partial
+// value as the start of its period fails the test, and the samples must hold
+// such a pair. The samples mix full and partial values, both layouts, zones
+// on neither, one or both sides, a leap second, and the to_seconds averages
+// of a year and a month. For times and date-times some pairs with different
+// zone designators order one way by their clocks and the other as instants,
+// so a clock-local range check fails the test.
 func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 	t.Parallel()
 	tests := []orderCase{
@@ -325,6 +343,21 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 				"2004-05-20T23:59:59.9", "2004", "2004-05-20T10:00:00+02:00", "2004-05-20T09:00:00Z",
 				"2004-05-20T08:00:00Z", "2004-05-21T00:30:00+01:00", "2004-05-20T23:30Z",
 				"20040520T100000-0500", "2016-12-31T23:59:60Z", "2017-01-01T00:59:60+01:00",
+				"2004-05-31T12:00Z",
+			},
+			// The month 2004-05 holds from 2004-05-01T14:00Z up to
+			// 2004-05-31T10:00Z at both readings, and the year 2004 from
+			// 2004-01-01T14:00Z up to 2004-12-31T10:00Z.
+			holds: map[string][]string{
+				"2004-05": {
+					"2004-05-20T10:00:00+02:00", "2004-05-20T09:00:00Z", "2004-05-20T08:00:00Z",
+					"2004-05-21T00:30:00+01:00", "2004-05-20T23:30Z", "20040520T100000-0500",
+				},
+				"2004": {
+					"2004-05-20T10:00:00+02:00", "2004-05-20T09:00:00Z", "2004-05-20T08:00:00Z",
+					"2004-05-21T00:30:00+01:00", "2004-05-20T23:30Z", "20040520T100000-0500",
+					"2004-05-31T12:00Z",
+				},
 			},
 		},
 		{
@@ -348,7 +381,14 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			var admitted, refused, unordered, acrossZone, clockDisagrees, sharedEqual int
+			for bound, held := range tc.holds {
+				for _, s := range append([]string{bound}, held...) {
+					if !slices.Contains(tc.samples, s) {
+						t.Fatalf("%s holds: %q is not a sample", tc.name, s)
+					}
+				}
+			}
+			var admitted, refused, unordered, acrossZone, equalAcrossZone, clockDisagrees, sharedEqual int
 			for _, b := range tc.samples {
 				from := constraints.TemporalRange{Lower: b, LowerInclusive: true, UpperUnbounded: true}
 				after := constraints.TemporalRange{Lower: b, UpperUnbounded: true}
@@ -358,9 +398,18 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 					aAbove, bAbove := tc.above(a, b), tc.above(b, a)
 					wantFrom, wantAfter, wantUpTo, wantBefore := !bAbove, aAbove, !aAbove, bAbove
 					if tc.zoned != nil && tc.zoned(a) != tc.zoned(b) {
+						held := heldAcrossZone(tc, a, b)
 						switch {
 						case aAbove && bAbove:
 							t.Errorf("the floor puts %q above %q and %q above %q, want one way at most", a, b, b, a)
+						case held && (aAbove || bAbove):
+							t.Errorf("the floor puts %q above %q: %t, and %q above %q: %t, want neither, one inside the other at both readings",
+								a, b, aAbove, b, a, bAbove)
+						case held:
+							// Equal, as a pair is at the shared precision:
+							// the ranges from b and up to b, included, admit
+							// a, and the excluded ones refuse it.
+							equalAcrossZone++
 						case aAbove || bAbove:
 							acrossZone++
 						default:
@@ -403,6 +452,9 @@ func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
 			if tc.zoned != nil && (unordered == 0 || acrossZone == 0 || clockDisagrees == 0) {
 				t.Errorf("%s samples: %d pairs of mixed zoned-ness within 14 hours, %d beyond them, and %d pairs whose clocks and instants disagree, want at least one of each",
 					tc.name, unordered, acrossZone, clockDisagrees)
+			}
+			if tc.holds != nil && equalAcrossZone == 0 {
+				t.Errorf("%s samples: no pair of mixed zoned-ness is equal, one inside the other at both readings, want at least one", tc.name)
 			}
 		})
 	}

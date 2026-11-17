@@ -93,12 +93,17 @@ func TestREQ103_DateTimeSpan(t *testing.T) {
 // TestREQ103_OrderAcrossZone pins the order of a value with a zone against
 // one with none: before where the first, read in UTC, ends before the second
 // read at +14:00 starts, after where it starts after the second read at
-// -14:00 ends, and not ordered where the two readings disagree, an edge the
-// two share included, or where the zone does not parse.
+// -14:00 ends, equal where it lies inside the second at both readings, and
+// not ordered where the two readings disagree, an edge the two share
+// included, or where the zone does not parse. The second covers its period
+// up to the start of the next, so a point 14 hours before it ends is the
+// start of the next at +14:00 and not inside it, while a reduced value that
+// ends there is.
 func TestREQ103_OrderAcrossZone(t *testing.T) {
 	t.Parallel()
 	point := func(s float64) Span { return Span{s, s} }
 	noon := point(12 * hour)
+	twoDays := Span{0, 48 * hour}
 	tests := []struct {
 		name     string
 		zoned    Span
@@ -126,6 +131,20 @@ func TestREQ103_OrderAcrossZone(t *testing.T) {
 		{name: "zoneless period ends before", zoned: point(31*hour + 1), zone: "Z", zoneless: Span{12 * hour, 17 * hour}, sign: 1, ok: true},
 		{name: "zoneless period starts after", zoned: point(-10 * hour), zone: "Z", zoneless: Span{5 * hour, 6 * hour}, sign: -1, ok: true},
 		{name: "zoneless period starts within", zoned: point(-9 * hour), zone: "Z", zoneless: Span{5 * hour, 6 * hour}, ok: false},
+		// Two days hold the stretch from 14 hours after they start to 14
+		// hours before they end at both readings.
+		{name: "inside at both readings, from where that starts", zoned: point(14 * hour), zone: "Z", zoneless: twoDays, sign: 0, ok: true},
+		{name: "inside at both readings, a reduced value", zoned: Span{20 * hour, 21 * hour}, zone: "Z", zoneless: twoDays, sign: 0, ok: true},
+		{name: "inside at both readings, up to where that ends", zoned: point(34*hour - 1), zone: "Z", zoneless: twoDays, sign: 0, ok: true},
+		{name: "inside at both readings, a reduced value ending where that ends", zoned: Span{33 * hour, 34 * hour}, zone: "Z", zoneless: twoDays, sign: 0, ok: true},
+		{name: "inside at both readings, read in UTC", zoned: point(16 * hour), zone: "+02:00", zoneless: twoDays, sign: 0, ok: true},
+		{name: "inside at -14:00 only", zoned: point(14*hour - 1), zone: "Z", zoneless: twoDays, ok: false},
+		{name: "inside at -14:00 only, read in UTC", zoned: point(16*hour - 1), zone: "+02:00", zoneless: twoDays, ok: false},
+		{name: "inside at +14:00 only, a point where that ends", zoned: point(34 * hour), zone: "Z", zoneless: twoDays, ok: false},
+		{name: "inside at +14:00 only, a reduced value ending after that", zoned: Span{33*hour + 60, 34*hour + 60}, zone: "Z", zoneless: twoDays, ok: false},
+		{name: "inside at +14:00 only, a reduced value starting before that", zoned: Span{13*hour + 1800, 14*hour + 1800}, zone: "Z", zoneless: twoDays, ok: false},
+		// A period shorter than 28 hours holds nothing at both readings.
+		{name: "inside a day at no reading but one", zoned: point(12 * hour), zone: "Z", zoneless: Span{0, 24 * hour}, ok: false},
 		{name: "no zone", zoned: point(-10 * hour), zone: "", zoneless: noon, ok: false},
 		{name: "a zone the parse refuses", zoned: point(-10 * hour), zone: "+15:00", zoneless: noon, ok: false},
 	}
@@ -139,8 +158,12 @@ func TestREQ103_OrderAcrossZone(t *testing.T) {
 
 // TestREQ103_OrderAcrossZoneOfParsedValues holds OrderAcrossZone, on the
 // spans of parsed values, to the rows of GitHub issue 467 and to a reduced
-// bound with no zone that covers a zoned value: 2030-06-01T10:00Z is not
-// ordered against 2030, which it lies inside at every reading.
+// value with no zone that covers a zoned one: 2030-06-01T10:00Z is equal to
+// 2030, which holds it at both readings, as 2030-06-01T10:00 is at the
+// precision the two share. The year 2030 holds at both readings the stretch
+// from 2030-01-01T14:00Z up to 2030-12-31T10:00Z, and a value within 14
+// hours of where the year starts or ends is not ordered against it. A day
+// is too short to hold a value at both readings.
 func TestREQ103_OrderAcrossZoneOfParsedValues(t *testing.T) {
 	t.Parallel()
 	span := func(s string) (Span, string) {
@@ -160,7 +183,16 @@ func TestREQ103_OrderAcrossZoneOfParsedValues(t *testing.T) {
 		{zoned: "2022-11-02T19:32:40+02:00", zoneless: "2021-12-31T23:59", sign: 1, ok: true},
 		{zoned: "2021-12-31T23:59Z", zoneless: "2022-11-02T19:32:40", sign: -1, ok: true},
 		{zoned: "2020-01-01T00:00Z", zoneless: "2022-11-02T19:32:40", sign: -1, ok: true},
-		{zoned: "2030-06-01T10:00Z", zoneless: "2030", ok: false},
+		{zoned: "2030-06-01T10:00Z", zoneless: "2030", sign: 0, ok: true},
+		{zoned: "2030-06-01T10:00+02:00", zoneless: "2030", sign: 0, ok: true},
+		{zoned: "2030-01-01T14:00:00Z", zoneless: "2030", sign: 0, ok: true},
+		{zoned: "2030-01-01T13:59:59Z", zoneless: "2030", ok: false},
+		{zoned: "2030-12-31T09:59Z", zoneless: "2030", sign: 0, ok: true},
+		{zoned: "2030-12-31T10:00:00Z", zoneless: "2030", ok: false},
+		{zoned: "2030-12-31T10:00Z", zoneless: "2030", ok: false},
+		{zoned: "2030-06-15T12:00Z", zoneless: "2030-06", sign: 0, ok: true},
+		{zoned: "2030-06-30T10:00:00Z", zoneless: "2030-06", ok: false},
+		{zoned: "2030-06-01T10:00Z", zoneless: "2030-06-01", ok: false},
 		{zoned: "2030-12-31T23:59:59-12:00", zoneless: "2030", ok: false},
 		{zoned: "2031-01-01T14:00:01Z", zoneless: "2030", sign: 1, ok: true},
 		{zoned: "2029-12-31T09:59:59Z", zoneless: "2030", sign: -1, ok: true},

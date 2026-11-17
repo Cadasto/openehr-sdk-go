@@ -72,21 +72,36 @@ func (p Date) nextMagnitude() int {
 // dateTime with a zone against one without: the first read in UTC
 // ([UTCMagnitude]), the second read at +14:00 and at -14:00, the zones
 // farthest from UTC. sign is -1 where zoned ends before zoneless starts at
-// +14:00, and +1 where zoned starts after zoneless ends at -14:00. ok is
-// false otherwise, where the two readings disagree: the spans then lie
-// within 14 hours of each other, an edge they share included. ok is false
-// too where [ParseZone] refuses zone, the empty zone included.
+// +14:00, and +1 where zoned starts after zoneless ends at -14:00.
+//
+// sign is 0 where zoned lies inside zoneless at both readings: from 14 hours
+// after zoneless starts up to 14 hours before it ends. The two are then
+// equal, as two values equal on every field they share are, so
+// 2030-06-01T10:00Z is equal to 2030 as 2030-06-01T10:00 is. zoneless covers
+// its period up to the start of the next, so a point 14 hours before
+// zoneless ends is the start of the next period at +14:00 and not inside,
+// while a reduced zoned span that ends there is. Only a month or a longer
+// period is long enough to hold a zoned value at both readings.
+//
+// ok is false otherwise, where the two readings disagree: zoned then lies
+// within 14 hours of where zoneless starts or ends, 14 hours exactly
+// included. ok is false too where [ParseZone] refuses zone, the empty zone
+// included.
 func OrderAcrossZone(zoned Span, zone string, zoneless Span) (sign int, ok bool) {
 	start, ok := UTCMagnitude(zoned.Start, zone)
 	if !ok {
 		return 0, false
 	}
 	end, _ := UTCMagnitude(zoned.End, zone)
+	// inner is where zoneless ends at +14:00, the earlier of its two ends.
+	inner := zoneless.End - maxZoneOffset
 	switch {
 	case end < zoneless.Start-maxZoneOffset:
 		return -1, true
 	case start > zoneless.End+maxZoneOffset:
 		return 1, true
+	case start >= zoneless.Start+maxZoneOffset && (end < inner || (end == inner && start < end)):
+		return 0, true
 	}
 	return 0, false
 }
