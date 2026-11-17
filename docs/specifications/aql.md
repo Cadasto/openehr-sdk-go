@@ -169,7 +169,7 @@ A consumer that needs a deterministic rendering of any `aql.Value`, parsed or co
 
 § Structured path access types exactly **one** bracketed predicate, the standing comparison at the class position, and leaves every other predicate as the raw text between the brackets, which [§ REQ-119](#req-119--re-parseable-canonical-aql-emission) keeps verbatim because a whitespace-collapsed predicate does not re-parse wherever the grammar separates its operands with a keyword.
 A consumer comparing that text against a compiled-OPT node id or a name would have to model the lexer's trivia itself.
-The path-segment predicate is therefore exposed as structure beside its text.
+Every bracketed path predicate is therefore exposed as structure beside its text, at a path step, after a class and on an alias root (§ The class and alias-root brackets carry the same model).
 **`Raw` is the spelling and stays authoritative for emission; the structured model is the value and is authoritative for comparison.** The model carries what `Raw` does not: where each component begins and ends.
 
 #### The bracket is three productions, not one
@@ -215,14 +215,17 @@ A regex component decomposes the `CONTAINED_REGEX` token: the braces, the interi
 #### An unstructured predicate is a statement, not a gap
 
 A predicate the SDK does not structure **MUST** report itself as unstructured, a nil structured carrier beside a populated `Raw`, and never as a partial structure, which a consumer could not tell from a complete one at the type level.
-The unstructured forms at the path-segment position are exactly: a comparison whose right-hand operand the shared value vocabulary does not carry (an `objectPath` operand, a node-code `ID_CODE` / `AT_CODE` operand, or a numeric literal in the residual of § Catalogue and residual), and a junction with an unstructured operand.
+The unstructured forms are exactly, at each of the three brackets: a comparison whose right-hand operand the shared value vocabulary does not carry (an `objectPath` operand, a node-code `ID_CODE` / `AT_CODE` operand, or a numeric literal in the residual of § Catalogue and residual), and a junction with an unstructured operand.
 Every other alternative of every production the position admits is structured, so a reader can fail closed on exactly these forms.
 Shrinking the set (a `PathValue` carrier for the path operand, a node-code value kind) widens the sealed value vocabulary and is its own change.
 
-#### The class position keeps its carrier
+#### The class and alias-root brackets carry the same model
 
-`parse.ClassExpr`'s own fields (`Archetype`, `ParamArchetype`, `Predicate`, `PredicateComparison`) stay the only carrier of the class-position predicate: its three admissible top-level forms already map onto them, and a second carrier derived from the same source node would drift.
-The structured model sits at the path-segment position only.
+The bracket after a class in `FROM` / `CONTAINS` and the bracket on a path's alias root (`o[...]/data`) are the same `pathPredicate` production as a path step.
+Each **MUST** carry the structured model beside its existing fields, derived as a path step's is, so one form yields one structure at all three: `parse.ClassExpr.ParsedPredicate` beside `Archetype`, `ParamArchetype`, `Predicate` and `PredicateComparison`, and `aql.IdentifiedPath.ParsedPredicate` beside `Predicate`.
+Both extractors fill it, the flat lint view included; it is nil where the bracket is absent and on a `VERSION` class, whose bracket is `versionPredicate`.
+`ClassExpr.Archetype` **MUST** carry the HRID of the named form `[hrid, name]` as well as of the bare one, so a reader of `Archetype` alone sees the archetype the class names.
+`ClassExpr.Predicate` keeps the named form's whole bracket text, which emission renders ([§ REQ-119 § Emit-side structural parity](#emit-side-structural-parity)).
 
 #### What the model leaves out
 
@@ -307,7 +310,7 @@ This is the buildable-grammar equivalent of [PROBE-020](conformance.md#probe-020
 
 ### Emission ignores the structured model
 
-`Emit` **MUST NOT** read the structured predicate model of [§ REQ-113 § Structured node predicates](#structured-node-predicates): it renders `Raw`, so a consumer mutating the model cannot change what is emitted.
+`Emit` **MUST NOT** read the structured predicate model of [§ REQ-113 § Structured node predicates](#structured-node-predicates), at a class or an alias root included: it renders `Raw`, and a class bracket from `ClassExpr.Predicate`, or from `ClassExpr.Archetype` when `Predicate` is empty, so a consumer mutating the model cannot change what is emitted.
 It renders the path of a comparison, `EXISTS`, `LIKE` and `MATCHES` from its `Path` and a class predicate from the verbatim `ClassExpr.Predicate`, never from the structured fields of [§ REQ-113 § Structured path access](#structured-path-access), so those fields leave § Round-trip property unaffected.
 
 ### The emission closure property
@@ -403,7 +406,7 @@ A `VERSION` class takes no archetype predicate on either carrier, since `version
 
 ### The class predicate positions
 
-`parse.ClassExpr.Predicate`, the bracket text that is neither an archetype HRID nor a `$param`, is spliced verbatim as the identifier positions are, and admits the same substitution: `Predicate: "a/b='c'] CONTAINS OBSERVATION o[d/e='f'"` emits a whole extra containment term that re-parses cleanly.
+`parse.ClassExpr.Predicate`, the bracket text that is neither a bare archetype HRID nor a `$param`, is spliced verbatim as the identifier positions are, and admits the same substitution: `Predicate: "a/b='c'] CONTAINS OBSERVATION o[d/e='f'"` emits a whole extra containment term that re-parses cleanly.
 One field feeds both `classExprOperand` alternatives, whose accept sets differ:
 
 | Carrier | Grammar | Admits |
@@ -453,7 +456,7 @@ A shape is refused because the grammar cannot carry it as written, or because it
 |---|---|
 | A containment junction anywhere but at the end of its chain | The grammar cannot carry it; `Build()` holds the same rule ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)). |
 | A class node with no RM type that is not a `VERSION` class expression, or with a child-join of its own | The grammar cannot carry it. |
-| A class expression carrying both an archetype and a standing predicate | The grammar cannot carry it: the two are the mutually exclusive spellings of its one `[...]` position, and emitting whichever a switch reaches first drops the other, a row filter, so the query returns more rows than the AST asked for. |
+| A class expression carrying both an archetype and a predicate that is not that archetype's named form | The grammar cannot carry it: the two are the mutually exclusive spellings of its one `[...]` position, and emitting `Predicate`, which emission renders first, drops the archetype, a row filter, so the query returns more rows than the AST asked for. |
 | A `VERSION` class expression carrying an RM type other than `VERSION`, or an archetype predicate | Unrendered content: the alternative has neither slot. `RMType: "VERSION"` beside the flag is accepted, since the extractor sets the two together. |
 | A `$param` archetype flag with no parameter | Unrendered content. |
 | A non-zero FROM root beside a root junction | Unrendered content. |
@@ -462,7 +465,9 @@ A shape is refused because the grammar cannot carry it as written, or because it
 | A negation on the FROM-root junction or on a junction operand | Unrendered content: `NOT` has no spelling there. Negation on a chain child, `NOT CONTAINS`, stays legal. |
 | A structured predicate comparison with no verbatim predicate text | Unrendered content. |
 
-The same dual-operand rule as the archetype-and-standing row binds `aql.Comparison` (`Path` and `Left`) and `aql.MatchesExpr` (its three operand forms).
+The one pair the archetype-and-predicate row accepts is the named form `ParseQuery` produces ([§ REQ-113 § The class and alias-root brackets carry the same model](#the-class-and-alias-root-brackets-carry-the-same-model)).
+Its `Predicate` reads, token by token on the lexer's default channel, as exactly `ARCHETYPE_HRID SYM_COMMA` and one name token (`STRING | PARAMETER | TERM_CODE | AT_CODE | ID_CODE`), with the HRID equal to `Archetype`, on a class that is neither `VERSION` nor a `$param` archetype; emitting `Predicate` then drops nothing.
+The same dual-operand rule as the archetype-and-predicate row binds `aql.Comparison` (`Path` and `Left`) and `aql.MatchesExpr` (its three operand forms).
 `ClassExpr.HasPredicate` is exempt: it is a derived flag carrying no content, so no value of it adds or removes emitted text.
 
 Completeness is checked before placement: the read side infers a node's kind from an absent RM type, so an incomplete class node checked the other way round would be reported as a misplaced junction the caller never wrote.

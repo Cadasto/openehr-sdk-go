@@ -403,13 +403,14 @@ Its client scenarios map to SDK coverage as follows:
 
 #### PROBE-095 — AQL predicate structuring
 
-- **Title:** Every bracketed path predicate the vendored grammar admits at a path-segment position arrives as a typed, trivia-free, delimiter-free structured value beside its untouched verbatim text — or as a member of the enumerated unstructured set, nil beside the verbatim text.
+- **Title:** Every bracketed path predicate the vendored grammar admits at a path step, after a class or on an alias root arrives as a typed, trivia-free, delimiter-free structured value beside its untouched verbatim text — or as a member of the enumerated unstructured set, nil beside the verbatim text.
 - **Preconditions:** The vendored grammar at `resources/aql/grammar/active/AqlParser.g4`, from which the corpus is generated rather than hand-listed, so no grammar alternative goes uncovered unnoticed ([§ REQ-119](aql.md#req-119--re-parseable-canonical-aql-emission) *Acceptance*).
 - **Wire assertion:** In-repo property over the rules of [§ REQ-113 § Structured node predicates](aql.md#structured-node-predicates), which this entry does not restate; it carries the oracle's construction.
   The corpus is generated from the grammar's `pathPredicate` alternatives, down to the `pathPredicateOperand` production whose members decide structured against enumerated-unstructured, and the sweep fails when the grammar admits a form that neither a kind nor the enumerated set covers, which a control shows it able to do.
   Every form is presented at both positions it can occupy, bracket top level and junction operand, and yields the same kind at each; each enumerated unstructured form gives nil beside populated verbatim text at both.
+  Every form is presented at the three brackets the grammar gives the production, a path step, a class and an alias root, and yields the path step's structure at each, both extractors agreeing.
   Trivia and escape independence is a property driven from the same corpus: a mechanically padded spelling gives components equal to the bare spelling's while its verbatim text differs, both arms firing, with the interior-trivia spellings padding cannot generate (inside an operand path, a name slot, regex braces) as named rows beside it.
-  Emission is checked unaffected: the REQ-119 round-trip suites stay green and the emitted text is byte-identical.
+  Emission is checked unaffected at every bracket: the REQ-119 round-trip suites stay green and the emitted text is byte-identical with the model cleared.
 - **Modes:** In-repo (unit-level property; no backend).
 - **Status:** Implemented (inline).
 - **Satisfies:** REQ-113.
