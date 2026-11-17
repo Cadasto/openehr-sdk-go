@@ -169,11 +169,14 @@ func (c CTime) Validate(value any) []Violation {
 // range up to 2021-12-31T23:59, included; as instants, a reduced value
 // standing for the start of the period it names, when both carry a zone and
 // the designators differ; and, when one carries a zone and the other does
-// not, only where they lie more than 14 hours apart, a reduced value
-// covering its whole period. A date with no time carries none. So the range
-// from 2020-01-01T00:00 to 2021-12-31T23:59 refuses "2022-11-02T19:32:40Z",
-// and the range up to 2030 admits "2030-06-01T10:00Z", as it admits
-// "2030-06-01T10:00". A value outside the range is a CodeOutOfRange.
+// not, a reduced value covering its whole period, as before or after where
+// they lie more than 14 hours apart, and as equal where the one with a zone
+// lies inside the other's period at both readings, 14 hours in from either
+// end of it. A date with no time carries none. So the range from
+// 2020-01-01T00:00 to 2021-12-31T23:59 refuses "2022-11-02T19:32:40Z", and
+// the range up to 2030 admits "2030-06-01T10:00Z", as it admits
+// "2030-06-01T10:00", while the range below 2030 refuses both. A value
+// outside the range is a CodeOutOfRange.
 //
 // TimezoneValidity is read as [CTime] reads it; a date-time with no time has
 // no zone, so ValidityMandatory refuses it.

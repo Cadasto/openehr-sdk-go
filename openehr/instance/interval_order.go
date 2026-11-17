@@ -1004,9 +1004,11 @@ func clockEnds(read func(s string) (clockParts, bool)) func(r constraints.Tempor
 // range check orders them ([iso8601.OrderAcrossZone]), after XML Schema 1.0
 // Part 2 §3.2.7.4: the one with a zone read in UTC, the other at +14:00 and
 // at -14:00, a partial value covering the whole period it names. Such a pair
-// compares only where both readings agree, so not within 14 hours of each
-// other, an edge they share included. A value the REQ-123 parse refuses does
-// not compare with any.
+// compares only where both readings agree: one before or after the other,
+// or the one with a zone inside the other's period at both readings, which
+// compares equal; not where the one with a zone lies within 14 hours of the
+// start or end of the other, an edge they share included. A value the
+// REQ-123 parse refuses does not compare with any.
 func temporalCompare(read temporalRead) func(a, b string) (int, bool) {
 	return func(a, b string) (int, bool) {
 		aFields, aSpan, aZone, aOK := read(a)

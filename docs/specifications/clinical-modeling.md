@@ -295,7 +295,7 @@ Concretely:
   - as XML Schema 1.0 Part 2 §3.2.7.4 orders a `dateTime` when one carries a zone and the other does not: the one with a zone is read in UTC and the other at `+14:00` and at `-14:00`, a partial value covering the whole period it names, and the two are ordered only where both readings agree.
     The one with a zone is equal to the other where it lies inside the other's period at both readings, as two values equal on every field they share are.
 
-  Where the two readings disagree, the value and the bound lie within 14 hours of each other, an edge they share included, and are not ordered, so such a bound draws no `CodeOutOfRange`.
+  Where the two readings disagree, the one with a zone lies within 14 hours of where the other's period starts or ends, an edge included, and the two are not ordered, so such a bound draws no `CodeOutOfRange`.
   So a `CDateTime` with the range `2020-01-01T00:00..2021-12-31T23:59` refuses `2022-11-02T19:32:40Z`, more than 14 hours past its upper bound at either reading.
   A `CDateTime` with the range `<=2030` admits `2030-06-01T10:00Z`, which lies inside the year 2030 at both readings, as it admits `2030-06-01T10:00`, and one with the range `<2030` refuses both.
   A `CTime` with the range `>09:30:00+02:00` admits `08:00:00Z`, which is 10:00 at `+02:00`, and `09:00:00`, which has no zone and lies within 14 hours of the bound.
@@ -2113,7 +2113,7 @@ The inventory classifies `DV_INTERVAL.Limits_consistent` as evaluated, but the f
 
 - the `units_system` of two DV_QUANTITY;
 - the comparability of two DV_ORDINAL or DV_SCALE, which the RM leaves undefined;
-- and the order of a pair it reads as strictly comparable but cannot order, one that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, or a zoned DV_TIME or DV_DATE_TIME against one without a zone within 14 hours of it.
+- and the order of a pair it reads as strictly comparable but cannot order, one that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, or a zoned DV_TIME or DV_DATE_TIME within 14 hours of the start or end of one without a zone.
 
 ### Value-typed mandatory presence
 

@@ -504,7 +504,9 @@ func instantOrder(class, lowerZone, upperZone string, lowerMag, upperMag float64
 // [iso8601.OrderAcrossZone], after XML Schema 1.0 Part 2 §3.2.7.4: the value
 // with a zone read in UTC, the one without at +14:00 and at -14:00, a
 // partial value covering the whole period it names. It is ordered only where
-// both readings agree, so a pair within 14 hours of each other, an edge they
+// both readings agree, the value with a zone inside the other's period at
+// both readings reading as equal, so not inverted. A pair whose value with a
+// zone lies within 14 hours of the start or end of the other, an edge they
 // share included, is not ordered and reports nothing here.
 //
 // The finding's magnitudes are the bound with a zone read in UTC and the one
