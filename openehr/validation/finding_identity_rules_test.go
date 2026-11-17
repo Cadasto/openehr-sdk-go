@@ -79,7 +79,7 @@ func fiItem(nodeID, name string, value rm.DataValue) *rm.Element {
 
 // fiCluster is the root of findingIdentityOPT holding items.
 func fiCluster(items ...rm.Item) *rm.Cluster {
-	return &rm.Cluster{ArchetypeNodeID: findingIdentityArchetype, Name: &rm.DVText{Value: "cluster"}, Items: items}
+	return &rm.Cluster{ArchetypeNodeID: findingIdentityArchetype, ArchetypeDetails: archetypeDetails(findingIdentityArchetype), Name: &rm.DVText{Value: "cluster"}, Items: items}
 }
 
 // assertHasIdentities fails the test unless each of want, written as
@@ -123,7 +123,7 @@ func TestValidate_REQ171_TemplateLayerRules(t *testing.T) {
 		},
 		{
 			name: "items present and empty",
-			root: &rm.Cluster{ArchetypeNodeID: findingIdentityArchetype, Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}},
+			root: &rm.Cluster{ArchetypeNodeID: findingIdentityArchetype, ArchetypeDetails: archetypeDetails(findingIdentityArchetype), Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}},
 			want: []string{
 				"required /items template existence",
 				"cardinality /items template cardinality",
@@ -158,6 +158,7 @@ func TestValidate_REQ171_TemplateLayerRules(t *testing.T) {
 			root: func() *rm.Cluster {
 				r := fiCluster(fiItem("at0003", "three", text))
 				r.ArchetypeNodeID = "openEHR-EHR-CLUSTER.other.v1"
+				r.ArchetypeDetails = archetypeDetails(r.ArchetypeNodeID)
 				return r
 			}(),
 			want: []string{"archetype_id_mismatch /archetype_node_id template identity"},
@@ -276,7 +277,7 @@ const paragraphChild = `
 // them.
 func TestValidate_REQ171_EmptyMandatoryListRule(t *testing.T) {
 	t.Parallel()
-	empty := &rm.Cluster{ArchetypeNodeID: "openEHR-EHR-CLUSTER.bare.v1", Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}}
+	empty := &rm.Cluster{ArchetypeNodeID: "openEHR-EHR-CLUSTER.bare.v1", ArchetypeDetails: archetypeDetails("openEHR-EHR-CLUSTER.bare.v1"), Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}}
 	paragraph := valueElement(&rm.DVParagraph{})
 	fullParagraph := valueElement(&rm.DVParagraph{Items: []rm.DVTextLike{&rm.DVText{Value: "line"}}})
 	tests := []struct {

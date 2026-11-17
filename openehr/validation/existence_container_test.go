@@ -120,7 +120,7 @@ func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 	cluster := mustCompileInline(t, containerOPT("CLUSTER", fromLowerUnbounded("0"), containerElement("0")))
 	optionalCluster := mustCompileInline(t, containerOPTWithExistence("CLUSTER", fiInterval("0", "1"), fromLowerUnbounded("0"), containerElement("0")))
 	tree := func(items []rm.Item) *rm.ItemTree {
-		return &rm.ItemTree{ArchetypeNodeID: containerArchetype("ITEM_TREE"), Name: rm.DVText{Value: "tree"}, Items: items}
+		return &rm.ItemTree{ArchetypeNodeID: containerArchetype("ITEM_TREE"), ArchetypeDetails: archetypeDetails(containerArchetype("ITEM_TREE")), Name: rm.DVText{Value: "tree"}, Items: items}
 	}
 	tests := []struct {
 		name string
@@ -177,25 +177,25 @@ func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 		},
 		{
 			name:  "absent RM-mandatory list, cardinality 0..*",
-			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), Name: rm.DVText{Value: "cluster"}},
+			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), ArchetypeDetails: archetypeDetails(containerArchetype("CLUSTER")), Name: rm.DVText{Value: "cluster"}},
 			under: cluster,
 			want:  []string{"required /items template existence"},
 		},
 		{
 			name:  "absent RM-mandatory list, existence 0..1",
-			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), Name: rm.DVText{Value: "cluster"}},
+			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), ArchetypeDetails: archetypeDetails(containerArchetype("CLUSTER")), Name: rm.DVText{Value: "cluster"}},
 			under: optionalCluster,
 			want:  []string{"required /items rm mandatory"},
 		},
 		{
 			name:  "present empty RM-mandatory list, existence 0..1",
-			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), Name: rm.DVText{Value: "cluster"}, Items: []rm.Item{}},
+			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), ArchetypeDetails: archetypeDetails(containerArchetype("CLUSTER")), Name: rm.DVText{Value: "cluster"}, Items: []rm.Item{}},
 			under: optionalCluster,
 			want:  []string{"cardinality /items rm cardinality"},
 		},
 		{
 			name:  "present empty RM-mandatory list, cardinality 0..*",
-			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), Name: rm.DVText{Value: "cluster"}, Items: []rm.Item{}},
+			root:  &rm.Cluster{ArchetypeNodeID: containerArchetype("CLUSTER"), ArchetypeDetails: archetypeDetails(containerArchetype("CLUSTER")), Name: rm.DVText{Value: "cluster"}, Items: []rm.Item{}},
 			under: cluster,
 			want:  []string{"cardinality /items rm cardinality"},
 		},

@@ -174,13 +174,14 @@ func TestValidate_REQ102_PointerHeldSampleCountBindsAsItsValue(t *testing.T) {
 	c := mustCompileInline(t, intervalEventOPT())
 	event := func(count rm.Integer) *rm.IntervalEvent[rm.ItemStructure] {
 		return &rm.IntervalEvent[rm.ItemStructure]{
-			ArchetypeNodeID: "openEHR-EHR-INTERVAL_EVENT.interval_event.v1",
-			Name:            &rm.DVText{Value: "event"},
-			Data:            &rm.ItemTree{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "data"}},
-			MathFunction:    codedTextOf(openEHRCode("146")),
-			Time:            rm.DVDateTime{Value: "2026-01-01T10:00:00Z"},
-			Width:           rm.DVDuration{Value: "PT1H"},
-			SampleCount:     new(count),
+			ArchetypeNodeID:  "openEHR-EHR-INTERVAL_EVENT.interval_event.v1",
+			ArchetypeDetails: archetypeDetails("openEHR-EHR-INTERVAL_EVENT.interval_event.v1"),
+			Name:             &rm.DVText{Value: "event"},
+			Data:             &rm.ItemTree{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "data"}},
+			MathFunction:     codedTextOf(openEHRCode("146")),
+			Time:             rm.DVDateTime{Value: "2026-01-01T10:00:00Z"},
+			Width:            rm.DVDuration{Value: "PT1H"},
+			SampleCount:      new(count),
 		}
 	}
 	tests := []struct {

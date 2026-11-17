@@ -265,8 +265,9 @@ func retypeSlotReEncoder(slot string, replacement map[string]any) func(any) ([]b
 // not just that its entries behave. The RM-floor leg (REQ-112) is a MUST for
 // every fixture; only a fixture whose vendored content carries findings
 // invariant to the round trip may be held out, and today that is exactly the
-// eighteen named below, each justified at its probe030SkipFloor entry. Eleven
-// of them omit archetype_details on an archetype root (REQ-112). Because
+// thirty-five named below, each justified at its probe030SkipFloor entry.
+// Twenty-eight of them omit archetype_details on an archetype root (REQ-112),
+// the seventeen folder_* samples among them. Because
 // probe030RoundTrip skips the floor for any key in this map, an entry added
 // here silently drops the floor MUST for that fixture while TestProbe030 and
 // the ValidateRM plant both stay green. This guard fails when the set changes,
@@ -292,6 +293,23 @@ func TestProbe030SkipFloorSetIsLocked(t *testing.T) {
 		"rm/ehr_status_valid_004_ehr_status_with_other_details_item_single.json",
 		"rm/ehr_status_valid_005_ehr_status_with_other_details_item_table.json",
 		"rm/ehr_status_valid_ehr_can_not_be_modifyable.json",
+		"rm/folder_empty_directory.json",
+		"rm/folder_empty_directory_2_items.json",
+		"rm/folder_empty_directory_items.json",
+		"rm/folder_empty_directory_with_defined_uid.json",
+		"rm/folder_empty_directory_with_details.json",
+		"rm/folder_empty_directory_with_details_items.json",
+		"rm/folder_folder_with_one_item_in_root.json",
+		"rm/folder_subfolders_in_directory.json",
+		"rm/folder_subfolders_in_directory_2_items.json",
+		"rm/folder_subfolders_in_directory_3_items.json",
+		"rm/folder_subfolders_in_directory_different_name.json",
+		"rm/folder_subfolders_in_directory_items.json",
+		"rm/folder_subfolders_in_directory_with_details.json",
+		"rm/folder_subfolders_in_directory_with_details_items.json",
+		"rm/folder_update_1_create_empty_directory.json",
+		"rm/folder_update_2_add_subfolders.json",
+		"rm/folder_update_3_add_items.json",
 		"rm/minimal_evaluation.json",
 	}
 	if got := slices.Sorted(maps.Keys(probe030SkipFloor)); !slices.Equal(got, want) {

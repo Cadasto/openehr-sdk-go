@@ -42,8 +42,9 @@ func TestValidateRMFolder_MissingName(t *testing.T) {
 // well-formed FOLDER reports OK.
 func TestValidateRMFolder_Valid(t *testing.T) {
 	folder := &rm.Folder{
-		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
-		Name:            rm.DVText{Value: "root"},
+		ArchetypeNodeID:  "openEHR-EHR-FOLDER.generic.v1",
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-FOLDER.generic.v1"),
+		Name:             rm.DVText{Value: "root"},
 	}
 	r := validation.ValidateRMFolder(folder)
 	if !r.OK {
@@ -83,8 +84,9 @@ func TestValidate_REQ112_REQ171_BlankCodeStringReportedOnce(t *testing.T) {
 	t.Parallel()
 	blank := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}}
 	folder := &rm.Folder{
-		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
-		Name:            rm.DVCodedText{Value: "labelled", DefiningCode: blank},
+		ArchetypeNodeID:  "openEHR-EHR-FOLDER.generic.v1",
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-FOLDER.generic.v1"),
+		Name:             rm.DVCodedText{Value: "labelled", DefiningCode: blank},
 	}
 	// A DV_CODED_TEXT binds to the DV_TEXT child, which declares no
 	// defining_code, so the RM rules alone read the CODE_PHRASE.
@@ -265,8 +267,9 @@ func TestValidateRM_CodePhraseValid(t *testing.T) {
 // reference's own evaluator.
 func TestValidateRMFolder_ObjectRefItemValid(t *testing.T) {
 	folder := &rm.Folder{
-		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
-		Name:            rm.DVText{Value: "root"},
+		ArchetypeNodeID:  "openEHR-EHR-FOLDER.generic.v1",
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-FOLDER.generic.v1"),
+		Name:             rm.DVText{Value: "root"},
 		Items: []rm.ObjectRefLike{rm.ObjectRef{
 			ID:        &rm.HierObjectID{Value: "8849182c-82ad-4088-a07f-48ead4180515"},
 			Type:      "COMPOSITION",

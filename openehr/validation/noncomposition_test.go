@@ -246,8 +246,9 @@ func TestValidateFolder_Synthetic(t *testing.T) {
 </template>`
 	c := mustCompileInline(t, body)
 	folder := &rm.Folder{
-		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
-		Name:            rm.DVText{Value: "root"},
+		ArchetypeNodeID:  "openEHR-EHR-FOLDER.generic.v1",
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-FOLDER.generic.v1"),
+		Name:             rm.DVText{Value: "root"},
 	}
 	r := validation.ValidateFolder(folder, c)
 	if !r.OK {

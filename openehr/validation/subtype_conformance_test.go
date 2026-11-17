@@ -102,7 +102,9 @@ func valueElement(v rm.DataValue) *rm.Element {
 	return &rm.Element{
 		ArchetypeNodeID: "openEHR-EHR-ELEMENT.element_value.v1",
 		Name:            rm.DVText{Value: "element"},
-		Value:           v,
+		// An archetype id as its node id makes it an archetype root.
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-ELEMENT.element_value.v1"),
+		Value:            v,
 	}
 }
 
@@ -191,9 +193,10 @@ func TestValidateFolder_REQ102_ReferenceSubtypeUnderObjectRefChild(t *testing.T)
 			t.Parallel()
 			c := mustCompileInline(t, folderOPT(tc.itemType))
 			folder := &rm.Folder{
-				ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
-				Name:            rm.DVText{Value: "root"},
-				Items:           []rm.ObjectRefLike{tc.item},
+				ArchetypeNodeID:  "openEHR-EHR-FOLDER.generic.v1",
+				ArchetypeDetails: archetypeDetails("openEHR-EHR-FOLDER.generic.v1"),
+				Name:             rm.DVText{Value: "root"},
+				Items:            []rm.ObjectRefLike{tc.item},
 			}
 			r := validation.ValidateFolder(folder, c)
 			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {

@@ -336,25 +336,32 @@ var probe030SkipFloor = map[string][]string{
 	},
 
 	// The entries below omit archetype_details on an archetype root, which
-	// the RM makes mandatory there (Is_archetype_root with
-	// LOCATABLE.Archetyped_valid).
+	// the RM makes mandatory there (LOCATABLE.Archetyped_valid): on a class
+	// that is always a root (Is_archetype_root), or on a node of any class
+	// whose archetype_node_id is an archetype id.
 
 	// compo_with_nested_party_related (EHRbase openEHR_SDK test data): the
-	// EVALUATION inside the first SECTION has no archetype_details, and its
+	// first SECTION, whose archetype_node_id is an archetype id, and the
+	// EVALUATION inside it have no archetype_details, and the EVALUATION's
 	// PARTY_RELATED subject codes its relationship as external::237, which
 	// breaks Relationship_valid (REQ-112 Coded invariants: the code must be
 	// in the openEHR subject relationship group).
 	"rm/compo_with_nested_party_related.json": {
+		"is_archetype_root /content[openEHR-EHR-SECTION.allgemeine_angaben.v1]/archetype_details",
 		"is_archetype_root /content[openEHR-EHR-SECTION.allgemeine_angaben.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/archetype_details",
 		"code_not_in_value_set /content[openEHR-EHR-SECTION.allgemeine_angaben.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/subject/relationship/defining_code",
 	},
 	// ehr_status_other_details_simple (EHRbase openEHR_SDK test data): the
-	// EHR_STATUS root has no archetype_details.
+	// EHR_STATUS root has no archetype_details, and neither has its
+	// other_details, whose archetype_node_id is an archetype id.
 	"rm/ehr_status_other_details_simple.json": {
 		"is_archetype_root /archetype_details",
+		"is_archetype_root /other_details/archetype_details",
 	},
 	// The eight ehr_status_valid_* samples (EHRbase Robot integration tests):
-	// each EHR_STATUS root has no archetype_details.
+	// each EHR_STATUS root has no archetype_details, and neither has the
+	// other_details of the five that carry one, whose archetype_node_id is
+	// an archetype id.
 	"rm/ehr_status_valid_0000_ehr_status_hardcoded_subject_id_value.json": {
 		"is_archetype_root /archetype_details",
 	},
@@ -363,21 +370,112 @@ var probe030SkipFloor = map[string][]string{
 	},
 	"rm/ehr_status_valid_000_ehr_status_with_other_details.json": {
 		"is_archetype_root /archetype_details",
+		"is_archetype_root /other_details/archetype_details",
 	},
 	"rm/ehr_status_valid_002_ehr_status_with_other_details_item_tree.json": {
 		"is_archetype_root /archetype_details",
+		"is_archetype_root /other_details/archetype_details",
 	},
 	"rm/ehr_status_valid_003_ehr_status_with_other_details_item_list.json": {
 		"is_archetype_root /archetype_details",
+		"is_archetype_root /other_details/archetype_details",
 	},
 	"rm/ehr_status_valid_004_ehr_status_with_other_details_item_single.json": {
 		"is_archetype_root /archetype_details",
+		"is_archetype_root /other_details/archetype_details",
 	},
 	"rm/ehr_status_valid_005_ehr_status_with_other_details_item_table.json": {
 		"is_archetype_root /archetype_details",
+		"is_archetype_root /other_details/archetype_details",
 	},
 	"rm/ehr_status_valid_ehr_can_not_be_modifyable.json": {
 		"is_archetype_root /archetype_details",
+	},
+	// The seventeen folder_* samples (EHRbase Robot integration tests): each
+	// FOLDER whose archetype_node_id is an archetype id, the root and every
+	// sub-folder alike, has no archetype_details.
+	"rm/folder_empty_directory.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/folder_empty_directory_2_items.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/folder_empty_directory_items.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/folder_empty_directory_with_defined_uid.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/folder_empty_directory_with_details.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/folder_empty_directory_with_details_items.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/folder_folder_with_one_item_in_root.json": {
+		"is_archetype_root /archetype_details",
+		"is_archetype_root /folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
+	},
+	"rm/folder_subfolders_in_directory.json": {
+		"is_archetype_root /archetype_details",
+		"is_archetype_root /folders[1]/archetype_details",
+		"is_archetype_root /folders[1]/folders[1]/archetype_details",
+		"is_archetype_root /folders[1]/folders[1]/folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
+		"is_archetype_root /folders[1]/folders[2]/archetype_details",
+		"is_archetype_root /folders[1]/folders[2]/folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
+		"is_archetype_root /folders[2]/archetype_details",
+		"is_archetype_root /folders[2]/folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
+		"is_archetype_root /folders[3]/archetype_details",
+	},
+	"rm/folder_subfolders_in_directory_2_items.json": {
+		"is_archetype_root /archetype_details",
+		"is_archetype_root /folders[1]/archetype_details",
+		"is_archetype_root /folders[2]/archetype_details",
+	},
+	"rm/folder_subfolders_in_directory_3_items.json": {
+		"is_archetype_root /archetype_details",
+		"is_archetype_root /folders[1]/archetype_details",
+		"is_archetype_root /folders[2]/archetype_details",
+		"is_archetype_root /folders[3]/archetype_details",
+	},
+	"rm/folder_subfolders_in_directory_different_name.json": {
+		"is_archetype_root /archetype_details",
+		"is_archetype_root /folders[1]/archetype_details",
+		"is_archetype_root /folders[1]/folders[1]/archetype_details",
+		"is_archetype_root /folders[1]/folders[1]/folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
+		"is_archetype_root /folders[1]/folders[2]/archetype_details",
+		"is_archetype_root /folders[1]/folders[2]/folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
+		"is_archetype_root /folders[2]/archetype_details",
+		"is_archetype_root /folders[2]/folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
+		"is_archetype_root /folders[3]/archetype_details",
+	},
+	"rm/folder_subfolders_in_directory_items.json": {
+		"is_archetype_root /archetype_details",
+		"is_archetype_root /folders[1]/archetype_details",
+		"is_archetype_root /folders[2]/archetype_details",
+	},
+	"rm/folder_subfolders_in_directory_with_details.json": {
+		"is_archetype_root /archetype_details",
+		"is_archetype_root /folders[1]/archetype_details",
+		"is_archetype_root /folders[2]/archetype_details",
+	},
+	"rm/folder_subfolders_in_directory_with_details_items.json": {
+		"is_archetype_root /archetype_details",
+		"is_archetype_root /folders[1]/archetype_details",
+		"is_archetype_root /folders[2]/archetype_details",
+	},
+	"rm/folder_update_1_create_empty_directory.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/folder_update_2_add_subfolders.json": {
+		"is_archetype_root /archetype_details",
+		"is_archetype_root /folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
+		"is_archetype_root /folders[openEHR-EHR-FOLDER.generic.v1]/folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
+	},
+	"rm/folder_update_3_add_items.json": {
+		"is_archetype_root /archetype_details",
+		"is_archetype_root /folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
+		"is_archetype_root /folders[openEHR-EHR-FOLDER.generic.v1]/folders[openEHR-EHR-FOLDER.generic.v1]/archetype_details",
 	},
 	// minimal_evaluation (EHRbase openEHR_SDK test data): the EVALUATION in
 	// content has no archetype_details.

@@ -660,9 +660,10 @@ func TestValidateFolder_REQ102_ItemsBindByRMType(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := mustCompileInline(t, folderOPT(tc.itemType))
 			folder := &rm.Folder{
-				ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
-				Name:            rm.DVText{Value: "root"},
-				Items:           tc.items,
+				ArchetypeNodeID:  "openEHR-EHR-FOLDER.generic.v1",
+				ArchetypeDetails: archetypeDetails("openEHR-EHR-FOLDER.generic.v1"),
+				Name:             rm.DVText{Value: "root"},
+				Items:            tc.items,
 			}
 			r := validation.ValidateFolder(folder, c)
 			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
@@ -715,8 +716,9 @@ func TestValidateFolder_REQ102_REQ111_NilItemUnderUntypedSubFolder(t *testing.T)
 		t.Run("sub-folder type "+strconv.Quote(subType), func(t *testing.T) {
 			c := mustCompileInline(t, subFolderOPT(subType))
 			f := &rm.Folder{
-				ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
-				Name:            &rm.DVText{Value: "folder"},
+				ArchetypeNodeID:  "openEHR-EHR-FOLDER.generic.v1",
+				ArchetypeDetails: archetypeDetails("openEHR-EHR-FOLDER.generic.v1"),
+				Name:             &rm.DVText{Value: "folder"},
 				Folders: []rm.Folder{{
 					ArchetypeNodeID: "at0001",
 					Name:            &rm.DVText{Value: "sub-folder"},
