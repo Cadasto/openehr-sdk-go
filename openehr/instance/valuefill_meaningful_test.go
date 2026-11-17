@@ -181,6 +181,17 @@ func TestREQ107_PlainTextTakesTheNameOfItsLocatable(t *testing.T) {
 			})
 		}
 	})
+	t.Run("value the RM rule needs where the template prohibits null_flavour", func(t *testing.T) {
+		// The template names no value and prohibits the null flavour, so
+		// the value Inv_null_flavour_indicated needs is a plain DV_TEXT
+		// built from its BMM type, which takes the ELEMENT's name too.
+		opt := optTemplate("CLUSTER", commentTerm, optMultiple("items", optNode("ELEMENT", "at0001", optProhibitedSingle("null_flavour"))))
+		eachSetting(t, opt, func(t *testing.T, _ instance.Options, out any) {
+			if got := commentValue[*rm.DVText](t, out).Value; got != "Comment" {
+				t.Errorf("DV_TEXT.value = %q, want the ELEMENT's name Comment", got)
+			}
+		})
+	})
 	t.Run("ELEMENT with no term", func(t *testing.T) {
 		// The OPT gives at0002 no term, so the ELEMENT is named after its
 		// RM type, which names no concept: the text is the example.

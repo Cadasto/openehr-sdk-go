@@ -4230,9 +4230,10 @@ func requiresAttr(opt *tcimpl.CompiledNode, attrName string) bool {
 
 // fillElementValue gives e the value the generator builds for an
 // ELEMENT.value the OPT leaves silent: a default of the attribute's BMM
-// type. A value the OPT names an allowed child for is built from that
-// child instead (writeRMNeeded), so it never gets here. It reports whether
-// it wrote one.
+// type, a plain DV_TEXT, which takes the name of e where the walk is in e
+// (textDefault). A value the OPT names an allowed child for is built from
+// that child instead (writeRMNeeded), so it never gets here. It reports
+// whether it wrote one.
 func (g *generator) fillElementValue(e *rm.Element) bool {
 	rmType, ok := rminfo.Default.AttributeRMType("ELEMENT", "value")
 	if !ok {
@@ -4241,6 +4242,9 @@ func (g *generator) fillElementValue(e *rm.Element) bool {
 	value, known := newRMIfKnown(rmType)
 	if !known {
 		return false
+	}
+	if g.enclosing == rm.Locatable(e) {
+		g.elementValue = value
 	}
 	g.populatePrimitiveDefault(value)
 	g.populateBMMRequiredAttrs(value, concreteFor(rmType), 0)
