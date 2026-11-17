@@ -554,7 +554,7 @@ Not checked: it needs a live external terminology; [§ REQ-111](#req-111--public
 | `term_mapping_match` | a TERM_MAPPING `match` outside `{'>', '=', '<', '?'}` (REQ-112 floor) |
 | `lower_included_valid` / `upper_included_valid` | an interval side marked both unbounded and included (REQ-112 floor, *Interval flags*) |
 | `is_archetype_root` | an absent or `null` `archetype_details` on an archetype-root node (REQ-112 floor, *Archetype roots*) |
-| `archetype_root_id` | an `archetype_details.archetype_id` that differs from `archetype_node_id` on an archetype-root node (REQ-112 floor, *Archetype roots*) |
+| `archetype_root_id` | an `archetype_details.archetype_id.value` that differs from `archetype_node_id` on an archetype-root node (REQ-112 floor, *Archetype roots*) |
 | `rm_version_valid` | an empty `ARCHETYPED.rm_version`, and one the document leaves out or sends as `null` on a value validated with no report of missing members; with the report it is `required` instead ([§ *Value-typed mandatory presence*](#value-typed-mandatory-presence)) |
 | `code_not_in_value_set` | a coded attribute outside the openEHR terminology group or code set its RM invariant names, reported at the CODE_PHRASE the invariant reads (REQ-112 floor, *Coded invariants*) |
 | `max_depth` | the walk hit its recursion-depth limit ([§ REQ-171 *Cycles and limits*](#cycles-and-limits)) |

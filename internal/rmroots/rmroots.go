@@ -6,10 +6,11 @@
 // Archetyped_valid invariant then requires the details. This is the list
 // the instance generator in openehr/instance reads, to refuse to
 // build such an object the template names no archetype for. The RM floor in
-// openehr/validation, which reports an object that lacks the details, takes
-// its classes from the Is_archetype_root entries of its invariant inventory
-// instead, and a test there pins the two sets equal, so they cannot drift
-// apart. The package uses the standard library only, so the generator can
+// openehr/validation takes the same classes from the Is_archetype_root
+// entries of its invariant inventory instead, and a test there pins the two
+// sets equal, so they cannot drift apart. The floor also reads an object of
+// any other class as a root when its archetype_node_id is an archetype id or
+// it carries archetype_details; that reading needs no list. The package uses the standard library only, so the generator can
 // import it without depending on the validator.
 package rmroots
 
