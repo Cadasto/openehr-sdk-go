@@ -946,7 +946,8 @@ The codecs **MUST**:
     - with its `defining_code` constrained through one `C_CODE_PHRASE`, or one `C_CODE_REFERENCE` read as the code phrase it carries.
 
     The name's code is the phrase's first listed code, else the placeholder `at0000` in the terminology the phrase, or the reference set's `terminology:` URI, names, else in `local` ([clinical-modeling.md § REQ-107 *Placeholders*](clinical-modeling.md#placeholders)).
-    Its text is the code's term text where the `C_STRING` on the name's value admits it, and, for a code outside `openehr`, another listed code takes the code's place where that `C_STRING` rejects it, as [clinical-modeling.md § REQ-107 *The text of a coded value*](clinical-modeling.md#the-text-of-a-coded-value) has it for a coded `name`; the placeholder names no term.
+    Its text is the code's term text where the `C_STRING` on the name's value admits it; the placeholder names no term.
+    Where that `C_STRING` rejects the term text of a code outside `openehr`, the first listed code whose term text it admits takes the code's place, with that text, as [clinical-modeling.md § REQ-107 *The text of a coded value*](clinical-modeling.md#the-text-of-a-coded-value) has it for a coded `name`.
     Otherwise the text is the one the generator writes under that `C_STRING`, or `example` where none constrains the value.
     A name whose alternatives disagree, or whose `defining_code` has alternatives, comes back as `DV_TEXT`.
   - The fourth is an ordinal's terminology.
