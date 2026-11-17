@@ -178,10 +178,14 @@ type generator struct {
 	// back to where the OPT gives the node no term. elementValue is the
 	// value the walk built as the value of enclosing, where that is an
 	// ELEMENT, or nil before it builds one: a plain DV_TEXT that is this
-	// value takes the ELEMENT's name (textDefault).
+	// value takes the ELEMENT's name (textDefault). openText is that value
+	// where its text is the open default textDefault wrote and no
+	// constraint has written one since, so settleElement writes it again
+	// from the name the ELEMENT ends with (noteOpenText).
 	enclosing     rm.Locatable
 	enclosingType string
 	elementValue  any
+	openText      *rm.DVText
 	// undescribed holds, per template node, whether it needs content the
 	// template does not describe (needsUndescribed), locatableTypes, per
 	// RM type, whether the value built for it is a LOCATABLE
@@ -211,9 +215,11 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		return nil
 	}
 	if l, ok := rmValue.(rm.Locatable); ok && !rm.IsTypedNil(rmValue) {
-		saved, savedType, savedValue := g.enclosing, g.enclosingType, g.elementValue
-		g.enclosing, g.enclosingType, g.elementValue = l, strings.TrimSpace(optNode.RMTypeName()), nil
-		defer func() { g.enclosing, g.enclosingType, g.elementValue = saved, savedType, savedValue }()
+		saved, savedType, savedValue, savedText := g.enclosing, g.enclosingType, g.elementValue, g.openText
+		g.enclosing, g.enclosingType, g.elementValue, g.openText = l, strings.TrimSpace(optNode.RMTypeName()), nil, nil
+		defer func() {
+			g.enclosing, g.enclosingType, g.elementValue, g.openText = saved, savedType, savedValue, savedText
+		}()
 	}
 	// Slots are leaf fill-points: the slot body is not in this OPT, and
 	// the caller composes it via REQ-101 builder Set calls. A slot the
@@ -1598,6 +1604,7 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	switch v := rmValue.(type) {
 	case *rm.DVText:
 		v.Value = g.textDefault(v)
+		g.noteOpenText(v, true)
 	case *rm.DVCodedText:
 		v.Value = "example"
 		v.DefiningCode = rm.CodePhrase{
@@ -1656,7 +1663,10 @@ const exampleText = "example"
 // REFERENCE_RANGE's meaning has. A name that is only the RM type
 // setLocatableIdentity falls back to, where the OPT gives the ELEMENT no
 // term, names no concept, so it gives exampleText too. A DV_CODED_TEXT
-// never takes it: its text is its code's (useCodedText).
+// never takes it: its text is its code's (useCodedText). Where the OPT
+// lists the ELEMENT's value before its name, the name read here is the
+// one the ELEMENT is built with, so settleElement writes the text again
+// once the walk has written the name (noteOpenText).
 func (g *generator) textDefault(v *rm.DVText) string {
 	if g.enclosing == nil || g.elementValue != any(v) {
 		return exampleText
@@ -1670,6 +1680,23 @@ func (g *generator) textDefault(v *rm.DVText) string {
 		return exampleText
 	default:
 		return text
+	}
+}
+
+// noteOpenText records whether the text the walk has just written on v
+// is the open default textDefault gives the plain DV_TEXT value of the
+// ELEMENT the walk is in (open), or the example of a constraint of its
+// own, which stays. Any other value is not recorded.
+func (g *generator) noteOpenText(v any, open bool) {
+	text, ok := v.(*rm.DVText)
+	if !ok || text == nil || g.elementValue != any(text) {
+		return
+	}
+	switch {
+	case open:
+		g.openText = text
+	case g.openText == text:
+		g.openText = nil
 	}
 }
 
@@ -3001,11 +3028,15 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		ex = sampleValue(pc, g.valueSampler)
 	}
 	if cs, ok := pc.(constraints.CString); ok {
-		if def, ok := g.openStringDefault(rmValue, attr); ok && openString(cs) {
+		if def, ok := g.openStringDefault(rmValue, attr); ok {
 			// A C_STRING that gives no example of its own leaves the
 			// string open, so it takes the value populatePrimitiveDefault
 			// gives.
-			ex = def
+			open := openString(cs)
+			if open {
+				ex = def
+			}
+			g.noteOpenText(rmValue, open)
 		}
 		return applyStringLeaf(leaf, rmValue, attr, cs, ex)
 	}
@@ -4121,9 +4152,14 @@ func (g *generator) placeholderElement() *rm.Element {
 // child admits. A null flavour with a code keeps it, with the text the
 // walk gave it: the rubric of that code in the openEHR null flavours
 // group, where the OPT's constraint on its text admits the rubric
-// (useCodedText). opt is the OPT node of e, or nil for an ELEMENT built
-// from the BMM alone.
+// (useCodedText). A plain DV_TEXT value whose text is still the open
+// default textDefault wrote (openText) takes it again from the name the
+// walk has now written for e, which the OPT can list after the value. opt
+// is the OPT node of e, or nil for an ELEMENT built from the BMM alone.
 func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
+	if text, ok := e.Value.(*rm.DVText); ok && text != nil && text == g.openText {
+		text.Value = g.textDefault(text)
+	}
 	if e.Value != nil && !rm.IsTypedNil(e.Value) {
 		if !valueGivesWay(opt) {
 			e.NullFlavour = nil

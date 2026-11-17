@@ -119,6 +119,68 @@ func TestREQ107_PlainTextTakesTheNameOfItsLocatable(t *testing.T) {
 			})
 		})
 	}
+	t.Run("name the template pins", func(t *testing.T) {
+		// The template renames the ELEMENT Pinned. Where it lists the
+		// value before the name, as most renamed corpus ELEMENTs do, the
+		// open value takes the name the walk writes after it, not the term
+		// Comment; a C_STRING's own example and a template default stay.
+		pinned := optSingle("name", text(value("<list>Pinned</list>")))
+		renamed := func(valueFirst bool, attrs ...string) string {
+			if valueFirst {
+				attrs = append(attrs, pinned)
+			} else {
+				attrs = append([]string{pinned}, attrs...)
+			}
+			return optTemplate("CLUSTER", commentTerm, optMultiple("items", optNode("ELEMENT", "at0001", attrs...)))
+		}
+		renamedCases := []struct {
+			name string
+			opt  string
+			want func(fill instance.ValueFill, got string) bool
+		}{
+			{
+				name: "name before value left silent",
+				opt:  renamed(false, optSingle("value", text())),
+				want: func(_ instance.ValueFill, got string) bool { return got == "Pinned" },
+			},
+			{
+				name: "value left silent before name",
+				opt:  renamed(true, optSingle("value", text())),
+				want: func(_ instance.ValueFill, got string) bool { return got == "Pinned" },
+			},
+			{
+				name: "value attribute with no child before name",
+				opt:  renamed(true, optSingle("value")),
+				want: func(_ instance.ValueFill, got string) bool { return got == "Pinned" },
+			},
+			{
+				name: "open C_STRING before name",
+				opt:  renamed(true, optSingle("value", text(value("")))),
+				want: func(_ instance.ValueFill, got string) bool { return got == "Pinned" },
+			},
+			{
+				name: "C_STRING with a list before name",
+				opt:  renamed(true, optSingle("value", text(value("<list>Comment</list><list>Severe</list>")))),
+				want: func(fill instance.ValueFill, got string) bool {
+					return got == "Comment" || (fill == instance.RandomFill && got == "Severe")
+				},
+			},
+			{
+				name: "template default before name",
+				opt:  withDefault(renamed(true, optSingle("value", text())), "DV_TEXT", "<value>Leeds EPCCS</value>"),
+				want: func(_ instance.ValueFill, got string) bool { return got == "Leeds EPCCS" },
+			},
+		}
+		for _, rc := range renamedCases {
+			t.Run(rc.name, func(t *testing.T) {
+				eachSetting(t, rc.opt, func(t *testing.T, opts instance.Options, out any) {
+					if got := commentValue[*rm.DVText](t, out).Value; !rc.want(opts.ValueFill, got) {
+						t.Errorf("DV_TEXT.value = %q, want the case's %s", got, rc.name)
+					}
+				})
+			})
+		}
+	})
 	t.Run("ELEMENT with no term", func(t *testing.T) {
 		// The OPT gives at0002 no term, so the ELEMENT is named after its
 		// RM type, which names no concept: the text is the example.
