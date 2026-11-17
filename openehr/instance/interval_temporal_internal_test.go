@@ -9,19 +9,19 @@ import (
 )
 
 // TestREQ107_TemporalBoundsCompareAsInstants pins how the REQ-107 ordering
-// rule compares DV_DATE, DV_DATE_TIME and DV_TIME bounds, in the order the
-// RM floor reads them (REQ-112 DV_INTERVAL): at the precision the two share
-// when both are written with one zone designator or both with none
+// rule compares DV_DATE, DV_DATE_TIME and DV_TIME bounds, in the order the RM
+// floor reads them (REQ-112 DV_INTERVAL): at the precision the two share when
+// both are written with one zone designator or both with none
 // (TestREQ107_TemporalBoundsCompareAtSharedPrecision pins the partial
 // values); as instants when both carry a zone and the designators differ, in
 // any layout the ISO 8601 parse accepts, without seconds or with a compact
-// zone included; for a zoned value against a zoneless one as the REQ-103
-// temporal range check orders them, after XML Schema 1.0 Part 2 §3.2.7.4,
-// the zoned one read in UTC and the other at +14:00 and at -14:00, a partial
-// value covering its whole period, so only where the two lie more than 14
-// hours apart; and not at all for a value the parse refuses. A pair that
-// does not compare, such a mixed pair within 14 hours included, is left
-// alone.
+// zone included; for a zoned value against a zoneless one as the temporal
+// range check of constraints.CTime and CDateTime orders them, after XML
+// Schema 1.0 Part 2 §3.2.7.4, the zoned one read in UTC and the other at
+// +14:00 and at -14:00, a partial value covering its whole period, so only
+// where the two lie more than 14 hours apart; and not at all for a value the
+// parse refuses. A pair that does not compare, a mixed pair within 14 hours
+// included, is left alone.
 func TestREQ107_TemporalBoundsCompareAsInstants(t *testing.T) {
 	cases := []struct {
 		name         string

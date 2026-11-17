@@ -9,7 +9,7 @@ package validation_test
 // DV_TIME or DV_DATE_TIME values in different time zones are ordered as
 // instants, partial values and leap seconds included, and one with a zone is
 // ordered against one without only where the two lie more than 14 hours
-// apart, as the REQ-103 temporal range check orders them. A pair that is not
+// apart, as the temporal range check orders them. A pair that is not
 // strictly comparable breaks DV_INTERVAL.Limits_consistent all the same
 // (rmfloor_interval_comparable_test.go). BASE Interval.Limits_comparable,
 // which DV_INTERVAL.Limits_consistent restates, is not evaluated on the BASE
@@ -284,15 +284,16 @@ func TestValidateRM_REQ112_IntervalOrderAtSharedPrecision(t *testing.T) {
 }
 
 // REQ-112 — a DV_TIME or DV_DATE_TIME with a zone and one without are ordered
-// as the REQ-103 temporal range check orders a value against a bound of the
-// other zoned-ness, after XML Schema 1.0 Part 2 §3.2.7.4: the one with a zone
-// read in UTC, the one without at +14:00 and at -14:00, a partial value
-// covering the whole period it names, and ordered only where both readings
-// agree. Each pair below lies more than 14 hours out of order, so it draws
-// Limits_consistent, and reversed it is in order. Value holds the bound with
-// a zone read in UTC and the one without on its clock, each at the start of
-// the period it names. The pairs within 14 hours of each other, which are not
-// ordered, are rows of [TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs].
+// as the temporal range check of constraints.CTime and CDateTime orders a
+// value against a bound of the other zoned-ness, after XML Schema 1.0 Part 2
+// §3.2.7.4: the one with a zone read in UTC, the one without at +14:00 and at
+// -14:00, a partial value covering the whole period it names, and ordered
+// only where both readings agree. Each pair below lies more than 14 hours out
+// of order, so it draws Limits_consistent, and reversed it is in order. Value
+// holds the bound with a zone read in UTC and the one without on its clock,
+// each at the start of the period it names. The pairs within 14 hours of each
+// other, which are not ordered, are rows of
+// [TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs].
 func TestValidateRM_REQ112_IntervalOrderAcrossZone(t *testing.T) {
 	t.Parallel()
 	checkOrder(t, "DV_DATE_TIME with a zone, two years after one without", "DV_DATE_TIME",
