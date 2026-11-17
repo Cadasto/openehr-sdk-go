@@ -630,9 +630,14 @@ type narrowCase struct {
 // unorderedAcrossZone reports whether v, a time, or a date-time when dated,
 // is not ordered against one of bounds that carries a zone where v carries
 // none, or none where v carries one: whether the two lie within 14 hours of
-// each other, as iso8601.OrderAcrossZone reads them.
+// where one starts or ends, as iso8601.OrderAcrossZone reads them. A case
+// with no clock bounds, a duration's, has none to leave v unordered, so v
+// is not read as a time and the sweep names the example it refuses.
 func unorderedAcrossZone(t *testing.T, dated bool, v string, bounds []string) bool {
 	t.Helper()
+	if len(bounds) == 0 {
+		return false
+	}
 	span, zone := clockSpan(t, dated, v)
 	for _, b := range bounds {
 		bspan, bzone := clockSpan(t, dated, b)
@@ -668,6 +673,19 @@ func clockSpan(t *testing.T, dated bool, v string) (iso8601.Span, string) {
 		t.Fatalf("value %q: %v", v, err)
 	}
 	return iso8601.TimeSpan(tm), tm.Zone
+}
+
+// TestREQ103_NarrowSweepReadsNoDurationAsATime holds the narrow-range sweep
+// on a duration, whose case has no clock bounds: unorderedAcrossZone reports
+// its value ordered without reading it as a time, so a refused duration
+// example is named instead of stopping the sweep on the time parse.
+func TestREQ103_NarrowSweepReadsNoDurationAsATime(t *testing.T) {
+	t.Parallel()
+	for _, v := range []string{"P1D", "-PT0.15S"} {
+		if unorderedAcrossZone(t, false, v, nil) {
+			t.Errorf("unorderedAcrossZone(%q, no bounds) = true, want false", v)
+		}
+	}
 }
 
 // narrowCases generates the constraints of the narrow-range sweep.
