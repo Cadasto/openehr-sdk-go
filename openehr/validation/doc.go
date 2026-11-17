@@ -90,7 +90,8 @@
 //     empty when present, and an event or a summary on every HISTORY;
 //   - archetype_details on every archetype root: a COMPOSITION,
 //     EHR_STATUS, EHR_ACCESS, PARTY or ENTRY, and any other node whose
-//     archetype_node_id is an archetype id; at every root, archetype_details
+//     archetype_node_id is an archetype id or that carries
+//     archetype_details; at every root, archetype_details
 //     that names the archetype archetype_node_id names; and a non-empty
 //     archetype_id and rm_version on every ARCHETYPED;
 //   - a member of its group or code set (reported as

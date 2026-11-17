@@ -183,7 +183,8 @@ type Issue struct {
 	// invariant is a lower-case word: "mandatory" for a mandatory attribute
 	// the instance lacks, or a mandatory string left empty; "cardinality"
 	// for a mandatory list that is present and empty; "precision_range" for
-	// a precision below -1.
+	// a precision below -1; "archetype_root_id" for an archetype root whose
+	// archetype_details names another archetype than its archetype_node_id.
 	//
 	// On [LayerTemplate], it is "existence" (an attribute the template
 	// requires and the instance lacks, or one it prohibits and the instance
