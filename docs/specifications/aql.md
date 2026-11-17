@@ -310,8 +310,8 @@ This is the buildable-grammar equivalent of [PROBE-020](conformance.md#probe-020
 
 ### Emission ignores the structured model
 
-`Emit` **MUST NOT** read the structured predicate model of [§ REQ-113 § Structured node predicates](#structured-node-predicates), at a class or an alias root included: it renders `Raw`, and a class bracket from `ClassExpr.Predicate`, or from `ClassExpr.Archetype` when `Predicate` is empty, so a consumer mutating the model cannot change what is emitted.
-It renders the path of a comparison, `EXISTS`, `LIKE` and `MATCHES` from its `Path` and a class predicate from the verbatim `ClassExpr.Predicate`, never from the structured fields of [§ REQ-113 § Structured path access](#structured-path-access), so those fields leave § Round-trip property unaffected.
+`Emit` **MUST NOT** read the structured predicate model of [§ REQ-113 § Structured node predicates](#structured-node-predicates), at a class or an alias root included: it renders `Raw`, so a consumer mutating the model cannot change what is emitted.
+It renders the path of a comparison, `EXISTS`, `LIKE` and `MATCHES` from its `Path`, and a class bracket from the verbatim `ClassExpr.Predicate`, or from `ClassExpr.Archetype` when `Predicate` is empty, never from the structured fields of [§ REQ-113 § Structured path access](#structured-path-access), so those fields leave § Round-trip property unaffected.
 
 ### The emission closure property
 
