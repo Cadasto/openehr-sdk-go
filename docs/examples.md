@@ -198,7 +198,7 @@ go run ./cmd/examples/validate-composition -invalid   # clear a required attribu
 
 It uses the same public `templatecompile.Compile` bridge as [compile-build-validate](#compile-build-validate), so the program can be copied into another module unchanged.
 
-**Default fixture:** `vital_signs.opt`, with a hand-built composition that is valid: an encounter holding one blood-pressure OBSERVATION with a systolic reading, the patient's position and the device used. Besides what the template asks for, it carries what the Reference Model requires: `archetype_details` on the COMPOSITION and the OBSERVATION, a value rather than a null flavour on every ELEMENT, and at least one item in the CLUSTER.
+**Default fixture:** `vital_signs.opt`, with a hand-built composition that is valid: an encounter holding one blood-pressure OBSERVATION with a systolic reading, the patient's position and the device used. Besides what the template asks for, it carries what the Reference Model requires: `archetype_details` on the COMPOSITION, the OBSERVATION and the device CLUSTER, a value rather than a null flavour on every ELEMENT, and at least one item in the CLUSTER.
 
 **Sample output:**
 
@@ -229,7 +229,7 @@ go run ./cmd/examples/validate-from-json comp.json tmpl.opt # your own files
 | Check | What it checks |
 |---|---|
 | Template constraints | What the OPT declares, node by node: existence, cardinality, RM type, archetype identity and value constraints |
-| RM floor | The openEHR Reference Model itself, over every part of the composition the template admits, the parts the OPT does not model included: the attributes the RM makes mandatory on every node, and the RM's own rules for each type, such as an ELEMENT carrying exactly one of a value or a null flavour, and every COMPOSITION and ENTRY carrying `archetype_details` |
+| RM floor | The openEHR Reference Model itself, over every part of the composition the template admits, the parts the OPT does not model included: the attributes the RM makes mandatory on every node, and the RM's own rules for each type, such as an ELEMENT carrying exactly one of a value or a null flavour, and every archetype root carrying `archetype_details` that names its archetype |
 | Members the document leaves out | A mandatory number, boolean or value struct, such as `DV_QUANTITY.magnitude`, that the document leaves out or sends as `null`. It decodes to its zero value, so the decoded composition cannot show it absent; the call reads the document and reports it `required` at the member's path |
 
 At each node the walk first asks whether the template admits the content there, then applies both layers, so the findings follow the document. Content the template refuses, such as an entry a slot does not allow, is reported once and not entered, so nothing inside it is checked; a rule of the node that holds it still reads it and reports at that node, as an ELEMENT carrying both a value and a prohibited null flavour shows. A missing attribute two checks find is reported once. An issue from the template or the Reference Model names its `Layer`; a guard such as `nil_root`, a walk condition such as `max_depth` and a document that does not decode carry none. A composition that passes is valid against the template and the Reference Model rules the floor checks. `validation.ValidateComposition` runs the two layers on a composition already in memory, where there is no document to read for the members it leaves out, and `validation.ValidateRM` runs the floor alone, for a root no template applies to.

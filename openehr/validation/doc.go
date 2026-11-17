@@ -88,9 +88,11 @@
 //   - a COMPOSITION content, EVENT_CONTEXT participations, INSTRUCTION
 //     activities, SECTION items and ATTESTATION items list that is not
 //     empty when present, and an event or a summary on every HISTORY;
-//   - archetype_details on every archetype root (COMPOSITION, EHR_STATUS,
-//     EHR_ACCESS, and every PARTY and ENTRY), and a non-empty archetype_id
-//     and rm_version on every ARCHETYPED;
+//   - archetype_details on every archetype root: a COMPOSITION,
+//     EHR_STATUS, EHR_ACCESS, PARTY or ENTRY, and any other node whose
+//     archetype_node_id is an archetype id; at every root, archetype_details
+//     that names the archetype archetype_node_id names; and a non-empty
+//     archetype_id and rm_version on every ARCHETYPED;
 //   - a member of its group or code set (reported as
 //     `code_not_in_value_set`; see [ValidateRM]) in each attribute the RM
 //     codes from the openEHR terminology, apart from those of the
