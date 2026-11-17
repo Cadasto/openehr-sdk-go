@@ -2,6 +2,7 @@ package lint
 
 import (
 	"fmt"
+	"strings"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
@@ -34,32 +35,40 @@ func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
 	// false-positive policy.
 	for _, p := range md.Paths {
 		ce, ok := md.Aliases[p.Alias]
-		if !ok || ce.Archetype == "" || ce.ParamArchetype {
-			// Unbound (Layer 2), no archetype, or $param. A $param carries no
-			// literal subtree to walk — the CDR resolves the bound scope at
-			// execution (PROBE-021). The ParamArchetype arm is belt-and-braces:
-			// Archetype holds the placeholder text ("$arch"), which no compiled
-			// index can match, so the len(roots)==0 continue below would absorb
-			// the case anyway — but through the wrong reason ("archetype
-			// absent"), and only while that lookup stays a miss.
-			continue
+		if !ok {
+			continue // unbound — Layer 2
 		}
-		roots := c.AllByArchetypeID(ce.Archetype)
+		// The roots are those of every literal HRID the class names: one for
+		// a bare or named bracket, each one an AND / OR bracket names. A
+		// $param names none (classArchetypes skips it) and carries no literal
+		// subtree to walk — the CDR resolves the bound scope at execution
+		// (PROBE-021).
+		var (
+			roots []*tcimpl.CompiledNode
+			under []string
+		)
+		for _, hrid := range classArchetypes(ce) {
+			if r := c.AllByArchetypeID(hrid); len(r) > 0 {
+				roots = append(roots, r...)
+				under = append(under, hrid)
+			}
+		}
 		if len(roots) == 0 {
-			continue // archetype absent — already flagged above
+			continue // no archetype, or every one absent — already flagged above
 		}
 		norm, err := Normalise(p)
 		if err != nil || len(norm.Segments) == 0 {
 			continue // bare alias root — nothing to resolve
 		}
-		// The same archetype may fill several slots (several roots). Warn
-		// only when the path diverges under EVERY root; report the first
-		// divergence. A path valid under any one root is not flagged.
+		// The same archetype may fill several slots (several roots), and a
+		// junction bracket names several archetypes. Warn only when the path
+		// diverges under EVERY root; report the first divergence. A path
+		// valid under any one root is not flagged.
 		//
 		// NOTE: every OPT fixture in the suite compiles each archetype to a
-		// single root, so the multi-root (len(roots) > 1) path is exercised
-		// by construction only — no fixture covers it. A synthetic
-		// multi-slot OPT would be needed to test it directly.
+		// single root, so the multi-root case of ONE archetype is exercised
+		// by construction only — no fixture covers it. Several roots from a
+		// junction's several archetypes are covered.
 		var (
 			bad         string
 			found       bool
@@ -81,7 +90,7 @@ func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
 				Path: displayPath(p),
 				Detail: fmt.Sprintf(
 					"segment %q not found under %s (path may still resolve at the CDR)",
-					bad, ce.Archetype,
+					bad, strings.Join(under, ", "),
 				),
 				Severity: Warning,
 				// The whole path is the finding's extent; the diverging segment

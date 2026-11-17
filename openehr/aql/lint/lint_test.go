@@ -322,6 +322,218 @@ func TestLintArchetypeNotInTemplate(t *testing.T) {
 	}
 }
 
+// REQ-113: the named archetype form `[hrid, name]` sets ClassExpr.Archetype,
+// so every Archetype reader sees the archetype the class names. These three
+// pin the readers: the identifiable-scope check, template membership and
+// path resolution.
+const namedBloodPressure = "OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1, 'Blood pressure']"
+
+func TestREQ113_NamedArchetypeIsIdentifiableScope(t *testing.T) {
+	r := lint.LintString("SELECT o/data FROM "+namedBloodPressure, nil)
+	if has(r, "aql_from_archetype") {
+		t.Fatalf("a class naming an archetype with a name must not warn aql_from_archetype, got %v", codes(r))
+	}
+}
+
+func TestREQ113_NamedArchetypeNotInTemplate(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	r := lint.LintString(
+		"SELECT o/data FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1, 'Lab']",
+		&lint.Options{Compiled: c},
+	)
+	if count(r, "aql_archetype_not_in_template") != 1 {
+		t.Fatalf("want one aql_archetype_not_in_template for the absent named archetype, got %v", codes(r))
+	}
+}
+
+func TestREQ113_PathResolvesUnderNamedArchetype(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	bad := lint.LintString("SELECT o/data[at0001]/eventz/value FROM "+namedBloodPressure, &lint.Options{Compiled: c})
+	if !has(bad, "aql_path_not_in_template") {
+		t.Errorf("a path under a named archetype must resolve against it and warn on eventz, got %v", codes(bad))
+	}
+	good := lint.LintString(
+		"SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude FROM "+namedBloodPressure,
+		&lint.Options{Compiled: c},
+	)
+	if has(good, "aql_path_not_in_template") {
+		t.Errorf("a valid path under a named archetype must not warn, got %v", codes(good))
+	}
+}
+
+// The fourth Archetype reader, the archetype/class conformance check, sees the
+// named form's HRID too.
+func TestREQ113_NamedArchetypeClassMismatch(t *testing.T) {
+	r := lint.LintString("SELECT ev FROM EVALUATION ev[openEHR-EHR-OBSERVATION.blood_pressure.v1, 'x']", nil)
+	if !has(r, "aql_archetype_class_mismatch") {
+		t.Fatalf("a named OBSERVATION archetype on an EVALUATION must raise aql_archetype_class_mismatch, got %v", codes(r))
+	}
+}
+
+// REQ-113, REQ-109: a class bracket that is an AND / OR junction holds its
+// archetype HRIDs in its operands, so ClassExpr.Archetype is empty and the
+// HRIDs are read from ClassExpr.ParsedPredicate. The tests below pin each
+// reader of a class's archetypes on the two junction forms: the
+// identifiable-scope check, the Metadata list behind template membership,
+// path resolution and the archetype/class check.
+const (
+	bloodPressureHRID   = "openEHR-EHR-OBSERVATION.blood_pressure.v1"
+	bodyTemperatureHRID = "openEHR-EHR-OBSERVATION.body_temperature.v1"
+	labResultHRID       = "openEHR-EHR-OBSERVATION.lab_result.v1"
+	labTestHRID         = "openEHR-EHR-OBSERVATION.lab_test.v1"
+
+	andLabResult             = "OBSERVATION o[" + labResultHRID + " and name/value='x']"
+	orBloodPressureLabResult = "OBSERVATION o[" + bloodPressureHRID + " or " + labResultHRID + "]"
+)
+
+// issuePaths returns the Path of every issue carrying code, in order.
+func issuePaths(r lint.Result, code string) []string {
+	var out []string
+	for _, i := range r.Issues {
+		if i.Code == code {
+			out = append(out, i.Path)
+		}
+	}
+	return out
+}
+
+// issueDetails returns the Detail of every issue carrying code, in order.
+func issueDetails(r lint.Result, code string) []string {
+	var out []string
+	for _, i := range r.Issues {
+		if i.Code == code {
+			out = append(out, i.Detail)
+		}
+	}
+	return out
+}
+
+func TestREQ113_REQ109_JunctionArchetypeIsIdentifiableScope(t *testing.T) {
+	for _, class := range []string{andLabResult, orBloodPressureLabResult} {
+		q := "SELECT o/data FROM " + class
+		if r := lint.LintString(q, nil); has(r, "aql_from_archetype") {
+			t.Errorf("LintString(%q) codes = %v, want no aql_from_archetype: the junction names an archetype", q, codes(r))
+		}
+	}
+}
+
+// REQ-109: only a literal HRID inside a junction names an archetype. A
+// `$param` or a node id there does not, so these classes still scan broadly.
+func TestREQ113_REQ109_JunctionWithoutArchetypeStillWarns(t *testing.T) {
+	for _, class := range []string{
+		"OBSERVATION o[$p and name/value='x']",
+		"OBSERVATION o[at0001]",
+		"OBSERVATION o[at0001 or at0002]",
+	} {
+		q := "SELECT o/data FROM " + class
+		if r := lint.LintString(q, nil); !has(r, "aql_from_archetype") {
+			t.Errorf("LintString(%q) codes = %v, want aql_from_archetype: no literal HRID is named", q, codes(r))
+		}
+	}
+}
+
+func TestREQ113_REQ109_JunctionArchetypesInMetadata(t *testing.T) {
+	q := "SELECT o/data FROM COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1 and name/value='x'] " +
+		"CONTAINS (OBSERVATION o[" + bloodPressureHRID + " or " + labResultHRID + " or " + bloodPressureHRID + "] " +
+		"AND OBSERVATION p[" + labResultHRID + "] AND OBSERVATION s[$p or " + bodyTemperatureHRID + "])"
+	got := lint.Extract(mustParse(t, q)).Archetypes
+	want := []string{"openEHR-EHR-COMPOSITION.encounter.v1", bloodPressureHRID, labResultHRID, bodyTemperatureHRID}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Extract(%q).Archetypes = %v, want %v (distinct, in document order)", q, got, want)
+	}
+}
+
+func TestREQ113_REQ109_JunctionArchetypeNotInTemplate(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	for _, tc := range []struct {
+		class string
+		want  []string // the absent HRIDs, one issue each
+	}{
+		{class: andLabResult, want: []string{labResultHRID}},
+		{class: orBloodPressureLabResult, want: []string{labResultHRID}},
+		{
+			class: "OBSERVATION o[" + labResultHRID + " or " + labTestHRID + " or " + labResultHRID + "]",
+			want:  []string{labResultHRID, labTestHRID},
+		},
+	} {
+		q := "SELECT o/data FROM " + tc.class
+		r := lint.LintString(q, &lint.Options{Compiled: c})
+		if got := issuePaths(r, "aql_archetype_not_in_template"); !slices.Equal(got, tc.want) {
+			t.Errorf("LintString(%q) aql_archetype_not_in_template paths = %v, want %v (codes %v)", q, got, tc.want, codes(r))
+		}
+	}
+}
+
+func TestREQ113_REQ109_PathResolvesUnderJunctionArchetype(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	for _, class := range []string{
+		"OBSERVATION o[" + bloodPressureHRID + " and name/value='x']",
+		orBloodPressureLabResult,
+	} {
+		bad := "SELECT o/data[at0001]/eventz/value FROM " + class
+		r := lint.LintString(bad, &lint.Options{Compiled: c})
+		details := issueDetails(r, "aql_path_not_in_template")
+		if len(details) != 1 || !strings.Contains(details[0], bloodPressureHRID) {
+			t.Errorf("LintString(%q) aql_path_not_in_template details = %q, want one naming %s", bad, details, bloodPressureHRID)
+		}
+		good := "SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude FROM " + class
+		if r := lint.LintString(good, &lint.Options{Compiled: c}); has(r, "aql_path_not_in_template") {
+			t.Errorf("LintString(%q) codes = %v, want no aql_path_not_in_template: the path is valid under %s", good, codes(r), bloodPressureHRID)
+		}
+	}
+}
+
+// The archetypes a junction names are alternatives: a path is warned only
+// when it diverges under every one of them the template carries. Blood
+// pressure's event data is an item tree (`items`), body temperature's an item
+// single (`item`), so each path below is valid under exactly one of the two.
+func TestREQ113_REQ109_PathUnderAnyJunctionArchetypeIsNotWarned(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	for _, tc := range []struct{ class, path string }{
+		{class: "OBSERVATION o[" + bodyTemperatureHRID + " or " + bloodPressureHRID + "]", path: "o/data/events/data/items/value"},
+		{class: "OBSERVATION o[" + bloodPressureHRID + " or " + bodyTemperatureHRID + "]", path: "o/data/events/data/item/value"},
+	} {
+		q := "SELECT " + tc.path + " FROM " + tc.class
+		if r := lint.LintString(q, &lint.Options{Compiled: c}); has(r, "aql_path_not_in_template") {
+			t.Errorf("LintString(%q) codes = %v, want no aql_path_not_in_template: one archetype carries the path", q, codes(r))
+		}
+	}
+	q := "SELECT o/data/eventz FROM OBSERVATION o[" + bloodPressureHRID + " or " + bodyTemperatureHRID + "]"
+	r := lint.LintString(q, &lint.Options{Compiled: c})
+	details := issueDetails(r, "aql_path_not_in_template")
+	if len(details) != 1 || !strings.Contains(details[0], bloodPressureHRID) || !strings.Contains(details[0], bodyTemperatureHRID) {
+		t.Errorf("LintString(%q) aql_path_not_in_template details = %q, want one naming both archetypes", q, details)
+	}
+}
+
+func TestREQ113_REQ109_JunctionArchetypeClassMismatch(t *testing.T) {
+	for _, class := range []string{
+		"EVALUATION ev[" + bloodPressureHRID + " and name/value='x']",
+		"EVALUATION ev[openEHR-EHR-EVALUATION.problem_diagnosis.v1 or " + bloodPressureHRID + "]",
+	} {
+		q := "SELECT ev FROM " + class
+		r := lint.LintString(q, nil)
+		details := issueDetails(r, "aql_archetype_class_mismatch")
+		if len(details) != 1 || !strings.Contains(details[0], bloodPressureHRID) {
+			t.Errorf("LintString(%q) aql_archetype_class_mismatch details = %q, want one naming %s", q, details, bloodPressureHRID)
+		}
+	}
+}
+
+// One finding per defect: an HRID a junction repeats is checked once, and
+// archetypes whose type segment the RM does not know raise one
+// aql_unknown_rm_class for the class expression, not one each.
+func TestREQ113_REQ109_JunctionArchetypeFindingsOncePerDefect(t *testing.T) {
+	for _, tc := range []struct{ q, code string }{
+		{q: "SELECT ev FROM EVALUATION ev[" + bloodPressureHRID + " or " + bloodPressureHRID + "]", code: "aql_archetype_class_mismatch"},
+		{q: "SELECT o FROM ENTRY o[openEHR-EHR-FOOTYPE.x.v1 or openEHR-EHR-BARTYPE.y.v1]", code: "aql_unknown_rm_class"},
+	} {
+		if r := lint.LintString(tc.q, nil); count(r, tc.code) != 1 {
+			t.Errorf("LintString(%q) codes = %v, want %s exactly once", tc.q, codes(r), tc.code)
+		}
+	}
+}
+
 // REQ-109 Layer 3: [$arch] is bind-time scope, not a missing HRID.
 func TestLintParamArchetypeNotInTemplateClean(t *testing.T) {
 	c := mustCompile(t, "vital_signs")

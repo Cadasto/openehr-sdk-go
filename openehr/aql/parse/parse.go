@@ -137,9 +137,10 @@ type Document struct {
 	// flattened to document order.
 	//
 	// This is the flat lint view, so every [ClassExpr] read here has a nil
-	// [ClassExpr.PredicateComparison]; the standing predicate is carried as
-	// verbatim text ([ClassExpr.Predicate]) only. Read [Document.Query] for
-	// the parsed comparison; see [ClassExpr.PredicateComparison] for the rule.
+	// [ClassExpr.PredicateComparison]; a standing predicate is carried as
+	// verbatim text ([ClassExpr.Predicate]) and as [ClassExpr.ParsedPredicate],
+	// which both views fill. Read [Document.Query] for the parsed comparison;
+	// see [ClassExpr.PredicateComparison] for the rule.
 	Classes []ClassExpr
 	// Paths are every alias-qualified identified path across the SELECT,
 	// WHERE, and ORDER BY clauses, in document order. A bare `true` /

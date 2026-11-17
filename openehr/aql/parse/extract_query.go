@@ -575,6 +575,10 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 		}
 		if pp := v.PathPredicate(); pp != nil {
 			ce.HasPredicate = true
+			// REQ-113 § Structured node predicates: the class bracket is the
+			// same production as a path step, so it gets the same typed form.
+			// Both class extractors populate it, as both path extractors do.
+			ce.ParsedPredicate = structuredPathPredicate(pp)
 			switch {
 			case pp.ArchetypePredicate() != nil:
 				ap := pp.ArchetypePredicate()
@@ -598,8 +602,10 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 				// Standing predicate (e.g. `[ehr_id/value=$x]`) — capture
 				// verbatim so the emitter round-trips it, and expose a
 				// structured {path, op, value} when it is a simple
-				// comparison (REQ-113).
+				// comparison (REQ-113). The named archetype form
+				// `[hrid, 'name']` also names its archetype on Archetype.
 				ce.Predicate = trimBrackets(sourceText(pp))
+				ce.Archetype = namedArchetypeHRID(pp)
 				ce.PredicateComparison = standingComparison(pp.StandardPredicate())
 			}
 		}
@@ -906,6 +912,9 @@ func extractIdentifiedPath(c gen.IIdentifiedPathContext, clause Clause) Identifi
 	}
 	if pp := c.PathPredicate(); pp != nil {
 		ip.Predicate = trimBrackets(sourceText(pp))
+		// REQ-113 § Structured node predicates: the alias-root bracket is the
+		// same production as a path step, so it gets the same typed form.
+		ip.ParsedPredicate = structuredPathPredicate(pp)
 	}
 	if op := c.ObjectPath(); op != nil {
 		ip.Segments = segmentsFromObjectPath(op)

@@ -242,17 +242,19 @@ func printOperand(indent string, node parse.Containment) {
 }
 
 // describeClassExpr renders `CLASS alias[predicate]`. The predicate is either
-// an archetype id or a standing predicate such as `[ehr_id/value=$x]`.
+// an archetype id or the bracket text as written, such as `[ehr_id/value=$x]`.
+// The text comes first: for a named archetype (`[archetype-id, 'name']`) it
+// holds the whole bracket while Archetype holds only the id.
 func describeClassExpr(class parse.ClassExpr) string {
 	out := class.RMType
 	if class.Alias != "" {
 		out += " " + class.Alias
 	}
 	switch {
-	case class.Archetype != "":
-		out += "[" + class.Archetype + "]"
 	case class.Predicate != "":
 		out += "[" + class.Predicate + "]"
+	case class.Archetype != "":
+		out += "[" + class.Archetype + "]"
 	}
 	return out
 }

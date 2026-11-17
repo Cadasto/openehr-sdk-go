@@ -8,7 +8,8 @@ package parse_test
 // REQ-119 § Acceptance forbids, and the failure it forbids is a grammar
 // alternative silently uncovered. The sweep below reads every alternative of
 // the three productions the bracketed position admits and fails when one has
-// no row here.
+// no row here. Each row runs at the three brackets the grammar gives this
+// production: a path step, a class and an alias root.
 
 import (
 	"fmt"
@@ -240,13 +241,97 @@ func predicateRows() []predicateRow {
 	}
 }
 
-// query wraps a predicate at the requested position.
-func (r predicateRow) query(at position) string {
+// bracket is which of the three `pathPredicate` positions of a query a form is
+// presented at. The grammar gives all three the same production, so the
+// generated corpus runs at each.
+type bracket int
+
+const (
+	atPathStep  bracket = iota // SELECT o/data[FORM]/magnitude FROM OBSERVATION o
+	atClass                    // SELECT o/data/magnitude FROM OBSERVATION o[FORM]
+	atAliasRoot                // SELECT o[FORM]/data/magnitude FROM OBSERVATION o
+)
+
+var brackets = []bracket{atPathStep, atClass, atAliasRoot}
+
+func (b bracket) String() string {
+	switch b {
+	case atClass:
+		return "class"
+	case atAliasRoot:
+		return "alias root"
+	case atPathStep:
+		return "path step"
+	}
+	return fmt.Sprintf("bracket(%d)", int(b))
+}
+
+// queryAt wraps a predicate at the requested position of the requested
+// bracket.
+func (r predicateRow) queryAt(b bracket, at position) string {
 	pred := r.pred
 	if at == inJunction {
 		pred = "at0009 and " + pred
 	}
-	return "SELECT o/data[" + pred + "]/magnitude FROM OBSERVATION o"
+	switch b {
+	case atClass:
+		return "SELECT o/data/magnitude FROM OBSERVATION o[" + pred + "]"
+	case atAliasRoot:
+		return "SELECT o[" + pred + "]/data/magnitude FROM OBSERVATION o"
+	case atPathStep:
+		return "SELECT o/data[" + pred + "]/magnitude FROM OBSERVATION o"
+	}
+	panic(fmt.Sprintf("queryAt: unknown %v", b))
+}
+
+// bracketPredicate reads back, from the flat view, the structured form and the
+// verbatim text of the one bracket a queryAt query carries. At the class
+// bracket the text is on Predicate, or on Archetype for a bare HRID or
+// `$param`.
+func bracketPredicate(t *testing.T, q string, b bracket) (aql.SegmentPredicate, string) {
+	t.Helper()
+	switch b {
+	case atClass:
+		doc, err := parse.Parse(q)
+		if err != nil {
+			t.Fatalf("Parse(%q) = %v", q, err)
+		}
+		c := doc.Classes[0]
+		if c.Predicate != "" {
+			return c.ParsedPredicate, c.Predicate
+		}
+		return c.ParsedPredicate, c.Archetype
+	case atAliasRoot:
+		doc, err := parse.Parse(q)
+		if err != nil {
+			t.Fatalf("Parse(%q) = %v", q, err)
+		}
+		return doc.Paths[0].ParsedPredicate, doc.Paths[0].Predicate
+	case atPathStep:
+		return segmentPredicate(t, q)
+	}
+	t.Fatalf("bracketPredicate: unknown %v", b)
+	return nil, ""
+}
+
+// structuredBracketPredicate is bracketPredicate over the structured query.
+func structuredBracketPredicate(t *testing.T, q string, b bracket) aql.SegmentPredicate {
+	t.Helper()
+	pq, err := parse.ParseQuery(q)
+	if err != nil {
+		t.Fatalf("ParseQuery(%q) = %v", q, err)
+	}
+	if b == atClass {
+		return pq.From.Root.ParsedPredicate
+	}
+	pe, ok := pq.Select.Items[0].Expr.(parse.PathExpr)
+	if !ok {
+		t.Fatalf("ParseQuery(%q): SELECT item is %T; want parse.PathExpr", q, pq.Select.Items[0].Expr)
+	}
+	if b == atAliasRoot {
+		return pe.ParsedPredicate
+	}
+	return firstSegmentPredicate([]parse.IdentifiedPath{pe.IdentifiedPath})
 }
 
 // segmentPredicate reads back the one predicated segment of such a query.
@@ -314,48 +399,78 @@ func TestTheGrammarSweepCanFail(t *testing.T) {
 	}
 }
 
-// TestEveryFormStructures runs each row at every position it can occupy.
+// TestEveryFormStructures runs each row at every position it can occupy, at
+// each of the three brackets.
 func TestEveryFormStructures(t *testing.T) {
+	t.Parallel()
+	for _, r := range predicateRows() {
+		for _, b := range brackets {
+			for _, at := range r.at {
+				t.Run(r.name+"/"+b.String()+"/"+at.String(), func(t *testing.T) {
+					t.Parallel()
+					checkFormStructures(t, r, b, at)
+				})
+			}
+		}
+	}
+}
+
+func checkFormStructures(t *testing.T, r predicateRow, b bracket, at position) {
+	t.Helper()
+	q := r.queryAt(b, at)
+	got, raw := bracketPredicate(t, q, b)
+	if r.wantNil {
+		// An enumerated unstructured form: nil beside the verbatim text — at
+		// BOTH positions, since a junction containing a hole must not ship a
+		// partial structure.
+		if got != nil {
+			t.Fatalf("predicate %q structured as %T; the spec enumerates "+
+				"this form as unstructured", raw, got)
+		}
+		if raw == "" {
+			t.Fatal("verbatim text is empty; Raw must stay populated for an " +
+				"unstructured predicate")
+		}
+		return
+	}
+	if got == nil {
+		t.Fatalf("predicate %q is unstructured; it is not in the spec's "+
+			"enumerated unstructured set", raw)
+	}
+	// At a junction position the whole predicate is a junction; the row's own
+	// kind is its right operand.
+	subject := got
+	if at == inJunction {
+		j, ok := got.(aql.JunctionPredicate)
+		if !ok {
+			t.Fatalf("a junction predicate structured as %T", got)
+		}
+		subject = j.Right
+	}
+	if fmt.Sprintf("%T", subject) != r.want {
+		t.Fatalf("%q structured as %T; want %s", raw, subject, r.want)
+	}
+	if r.check != nil {
+		r.check(t, subject)
+	}
+}
+
+// TestTheSameFormYieldsTheSameKindAtEveryBracket holds the three brackets to
+// one model: a form structures at the class and at the alias root exactly as
+// it does at a path step, nil included, at both positions inside the bracket.
+func TestTheSameFormYieldsTheSameKindAtEveryBracket(t *testing.T) {
 	t.Parallel()
 	for _, r := range predicateRows() {
 		for _, at := range r.at {
 			t.Run(r.name+"/"+at.String(), func(t *testing.T) {
 				t.Parallel()
-				q := r.query(at)
-				got, raw := segmentPredicate(t, q)
-				if r.wantNil {
-					// An enumerated unstructured form: nil beside the verbatim
-					// text — at BOTH positions, since a junction containing a
-					// hole must not ship a partial structure.
-					if got != nil {
-						t.Fatalf("predicate %q structured as %T; the spec enumerates "+
-							"this form as unstructured", raw, got)
+				step, _ := bracketPredicate(t, r.queryAt(atPathStep, at), atPathStep)
+				for _, b := range []bracket{atClass, atAliasRoot} {
+					got, raw := bracketPredicate(t, r.queryAt(b, at), b)
+					if !aql.EqualPredicates(step, got) {
+						t.Errorf("%q at the %s: %+v; at a path step: %+v; the same form must "+
+							"yield the same structure at every bracket", raw, b, got, step)
 					}
-					if raw == "" {
-						t.Fatal("verbatim text is empty; Raw must stay populated for an " +
-							"unstructured predicate")
-					}
-					return
-				}
-				if got == nil {
-					t.Fatalf("predicate %q is unstructured; it is not in the spec's "+
-						"enumerated unstructured set", raw)
-				}
-				// At a junction position the whole predicate is a junction; the
-				// row's own kind is its right operand.
-				subject := got
-				if at == inJunction {
-					j, ok := got.(aql.JunctionPredicate)
-					if !ok {
-						t.Fatalf("a junction predicate structured as %T", got)
-					}
-					subject = j.Right
-				}
-				if fmt.Sprintf("%T", subject) != r.want {
-					t.Fatalf("%q structured as %T; want %s", raw, subject, r.want)
-				}
-				if r.check != nil {
-					r.check(t, subject)
 				}
 			})
 		}
@@ -372,24 +487,26 @@ func TestTheSameFormYieldsTheSameKindInBothPositions(t *testing.T) {
 		if len(r.at) < 2 || r.wantNil {
 			continue
 		}
-		t.Run(r.name, func(t *testing.T) {
-			t.Parallel()
-			top, _ := segmentPredicate(t, r.query(atTopLevel))
-			nested, _ := segmentPredicate(t, r.query(inJunction))
-			j, ok := nested.(aql.JunctionPredicate)
-			if !ok {
-				t.Fatalf("nested case structured as %T; want a junction", nested)
-			}
-			if fmt.Sprintf("%T", top) != fmt.Sprintf("%T", j.Right) {
-				t.Errorf("the same form yields %T at the top of the bracket and %T as a "+
-					"junction operand; the kind must be a property of the form",
-					top, j.Right)
-			}
-			if !aql.EqualPredicates(top, j.Right) {
-				t.Errorf("the same form is not EqualPredicates across positions:\n"+
-					"  top level: %+v\n  nested:    %+v", top, j.Right)
-			}
-		})
+		for _, b := range brackets {
+			t.Run(r.name+"/"+b.String(), func(t *testing.T) {
+				t.Parallel()
+				top, _ := bracketPredicate(t, r.queryAt(b, atTopLevel), b)
+				nested, _ := bracketPredicate(t, r.queryAt(b, inJunction), b)
+				j, ok := nested.(aql.JunctionPredicate)
+				if !ok {
+					t.Fatalf("nested case structured as %T; want a junction", nested)
+				}
+				if fmt.Sprintf("%T", top) != fmt.Sprintf("%T", j.Right) {
+					t.Errorf("the same form yields %T at the top of the bracket and %T as a "+
+						"junction operand; the kind must be a property of the form",
+						top, j.Right)
+				}
+				if !aql.EqualPredicates(top, j.Right) {
+					t.Errorf("the same form is not EqualPredicates across positions:\n"+
+						"  top level: %+v\n  nested:    %+v", top, j.Right)
+				}
+			})
+		}
 	}
 }
 
@@ -550,34 +667,25 @@ func TestEveryNameSpellingIsDiscriminated(t *testing.T) {
 	}
 }
 
-// TestBothExtractorsAgreeOnTheStructure keeps the two path extraction sites in
-// step: their outputs are compared for equality elsewhere, so a structure
-// populated by only one of them would be a silent asymmetry.
+// TestBothExtractorsAgreeOnTheStructure keeps the two extraction sites of each
+// bracket in step: their outputs are compared for equality elsewhere, so a
+// structure populated by only one of them would be a silent asymmetry.
 func TestBothExtractorsAgreeOnTheStructure(t *testing.T) {
 	t.Parallel()
 	for _, r := range predicateRows() {
-		t.Run(r.name, func(t *testing.T) {
-			t.Parallel()
-			q := r.query(atTopLevel)
-			flat, err := parse.Parse(q)
-			if err != nil {
-				t.Fatalf("Parse: %v", err)
+		for _, b := range brackets {
+			for _, at := range r.at {
+				t.Run(r.name+"/"+b.String()+"/"+at.String(), func(t *testing.T) {
+					t.Parallel()
+					q := r.queryAt(b, at)
+					want, _ := bracketPredicate(t, q, b)
+					got := structuredBracketPredicate(t, q, b)
+					if !aql.EqualPredicates(want, got) {
+						t.Errorf("the two extractors disagree on %q:\n  Parse:      %+v\n  ParseQuery: %+v", q, want, got)
+					}
+				})
 			}
-			structured, err := parse.ParseQuery(q)
-			if err != nil {
-				t.Fatalf("ParseQuery: %v", err)
-			}
-			want := firstSegmentPredicate(flat.Paths)
-			var got aql.SegmentPredicate
-			for _, item := range structured.Select.Items {
-				if pe, ok := item.Expr.(parse.PathExpr); ok {
-					got = firstSegmentPredicate([]parse.IdentifiedPath{pe.IdentifiedPath})
-				}
-			}
-			if !aql.EqualPredicates(want, got) {
-				t.Errorf("the two extractors disagree:\n  Parse:      %+v\n  ParseQuery: %+v", want, got)
-			}
-		})
+		}
 	}
 }
 
@@ -593,34 +701,65 @@ func firstSegmentPredicate(paths []parse.IdentifiedPath) aql.SegmentPredicate {
 }
 
 // TestEmissionIsUnaffected asserts rather than assumes REQ-119 parity: the
-// structured model is a read-side derivation, so emitted text must be
-// byte-identical to the source's canonical form.
+// structured model is a read-side derivation, so emission is a fixed point and
+// the emitted text is byte-identical with the model cleared, at every bracket.
 func TestEmissionIsUnaffected(t *testing.T) {
 	t.Parallel()
 	for _, r := range predicateRows() {
-		t.Run(r.name, func(t *testing.T) {
-			t.Parallel()
-			q := r.query(atTopLevel)
-			pq, err := parse.ParseQuery(q)
-			if err != nil {
-				t.Fatalf("ParseQuery: %v", err)
+		for _, b := range brackets {
+			for _, at := range r.at {
+				t.Run(r.name+"/"+b.String()+"/"+at.String(), func(t *testing.T) {
+					t.Parallel()
+					q := r.queryAt(b, at)
+					pq, err := parse.ParseQuery(q)
+					if err != nil {
+						t.Fatalf("ParseQuery: %v", err)
+					}
+					emitted, err := pq.Emit()
+					if err != nil {
+						t.Fatalf("Emit: %v", err)
+					}
+					again, err := parse.ParseQuery(emitted)
+					if err != nil {
+						t.Fatalf("re-parsing emitted %q: %v", emitted, err)
+					}
+					twice, err := again.Emit()
+					if err != nil {
+						t.Fatalf("second Emit: %v", err)
+					}
+					if twice != emitted {
+						t.Errorf("emission is not a fixed point:\n  first  %q\n  second %q", emitted, twice)
+					}
+					clearPredicateModel(pq)
+					cleared, err := pq.Emit()
+					if err != nil || cleared != emitted {
+						t.Errorf("emission read the structured model: with it %q, without it %q (err %v)",
+							emitted, cleared, err)
+					}
+				})
 			}
-			emitted, err := pq.Emit()
-			if err != nil {
-				t.Fatalf("Emit: %v", err)
-			}
-			again, err := parse.ParseQuery(emitted)
-			if err != nil {
-				t.Fatalf("re-parsing emitted %q: %v", emitted, err)
-			}
-			twice, err := again.Emit()
-			if err != nil {
-				t.Fatalf("second Emit: %v", err)
-			}
-			if twice != emitted {
-				t.Errorf("emission is not a fixed point:\n  first  %q\n  second %q", emitted, twice)
-			}
-		})
+		}
+	}
+}
+
+// clearPredicateModel removes the structured predicate model from every
+// bracket of a query of the queryAt shape: the class, the SELECT path's alias
+// root and its steps.
+func clearPredicateModel(q *parse.Query) {
+	q.From.Root.ParsedPredicate = nil
+	for i, item := range q.Select.Items {
+		pe, ok := item.Expr.(parse.PathExpr)
+		if !ok {
+			continue
+		}
+		pe.ParsedPredicate = nil
+		segs := make([]parse.PathSegment, len(pe.Segments))
+		for j, seg := range pe.Segments {
+			seg.Parsed = nil
+			segs[j] = seg
+		}
+		pe.Segments = segs
+		q.Select.Items[i].Expr = pe
 	}
 }
 

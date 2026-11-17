@@ -409,9 +409,14 @@ func namesSelectAlias(p parse.IdentifiedPath, selectAliases map[string]bool) boo
 	return selectAliases[p.Alias]
 }
 
+// hasIdentifiableScope reports whether FROM / CONTAINS names a literal
+// archetype HRID (bare, named, or inside an AND / OR bracket), a `$param`
+// archetype bracket, a VERSION operand or an EHR root. A `$param` or a node id
+// inside a junction bracket does not count: only the whole `[$param]` bracket
+// sets ParamArchetype.
 func hasIdentifiableScope(doc *parse.Document) bool {
 	return slices.ContainsFunc(doc.Classes, func(ce parse.ClassExpr) bool {
-		return ce.Archetype != "" || ce.ParamArchetype || ce.Version || ce.RMType == "EHR"
+		return len(classArchetypes(ce)) > 0 || ce.ParamArchetype || ce.Version || ce.RMType == "EHR"
 	})
 }
 
