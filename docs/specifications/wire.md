@@ -926,7 +926,7 @@ The codecs **MUST**:
   The `rm_version` value is not: the reference writes a fixed `1.0.4`, while `rm_version` records the RM release an object was built against, so the SDK writes its own.
   Encode writes nothing for `archetype_details` ([§ REQ-140](#req-140--underscore-prefixed-rm-attributes) names it among the attributes out of scope).
   Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
-- Take from the compiled template, when decode is given one (`simplified.WithTemplate`), what the formats do not carry and the template determines.
+- Take from the compiled template, when decode is given one (`simplified.WithTemplate`), what the formats do not carry and the template determines, and, where the template leaves a coded node name open, the one the generator writes.
   Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
   - The first such fact is a folded structure's concrete subtype: the formats fold every `ITEM_STRUCTURE` away, and `ITEM_TREE` and `ITEM_LIST` both hold `items`, so the path cannot tell them apart.
     A decoded `ITEM_STRUCTURE` takes the subtype the compiled template gives the node at its path, where that subtype is an `ITEM_STRUCTURE` declaring the attribute the path goes on through.
@@ -940,12 +940,15 @@ The codecs **MUST**:
     It rebuilds the structure as the generator writes it: the template's subtype, node id and name, and no member, its list present and empty where the generator writes it so.
     It builds no parent node, member or data value, no structure for a slot or an archetype root, and none where the template nodes that share the parent's path disagree on it.
     Where the template asks the structure for a member, the body lacks data, and no structure is rebuilt.
-  - The third is a coded node name.
-    Where the template constrains a rebuilt node's name as a `DV_CODED_TEXT`, through one child or alternatives that agree, and determines one coded value, decode gives the node that `DV_CODED_TEXT` name as the generator writes it, in place of the `DV_TEXT` name from the archetype terminology.
-    The value is determined where the name's `C_CODE_PHRASE` lists exactly one code, or lists several of which exactly one has a term text equal to the text the template pins on the name.
-    Its terminology is the `C_CODE_PHRASE`'s, and its text is the pinned text, else the code's term text, read as [clinical-modeling.md § *Node names and name predicates*](clinical-modeling.md#node-names-and-name-predicates) reads it.
+  - The third is a coded node name, for which the formats have no key below the root.
+    Decode gives a rebuilt node, in place of the `DV_TEXT` name from the archetype terminology, the `DV_CODED_TEXT` name the generator writes there under `ExampleFill`, where the template constrains the node's name both of these ways:
+    - as a `DV_CODED_TEXT`, through one child or through alternatives that agree on the name;
+    - with its `defining_code` constrained through one `C_CODE_PHRASE`, or one `C_CODE_REFERENCE` read as the code phrase it carries.
 
-    No node name below the root has a key in the formats, so a coded name the template leaves open (a code from an external reference set, or several codes and no pinned text) comes back as `DV_TEXT`.
+    The name's code is the phrase's first listed code, else the placeholder `at0000` in the terminology the phrase, or the reference set's `terminology:` URI, names, else in `local` ([clinical-modeling.md § REQ-107 *Placeholders*](clinical-modeling.md#placeholders)).
+    Its text is the code's term text where the `C_STRING` on the name's value admits it, and, for a code outside `openehr`, another listed code takes the code's place where that `C_STRING` rejects it, as [clinical-modeling.md § REQ-107 *The text of a coded value*](clinical-modeling.md#the-text-of-a-coded-value) has it for a coded `name`; the placeholder names no term.
+    Otherwise the text is the one the generator writes under that `C_STRING`, or `example` where none constrains the value.
+    A name whose alternatives disagree, or whose `defining_code` has alternatives, comes back as `DV_TEXT`.
   - The fourth is an ordinal's terminology.
     The formats carry the code and the ordinal value of a `DV_ORDINAL`, a leaf or a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, and its symbol's terminology only as an optional `|terminology`, which decode reads as written.
     Without one, decode without the template rebuilds the symbol in `local`, as the reference does.
