@@ -520,8 +520,10 @@ func closedSpan(lower, upper string) constraints.TemporalRange {
 // equal to a bound on every shared field is equal to it: 2004-05 and 2004
 // are within a range from 2004-05-20, and 09 within one from 09:30. Where
 // both carry a zone and the designators differ, the two are ordered as
-// instants, and where one carries a zone and the other does not, not at all,
-// so that bound does not refuse it (REQ-112 DV_INTERVAL).
+// instants, as REQ-112 DV_INTERVAL orders them. Where one carries a zone
+// and the other does not, they are ordered only more than 14 hours apart,
+// so a bound within 14 hours of the value does not refuse it;
+// TestREQ103TemporalRangeOrdersAcrossZone holds that order.
 func TestREQ103TemporalRangeOutcomes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

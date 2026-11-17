@@ -300,7 +300,8 @@ func TestREQ107_CodePhraseEmptyListPlaceholder(t *testing.T) {
 // and the range, when the pattern or a bound is malformed, and, in the
 // exceptions the spec names, when a literal field after the first moves each
 // bound out of the range though a valid value exists, and when only a value
-// the bounds do not order meets the range.
+// the bounds do not order, within 14 hours of a bound with a zone where it
+// carries none or the reverse, meets the range.
 func TestREQ103_TemporalExampleValue(t *testing.T) {
 	t.Parallel()
 	from := func(lower string, included bool) constraints.TemporalRange {
@@ -371,12 +372,13 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 		{name: "time, zone Z, bound read in UTC leaves the day", c: constraints.CTime{Pattern: "hh:mm:ssZ", Range: closed("01:00:00+02:00", "01:30:00+02:00")}, want: "12:00:00", unsatisfiable: true},
 		{name: "time, zone required, bound keeps its zone", c: constraints.CTime{Pattern: "hh:mm:XX+hh:mm", Range: closed("13:30:30+02:00", "13:32:00+02:00")}, want: "13:30+02:00"},
 		{name: "time, zone Z, lower read in UTC drops its seconds", c: constraints.CTime{Pattern: "hh:mm:XXZ", Range: closed("13:30:30+02:00", "13:32:00+02:00")}, want: "11:31Z"},
-		{name: "time, sentinel not ordered against a zoned bound", c: constraints.CTime{Range: from("13:30:00+02:00", false)}, want: "12:00:00"},
+		{name: "time, sentinel within 14 hours of a zoned bound", c: constraints.CTime{Range: from("13:30:00+02:00", false)}, want: "12:00:00"},
 		{name: "date-time, minute of the lower bound", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: from("2024-05-20T10:15:30Z", true)}, want: "2024-05-20T10:15Z"},
 		{name: "date-time, bound keeps its zone", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: closed("2024-05-20T10:15:30+02:00", "2024-05-20T10:17:00+02:00")}, want: "2024-05-20T10:15+02:00"},
 		{name: "date-time, excluded date bound under a full pattern", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:ss", Range: from("2024-05-20", false), TimezoneValidity: constraints.ValidityDisallowed}, want: "2024-05-21T00:00:00"},
 		{name: "date-time, excluded upper across midnight", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:XX:XX", Range: upTo("2004-01-01T00:00:00Z", false)}, want: "2003-12-31T23Z"},
-		{name: "date-time, sentinel not ordered against a date bound", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:ss", Range: from("2024-05-20", true)}, want: "2020-01-01T12:00:00Z"},
+		{name: "date-time, sentinel more than 14 hours before a date bound", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:ss", Range: from("2024-05-20", true)}, want: "2024-05-20T00:00:00"},
+		{name: "date-time, sentinel within 14 hours of a date bound", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:ss", Range: from("2020-01-02", true)}, want: "2020-01-01T12:00:00Z"},
 		{name: "time, zone mandatory", c: constraints.CTime{TimezoneValidity: constraints.ValidityMandatory}, want: "12:00:00Z"},
 		{name: "time, zone disallowed", c: constraints.CTime{Pattern: "hh:mm:XX", TimezoneValidity: constraints.ValidityDisallowed}, want: "12:00"},
 		{name: "time, zone mandatory, bound in range", c: constraints.CTime{Range: closed("13:30:00+02:00", "13:45:00+02:00"), TimezoneValidity: constraints.ValidityMandatory}, want: "13:30:00+02:00"},
@@ -384,7 +386,7 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 		{name: "date-time, zone mandatory", c: constraints.CDateTime{Pattern: "yyyy-mm-ddTHH:MM:XX", TimezoneValidity: constraints.ValidityMandatory}, want: "2020-01-01T12:00Z"},
 		{name: "date-time, zone disallowed", c: constraints.CDateTime{TimezoneValidity: constraints.ValidityDisallowed}, want: "2020-01-01T12:00:00"},
 		{name: "date-time, date bound, zone disallowed", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:ss", Range: from("2024-05-20", true), TimezoneValidity: constraints.ValidityDisallowed}, want: "2024-05-20T00:00:00"},
-		{name: "date-time, zone disallowed against a zoned bound", c: constraints.CDateTime{Range: upTo("2004-01-01T00:00:00+01:00", true), TimezoneValidity: constraints.ValidityDisallowed}, want: "2020-01-01T12:00:00"},
+		{name: "date-time, zone disallowed against a zoned bound", c: constraints.CDateTime{Range: upTo("2004-01-01T00:00:00+01:00", true), TimezoneValidity: constraints.ValidityDisallowed}, want: "2004-01-01T00:00:00"},
 		{name: "date, zone mandatory", c: constraints.CDate{TimezoneValidity: constraints.ValidityMandatory}, want: "2020-01-01", unsatisfiable: true},
 		{name: "time, zone suffix and zone disallowed", c: constraints.CTime{Pattern: "hh:mm:ss+hh", TimezoneValidity: constraints.ValidityDisallowed}, want: "12:00:00", unsatisfiable: true},
 		{name: "duration, zero inside the range", c: constraints.CDuration{Range: from("PT0S", true)}, want: "P0D"},
@@ -405,7 +407,8 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 		{name: "duration, excluded bounds a tenth of a second apart below zero", c: constraints.CDuration{Range: constraints.TemporalRange{Lower: "-PT0.2S", Upper: "-PT0.1S"}}, want: "-PT0.15S"},
 		{name: "duration, excluded bounds a microsecond apart", c: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", Upper: "PT0.000001S"}}, want: "PT0.0000005S"},
 		// The exception the spec names: only a value the bounds do not
-		// order meets the range, 00:00:00Z here, and 2021-05-15T10:00 below.
+		// order, within 14 hours of them, meets the range, 00:00:00Z here,
+		// and 2021-05-15T10:00 below.
 		{name: "time, only a zoned time meets a range with no zone", c: constraints.CTime{Range: upTo("00:00:00", false)}, want: "12:00:00", unsatisfiable: true},
 		{name: "date-time, only a date-time with no zone meets a zoned range", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: constraints.TemporalRange{Lower: "2021-05-15T10:00:00Z", Upper: "2021-05-15T10:00:01Z"}}, want: "2020-01-01T12:00:00Z", unsatisfiable: true},
 	}
@@ -577,10 +580,10 @@ func TestREQ103_TemporalExampleValueSweep(t *testing.T) {
 // and a duration every set of designators. Where Validate refuses the
 // example, a search of values around each bound, in several zones and with
 // fractions of a second, finds none Validate accepts, except in the one
-// exception the spec names: every value it finds is one the bounds do not
+// exception the spec names: every value it finds is one a bound does not
 // order, a time with a zone where the bounds carry none, or a date-time
-// with none where they carry one. A test that pins one such case is
-// TestREQ103_TemporalExampleValue.
+// with none where they carry one, within 14 hours of that bound. A test
+// that pins one such case is TestREQ103_TemporalExampleValue.
 func TestREQ103_TemporalExampleValueNarrowRanges(t *testing.T) {
 	t.Parallel()
 	exceptions := 0
@@ -596,7 +599,7 @@ func TestREQ103_TemporalExampleValueNarrowRanges(t *testing.T) {
 				continue
 			}
 			valid = true
-			if zoned(t, nc.dated, probe) == nc.zoned {
+			if !unorderedAcrossZone(t, nc.dated, probe, nc.bounds) {
 				ordered = append(ordered, probe)
 			}
 		}
@@ -614,35 +617,57 @@ func TestREQ103_TemporalExampleValueNarrowRanges(t *testing.T) {
 
 // narrowCase is one constraint of the narrow-range sweep, with the values
 // the search tries where Validate refuses its example. dated marks a
-// date-time, and zoned says its bounds carry a zone; a time's or a
-// date-time's bounds carry one both or neither, and a duration's none.
+// date-time, and bounds holds the bounds of a time's or a date-time's
+// range on each side that is not unbounded; a duration's are left out.
 type narrowCase struct {
 	name   string
 	c      constraints.PrimitiveConstraint
 	probes []string
+	bounds []string
 	dated  bool
-	zoned  bool
 }
 
-// zoned reports whether v, a time, or a date-time when dated, or a
-// duration, carries a zone.
-func zoned(t *testing.T, dated bool, v string) bool {
+// unorderedAcrossZone reports whether v, a time, or a date-time when dated,
+// is not ordered against one of bounds that carries a zone where v carries
+// none, or none where v carries one: whether the two lie within 14 hours of
+// each other, as iso8601.OrderAcrossZone reads them.
+func unorderedAcrossZone(t *testing.T, dated bool, v string, bounds []string) bool {
 	t.Helper()
-	if strings.HasPrefix(strings.TrimPrefix(v, "-"), "P") {
-		return false
+	span, zone := clockSpan(t, dated, v)
+	for _, b := range bounds {
+		bspan, bzone := clockSpan(t, dated, b)
+		var ordered bool
+		switch {
+		case zone != "" && bzone == "":
+			_, ordered = iso8601.OrderAcrossZone(span, zone, bspan)
+		case zone == "" && bzone != "":
+			_, ordered = iso8601.OrderAcrossZone(bspan, bzone, span)
+		default:
+			continue
+		}
+		if !ordered {
+			return true
+		}
 	}
+	return false
+}
+
+// clockSpan reads v, a time, or a date-time when dated, into the span of
+// time it covers and its zone.
+func clockSpan(t *testing.T, dated bool, v string) (iso8601.Span, string) {
+	t.Helper()
 	if dated {
-		_, tm, err := iso8601.ParseDateTime(v)
+		d, tm, err := iso8601.ParseDateTime(v)
 		if err != nil {
 			t.Fatalf("value %q: %v", v, err)
 		}
-		return tm.Zone != ""
+		return iso8601.DateTimeSpan(d, tm, strings.Contains(v, "T")), tm.Zone
 	}
 	tm, err := iso8601.ParseTime(v)
 	if err != nil {
 		t.Fatalf("value %q: %v", v, err)
 	}
-	return tm.Zone != ""
+	return iso8601.TimeSpan(tm), tm.Zone
 }
 
 // narrowCases generates the constraints of the narrow-range sweep.
@@ -651,28 +676,28 @@ func narrowCases(t *testing.T) []narrowCase {
 	validities := []constraints.ValidityKind{constraints.ValidityOptional, constraints.ValidityMandatory, constraints.ValidityDisallowed}
 	var out []narrowCase
 	for _, r := range narrowClockRanges("", narrowTimeLowers, narrowTimeUppers, narrowTimePairs) {
-		probes, z := clockProbes(t, false, r), boundZoned(t, false, r)
+		probes := clockProbes(t, false, r)
 		for _, p := range clockPatterns("") {
 			for _, tz := range validities {
 				out = append(out, narrowCase{
 					name:   fmt.Sprintf("time %q %s tz %d", p, r, tz),
 					c:      constraints.CTime{Pattern: p, Range: r, TimezoneValidity: tz},
 					probes: probes,
-					zoned:  z,
+					bounds: boundsOf(r),
 				})
 			}
 		}
 	}
 	for _, r := range narrowClockRanges("2021-05-15T", narrowTimeLowers, nil, narrowTimePairs) {
-		probes, z := clockProbes(t, true, r), boundZoned(t, true, r)
+		probes := clockProbes(t, true, r)
 		for _, p := range clockPatterns("yyyy-mm-ddT") {
 			for _, tz := range validities {
 				out = append(out, narrowCase{
 					name:   fmt.Sprintf("date-time %q %s tz %d", p, r, tz),
 					c:      constraints.CDateTime{Pattern: p, Range: r, TimezoneValidity: tz},
 					probes: probes,
+					bounds: boundsOf(r),
 					dated:  true,
-					zoned:  z,
 				})
 			}
 		}
@@ -703,21 +728,16 @@ var (
 	narrowZones = []string{"", "Z", "+02:00"}
 )
 
-// boundZoned reports whether the bounds of r, a time range, or a date-time
-// one when dated, carry a zone, and fails t where one does and the other
-// does not.
-func boundZoned(t *testing.T, dated bool, r constraints.TemporalRange) bool {
-	t.Helper()
-	var got []bool
-	for _, bound := range []string{r.Lower, r.Upper} {
-		if bound != "" {
-			got = append(got, zoned(t, dated, bound))
-		}
+// boundsOf returns the bounds of r on each side that is not unbounded.
+func boundsOf(r constraints.TemporalRange) []string {
+	var out []string
+	if !r.LowerUnbounded {
+		out = append(out, r.Lower)
 	}
-	if len(got) == 2 && got[0] != got[1] {
-		t.Fatalf("range %s: one bound carries a zone and the other none", r)
+	if !r.UpperUnbounded {
+		out = append(out, r.Upper)
 	}
-	return got[0]
+	return out
 }
 
 // narrowClockRanges returns the narrow ranges of a time, each clock written
