@@ -239,8 +239,8 @@ type Issue struct {
 	//     [2]float64;
 	//   - on an rm_invariant issue for interval bounds out of order, the
 	//     two bounds' magnitudes, lower first, a [2]float64, a date-time
-	//     with a zone read in UTC, and two times written with different
-	//     zone designators each read in UTC;
+	//     with a zone read in UTC, and a time read in UTC where it carries
+	//     a zone and the other bound carries a different one or none;
 	//   - on an rm_invariant issue for a date, time or duration that is
 	//     not valid ISO 8601, its value, a string;
 	//   - on a term_mapping_match issue, the match, an rm.Character;
