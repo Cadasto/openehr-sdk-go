@@ -195,10 +195,11 @@
 // count, a quantity in the bounds' units, a proportion of the bounds' type,
 // by ratio, an ordinal, by value, and a date, a time or a date-time in the
 // order the Reference Model checks give interval bounds, as instants where
-// two zones differ, and a value with a zone against one without only where
-// they lie more than 14 hours apart), and an RM Integer, such as a DV_ORDINAL's value, inside
-// its 32 bits, the example of a range bounded on one side alone staying on
-// that side. Where nothing is left, Generate returns an error wrapping
+// two zones differ, and a value with a zone against one without where they
+// lie more than 14 hours apart or the one with a zone lies inside the
+// other's period at both readings), and an RM Integer, such as a
+// DV_ORDINAL's value, inside its 32 bits, the example of a range bounded on
+// one side alone staying on that side. Where nothing is left, Generate returns an error wrapping
 // [ErrConstraintUnsatisfiable]. Where the template gives an RM attribute
 // no value, the generator writes an RM-valid default, unless the
 // template's own constraint on that attribute rejects it. A coded
