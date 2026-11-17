@@ -90,9 +90,10 @@ func checkURIOnly(t *testing.T, mm *rm.DVMultimedia, want string) {
 // RM defaults check that a DV_MULTIMEDIA whose media type is not a text
 // one carries a uri, with a fixed positive size and no inline data: the
 // uri its OPT child gives, where the OPT names one, under every policy,
-// and else http://example.com. Where the OPT prohibits the uri, it carries
-// the inline example payload sized by its bytes instead, as a text media
-// type does; where it prohibits the data, a uri. Where the OPT's
+// and else http://example.com. Where the OPT prohibits the uri or requires
+// the data, it carries the inline example payload sized by its bytes
+// instead, as a text media type does, beside a uri the OPT requires;
+// where it prohibits the data, a uri. Where the OPT's
 // constraint on size rejects the fixed size, the size the walk wrote
 // stays. It holds at the root and as an ELEMENT's value, under every
 // policy, both value fills and both compile modes, and the RM floor and
@@ -128,6 +129,24 @@ func TestREQ107_MultimediaTakesAURIForAMediaTypeOtherThanText(t *testing.T) {
 			name:  "image/png with the uri prohibited",
 			attrs: []string{png, optProhibitedSingle("uri")},
 			check: checkSizedData,
+		},
+		{
+			name:  "image/png with the data required",
+			attrs: []string{png, optSingle("data")},
+			check: checkSizedData,
+		},
+		{
+			name:  "image/png with the data and the uri required",
+			attrs: []string{png, optSingle("data"), optSingle("uri")},
+			check: func(t *testing.T, mm *rm.DVMultimedia) {
+				t.Helper()
+				if len(mm.Data) == 0 || int(mm.Size) != len(mm.Data) {
+					t.Errorf("DV_MULTIMEDIA has data %q and size %d, want the example payload sized by its bytes", mm.Data, mm.Size)
+				}
+				if uri, ok := mm.URI.(*rm.DVURI); !ok || uri == nil || uri.Value == "" {
+					t.Errorf("DV_MULTIMEDIA.uri = %#v, want a DV_URI beside the data", mm.URI)
+				}
+			},
 		},
 		{
 			name:  "text/html",

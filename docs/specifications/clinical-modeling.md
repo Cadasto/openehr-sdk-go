@@ -1045,7 +1045,9 @@ A `COMPOSITION`'s `context` is written under every policy, `Required` included, 
 Every `DV_MULTIMEDIA` the generator writes **SHOULD** carry the content its settled `media_type` suits, so that it meets DV_MULTIMEDIA `Not_empty`:
 
 - where the OPT prohibits `data`: a `uri`, which `Not_empty` then needs (§ [Precedence](#precedence) 2), with the fixed size below;
-- else, of a text media type (`text/` and a subtype), or of another one where the OPT prohibits the `uri`: inline `data`, a non-empty example payload that is the same under both `ValueFill` values, and a `size` that is the number of bytes of that `data`, which the RM defines as the original size of the unencoded data;
+- else, inline `data`, a non-empty example payload that is the same under both `ValueFill` values, and a `size` that is the number of bytes of that `data`, which the RM defines as the original size of the unencoded data, for one:
+  - of a text media type (`text/` and a subtype);
+  - of another media type, where the OPT prohibits the `uri` or requires the `data`;
 - else: a `uri` and no `data`, and the `size` 1024, a fixed positive number, since the generator cannot read the content at the `uri`.
 
 The `uri` is built from its first allowed OPT child where the OPT names one, under every policy, and is the default `http://example.com` above otherwise.

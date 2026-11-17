@@ -243,15 +243,15 @@
 // fills, with that byte count as its size. One of any other media type
 // carries a uri instead, with the size 1024: the uri its template child
 // gives, or http://example.com where the template names no child for it.
-// Where the template prohibits the uri, the value carries the inline data,
-// and where it prohibits the data, a uri. The size the walk wrote stays
-// where the template's constraint on size rejects the generator's. A
-// language, encoding or charset the template names with no code, on an
-// entry, a text or an encapsulated value, takes Options.Language in
-// ISO_639-1 or UTF-8 in IANA_character-sets, and a periodic time
-// specification's value keeps the formalism HL7:PIVL or HL7:EIVL the walk
-// wrote, else takes HL7:PIVL, or HL7:EIVL where the template rejects
-// HL7:PIVL.
+// Where the template prohibits the uri or requires the data, the value
+// carries the inline data, and where it prohibits the data, a uri. The
+// size the walk wrote stays where the template's constraint on size
+// rejects the generator's. A language, encoding or charset the template
+// names with no code, on an entry, a text or an encapsulated value, takes
+// Options.Language in ISO_639-1 or UTF-8 in IANA_character-sets, and a
+// periodic time specification's value keeps the formalism HL7:PIVL or
+// HL7:EIVL the walk wrote, else takes HL7:PIVL, or HL7:EIVL where the
+// template rejects HL7:PIVL.
 //
 // Under either value fill, a data value whose node the template's
 // constraints give a default value takes that default in place of the

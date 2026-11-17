@@ -3931,21 +3931,25 @@ func textMediaType(mt rm.CodePhrase) bool {
 
 // takesURI reports whether m, a DV_MULTIMEDIA whose OPT node is opt, gets a
 // uri rather than inline data: its OPT prohibits the data, or its media
-// type is not a text one and its OPT does not prohibit the uri. opt is nil
-// for one built from the BMM alone.
+// type is not a text one and its OPT neither prohibits the uri nor
+// requires the data. opt is nil for one built from the BMM alone.
 func takesURI(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) bool {
-	return prohibited(opt, "data") || (!textMediaType(m.MediaType) && !prohibited(opt, "uri"))
+	if prohibited(opt, "data") {
+		return true
+	}
+	return !textMediaType(m.MediaType) && !prohibited(opt, "uri") && !requiresAttr(opt, "data")
 }
 
 // settleMultimedia gives a DV_MULTIMEDIA the content the OPT left it
 // without, where the OPT's own constraint admits it, once settleCoded has
 // settled its coded attributes, its media type among them. A value of a
 // text media type gets multimediaExample as its data, and so does one of
-// another media type whose OPT prohibits the uri, unless the OPT prohibits
-// data. Any other value with no uri, of another media type or whose OPT
-// prohibits data, gets the uri multimediaURI, where the walk built none
-// from the uri's OPT child (writeRMNeeded); RM Not_empty wins over a
-// prohibition of the uri too. A value with data takes the number of its
+// another media type whose OPT prohibits the uri or requires the data,
+// unless the OPT prohibits data; a uri the OPT requires beside the data
+// is the walk's. Any other value with no uri, of another media type or
+// whose OPT prohibits data, gets the uri multimediaURI, where the walk
+// built none from the uri's OPT child (writeRMNeeded); RM Not_empty wins
+// over a prohibition of the uri too. A value with data takes the number of its
 // bytes as its size, the size of the data before any encoding, as the RM
 // defines it, and one with a uri alone multimediaURISize; the size the walk
 // wrote stays where the OPT's constraint on size rejects that number. opt
@@ -4172,7 +4176,12 @@ func valueGivesWay(opt *tcimpl.CompiledNode) bool {
 // requiresAttr reports whether opt names attrName as required
 // (isRequired): the BMM marks it mandatory, its existence lower bound is
 // at least 1, or a child asks the list for a member (holdsRequiredChild).
+// opt is nil for a value built from the BMM alone, which no OPT
+// constrains.
 func requiresAttr(opt *tcimpl.CompiledNode, attrName string) bool {
+	if opt == nil {
+		return false
+	}
 	attr := opt.Attribute(attrName)
 	return attr != nil && isRequired(opt, attr)
 }
