@@ -2051,6 +2051,7 @@ requirements:
       - openehr/aql/lint/semantic_test.go
       - openehr/aql/paging_test.go
       - openehr/aql/parse/ast_test.go
+      - openehr/aql/parse/class_predicate_test.go
       - openehr/aql/parse/clause_spans_test.go
       - openehr/aql/parse/dropped_test.go
       - openehr/aql/parse/literal_roundtrip_test.go
@@ -2096,6 +2097,8 @@ requirements:
       - openehr/aql/lint/lint_test.go
       - openehr/aql/lint/pathshape_internal_test.go
       - openehr/aql/lint/pathshape_test.go
+      - openehr/aql/parse/class_predicate_internal_test.go
+      - openehr/aql/parse/class_predicate_test.go
       - openehr/aql/parse/dispatch_tripwire_test.go
       - openehr/aql/parse/emit_parity_test.go
       - openehr/aql/parse/emit_verify_internal_test.go
