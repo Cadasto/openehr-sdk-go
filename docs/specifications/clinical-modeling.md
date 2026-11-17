@@ -289,12 +289,14 @@ Concretely:
   A date, a time or a date-time is compared with a bound at the precision the two share: field by field from the largest down, over the fields both carry, the seconds with their fraction.
   The first field that differs decides, and two values equal on every shared field are equal.
   A bound so covers the whole period it names: `2021-05` lies within `1900..2021` and outside `1900..<2021`.
-  A time or a date-time is ordered against a bound as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* orders two DV_TIME or two DV_DATE_TIME values:
+  A time or a date-time is ordered against a bound as below, the order [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* follows for two DV_TIME or two DV_DATE_TIME values:
   - at that shared precision when the two are written with one zone designator, or both with none;
   - as instants, each read in UTC by the `magnitude()` of [REQ-123](reference-model.md#req-123--temporal-data-value-helpers), in which a partial value stands for the start of the period it names, when both carry a zone and the designators differ;
-  - not at all when one carries a zone and the other does not, so such a bound draws no `CodeOutOfRange`.
+  - as XML Schema 1.0 Part 2 §3.2.7.4 orders a `dateTime` when one carries a zone and the other does not: the one with a zone is read in UTC and the other at `+14:00` and at `-14:00`, a partial value covering the whole period it names, and the two are ordered only where both readings agree.
 
-  So a `CTime` with the range `>09:30:00+02:00` admits `08:00:00Z`, which is 10:00 at `+02:00`, and `09:00:00`, which has no zone.
+  Where the two readings disagree, the value and the bound lie within 14 hours of each other, an edge they share included, and are not ordered, so such a bound draws no `CodeOutOfRange`.
+  So a `CDateTime` with the range `2020-01-01T00:00..2021-12-31T23:59` refuses `2022-11-02T19:32:40Z`, more than 14 hours past its upper bound at either reading, and one with the range `<=2030` admits `2030-06-01T10:00Z`, inside the year 2030 at either reading, as it admits `2030-06-01T10:00`.
+  A `CTime` with the range `>09:30:00+02:00` admits `08:00:00Z`, which is 10:00 at `+02:00`, and `09:00:00`, which has no zone and lies within 14 hours of the bound.
   ADL 1.4 asks a closed interval to give a zone on both bounds or on neither (*Intervals*); the SDK does not check that, and orders the value against each bound on its own.
   The compile step reads a bound that the ISO 8601 parse of the constrained type refuses as [§ REQ-111](#req-111--public-compiled-template-bridge) *What the compile step tolerates* says; on a `TemporalRange` built in code, such a bound on a side that is not unbounded is malformed (below).
 - `CBoolean.Validate` accepts Go `bool`.
@@ -382,7 +384,8 @@ Two cases are exceptions to the rule for bounded constraints, where the example 
 
 - a pattern that writes a field after the first as a literal number, beside a range, which can move a bound written to it out of the range (`CDate{Pattern: "yyyy-06-dd"}` with the range `<=2004-05-20` gives `"2020-01-01"`, though `"2003-06-01"` is valid).
   The ITS-XML pattern grammars admit no literal number, so only an OPT that breaks that schema, or a constraint built in code, reaches it;
-- a range that only a value its bounds do not order satisfies, a time with a zone where the bounds carry none, or a date-time with no zone where they carry one, since a candidate takes or drops a zone only where the pattern or the `TimezoneValidity` asks it to.
+- a range that only a value its bounds do not order satisfies: a time with a zone where the bounds carry none, or a date-time with no zone where they carry one, within 14 hours of a bound (§ *Validate contract*).
+  The example is then the sentinel because a candidate takes or drops a zone only where the pattern or the `TimezoneValidity` asks it to.
   `CTime` with the range `<00:00:00` gives `"12:00:00"`, though `"00:00:00Z"` is valid.
   An OPT reaches it where neither the pattern nor a `timezone_validity` constrains the zone, through an excluded bound that reaches the end of the day, such as `23:59`, or lies at its start, for a time, or through two bounds closer together than the last field the pattern writes.
 
