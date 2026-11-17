@@ -1981,6 +1981,7 @@ requirements:
       - openehr/validation/nonempty_lists_internal_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/primitive_empty_part_test.go
+      - openehr/validation/rmfloor_archetype_internal_test.go
       - openehr/validation/rmfloor_archetype_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
@@ -2641,6 +2642,7 @@ requirements:
       - openehr/validation/prohibited_test.go
       - openehr/validation/registry_roots_test.go
       - openehr/validation/rm_class_names_internal_test.go
+      - openehr/validation/rmfloor_archetype_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_coded_test.go

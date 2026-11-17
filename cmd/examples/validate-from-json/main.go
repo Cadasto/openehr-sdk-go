@@ -21,7 +21,8 @@
 //     the composition the template admits: the attributes the RM makes
 //     mandatory on every node, and the RM's own rules for each type, such
 //     as an ELEMENT carrying exactly one of a value or a null flavour, and
-//     every COMPOSITION and ENTRY carrying archetype_details.
+//     every archetype root carrying archetype_details that names its
+//     archetype.
 //
 // A defect two checks find is reported once. validation.ValidateComposition
 // runs the last two checks on a composition already in memory, and

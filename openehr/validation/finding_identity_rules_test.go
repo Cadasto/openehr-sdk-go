@@ -79,7 +79,7 @@ func fiItem(nodeID, name string, value rm.DataValue) *rm.Element {
 
 // fiCluster is the root of findingIdentityOPT holding items.
 func fiCluster(items ...rm.Item) *rm.Cluster {
-	return &rm.Cluster{ArchetypeNodeID: findingIdentityArchetype, Name: &rm.DVText{Value: "cluster"}, Items: items}
+	return &rm.Cluster{ArchetypeNodeID: findingIdentityArchetype, ArchetypeDetails: archetypeDetails(findingIdentityArchetype), Name: &rm.DVText{Value: "cluster"}, Items: items}
 }
 
 // assertHasIdentities fails the test unless each of want, written as
@@ -123,7 +123,7 @@ func TestValidate_REQ171_TemplateLayerRules(t *testing.T) {
 		},
 		{
 			name: "items present and empty",
-			root: &rm.Cluster{ArchetypeNodeID: findingIdentityArchetype, Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}},
+			root: &rm.Cluster{ArchetypeNodeID: findingIdentityArchetype, ArchetypeDetails: archetypeDetails(findingIdentityArchetype), Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}},
 			want: []string{
 				"required /items template existence",
 				"cardinality /items template cardinality",
@@ -158,6 +158,7 @@ func TestValidate_REQ171_TemplateLayerRules(t *testing.T) {
 			root: func() *rm.Cluster {
 				r := fiCluster(fiItem("at0003", "three", text))
 				r.ArchetypeNodeID = "openEHR-EHR-CLUSTER.other.v1"
+				r.ArchetypeDetails = archetypeDetails(r.ArchetypeNodeID)
 				return r
 			}(),
 			want: []string{"archetype_id_mismatch /archetype_node_id template identity"},
@@ -276,7 +277,7 @@ const paragraphChild = `
 // them.
 func TestValidate_REQ171_EmptyMandatoryListRule(t *testing.T) {
 	t.Parallel()
-	empty := &rm.Cluster{ArchetypeNodeID: "openEHR-EHR-CLUSTER.bare.v1", Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}}
+	empty := &rm.Cluster{ArchetypeNodeID: "openEHR-EHR-CLUSTER.bare.v1", ArchetypeDetails: archetypeDetails("openEHR-EHR-CLUSTER.bare.v1"), Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}}
 	paragraph := valueElement(&rm.DVParagraph{})
 	fullParagraph := valueElement(&rm.DVParagraph{Items: []rm.DVTextLike{&rm.DVText{Value: "line"}}})
 	tests := []struct {
@@ -325,9 +326,9 @@ func TestValidate_REQ171_EmptyMandatoryListRule(t *testing.T) {
 
 // REQ-171 — each RM-layer rule the floor evaluates outside the coded
 // invariants, on the issue it draws: a rule the BMM names as CLASS.Invariant,
-// and the three the BMM states in an attribute's definition (mandatory,
-// cardinality, precision_range). The rule-specific codes carry their rule's
-// name; rm_invariant tells its rules apart by Rule alone.
+// and the four the BMM states in an attribute's definition (mandatory,
+// cardinality, precision_range, archetype_root_id). The rule-specific codes
+// carry their rule's name; rm_invariant tells its rules apart by Rule alone.
 func TestValidateRM_REQ171_RMLayerRules(t *testing.T) {
 	t.Parallel()
 	minus2 := rm.Integer(-2)
@@ -345,6 +346,22 @@ func TestValidateRM_REQ171_RMLayerRules(t *testing.T) {
 		want []string
 	}{
 		{name: "FOLDER without a name", root: &rm.Folder{ArchetypeNodeID: "at0001"}, want: []string{"required /name rm mandatory"}},
+		{
+			// A FOLDER is no root by its class, but is one by an archetype
+			// id as its archetype_node_id.
+			name: "FOLDER with an archetype id and no archetype_details",
+			root: &rm.Folder{ArchetypeNodeID: "openEHR-EHR-FOLDER.episode.v1", Name: &rm.DVText{Value: "f"}},
+			want: []string{"is_archetype_root /archetype_details rm LOCATABLE.Archetyped_valid"},
+		},
+		{
+			name: "FOLDER whose archetype_details names another archetype",
+			root: &rm.Folder{
+				ArchetypeNodeID:  "openEHR-EHR-FOLDER.episode.v1",
+				Name:             &rm.DVText{Value: "f"},
+				ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-FOLDER.generic.v1"}, RMVersion: "1.1.0"},
+			},
+			want: []string{"archetype_root_id /archetype_details/archetype_id/value rm archetype_root_id"},
+		},
 		{
 			name: "CLUSTER with an empty items list",
 			root: &rm.Cluster{ArchetypeNodeID: "at0001", Name: &rm.DVText{Value: "c"}, Items: []rm.Item{}},

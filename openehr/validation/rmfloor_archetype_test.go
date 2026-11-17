@@ -1,12 +1,14 @@
 package validation_test
 
 // rmfloor_archetype_test.go: REQ-112 — the RM floor's archetype-root and
-// ARCHETYPED catalogue rows. An object of a class that declares the RM
-// Is_archetype_root invariant must carry archetype_details
-// (LOCATABLE.Archetyped_valid), and an ARCHETYPED wherever it sits must carry a
-// non-empty archetype_id and rm_version. The EHR_STATUS rows through both
-// entries, the Bytes entry's key presence included, are PROBE-081's
-// (rmfloor_bytes_test.go).
+// ARCHETYPED catalogue rows. An archetype root must carry archetype_details
+// (LOCATABLE.Archetyped_valid): an object of a class that declares the RM
+// Is_archetype_root invariant, one whose archetype_node_id is an archetype id,
+// and one that carries the details. At a root, archetype_details names the
+// archetype archetype_node_id names (archetype_root_id). An ARCHETYPED
+// wherever it sits must carry a non-empty archetype_id and rm_version. The
+// EHR_STATUS rows through both entries, the Bytes entry's key presence
+// included, are PROBE-081's (rmfloor_bytes_test.go).
 
 import (
 	"maps"
@@ -22,16 +24,16 @@ import (
 )
 
 // TestValidateRM_ArchetypeRootClassesMatchSharedList checks that the floor
-// reports the archetype-root rule on exactly the classes of the shared
-// closed list (REQ-112, ADR 0001), which internal/rmroots pins to the
+// reports the archetype-root rule by class on exactly the classes of the
+// shared closed list (REQ-112, ADR 0001), which internal/rmroots pins to the
 // vendored BMM's Is_archetype_root declarations. It runs the floor over
-// every registered LOCATABLE concrete: a zero value of a root class must
-// report `is_archetype_root` at /archetype_details, any other LOCATABLE
-// must not (the spec's MUST NOT: FOLDER, PARTY_RELATIONSHIP, GENERIC_ENTRY,
-// PARTY_IDENTITY, CONTACT, ADDRESS, CAPABILITY and the data structures),
-// and a value of either kind carrying archetype_details must not. A floor
-// that stops reporting a root class, or reports a class the list leaves
-// out, fails here.
+// every registered LOCATABLE concrete: a zero value, whose archetype_node_id
+// is empty and so no archetype id, must report `is_archetype_root` at
+// /archetype_details on a root class and on no other LOCATABLE (FOLDER,
+// PARTY_RELATIONSHIP, GENERIC_ENTRY, PARTY_IDENTITY, CONTACT, ADDRESS,
+// CAPABILITY and the data structures), and a value of either kind carrying
+// archetype_details must not. A floor that stops reporting a root class, or
+// reports by class one the list leaves out, fails here.
 func TestValidateRM_ArchetypeRootClassesMatchSharedList(t *testing.T) {
 	swept := map[string]bool{}
 	var roots []string
@@ -83,8 +85,10 @@ func reportsArchetypeRoot(r validation.Result) bool {
 }
 
 // TestValidateRM_ArchetypeRootTypedEntries checks the typed entries report the
-// archetype-root rule on their own root (REQ-112): EHR_ACCESS and a demographic
-// PARTY without archetype_details are reported, a FOLDER is not.
+// archetype-root rule on their own root (REQ-112): EHR_ACCESS, a demographic
+// PARTY and a FOLDER whose archetype_node_id is an archetype id, without
+// archetype_details, are reported; a FOLDER whose archetype_node_id is an
+// at-code is not.
 func TestValidateRM_ArchetypeRootTypedEntries(t *testing.T) {
 	name := rm.DVText{Value: "n"}
 	cases := []struct {
@@ -101,8 +105,11 @@ func TestValidateRM_ArchetypeRootTypedEntries(t *testing.T) {
 		{"ValidateRMDemographic(ROLE)", func() validation.Result {
 			return validation.ValidateRMDemographic(&rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", Name: name})
 		}, true},
-		{"ValidateRMFolder", func() validation.Result {
+		{"ValidateRMFolder(archetype id)", func() validation.Result {
 			return validation.ValidateRMFolder(&rm.Folder{ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1", Name: name})
+		}, true},
+		{"ValidateRMFolder(at-code)", func() validation.Result {
+			return validation.ValidateRMFolder(&rm.Folder{ArchetypeNodeID: "at0001", Name: name})
 		}, false},
 	}
 	for _, tc := range cases {
@@ -190,10 +197,15 @@ func evaluationJSON(details string, items ...string) string {
 			"items":[` + strings.Join(items, ",") + `]}}`
 }
 
-// sectionJSON returns a SECTION holding items, verbatim.
-func sectionJSON(items ...string) string {
+// sectionJSON returns a SECTION holding items, verbatim; details is its
+// archetype_details member value (empty leaves it out).
+func sectionJSON(details string, items ...string) string {
+	member := ""
+	if details != "" {
+		member = `"archetype_details":` + details + `,`
+	}
 	return `{"_type":"SECTION","name":{"_type":"DV_TEXT","value":"Findings"},
-		"archetype_node_id":"openEHR-EHR-SECTION.adhoc.v1",
+		"archetype_node_id":"openEHR-EHR-SECTION.adhoc.v1",` + member + `
 		"items":[` + strings.Join(items, ",") + `]}`
 }
 
@@ -213,17 +225,19 @@ func clusterJSON(details string) string {
 // TestValidateRM_NestedArchetypeRootsAndArchetyped checks the two rows on
 // nodes below the root (REQ-112), each reported at its own path and nothing
 // else: an ENTRY nested in a COMPOSITION, directly or in a SECTION, is an
-// archetype root and needs archetype_details; a CLUSTER is not a root, so it
-// may leave archetype_details out, but one it carries must be a complete
-// ARCHETYPED, as must a root's.
+// archetype root by its class and needs archetype_details; a SECTION or a
+// CLUSTER whose archetype_node_id is an archetype id is a root by its node id
+// and needs it too; and an ARCHETYPED a node carries must be complete.
 func TestValidateRM_NestedArchetypeRootsAndArchetyped(t *testing.T) {
 	const (
 		compositionID = "openEHR-EHR-COMPOSITION.encounter.v1"
 		evaluationID  = "openEHR-EHR-EVALUATION.problem_diagnosis.v1"
+		sectionID     = "openEHR-EHR-SECTION.adhoc.v1"
 		clusterID     = "openEHR-EHR-CLUSTER.anatomical_location.v1"
 		incomplete    = `{"_type":"ARCHETYPED","archetype_id":{"_type":"ARCHETYPE_ID","value":""},"rm_version":""}`
 	)
 	root := archetypedJSON(compositionID)
+	section := archetypedJSON(sectionID)
 	cases := []struct {
 		name string
 		body string
@@ -231,7 +245,17 @@ func TestValidateRM_NestedArchetypeRootsAndArchetyped(t *testing.T) {
 	}{
 		{
 			name: "every root carries archetype_details",
+			body: compositionJSON(root, sectionJSON(section, evaluationJSON(archetypedJSON(evaluationID), clusterJSON(archetypedJSON(clusterID))))),
+		},
+		{
+			name: "SECTION with an archetype id and no archetype_details",
+			body: compositionJSON(root, sectionJSON("", evaluationJSON(archetypedJSON(evaluationID)))),
+			want: []string{"is_archetype_root /content[openEHR-EHR-SECTION.adhoc.v1]/archetype_details"},
+		},
+		{
+			name: "CLUSTER with an archetype id and no archetype_details",
 			body: compositionJSON(root, evaluationJSON(archetypedJSON(evaluationID), clusterJSON(""))),
+			want: []string{"is_archetype_root /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/archetype_details"},
 		},
 		{
 			name: "COMPOSITION root without archetype_details",
@@ -245,7 +269,7 @@ func TestValidateRM_NestedArchetypeRootsAndArchetyped(t *testing.T) {
 		},
 		{
 			name: "EVALUATION in a SECTION without archetype_details",
-			body: compositionJSON(root, sectionJSON(evaluationJSON(archetypedJSON(evaluationID))), sectionJSON(evaluationJSON(""))),
+			body: compositionJSON(root, sectionJSON(section, evaluationJSON(archetypedJSON(evaluationID))), sectionJSON(section, evaluationJSON(""))),
 			want: []string{"is_archetype_root /content[2]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/archetype_details"},
 		},
 		{
@@ -279,5 +303,188 @@ func TestValidateRM_NestedArchetypeRootsAndArchetyped(t *testing.T) {
 				t.Errorf("ValidateRM(%s) findings = %q, want %q", tc.name, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestValidateJSON_REQ112_REQ171_ArchetypedValidPerInstance checks
+// LOCATABLE.Archetyped_valid per instance (REQ-112 Archetype roots, REQ-171
+// Finding identity) on the four bodies of issue 466 and their controls, each
+// decoded with its report of missing members. A FOLDER, which no class
+// invariant makes a root, is one when its archetype_node_id is an archetype
+// id, so it must carry archetype_details, at the root and nested; on any
+// root, by class or by node id, archetype_details must name the archetype
+// archetype_node_id names, and so must the details an at-code node carries.
+// A class root without details draws its class rule alone, an
+// archetype_node_id that only looks like an archetype id draws nothing, and
+// an empty id draws only its `required`. No issue names a submitted id but
+// by the path's node predicate, and no Detail names one at all.
+func TestValidateJSON_REQ112_REQ171_ArchetypedValidPerInstance(t *testing.T) {
+	t.Parallel()
+	const (
+		name    = `"name":{"_type":"DV_TEXT","value":"x"}`
+		episode = "openEHR-EHR-FOLDER.episode.v1"
+		generic = "openEHR-EHR-FOLDER.generic.v1"
+		status  = "openEHR-EHR-EHR_STATUS.generic.v1"
+		other   = "openEHR-EHR-EHR_STATUS.other.v1"
+	)
+	details := func(id string) string { return `"archetype_details":` + archetypedJSON(id) }
+	folder := func(nodeID string, members ...string) string {
+		return `{"_type":"FOLDER","archetype_node_id":"` + nodeID + `",` + strings.Join(append([]string{name}, members...), ",") + `}`
+	}
+	ehrStatus := func(members ...string) string {
+		return `{"_type":"EHR_STATUS","archetype_node_id":"` + status + `","subject":{"_type":"PARTY_SELF"},"is_queryable":true,"is_modifiable":true,` +
+			strings.Join(append([]string{name}, members...), ",") + `}`
+	}
+	newFolder := func() any { return new(rm.Folder) }
+	newStatus := func() any { return new(rm.EHRStatus) }
+	cases := []struct {
+		name string
+		body string
+		root func() any
+		want []string
+	}{
+		{
+			name: "issue 1: FOLDER root with an archetype id and no archetype_details",
+			body: folder(episode),
+			root: newFolder,
+			want: []string{"is_archetype_root /archetype_details rm LOCATABLE.Archetyped_valid"},
+		},
+		{
+			name: "issue 2: the same FOLDER nested in another",
+			body: folder("at0001", `"folders":[`+folder(episode)+`]`),
+			root: newFolder,
+			want: []string{"is_archetype_root /folders[openEHR-EHR-FOLDER.episode.v1]/archetype_details rm LOCATABLE.Archetyped_valid"},
+		},
+		{
+			name: "issue 3: FOLDER root whose archetype_details names another archetype",
+			body: folder(episode, details(generic)),
+			root: newFolder,
+			want: []string{"archetype_root_id /archetype_details/archetype_id/value rm archetype_root_id"},
+		},
+		{
+			name: "issue 4: EHR_STATUS whose archetype_details names another archetype",
+			body: ehrStatus(details(other)),
+			root: newStatus,
+			want: []string{"archetype_root_id /archetype_details/archetype_id/value rm archetype_root_id"},
+		},
+		{
+			name: "FOLDER with an at-code that carries archetype_details",
+			body: folder("at0001", details(generic)),
+			root: newFolder,
+			want: []string{"archetype_root_id /archetype_details/archetype_id/value rm archetype_root_id"},
+		},
+		{
+			name: "control: EHR_STATUS without archetype_details draws its class rule alone",
+			body: ehrStatus(),
+			root: newStatus,
+			want: []string{"is_archetype_root /archetype_details rm EHR_STATUS.Is_archetype_root"},
+		},
+		{
+			name: "control: EHR_STATUS whose archetype_details names its archetype",
+			body: ehrStatus(details(status)),
+			root: newStatus,
+		},
+		{
+			name: "control: FOLDER whose archetype_details names its archetype",
+			body: folder(episode, details(episode)),
+			root: newFolder,
+		},
+		{
+			name: "control: FOLDER with an at-code and no archetype_details",
+			body: folder("at0001"),
+			root: newFolder,
+		},
+		{
+			name: "control: FOLDER whose node id has no version, so is no archetype id",
+			body: folder("openEHR-EHR-FOLDER.episode"),
+			root: newFolder,
+		},
+		{
+			name: "control: FOLDER whose archetype_details has an empty archetype id",
+			body: folder(episode, `"archetype_details":{"_type":"ARCHETYPED","archetype_id":{"_type":"ARCHETYPE_ID","value":""},"rm_version":"1.1.0"}`),
+			root: newFolder,
+			want: []string{"required /archetype_details/archetype_id/value rm mandatory"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := validation.ValidateJSON([]byte(tc.body), tc.root(), nil)
+			if got := identityKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateJSON(%s) issues (code path layer rule) = %q, want %q", tc.body, got, tc.want)
+			}
+			for _, i := range r.Issues {
+				for _, id := range []string{episode, generic, status, other} {
+					if strings.Contains(i.Detail, id) {
+						t.Errorf("%s at %q: Detail %q names the submitted id %q", i.Code, i.Path, i.Detail, id)
+					}
+				}
+			}
+			assertValueFree(t, r, generic, other)
+		})
+	}
+}
+
+// TestValidateRM_REQ112_REQ171_ArchetypeRootPerInstanceOnEveryLocatable
+// sweeps every registered LOCATABLE concrete (REQ-112 Archetype roots,
+// REQ-171 Finding identity). Whatever its class, a node whose
+// archetype_node_id is an archetype id and that carries no
+// archetype_details draws one `is_archetype_root` at /archetype_details:
+// under the Is_archetype_root invariant its class declares or inherits on a
+// root class, and under LOCATABLE.Archetyped_valid on any other. One whose
+// archetype_details names another archetype, or that carries details under
+// an at-code, draws one `archetype_root_id` at
+// /archetype_details/archetype_id/value; one whose details name its
+// archetype draws neither. Under an at-code with no details, only a root
+// class draws its rule.
+func TestValidateRM_REQ112_REQ171_ArchetypeRootPerInstanceOnEveryLocatable(t *testing.T) {
+	t.Parallel()
+	declarers, err := archetypeRootDeclarers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mismatch := []string{"archetype_root_id /archetype_details/archetype_id/value rm archetype_root_id"}
+	swept := 0
+	for _, name := range typereg.Default.Names() {
+		ctor, _ := typereg.Default.Lookup(name)
+		if _, ok := ctor().(rm.MutableLocatable); !ok {
+			continue
+		}
+		swept++
+		id := "openEHR-EHR-" + name + ".x.v1"
+		absent := []string{"is_archetype_root /archetype_details rm LOCATABLE.Archetyped_valid"}
+		var atCode []string
+		if d, root := declarers[name]; root {
+			absent = []string{"is_archetype_root /archetype_details rm " + d + ".Is_archetype_root"}
+			atCode = absent
+		}
+		for _, tc := range []struct {
+			what    string
+			nodeID  string
+			details string
+			want    []string
+		}{
+			{what: "an archetype id and no archetype_details", nodeID: id, want: absent},
+			{what: "archetype_details that name its archetype", nodeID: id, details: id},
+			{what: "archetype_details that name another archetype", nodeID: id, details: "openEHR-EHR-" + name + ".y.v1", want: mismatch},
+			{what: "an at-code and archetype_details", nodeID: "at0001", details: id, want: mismatch},
+			{what: "an at-code and no archetype_details", nodeID: "at0001", want: atCode},
+		} {
+			v := ctor()
+			loc := v.(rm.MutableLocatable)
+			loc.SetArchetypeNodeID(tc.nodeID)
+			if tc.details != "" {
+				loc.SetArchetypeDetails(&rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: tc.details}, RMVersion: "1.1.0"})
+			}
+			got := slices.DeleteFunc(identityKeys(validation.ValidateRM(v).Issues), func(k string) bool {
+				return !strings.Contains(k, " /archetype_details")
+			})
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateRM(%s with %s) issues at /archetype_details = %q, want %q", name, tc.what, got, tc.want)
+			}
+		}
+	}
+	if swept < len(declarers) {
+		t.Fatalf("swept %d LOCATABLE concretes, fewer than the %d archetype-root classes; the sweep has gone blind", swept, len(declarers))
 	}
 }

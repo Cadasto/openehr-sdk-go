@@ -867,7 +867,7 @@ func TestValidate_PROBE110_ASharedItemIsTriedPerReport(t *testing.T) {
 	)
 	c := mustCompileInline(t, mustReplaceOnce(t, opt, `<lower>0</lower><upper>1</upper>`, `<lower>0</lower><upper>2</upper>`))
 	shared := &rm.Element{ArchetypeNodeID: "at0001", Name: &rm.DVText{Value: "count"}, Value: &rm.DVCount{Magnitude: 7}}
-	cluster := &rm.Cluster{ArchetypeNodeID: "openEHR-EHR-CLUSTER.items.v1", Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{shared, shared}}
+	cluster := &rm.Cluster{ArchetypeNodeID: "openEHR-EHR-CLUSTER.items.v1", ArchetypeDetails: archetypeDetails("openEHR-EHR-CLUSTER.items.v1"), Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{shared, shared}}
 	r := validation.Validate(cluster, c, validation.WithMissing([]string{"/items/0/value/magnitude"}))
 	if got, want := issueKeys(r.Issues), []string{"required /items[1]/value/magnitude"}; !slices.Equal(got, want) {
 		t.Errorf("Validate(CLUSTER holding one ELEMENT twice, c, WithMissing(/items/0/value/magnitude)) issues = %q, want %q", got, want)

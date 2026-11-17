@@ -891,6 +891,9 @@ func validBloodPressureObservation() *rm.Observation {
 				&rm.Cluster{
 					ArchetypeNodeID: "openEHR-EHR-CLUSTER.device.v1",
 					Name:            rm.DVText{Value: "Device"},
+					// An archetype id as its node id makes it an
+					// archetype root, which carries archetype_details.
+					ArchetypeDetails: archetypeDetails("openEHR-EHR-CLUSTER.device.v1"),
 					// The RM requires a CLUSTER to hold at least one item.
 					Items: []rm.Item{&rm.Element{
 						ArchetypeNodeID: "at0001",
@@ -912,8 +915,9 @@ func archetypeDetails(archetypeID string) *rm.Archetyped {
 func validSingleAttributeSlotComposition(protocolID string) *rm.Composition {
 	obs := validBloodPressureObservation()
 	obs.Protocol = &rm.ItemTree{
-		ArchetypeNodeID: protocolID,
-		Name:            rm.DVText{Value: "Protocol"},
+		ArchetypeNodeID:  protocolID,
+		ArchetypeDetails: archetypeDetails(protocolID),
+		Name:             rm.DVText{Value: "Protocol"},
 	}
 	return &rm.Composition{
 		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.single_attribute_slot.v1",

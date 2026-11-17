@@ -107,8 +107,9 @@ func ValidBloodPressureComposition() *rm.Composition {
 					Name:            rm.DVText{Value: "protocol"},
 					Items: []rm.Item{
 						&rm.Cluster{
-							ArchetypeNodeID: "openEHR-EHR-CLUSTER.device.v1",
-							Name:            rm.DVText{Value: "Device"},
+							ArchetypeNodeID:  "openEHR-EHR-CLUSTER.device.v1",
+							Name:             rm.DVText{Value: "Device"},
+							ArchetypeDetails: archetyped("openEHR-EHR-CLUSTER.device.v1"),
 							Items: []rm.Item{&rm.Element{
 								ArchetypeNodeID: "at0001",
 								Name:            rm.DVText{Value: "Device name"},
@@ -242,6 +243,7 @@ const AlternativeMismatchOPT = `<?xml version="1.0"?>
         <node_id />
       </children>
     </attributes>
+    <archetype_id><value>openEHR-EHR-COMPOSITION.probe.v1</value></archetype_id>
   </definition>
 </template>`
 
@@ -266,16 +268,20 @@ const RMTypeMismatchOPT = `<?xml version="1.0"?>
         <node_id />
       </children>
     </attributes>
+    <archetype_id><value>openEHR-EHR-COMPOSITION.probe.v1</value></archetype_id>
   </definition>
 </template>`
+
+// probeArchetype is the archetype of the root of the composer templates.
+const probeArchetype = "openEHR-EHR-COMPOSITION.probe.v1"
 
 // probeComposition returns a composition, valid against the RM, for the
 // composer templates, with composer as its composer.
 func probeComposition(composer rm.PartyProxy) *rm.Composition {
 	return &rm.Composition{
-		ArchetypeNodeID:  "at0000",
+		ArchetypeNodeID:  probeArchetype,
 		Name:             rm.DVText{Value: "probe"},
-		ArchetypeDetails: archetyped("openEHR-EHR-COMPOSITION.probe.v1"),
+		ArchetypeDetails: archetyped(probeArchetype),
 		Category: rm.DVCodedText{
 			DVText: rm.DVText{Value: "event"},
 			DefiningCode: rm.CodePhrase{
@@ -412,8 +418,9 @@ func PersonAbsentIdentities() *rm.Person {
 // one [FolderOPT] pins.
 func FolderOtherArchetype() *rm.Folder {
 	return &rm.Folder{
-		ArchetypeNodeID: "openEHR-EHR-FOLDER.other.v1",
-		Name:            rm.DVText{Value: "root"},
+		ArchetypeNodeID:  "openEHR-EHR-FOLDER.other.v1",
+		Name:             rm.DVText{Value: "root"},
+		ArchetypeDetails: archetyped("openEHR-EHR-FOLDER.other.v1"),
 	}
 }
 

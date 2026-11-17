@@ -61,6 +61,7 @@ var fixedRuleCodes = map[string]string{
 	"mappings_valid":       "DV_TEXT.Mappings_valid",
 	"term_mapping_match":   "TERM_MAPPING.Match_valid",
 	"rm_version_valid":     "ARCHETYPED.Rm_version_valid",
+	"archetype_root_id":    "archetype_root_id",
 }
 
 // ruleCandidate is the shape of a string the source scan takes for a rule
@@ -161,7 +162,9 @@ func identityProblem(i validation.Issue, bmm map[string]bool) string {
 	case code == "rm_invariant":
 		ok = rmLayer && (i.Rule == "mandatory" || i.Rule == "precision_range" || bmm[i.Rule])
 	case code == "is_archetype_root":
-		ok = rmLayer && bmm[i.Rule] && strings.HasSuffix(i.Rule, ".Is_archetype_root")
+		// A class root names the Is_archetype_root it declares or inherits;
+		// a node that is a root by its archetype_node_id, Archetyped_valid.
+		ok = rmLayer && bmm[i.Rule] && (strings.HasSuffix(i.Rule, ".Is_archetype_root") || i.Rule == "LOCATABLE.Archetyped_valid")
 	case code == "code_not_in_value_set":
 		ok = rmLayer && bmm[i.Rule]
 	case fixedRuleCodes[code] != "":

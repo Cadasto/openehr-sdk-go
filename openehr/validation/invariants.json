@@ -146,7 +146,7 @@
   "Iso8601_timezone.Minute_valid": {"kind": "out_of_scope", "reason": "Not yet evaluated: the SDK's Iso8601_timezone type holds no value, so one validated on its own has none to check. No RM attribute holds one: a zone is written inside a DV_TIME or DV_DATE_TIME value, which that class's Value_valid parses."},
   "Iso8601_timezone.Sign_valid": {"kind": "out_of_scope", "reason": "Not yet evaluated: the SDK's Iso8601_timezone type holds no value, so one validated on its own has none to check. No RM attribute holds one: a zone is written inside a DV_TIME or DV_DATE_TIME value, which that class's Value_valid parses."},
   "LOCATABLE.Archetype_node_id_valid": {"kind": "evaluated", "function": "checkMandatory"},
-  "LOCATABLE.Archetyped_valid": {"kind": "out_of_scope", "reason": "The RM defines is_archetype_root only in prose, so on a class that may or may not be an archetype root the presence of archetype_details is the answer and the rule holds; the classes that must be roots are checked under their own Is_archetype_root."},
+  "LOCATABLE.Archetyped_valid": {"kind": "evaluated", "function": "checkArchetypedValid"},
   "LOCATABLE.Links_valid": {"kind": "evaluated", "function": "checkLinks"},
   "List.First_validity": {"kind": "out_of_scope", "reason": "A property of BASE List that every Go slice has: a list that is not empty has a first and a last item; no class the RM type registry decodes inherits List."},
   "List.Last_validity": {"kind": "out_of_scope", "reason": "A property of BASE List that every Go slice has: a list that is not empty has a first and a last item; no class the RM type registry decodes inherits List."},

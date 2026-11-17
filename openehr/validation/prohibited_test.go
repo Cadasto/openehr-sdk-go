@@ -71,7 +71,7 @@ func existenceOPT(interval string) string {
 // prohibitedElement returns the root of prohibitedOPT carrying value and
 // nullFlavour, either of which may be nil.
 func prohibitedElement(value rm.DataValue, nullFlavour *rm.DVCodedText) *rm.Element {
-	return &rm.Element{ArchetypeNodeID: prohibitedArchetype, Name: rm.DVText{Value: "element"}, Value: value, NullFlavour: nullFlavour}
+	return &rm.Element{ArchetypeNodeID: prohibitedArchetype, ArchetypeDetails: archetypeDetails(prohibitedArchetype), Name: rm.DVText{Value: "element"}, Value: value, NullFlavour: nullFlavour}
 }
 
 // templateIssues returns the template-layer issues of r, as identityKeys

@@ -27,11 +27,12 @@ import (
 // given events and summary, and the attributes the RM requires otherwise.
 func rmHistory(events []rm.Event, summary rm.ItemStructure) *rm.History[rm.ItemStructure] {
 	return &rm.History[rm.ItemStructure]{
-		ArchetypeNodeID: historyArchetype,
-		Name:            rm.DVText{Value: "history"},
-		Origin:          rm.DVDateTime{Value: "2026-10-25T10:00:00Z"},
-		Events:          events,
-		Summary:         summary,
+		ArchetypeNodeID:  historyArchetype,
+		ArchetypeDetails: archetypeDetails(historyArchetype),
+		Name:             rm.DVText{Value: "history"},
+		Origin:           rm.DVDateTime{Value: "2026-10-25T10:00:00Z"},
+		Events:           events,
+		Summary:          summary,
 	}
 }
 

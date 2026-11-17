@@ -48,7 +48,7 @@ const codedEvaluator = "checkCodedInvariants"
 
 // dispatchBindings parses the non-test Go files in dir and reads the
 // invariantChecks literal of file. Each entry must be a call of nodeCheck,
-// typeCheck, ruleCheck or coveredCheck whose first argument, a string
+// typeCheck, rootCheck, ruleCheck or coveredCheck whose first argument, a string
 // literal, is the name of the method expression (*findings).name its second
 // argument is, or a call of codedCheck, which binds checkCodedInvariants.
 // Every function an entry binds must be a method of findings the source
@@ -141,7 +141,7 @@ func boundFunction(e ast.Expr) (fn string, covered bool, problem string) {
 	switch binder.Name {
 	case "codedCheck":
 		return codedEvaluator, false, ""
-	case "nodeCheck", "typeCheck", "ruleCheck":
+	case "nodeCheck", "typeCheck", "ruleCheck", "rootCheck":
 	case "coveredCheck":
 		covered = true
 	default:
@@ -499,7 +499,10 @@ func TestFloor_REQ171_CodedPassChecksOnlyTheRowsItIsGiven(t *testing.T) {
 // REQ-112 Archetype roots, REQ-107 — the classes the floor checks as
 // archetype roots, those subject to an evaluated Is_archetype_root
 // invariant in the inventory, are the classes the instance generator treats
-// as archetype roots (internal/rmroots), so the two cannot drift apart.
+// as archetype roots (internal/rmroots), so the two cannot drift apart. The
+// dispatch marks exactly those classes as always roots, so the
+// Archetyped_valid evaluator leaves their absent archetype_details to the
+// Is_archetype_root check, and no other.
 func TestInventory_REQ112_ArchetypeRootsMatchTheGenerator(t *testing.T) {
 	t.Parallel()
 	roots := 0
@@ -509,6 +512,9 @@ func TestInventory_REQ112_ArchetypeRootsMatchTheGenerator(t *testing.T) {
 		})
 		if floor != rmroots.IsArchetypeRoot(class) {
 			t.Errorf("%s: the floor checks it as an archetype root: %t; rmroots.IsArchetypeRoot: %t", class, floor, rmroots.IsArchetypeRoot(class))
+		}
+		if got := floorRules.byClass[class].classRoot; got != floor {
+			t.Errorf("%s: the dispatch marks it as always an archetype root: %t, want %t", class, got, floor)
 		}
 		if floor {
 			roots++

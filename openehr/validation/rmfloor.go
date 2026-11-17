@@ -314,7 +314,7 @@ func (f *findings) checkInvariants(value any, rmType string, path issuePath, rul
 		return
 	}
 	f.visited = f.visited.with(rules.index)
-	n := floorNode{value: value, rmType: rmType, path: path}
+	n := floorNode{value: value, rmType: rmType, path: path, classRoot: rules.classRoot}
 	for _, c := range rules.checks {
 		c.run(f, n, c.rule)
 	}
@@ -330,7 +330,9 @@ func (f *findings) checkInvariants(value any, rmType string, path issuePath, rul
 // LOCATABLE's `Archetyped_valid` (is_archetype_root xor archetype_details =
 // Void) then makes archetype_details mandatory, although LOCATABLE declares
 // it optional. An absent archetype_details, whether omitted or JSON null,
-// reports `is_archetype_root` at the node's archetype_details.
+// reports `is_archetype_root` at the node's archetype_details, whatever its
+// archetype_node_id: [findings.checkArchetypedValid] leaves the node of such
+// a class to this check, so the absence draws one finding.
 //
 // The attribute is read through [rm.Locatable], which every LOCATABLE
 // concrete implements. The issue's rule is the Is_archetype_root invariant
@@ -350,6 +352,87 @@ func (f *findings) checkArchetypeRoot(value any, rmType string, path issuePath, 
 			Detail: rmType + " is an archetype root, so archetype_details must be present (RM Is_archetype_root, LOCATABLE.Archetyped_valid)",
 		})
 	}
+}
+
+// checkArchetypedValid evaluates LOCATABLE.Archetyped_valid
+// (is_archetype_root xor archetype_details = Void) on a node whose class is
+// not always an archetype root. The RM defines is_archetype_root only in
+// prose: archetype_node_id holds an at-code, except at an archetype root,
+// where it holds the archetype id archetype_details records. So a node whose
+// archetype_node_id parses as an ARCHETYPE_ID is a root, and an absent
+// archetype_details on it, whether omitted or JSON null, reports
+// `is_archetype_root` at the node's archetype_details. A node whose
+// archetype_node_id is no archetype id, an at-code among them, may leave the
+// details out; one that carries them is a root by that alone, and
+// [findings.checkArchetypeRootID] compares its two ids.
+//
+// classRoot is set on a node of a class that is always a root, whose
+// absent details [findings.checkArchetypeRoot] reports under the class's
+// Is_archetype_root, so this check reports nothing there. The diagnostic
+// names the class and the attribute, never a value.
+func (f *findings) checkArchetypedValid(value any, rmType string, path issuePath, classRoot bool) {
+	if classRoot {
+		return
+	}
+	l, ok := value.(rm.Locatable)
+	if !ok || rmaccess.IsTypedNilPointer(value) || l.GetArchetypeDetails() != nil {
+		return
+	}
+	if !isArchetypeID(l.GetArchetypeNodeID()) {
+		return
+	}
+	f.emit(Issue{
+		Path:   path.join("/archetype_details"),
+		Code:   "is_archetype_root",
+		Layer:  LayerRM,
+		Rule:   ruleArchetypedValid,
+		Detail: bareClass(rmType) + " has an archetype id as archetype_node_id, so it is an archetype root and archetype_details must be present (RM LOCATABLE.Archetyped_valid)",
+	})
+}
+
+// isArchetypeID reports whether id parses as an ARCHETYPE_ID
+// ([rm.ParseArchetypeID]). Every archetype id holds a hyphen and no at-code
+// or id-code does, so the hyphen tells most node ids apart without the
+// parse, which builds an error for each id it refuses.
+func isArchetypeID(id string) bool {
+	if strings.IndexByte(id, '-') < 0 {
+		return false
+	}
+	_, err := rm.ParseArchetypeID(id)
+	return err == nil
+}
+
+// checkArchetypeRootID applies the rule the RM states in the definition of
+// LOCATABLE.archetype_node_id: at an archetype root, archetype_node_id is
+// the stringified form of the archetype_id in archetype_details. It runs on
+// every LOCATABLE. A node that carries archetype_details is a root by that
+// alone, whatever its class or archetype_node_id, so an
+// archetype_details.archetype_id.value that differs from archetype_node_id,
+// compared exactly, reports `archetype_root_id` at
+// archetype_details/archetype_id/value; an at-code node that carries the
+// details draws it too. An empty id on either side draws the `required` of
+// the mandatory-presence rule instead, so a defect draws one finding. The
+// diagnostic names the class and the attributes, never their values.
+func (f *findings) checkArchetypeRootID(value any, rmType string, path issuePath) {
+	l, ok := value.(rm.Locatable)
+	if !ok || rmaccess.IsTypedNilPointer(value) {
+		return
+	}
+	d := l.GetArchetypeDetails()
+	if d == nil {
+		return
+	}
+	nodeID := l.GetArchetypeNodeID()
+	if nodeID == "" || d.ArchetypeID.Value == "" || nodeID == d.ArchetypeID.Value {
+		return
+	}
+	f.emit(Issue{
+		Path:   path.join("/archetype_details/archetype_id/value"),
+		Code:   "archetype_root_id",
+		Layer:  LayerRM,
+		Rule:   ruleArchetypeRootID,
+		Detail: bareClass(rmType) + " carries archetype_details, so it is an archetype root and archetype_details.archetype_id must equal archetype_node_id (RM LOCATABLE.archetype_node_id)",
+	})
 }
 
 // checkArchetyped enforces the floor on an ARCHETYPED node, wherever it sits:

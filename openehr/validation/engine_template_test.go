@@ -125,10 +125,15 @@ type refusedContentCase struct {
 	want, inside string
 }
 
-// compositionOPT returns a COMPOSITION template, root node at0000, that
-// declares attributes, each an <attributes> element, and nothing else.
+// probeCompositionArchetype is the archetype of the compositions the
+// composer probes build (testkit/probes/validation).
+const probeCompositionArchetype = "openEHR-EHR-COMPOSITION.probe.v1"
+
+// compositionOPT returns a COMPOSITION template, root node at0000 of
+// probeCompositionArchetype, that declares attributes, each an <attributes>
+// element, and nothing else.
 func compositionOPT(attributes ...string) string {
-	return rootOPT("COMPOSITION", "", attributes...)
+	return rootOPT("COMPOSITION", probeCompositionArchetype, attributes...)
 }
 
 // rootOPT returns a template whose root node, of RM type rmType and node id
@@ -210,9 +215,10 @@ func refusedContentCases(t *testing.T) []refusedContentCase {
 
 	// A present and empty mappings list breaks DV_TEXT.Mappings_valid.
 	forbiddenItem := &rm.Cluster{
-		ArchetypeNodeID: forbiddenChildArchetype,
-		Name:            &rm.DVText{Value: "cluster"},
-		Items:           []rm.Item{fiItem("at0002", "two", &rm.DVText{Value: "text", Mappings: []rm.TermMapping{}})},
+		ArchetypeNodeID:  forbiddenChildArchetype,
+		ArchetypeDetails: archetypeDetails(forbiddenChildArchetype),
+		Name:             &rm.DVText{Value: "cluster"},
+		Items:            []rm.Item{fiItem("at0002", "two", &rm.DVText{Value: "text", Mappings: []rm.TermMapping{}})},
 	}
 
 	relatedComposer := probes.ComposerPartyRelated()

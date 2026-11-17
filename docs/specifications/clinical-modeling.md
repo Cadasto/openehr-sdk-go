@@ -561,7 +561,8 @@ Not checked: it needs a live external terminology; [§ REQ-111](#req-111--public
 | `mappings_valid` | a present-but-empty `mappings` on DV_TEXT / DV_CODED_TEXT (REQ-112 floor) |
 | `term_mapping_match` | a TERM_MAPPING `match` outside `{'>', '=', '<', '?'}` (REQ-112 floor) |
 | `lower_included_valid` / `upper_included_valid` | an interval side marked both unbounded and included (REQ-112 floor, *Interval flags*) |
-| `is_archetype_root` | an absent or `null` `archetype_details` on an archetype-root node (REQ-112 floor) |
+| `is_archetype_root` | an absent or `null` `archetype_details` on an archetype-root node (REQ-112 floor, *Archetype roots*) |
+| `archetype_root_id` | an `archetype_details.archetype_id.value` that differs from `archetype_node_id` on an archetype-root node (REQ-112 floor, *Archetype roots*) |
 | `rm_version_valid` | an empty `ARCHETYPED.rm_version`, and one the document leaves out or sends as `null` on a value validated with no report of missing members; with the report it is `required` instead ([§ *Value-typed mandatory presence*](#value-typed-mandatory-presence)) |
 | `code_not_in_value_set` | a coded attribute outside the openEHR terminology group or code set its RM invariant names, reported at the CODE_PHRASE the invariant reads (REQ-112 floor, *Coded invariants*) |
 | `max_depth` | the walk hit its recursion-depth limit ([§ REQ-171 *Cycles and limits*](#cycles-and-limits)) |
@@ -2029,12 +2030,36 @@ The scheme is the text before the first `:` when RFC 3986 section 3.1 admits it 
 A `value` with no scheme, such as `example.org/x`, has none equal to `ehr` and breaks it too; an empty one is the required-set walk's (`DV_URI.Value_valid`).
 The diagnostic names the class and the attribute, never a value, the scheme being part of it, and the issue's `Value` is empty ([§ REQ-168](#req-168--value-free-validation-diagnostics)).
 
-#### Archetype roots (`Is_archetype_root`)
+#### Archetype roots (`Is_archetype_root`, `Archetyped_valid`)
 
-The class-level `Is_archetype_root` invariant fixes `is_archetype_root` true on every class whose BMM declares it, and together with `LOCATABLE.Archetyped_valid` (`is_archetype_root xor archetype_details = Void`) that makes `archetype_details` mandatory on those nodes even though LOCATABLE declares it 0..1; `Archetyped_valid` alone does not, since a non-root node with no details satisfies it.
-The declaring classes are COMPOSITION, EHR_ACCESS, EHR_STATUS, PARTY (with its concrete descendants PERSON, ORGANISATION, GROUP, AGENT, ROLE) and ENTRY (with its concrete descendants ADMIN_ENTRY, OBSERVATION, EVALUATION, INSTRUCTION, ACTION).
-The floor reports an absent or `null` `archetype_details` as `is_archetype_root` at `…/archetype_details` on a node of such a class, and **MUST NOT** report it on any other: classes that declare no `Is_archetype_root` (FOLDER, PARTY_RELATIONSHIP, EXTRACT, GENERIC_ENTRY, the demographic parts PARTY_IDENTITY, CONTACT, ADDRESS and CAPABILITY, and the data-structure classes) leave the attribute optional.
-This positive set is closed: the floor takes it from the `Is_archetype_root` entries of the inventory of [§ REQ-171 *Where the RM rules come from*](#where-the-rm-rules-come-from), and the [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator from a closed list held equal to it and to the vendored BMM's `Is_archetype_root` declarations, so a BMM bump that adds a root class fails the build ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md)).
+`LOCATABLE.Archetyped_valid` (`is_archetype_root xor archetype_details = Void`) makes `archetype_details` mandatory on an archetype root, although LOCATABLE declares it 0..1.
+The RM defines `is_archetype_root` in prose: `archetype_node_id` holds an at-code, except at an archetype root, where it is the stringified `archetype_id` of `archetype_details`.
+So the floor decides it per node, on every LOCATABLE the walk visits.
+A node is an archetype root when any of these holds:
+
+- its class is always one: the class-level `Is_archetype_root` invariant fixes `is_archetype_root` true on the class that declares it and on its descendants;
+- its `archetype_node_id` parses as an `ARCHETYPE_ID`, as [REQ-120](reference-model.md#req-120--rm-identifier-parsing-and-derivation)'s `ParseArchetypeID` reads it;
+- it carries `archetype_details`.
+
+The classes that are always roots are COMPOSITION, EHR_ACCESS, EHR_STATUS, PARTY (with its concrete descendants PERSON, ORGANISATION, GROUP, AGENT, ROLE) and ENTRY (with its concrete descendants ADMIN_ENTRY, OBSERVATION, EVALUATION, INSTRUCTION, ACTION).
+This set is closed: the floor takes it from the `Is_archetype_root` entries of the inventory of [§ REQ-171 *Where the RM rules come from*](#where-the-rm-rules-come-from).
+The [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator takes it from a closed list held equal to it and to the vendored BMM's `Is_archetype_root` declarations, so a BMM bump that adds a root class fails the build ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md)).
+
+The floor **MUST** report an absent or `null` `archetype_details` on an archetype root once, as `is_archetype_root` at `…/archetype_details`, with the rule this table gives:
+
+| The node | `Rule` |
+|---|---|
+| is of a class that is always a root | the `Is_archetype_root` the class declares or inherits (`ENTRY.Is_archetype_root` on an OBSERVATION) |
+| is of any other class, and its `archetype_node_id` parses as an `ARCHETYPE_ID` | `LOCATABLE.Archetyped_valid` |
+
+A node of any other class whose `archetype_node_id` is no `ARCHETYPE_ID`, an at-code such as `at0001` among them, may leave `archetype_details` out.
+
+At an archetype root, the floor **MUST** report an `archetype_details.archetype_id.value` that differs from `archetype_node_id`, compared exactly, as `archetype_root_id` at `…/archetype_details/archetype_id/value`, rule `archetype_root_id`.
+The RM states this rule in the definition of `LOCATABLE.archetype_node_id`, not as a named invariant.
+A node whose `archetype_node_id` is an at-code and that carries `archetype_details` is a root, so it draws this finding too.
+An empty id on either side draws only the `required` it already draws, so one defect draws one finding.
+Each diagnostic names the class and the attributes, never a value ([§ REQ-168](#req-168--value-free-validation-diagnostics)).
+
 This is a class invariant of the object, not a storage rule, so it holds for a detached object exactly as for a persisted one.
 Rules that need stored history (`VERSIONED_COMPOSITION.Archetype_node_id_valid`) and requiring `ARCHETYPED.template_id` (0..1 in the RM) stay out of scope.
 
@@ -2044,7 +2069,7 @@ Wherever an `archetype_details` node is present, on any LOCATABLE, its two RM-ma
 On a value validated with no report of missing members, the value-based entries (`ValidateRM` and the typed sugars) report an empty `archetype_id.value` as `required` at `…/archetype_details/archetype_id/value` (SDK policy: `OBJECT_ID.value` is RM-mandatory and has no non-empty invariant of its own) and an empty `rm_version` as `rm_version_valid` (`Rm_version_valid: not rm_version.is_empty`) at `…/archetype_details/rm_version`.
 Absent and `null` decode to the same zero values and are reported the same way, and an ARCHETYPED handed to `ValidateRM` as the root is checked the same way, with the findings at `/archetype_id/value` and `/rm_version`.
 With a decode's report of missing members, an absent or `null` member is read as [§ *Value-typed mandatory presence*](#value-typed-mandatory-presence) says.
-Validating the `ARCHETYPE_ID` grammar is out of scope for this catalogue.
+The floor does not validate the `ARCHETYPE_ID` grammar of `archetype_id`; it reads that grammar only to tell an archetype root by its `archetype_node_id` (*Archetype roots*).
 
 #### Coded invariants
 
@@ -2409,6 +2434,7 @@ An issue from `ValidateAQL` or `ValidateAQLWithTypeRelation` is not an instance 
   - `mandatory` for an RM-mandatory attribute the instance lacks, a mandatory string left empty included, and for an item of a list that holds no RM value (§ REQ-112 *Driver*);
   - `cardinality` for an RM-mandatory container that is present and empty;
   - `precision_range` for a `precision` below -1;
+  - `archetype_root_id` for an archetype root whose `archetype_details` names another archetype than its `archetype_node_id` (§ REQ-112 *Archetype roots*);
 - on the template layer, one of:
   - `existence` (an attribute the template requires and the instance lacks, or one it prohibits and the instance carries);
   - `cardinality` (the attribute's item count);
@@ -2429,7 +2455,7 @@ Every invariant of the pinned RM and BASE BMMs, BASE's primitive types included,
 A BMM bump that adds an invariant fails code generation until the invariant is classified ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md)).
 An invariant that another evaluated check already decides, the mandatory-presence rule among them, is *evaluated*; its findings carry the rule of the check that reports them (*Finding identity*).
 
-The RM rules the validators apply are the *evaluated* entries together with the rules *Finding identity* takes from an attribute's definition (`mandatory`, `cardinality`, `precision_range`).
+The RM rules the validators apply are the *evaluated* entries together with the rules *Finding identity* takes from an attribute's definition (`mandatory`, `cardinality`, `precision_range`, `archetype_root_id`).
 The validators interpret no BMM invariant expression at run time and load no rule from outside the binary.
 The openEHR terminology checks of § REQ-112 *Coded invariants* are RM rules, classified in the inventory like any other.
 

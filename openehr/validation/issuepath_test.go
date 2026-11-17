@@ -238,10 +238,14 @@ func reusedObservationChild(name string, lower int) string {
 func reusedComposition(names ...string) *rm.Composition {
 	comp := validVitalSignsComposition()
 	comp.ArchetypeNodeID = "openEHR-EHR-COMPOSITION.reused.v1"
+	// An archetype root's archetype_details names the archetype its
+	// archetype_node_id names.
+	comp.ArchetypeDetails = archetypeDetails(comp.ArchetypeNodeID)
 	comp.Content = nil
 	for _, name := range names {
 		obs := validBloodPressureObservation()
 		obs.ArchetypeNodeID = "openEHR-EHR-OBSERVATION.reused.v1"
+		obs.ArchetypeDetails = archetypeDetails(obs.ArchetypeNodeID)
 		obs.Name = rm.DVText{Value: name}
 		comp.Content = append(comp.Content, obs)
 	}

@@ -10,7 +10,10 @@ package validation
 // Finding identity). The generated inventory supplies the pairs: an
 // invariant newly called evaluated that has no row fails the probe, and so
 // does a class newly subject to an invariant whose row does not fit the
-// class. DV_INTERVAL.Limits_consistent is ordered by the type of the bounds,
+// class. LOCATABLE.Archetyped_valid is decided, on a class that is always an
+// archetype root, by the Is_archetype_root invariant the class is subject to,
+// so there its break draws that invariant's finding.
+// DV_INTERVAL.Limits_consistent is ordered by the type of the bounds,
 // so its row breaks it with bounds of every concrete DV_ORDERED the pinned
 // RM declares, and a type newly declared fails the probe until its pair is
 // added; it also breaks it with bounds that are not strictly comparable.
@@ -18,6 +21,7 @@ package validation
 import (
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -32,10 +36,18 @@ const (
 	bogusCoded  = `{"_type":"DV_CODED_TEXT","value":"x","defining_code":` + bogusPhrase + `}`
 )
 
-// archetypeDetailsMember holds a complete archetype_details. The floor reads
-// neither the grammar of the archetype id nor the class it names, so one
-// value serves every archetype root.
-const archetypeDetailsMember = `"archetype_details":{"_type":"ARCHETYPED","archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"},"rm_version":"1.1.0"}`
+// archetypeRootNodeID is an archetype id, which makes a node whose
+// archetype_node_id it is an archetype root, whatever its class.
+const archetypeRootNodeID = "openEHR-EHR-OBSERVATION.x.v1"
+
+// archetypeDetailsMember holds a complete archetype_details naming
+// archetypeRootNodeID. The floor reads neither the grammar of the
+// archetype id nor the class it names, so one value serves every archetype
+// root.
+const archetypeDetailsMember = `"archetype_details":{"_type":"ARCHETYPED","archetype_id":{"_type":"ARCHETYPE_ID","value":"` + archetypeRootNodeID + `"},"rm_version":"1.1.0"}`
+
+// archetypeRootNodeIDMember holds archetypeRootNodeID as archetype_node_id.
+const archetypeRootNodeIDMember = `"archetype_node_id":"` + archetypeRootNodeID + `"`
 
 // ehrLinkJSON is a complete LINK to an item in an EHR, the member that keeps
 // LOCATABLE.Links_valid on a `links` that holds it.
@@ -70,11 +82,17 @@ func localSymbolJSON(code string) string {
 // an invariant whose evaluator reads values of one class in more than one
 // way: Limits_consistent orders the bounds of a DV_INTERVAL by their type
 // and requires them to be strictly comparable, Fraction_validity holds on a fraction and on an integer fraction, and
-// Events_valid reads a HISTORY's events absent and empty.
+// Events_valid reads a HISTORY's events absent and empty. classRoot is set on
+// the row of an invariant that, on a class that is always an archetype root,
+// the Is_archetype_root invariant the class is subject to decides: there a
+// breaking value draws that invariant's finding at /archetype_details, and
+// none whose rule is the row's (REQ-171 Finding identity, one finding per
+// defect).
 type matrixRow struct {
 	breaking, conforming string
 	rule, path           string
 	more                 []matrixPair
+	classRoot            bool
 }
 
 // matrixPair is one further pair of a row: the members of a value that
@@ -181,6 +199,7 @@ var invariantMatrix = map[string]matrixRow{
 	"INSTRUCTION.Activities_valid":          {breaking: `"activities":[]`, conforming: `"activities":[{"_type":"ACTIVITY","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"x"}}]`},
 	"Interval.Lower_included_valid":         {breaking: `"lower_unbounded":true,"lower_included":true`, conforming: `"lower_unbounded":true,"lower_included":false`},
 	"Interval.Upper_included_valid":         {breaking: `"upper_unbounded":true,"upper_included":true`, conforming: `"upper_unbounded":true,"upper_included":false`},
+	"LOCATABLE.Archetyped_valid":            {breaking: archetypeRootNodeIDMember, conforming: archetypeRootNodeIDMember + "," + archetypeDetailsMember, classRoot: true},
 	"LOCATABLE.Links_valid":                 {breaking: `"links":[]`, conforming: `"links":[` + ehrLinkJSON + `]`},
 	"PARTY.Is_archetype_root":               {breaking: ``, conforming: archetypeDetailsMember},
 	"PARTY_IDENTIFIED.Basic_validity":       {breaking: ``, conforming: `"name":"x"`},
@@ -278,7 +297,10 @@ func validateMembers(class, members string) (Result, string, error) {
 // invariant's finding: an issue whose rule is the invariant, or, for an
 // invariant another evaluated check decides, the issue that check reports, at
 // its path and with its rule, and the invariant must not be listed as
-// unevaluated. Each conforming value of the row must draw no such issue. The
+// unevaluated; on a class that is always an archetype root, the issue of a
+// classRoot row is the class's Is_archetype_root finding at
+// /archetype_details. Each conforming value of the row must draw no such
+// issue. The
 // probe fails for an evaluated invariant without a row, for a row that names
 // no conforming value, holds a further pair short of a value, or misstates
 // which check decides its invariant, for a row of an invariant that is not
@@ -318,6 +340,10 @@ func TestPROBE077_REQ112_REQ171_InvariantMatrix(t *testing.T) {
 				if covered {
 					finding = func(i Issue) bool { return i.Rule == row.rule && i.Path == row.path }
 					want = "whose rule is " + row.rule + " at " + row.path
+				}
+				if root := classRootInvariant(class); row.classRoot && root != "" {
+					finding = func(i Issue) bool { return i.Rule == root && i.Path == "/archetype_details" }
+					want = "whose rule is " + root + " at /archetype_details"
 				}
 				for _, pair := range row.pairs() {
 					if r, body, err := validateMembers(class, pair.breaking); err != nil {
@@ -365,6 +391,18 @@ func TestPROBE077_REQ112_REQ171_InvariantMatrix(t *testing.T) {
 	for _, class := range uncoveredBoundTypes(t) {
 		t.Errorf("the row for %s breaks it with no %s bounds; add a pair whose bounds are two strictly comparable %s", ruleIntervalLimits, class, class)
 	}
+}
+
+// classRootInvariant returns the Is_archetype_root invariant the inventory
+// calls evaluated that class is subject to, which makes it always an
+// archetype root, or "" when it is subject to none.
+func classRootInvariant(class string) string {
+	for _, key := range classInvariants[class] {
+		if strings.HasSuffix(key, ".Is_archetype_root") && invariantInventory[key].kind == invariantEvaluated {
+			return key
+		}
+	}
+	return ""
 }
 
 // uncoveredBoundTypes returns the concrete DV_ORDERED classes of the pinned

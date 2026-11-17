@@ -47,9 +47,10 @@ func locatableAttributesOPT(lower, upper string) string {
 // otherwise.
 func locatableElement(full bool) *rm.Element {
 	el := &rm.Element{
-		ArchetypeNodeID: locatableArchetype,
-		Name:            &rm.DVText{Value: "element"},
-		Value:           &rm.DVBoolean{Value: true},
+		ArchetypeNodeID:  locatableArchetype,
+		ArchetypeDetails: archetypeDetails(locatableArchetype),
+		Name:             &rm.DVText{Value: "element"},
+		Value:            &rm.DVBoolean{Value: true},
 	}
 	if full {
 		el.UID = &rm.HierObjectID{Value: "8849182c-82ad-4088-a07f-48ead4180515"}

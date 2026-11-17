@@ -150,7 +150,7 @@ func TestValidate_REQ102_MandatoryChildUnderAnOptionalList(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			c := mustCompileInline(t, tc.opt)
-			root := &rm.ItemTree{ArchetypeNodeID: containerArchetype("ITEM_TREE"), Name: rm.DVText{Value: "tree"}, Items: tc.items}
+			root := &rm.ItemTree{ArchetypeNodeID: containerArchetype("ITEM_TREE"), ArchetypeDetails: archetypeDetails(containerArchetype("ITEM_TREE")), Name: rm.DVText{Value: "tree"}, Items: tc.items}
 			r := validation.Validate(root, c)
 			if got := identityKeys(r.Issues); !slices.Equal(got, tc.want) {
 				t.Errorf("Validate(%s) issues = %q, want %q (REQ-102 § A mandatory child under an optional list)", tc.name, got, tc.want)
@@ -299,8 +299,9 @@ func TestValidate_REQ102_AbsentPrimitiveListCountsNoChild(t *testing.T) {
 	c := mustCompileInline(t, opt)
 	media := func(data []byte) *rm.Element {
 		return &rm.Element{
-			ArchetypeNodeID: "openEHR-EHR-ELEMENT.multimedia.v1",
-			Name:            rm.DVText{Value: "element"},
+			ArchetypeNodeID:  "openEHR-EHR-ELEMENT.multimedia.v1",
+			ArchetypeDetails: archetypeDetails("openEHR-EHR-ELEMENT.multimedia.v1"),
+			Name:             rm.DVText{Value: "element"},
 			Value: &rm.DVMultimedia{
 				MediaType: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}, CodeString: "image/png"},
 				URI:       &rm.DVURI{Value: "https://example.org/image.png"},

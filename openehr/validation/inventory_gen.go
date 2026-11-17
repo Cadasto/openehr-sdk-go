@@ -155,7 +155,7 @@ var invariantInventory = map[string]inventoryEntry{
 	"Iso8601_timezone.Minute_valid":                        {kind: invariantOutOfScope},
 	"Iso8601_timezone.Sign_valid":                          {kind: invariantOutOfScope},
 	"LOCATABLE.Archetype_node_id_valid":                    {kind: invariantEvaluated, function: "checkMandatory"},
-	"LOCATABLE.Archetyped_valid":                           {kind: invariantOutOfScope},
+	"LOCATABLE.Archetyped_valid":                           {kind: invariantEvaluated, function: "checkArchetypedValid"},
 	"LOCATABLE.Links_valid":                                {kind: invariantEvaluated, function: "checkLinks"},
 	"List.First_validity":                                  {kind: invariantOutOfScope},
 	"List.Last_validity":                                   {kind: invariantOutOfScope},

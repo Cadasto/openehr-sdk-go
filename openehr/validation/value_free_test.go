@@ -413,6 +413,16 @@ func TestREQ168_EmptyValue(t *testing.T) {
 			paths: []string{"/archetype_details"},
 		},
 		{
+			name: "archetype_root_id",
+			run: floor(&rm.Folder{
+				ArchetypeNodeID:  "openEHR-EHR-FOLDER.episode.v1",
+				Name:             rm.DVText{Value: "root"},
+				ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-FOLDER.generic.v1"}, RMVersion: "1.1.0"},
+			}),
+			code:  "archetype_root_id",
+			paths: []string{"/archetype_details/archetype_id/value"},
+		},
+		{
 			name:  "rm_version_valid",
 			run:   floor(&rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-EHR_STATUS.generic.v1"}}),
 			code:  "rm_version_valid",

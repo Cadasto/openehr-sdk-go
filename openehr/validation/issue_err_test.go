@@ -49,6 +49,7 @@ func TestIssueErr_REQ102_Sentinels(t *testing.T) {
 		{code: "upper_included_valid"},
 		{code: "code_not_in_value_set"},
 		{code: "is_archetype_root"},
+		{code: "archetype_root_id"},
 		{code: "rm_version_valid"},
 		{code: "aql_from_archetype"},
 	} {
