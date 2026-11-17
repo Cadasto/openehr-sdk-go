@@ -1878,7 +1878,7 @@ func walkAQLKeyed(compJSON map[string]any, aqlPath, namePath string, predIndex m
 			namePrefix.WriteString("]")
 		}
 		// A reused sibling's member carries the sibling's name: the coded name
-		// the template determines there, else the pinned text. A sibling that
+		// decode gives the node there, else the pinned text. A sibling that
 		// pins none among siblings that pin one owns no member that carries
 		// one of their names.
 		var pinned map[string]any
@@ -2779,9 +2779,10 @@ type templateIndex struct {
 	names map[string]string
 	// codedNames maps a path to the DV_CODED_TEXT name decode gives the node
 	// there in place of the DV_TEXT name of names, where the template
-	// determines one ([codedNameOf]). It maps to the zero codedName where the
-	// nodes at one path disagree on it, one of them determining none
-	// included: the template then gives no single coded name.
+	// constrains the node's name so that it gives one ([codedNameOf]). It
+	// maps to the zero codedName where the nodes at one path disagree on it,
+	// one of them giving none included: the template then gives no single
+	// coded name.
 	codedNames map[string]codedName
 	// ordinals maps the compiled path of a C_DV_ORDINAL node, and its bare
 	// path, to the terminology its pairs give each code at each ordinal
@@ -2904,8 +2905,8 @@ func (x *templateIndex) indexed(path string) string {
 }
 
 // nameJSON returns, as a canonical object, the name decode gives the node at
-// path: the coded name the template determines there, else a DV_TEXT of the
-// node's name, or nil where the index gives the node no name.
+// path: the coded name of the index there, else a DV_TEXT of the node's name,
+// or nil where the index gives the node no name.
 func (x *templateIndex) nameJSON(path string) map[string]any {
 	if x == nil {
 		return nil
@@ -3186,9 +3187,10 @@ func (x *templateIndex) addCodedName(path string, name codedName) {
 	x.codedNames[path] = name
 }
 
-// codedName is a DV_CODED_TEXT name the template determines for a node, or
-// the composition category it fixes ([categoryOf]): its text, and the code and
-// terminology of its defining code. The zero value is no coded value.
+// codedName is the DV_CODED_TEXT name decode gives a node ([codedNameOf]),
+// or the composition category the template fixes ([categoryOf]): its text,
+// and the code and terminology of its defining code. The zero value is no
+// coded value.
 type codedName struct {
 	value, code, terminology string
 }
@@ -3202,12 +3204,12 @@ func (c codedName) json() map[string]any {
 	}
 }
 
-// codedNameOf returns the coded name the template determines for the node n,
-// or the zero codedName where it determines none. The template determines
-// one where it constrains n's name as a DV_CODED_TEXT, through one child or
-// through alternatives that agree on it, each of which determines one coded
-// value ([codedValueOf]). A name the template constrains in any other way,
-// or not at all, gets the DV_TEXT name of the index.
+// codedNameOf returns the coded name decode gives the node n, or the zero
+// codedName where it gives none. It gives one where the template constrains
+// n's name as a DV_CODED_TEXT, through one child or through alternatives
+// that agree on it, each of which gives one ([codedValueOf]). A name the
+// template constrains in any other way, or not at all, gets the DV_TEXT name
+// of the index.
 func codedNameOf(n *templatecompile.CompiledNode) codedName {
 	attr := n.Attribute("name")
 	if attr == nil {
@@ -3226,59 +3228,125 @@ func codedNameOf(n *templatecompile.CompiledNode) codedName {
 	return first
 }
 
-// codedValueOf returns the coded value c, a child of a node's name,
-// determines, or the zero codedName where it determines none. c must be a
-// DV_CODED_TEXT whose defining_code the template constrains through one
-// C_CODE_PHRASE, or one C_CODE_REFERENCE read as the code phrase it carries,
-// of a named terminology, that lists either exactly one code, or several of
-// which exactly one has a term text ([tcimpl.CodeTermText]) equal to the
-// text the template pins on c's value: a closed C_STRING list of one entry. The
-// value's text is the pinned text, else the code's term text, and the
-// C_STRING on c's value, if any, must admit it. This is the name the
-// generator writes there. A code phrase that names no terminology or lists
-// no code, such as a reference set that names only its URI, and several
-// codes with no pinned text leave the code open, and a code with no term
-// text and no pinned text leaves the text open: decode invents neither.
+// codedValueOf returns the coded name the generator writes under its example
+// fill for c, a child of a node's name, or the zero codedName where decode
+// gives none. c must be a DV_CODED_TEXT whose defining_code the template
+// constrains through one code phrase, or leaves unconstrained
+// ([definingCodePhrase]).
+//
+// The code is the phrase's example value: its first listed code, else the
+// placeholder at0000, in the phrase's terminology, else in local. It takes
+// the text, or another listed code, the terms of the listed codes give it
+// ([listedCodeName]), judged by the C_STRING on c's value, if any: the first
+// alternative the template allows there, which the generator writes the
+// text from and judges it by. Otherwise it keeps the text the generator
+// writes under that C_STRING ([cstringvalue.Pick] of its example value), or
+// "example" where there is none; a C_STRING no string the generator builds
+// satisfies leaves the node no coded name.
 func codedValueOf(c *templatecompile.CompiledNode) codedName {
 	if c.RMTypeName() != "DV_CODED_TEXT" {
 		return codedName{}
 	}
-	phrase, ok := constraints.CodePhraseOf(onePrimitive(c, "defining_code"))
-	if !ok || phrase.Terminology == "" {
+	phrase, ok := definingCodePhrase(c)
+	if !ok {
 		return codedName{}
 	}
-	text, hasText := onePrimitive(c, "value").(constraints.CString)
-	pinned := ""
-	if hasText && len(text.List) == 1 && !text.ListOpen {
-		pinned = text.List[0]
+	example, _ := phrase.ExampleValue().(constraints.CodedTermRef)
+	name := codedName{code: example.CodeString, terminology: example.Terminology}
+	text, hasText := firstPrimitive(c, "value").(constraints.CString)
+	admits := func(s string) bool { return !hasText || len(text.Validate(s)) == 0 }
+	if named, ok := listedCodeName(c, phrase, name, admits); ok {
+		return named
 	}
-	code := ""
-	switch {
-	case len(phrase.CodeList) == 1:
-		code = phrase.CodeList[0]
-	case pinned != "":
-		for _, listed := range phrase.CodeList {
-			if term, ok := tcimpl.CodeTermText(c, phrase.Terminology, listed); ok && term == pinned {
-				if code != "" && code != listed {
-					return codedName{}
-				}
-				code = listed
-			}
-		}
-	}
-	if code == "" {
-		return codedName{}
-	}
-	value := pinned
-	if value == "" {
-		if value, ok = tcimpl.CodeTermText(c, phrase.Terminology, code); !ok {
+	name.value = exampleText
+	if hasText {
+		picked, err := cstringvalue.Pick(text, text.ExampleValue())
+		if err != nil {
 			return codedName{}
 		}
+		name.value = picked
 	}
-	if hasText && len(text.Validate(value)) > 0 {
-		return codedName{}
+	return name
+}
+
+// definingCodePhrase returns the code phrase the generator writes the code
+// of a coded name from, where the template puts it on the defining_code of
+// c: its one C_CODE_PHRASE, or its one C_CODE_REFERENCE read as the code
+// phrase it carries, in the terminology its terminology: URI names where
+// that phrase names none. Where the template leaves the defining_code
+// unconstrained, with no attribute, no child, or one child that constrains
+// nothing, it returns the empty phrase, whose example value is the
+// placeholder at0000 in local, the code the generator writes there. ok is
+// false where the defining_code has alternatives, or one child that
+// constrains it in any other way.
+func definingCodePhrase(c *templatecompile.CompiledNode) (phrase constraints.CodePhrase, ok bool) {
+	attr := c.Attribute("defining_code")
+	if attr == nil {
+		return constraints.CodePhrase{}, true
 	}
-	return codedName{value: value, code: code, terminology: phrase.Terminology}
+	children := tcimpl.AllowedChildNodes(attr)
+	switch {
+	case len(children) == 0:
+		return constraints.CodePhrase{}, true
+	case len(children) > 1:
+		return constraints.CodePhrase{}, false
+	}
+	if constrainsNothing(children[0]) {
+		return constraints.CodePhrase{}, true
+	}
+	return constraints.CodePhraseWithTerminologyOf(children[0].PrimitiveConstraint())
+}
+
+// constrainsNothing reports whether the template node n constrains nothing
+// below its RM type: it carries no primitive constraint and allows no child
+// on any of its attributes, such as the ones the compiled template adds
+// where the RM requires them.
+func constrainsNothing(n *templatecompile.CompiledNode) bool {
+	if n.PrimitiveConstraint() != nil {
+		return false
+	}
+	for _, a := range tcimpl.NodeAttributes(n) {
+		if len(tcimpl.AllowedChildNodes(a)) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// exampleText is the text the generator writes on a String attribute the
+// template leaves open, such as the value of a coded name with no C_STRING.
+const exampleText = "example"
+
+// listedCodeName returns name, whose code is the first one phrase lists, with
+// the text the terms of the listed codes give it under the node c, as the
+// generator gives a coded name one. The code takes its term text
+// ([tcimpl.CodeTermText]) where admits accepts it. Where admits rejects it
+// and the code is not an openehr one, the first listed code whose term text
+// admits accepts takes its place, with that text. ok is false where phrase
+// lists no code, so that name's code is the placeholder at0000, which names
+// no term, where the code has no term text, and where no listed code's term
+// text is accepted as the rule above reads it.
+func listedCodeName(c *templatecompile.CompiledNode, phrase constraints.CodePhrase, name codedName, admits func(string) bool) (codedName, bool) {
+	if len(phrase.CodeList) == 0 {
+		return codedName{}, false
+	}
+	term, ok := tcimpl.CodeTermText(c, name.terminology, name.code)
+	if !ok {
+		return codedName{}, false
+	}
+	if admits(term) {
+		name.value = term
+		return name, true
+	}
+	if name.terminology == terminology.ID {
+		return codedName{}, false
+	}
+	for _, listed := range phrase.CodeList {
+		if term, ok := tcimpl.CodeTermText(c, name.terminology, listed); ok && admits(term) {
+			return codedName{value: term, code: listed, terminology: name.terminology}, true
+		}
+	}
+	return codedName{}, false
 }
 
 // onePrimitive returns the primitive constraint of the one child the template
@@ -3291,6 +3359,20 @@ func onePrimitive(n *templatecompile.CompiledNode, attr string) constraints.Prim
 	}
 	children := tcimpl.AllowedChildNodes(a)
 	if len(children) != 1 {
+		return nil
+	}
+	return children[0].PrimitiveConstraint()
+}
+
+// firstPrimitive returns the primitive constraint of the first child the
+// template allows on the attribute attr of n, or nil where it allows none.
+func firstPrimitive(n *templatecompile.CompiledNode, attr string) constraints.PrimitiveConstraint {
+	a := n.Attribute(attr)
+	if a == nil {
+		return nil
+	}
+	children := tcimpl.AllowedChildNodes(a)
+	if len(children) == 0 {
 		return nil
 	}
 	return children[0].PrimitiveConstraint()
@@ -3393,9 +3475,9 @@ func templateIndexFor(c *templatecompile.Compiled) *templateIndex {
 // own archetype does not define its node id gets no name from the index.
 // Decode repopulates LOCATABLE.name from the names, and takes
 // a folded ITEM_STRUCTURE's concrete subtype from the types (see WithTemplate).
-// Where the template constrains a node's name as a DV_CODED_TEXT and
-// determines its code and text, the node's coded name ([codedNameOf]) takes
-// the place of its DV_TEXT name.
+// Where the template constrains a node's name as a DV_CODED_TEXT whose code
+// it constrains through one code phrase, the coded name the generator writes
+// there ([codedNameOf]) takes the place of its DV_TEXT name.
 //
 // Every node is indexed under both its compiled path and that path's bare
 // spelling. Siblings sharing a bare path carry the same at-code and therefore

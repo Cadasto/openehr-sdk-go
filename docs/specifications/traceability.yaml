@@ -593,6 +593,7 @@ requirements:
       - openehr/serialize/simplified/archetype_details_test.go
       - openehr/serialize/simplified/bare_value_internal_test.go
       - openehr/serialize/simplified/cdr_spellings_test.go
+      - openehr/serialize/simplified/coded_name_corpus_test.go
       - openehr/serialize/simplified/coded_name_internal_test.go
       - openehr/serialize/simplified/coded_name_test.go
       - openehr/serialize/simplified/completion_defaults_test.go

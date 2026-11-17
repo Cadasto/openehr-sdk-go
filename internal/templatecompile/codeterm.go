@@ -2,8 +2,10 @@ package templatecompile
 
 // codeterm.go: the term text of a code a template lists, as a coded name or
 // value reads it. The compile step names a node by it, the FLAT and
-// STRUCTURED decode completes a coded value with it, and the generator gives
-// a coded text the text of its code with it, so the rule has this one home.
+// STRUCTURED decode gives a coded name and completes a coded value with it,
+// and the generator gives a coded text the text of its code with it, an
+// openehr code's rubric on a node's name included, so that decode rebuilds
+// the name the generator writes and the rule has this one home.
 
 import (
 	"strings"

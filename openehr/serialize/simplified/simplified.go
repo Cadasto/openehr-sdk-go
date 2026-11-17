@@ -92,10 +92,12 @@ func (c decodeConfig) tracked() bool {
 // name but the composition's own, `<root>/_name`, which decode reads in both
 // modes, and the Web Template collapses the HISTORY / ITEM_STRUCTURE
 // wrappers, so the compiled template is the authoritative source). Where the
-// template constrains a node's name as a DV_CODED_TEXT and settles both its
-// code and its text, the node gets that coded name. Where it leaves the code
-// or the text open (a code from an external value set, say), the node gets a
-// DV_TEXT name, since the formats carry no name to read the rest from. A
+// template constrains a node's name as a DV_CODED_TEXT, the node gets the
+// coded name the instance generator writes there with its example fill, which
+// settles a code or a text the template leaves open (a code from an external
+// value set, say). The node gets a DV_TEXT name only where the name's
+// alternatives disagree, or its defining_code has alternatives or constrains
+// the code other than through a code phrase. A
 // structure the formats fold away takes the concrete ITEM_STRUCTURE subtype
 // the template gives it, such as an ITEM_LIST, which the path alone cannot
 // tell from an ITEM_TREE. An event the Web Template folds into its

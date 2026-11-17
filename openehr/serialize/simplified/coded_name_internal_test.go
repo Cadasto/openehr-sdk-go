@@ -1,9 +1,9 @@
 package simplified
 
-// REQ-053, REQ-111 — the template index gives a node a coded name only where
-// the template determines one for every node at the node's path: alternatives
-// and reused siblings that disagree leave the path with none, and the node
-// takes its DV_TEXT name.
+// REQ-053, REQ-111 — the template index gives a coded name to every node whose
+// name the template constrains as a DV_CODED_TEXT, and none where the nodes at
+// one path disagree on it: alternatives and reused siblings that disagree
+// leave the path with none, and the node takes its DV_TEXT name.
 
 import (
 	"os"
@@ -115,9 +115,8 @@ func TestREQ053TemplateIndexCodedNameDisagreement(t *testing.T) {
 // reused siblings of the ELEMENT at0016 share its bare path but are told apart
 // by their pinned names. Each keeps its own coded name under its compiled
 // path, but the bare spelling decode composes from FLAT cannot say which
-// sibling is meant, so where they disagree on the coded name, a sibling that
-// gives none included, the bare path has none and decode gives the DV_TEXT
-// rubric.
+// sibling is meant, so where they disagree on the coded name the bare path
+// has none and decode gives the DV_TEXT rubric.
 func TestREQ053TemplateIndexCodedNameOfReusedSiblings(t *testing.T) {
 	original := codedName{value: "Second option", code: "at0018", terminology: "local"}
 	cases := []struct {
@@ -129,7 +128,12 @@ func TestREQ053TemplateIndexCodedNameOfReusedSiblings(t *testing.T) {
 			name: "a twin with another coded name", twinName: "First option",
 			twin: codedName{value: "First option", code: "at0017", terminology: "local"},
 		},
-		{name: "a twin whose pinned text no code has", twinName: "Third option"},
+		{
+			// No listed code's term is the pinned text, so the twin keeps the
+			// first listed code and the pinned text, as the generator writes it.
+			name: "a twin whose pinned text no code has", twinName: "Third option",
+			twin: codedName{value: "Third option", code: "at0017", terminology: "local"},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

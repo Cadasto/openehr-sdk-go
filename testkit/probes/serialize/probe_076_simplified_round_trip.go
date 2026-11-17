@@ -240,10 +240,6 @@ const probe076ReusedSiblingObservation = `simplified: FLAT id "sdk_sibling" is o
 // siblings no name tells apart is registered.
 const probe076ReusedSiblingsRegistered = "openehr/serialize/simplified/deviations.md § Conformance, Archetype-reuse siblings, residual, Encode"
 
-// probe076CodedNameRegistered is where a coded name the template leaves open
-// is registered.
-const probe076CodedNameRegistered = "openehr/serialize/simplified/deviations.md § Deviations, LOCATABLE.name on decode, Registered format limit"
-
 // Probe076SkeletonExclusions are the findings the skeleton leg expects over
 // the vendored corpus, each matched exactly and each in both formats.
 var Probe076SkeletonExclusions = slices.Concat(
@@ -269,32 +265,6 @@ var Probe076SkeletonExclusions = slices.Concat(
 			"encode refuses data at a reused sibling rather than write it under every sibling's FLAT id. "+
 			"It refuses the context first, so the content's OBSERVATION, refused under Required, is not reached.",
 		probe076ReusedSiblingsRegistered,
-	),
-	probe076InBothFormats(
-		Probe076Finding{
-			Template: "Referral Request.v1",
-			Policy:   instance.Medium,
-			Stage:    probe076StageValidate,
-			Code:     "rm_type_mismatch",
-			Path:     "/context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]/name",
-		},
-		"The annotation's name is a DV_CODED_TEXT whose code comes from an external reference set the template lists no code of. "+
-			"FLAT and STRUCTURED have no key for a node's name below the root, and decode invents no code, "+
-			"so the name comes back as DV_TEXT.",
-		probe076CodedNameRegistered,
-	),
-	probe076InBothFormats(
-		Probe076Finding{
-			Template: "Vital signs monitoring",
-			Policy:   instance.Medium,
-			Stage:    probe076StageValidate,
-			Code:     "rm_type_mismatch",
-			Path:     "/content[openEHR-EHR-OBSERVATION.pulse.v2]/data/events[at0003]/data/items[at1023]/name",
-		},
-		"The pulse interpretation's name is a DV_CODED_TEXT the template lets take either of two local codes, at1057 or at1058, and pins no text. "+
-			"FLAT and STRUCTURED have no key for a node's name below the root, and decode invents no code, "+
-			"so the name comes back as DV_TEXT.",
-		probe076CodedNameRegistered,
 	),
 	probe076InBothFormats(
 		Probe076Finding{
