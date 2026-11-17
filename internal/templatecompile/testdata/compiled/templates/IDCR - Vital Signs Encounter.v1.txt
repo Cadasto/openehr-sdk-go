@@ -241,8 +241,8 @@ node /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004]
-  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+node /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004,'Heart Rate']
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="Heart Rate" occurrences=0..1 slot=false
   term[en] "at0004" code="at0004" comment="Run-time name constraints have been specified, in order to simplify the renaming of this data element to Pulse Rate or Heart Rate, as required." description="The rate, measured in beats per minute." text="Rate"
   binding terminology="LNC205" node_or_path="/data[at0002]/events[at0003]/data[at0001]/items[at0004]" target_terminology="LNC205" target_code="8310-5"
   binding terminology="SNOMED-CT" node_or_path="at0004" target_terminology="SNOMED-CT(2003)" target_code="163030003"
@@ -250,19 +250,19 @@ node /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.
   attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004]/name
+node /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004,'Heart Rate']/name
   rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
   attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004]/name/defining_code
+node /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004,'Heart Rate']/name/defining_code
   rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at1027"]}
   code_term[en] "at1027" code="at1027" description="The heart rate, measured in beats per minute." text="Heart Rate"
   attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
-node /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004]/value
+node /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004,'Heart Rate']/value
   rm_type="DV_QUANTITY" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
   primitive=constraints.DvQuantity{Units:[constraints.QuantityUnit{Units:"/min" Magnitude:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:true UpperInclusive:false LowerUnbounded:false UpperUnbounded:true} Precision:constraints.NumericRange{Lower:0 Upper:0 LowerInclusive:true UpperInclusive:true LowerUnbounded:false UpperUnbounded:false}}] Property:constraints.CodedTermRef{Terminology:"openehr" CodeString:"382"} PropertyUnits:["/min" "Hz" "kHz" "MHz" "mHz"]}
   attr "magnitude" rm_type="Real" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0

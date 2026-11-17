@@ -373,16 +373,16 @@
 /content[openEHR-EHR-SECTION.legal_information_rcp.v1]
 /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]
 /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data
-/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]
-/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/name
-/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/name/defining_code
-/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/value
-/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003]/value/defining_code
-/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]
-/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/name
-/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/name/defining_code
-/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/value
-/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015]/value/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003,'Preferred place of care']
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003,'Preferred place of care']/name
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003,'Preferred place of care']/name/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003,'Preferred place of care']/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0003,'Preferred place of care']/value/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015,'Preferred place of death']
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015,'Preferred place of death']/name
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015,'Preferred place of death']/name/defining_code
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015,'Preferred place of death']/value
+/content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0015,'Preferred place of death']/value/defining_code
 /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0029]
 /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/data/items[at0029]/value
 /content[openEHR-EHR-SECTION.legal_information_rcp.v1]/items[openEHR-EHR-EVALUATION.care_preference_uk.v1]/protocol
@@ -992,10 +992,10 @@
 /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data
 /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]
 /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data
-/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004]
-/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004]/name
-/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004]/name/defining_code
-/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004]/value
+/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004,'Heart Rate']
+/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004,'Heart Rate']/name
+/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004,'Heart Rate']/name/defining_code
+/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at0004,'Heart Rate']/value
 /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at1055]
 /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at1055]/value
 /content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data/events[at0003]/data/items[at1055]/value/defining_code

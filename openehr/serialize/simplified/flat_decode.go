@@ -255,7 +255,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		if err != nil {
 			return nil, err
 		}
-		node, predIndex, predType, err := resolveLeaf(wt, pk.segs, sib)
+		node, predIndex, predType, err := resolveLeaf(wt, pk.segs, sib, tmpl)
 		if errors.Is(err, errSegNotFound) {
 			// A key that does not resolve to a Web Template node is a wrong
 			// template, a typo, or an unsupported _-prefixed RM attribute (ctx/
@@ -273,7 +273,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 		// A key at an ELEMENT with value types reads as its first one.
 		leaf := valueLeaf(node)
 		v, spelled := groups[base][sampleCountSuffix]
-		if event, carried := sampleCountEvent(leaf); spelled && carried {
+		if event, carried := sampleCountEvent(leaf, tmpl); spelled && carried {
 			// An event's sample count is a suffix on its node, or on the
 			// OBSERVATION node that folds the event in, which has no value of
 			// its own (REQ-053).
@@ -1637,8 +1637,10 @@ func unmarshalObject(data []byte) (map[string]any, error) {
 // apply one segment's index or type to another; the bare path prefix stays
 // unique per chain position. Returns errSegNotFound when a segment id is not
 // found, and refuses a key through a reused sibling that no pinned name tells
-// apart from the others (sib).
-func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSiblings) (*webtemplate.Node, map[string]int, map[string]string, error) {
+// apart from the others (sib). tmpl, the compiled template's index, nil
+// without the template, settles the attributes the codec reads where the Web
+// Template has no node ([decodeCodecLeaf]).
+func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSiblings, tmpl *templateIndex) (*webtemplate.Node, map[string]int, map[string]string, error) {
 	predIndex := make(map[string]int)
 	predType := make(map[string]string)
 	node := wt.Tree
@@ -1660,8 +1662,9 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 			// is a leaf, so a segment below it resolves nothing. An
 			// INTERVAL_EVENT attribute of an abstract EVENT, at its node or
 			// at the OBSERVATION node that folds it in, makes the event an
-			// INTERVAL_EVENT (REQ-053).
-			leaf := codecLeaf(node, seg.id)
+			// INTERVAL_EVENT (REQ-053); with the template, a folded event it
+			// types POINT_EVENT reads none (issue 452).
+			leaf := decodeCodecLeaf(node, seg.id, tmpl)
 			switch {
 			case leaf == nil:
 				return nil, nil, nil, errSegNotFound
@@ -1689,6 +1692,7 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, sib *reusedSibling
 			// than corrupt; see deviations.md § Conformance.
 			return nil, nil, nil, fmt.Errorf("%w: FLAT id %q reaches one of several reused siblings sharing the path %q — not yet decodable (see deviations.md)", ErrUnknownPath, seg.id, sib.nodePath(next))
 		}
+		markFoldedIntervalEvent(node, next, predType)
 		if next.NodeID != "" {
 			bare := bareAQLPath(next.AQLPath)
 			predType[bare] = nodeRMType(next)
@@ -2570,7 +2574,7 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	// interconversion's explicit-index spelling and anything higher is refused;
 	// a DV_INTERVAL leaf's index belongs to the ELEMENT the Web Template folded
 	// away, which may repeat, and the placement reads it.
-	node, predIndex, predType, err := resolveLeaf(wt, pk.segs, sib)
+	node, predIndex, predType, err := resolveLeaf(wt, pk.segs, sib, tmpl)
 	if err != nil {
 		// splitCompositeLeafKey resolved this path already, so the only ways
 		// here are an index past the bound of a single-valued attribute and the
@@ -2695,7 +2699,7 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 			resolve: func(string) (map[string]any, error) { return compJSON, nil },
 		}, nil
 	}
-	node, predIndex, predType, err := resolveLeaf(wt, segs, sib)
+	node, predIndex, predType, err := resolveLeaf(wt, segs, sib, tmpl)
 	if err != nil {
 		return rmattrOwner{}, err
 	}
@@ -2825,7 +2829,7 @@ type templateIndex struct {
 // a DV_CODED_TEXT whose defining_code is constrained by one C_CODE_PHRASE, or
 // one C_CODE_REFERENCE read as the code phrase it carries, of the openehr
 // terminology listing exactly one code, it is that code with its openEHR
-// rubric as its text ([codeTermText]). A template that constrains the
+// rubric as its text ([tcimpl.CodeTermText]). A template that constrains the
 // category in any other way, or not at all, and a code with no single rubric
 // fix none: categoryOf then returns the zero codedName.
 func categoryOf(root *templatecompile.CompiledNode) codedName {
@@ -2842,7 +2846,7 @@ func categoryOf(root *templatecompile.CompiledNode) codedName {
 		return codedName{}
 	}
 	code := phrase.CodeList[0]
-	text, ok := codeTermText(children[0], terminology.ID, code)
+	text, ok := tcimpl.CodeTermText(children[0], terminology.ID, code)
 	if !ok {
 		return codedName{}
 	}
@@ -2945,7 +2949,7 @@ func (x *templateIndex) addOrdinals(path string, n *templatecompile.CompiledNode
 			term = ""
 		}
 		terms[pair] = term
-		text, _ := codeTermText(n, v.Symbol.Terminology, v.Symbol.CodeString)
+		text, _ := tcimpl.CodeTermText(n, v.Symbol.Terminology, v.Symbol.CodeString)
 		c, seen := codes[pair.code]
 		switch {
 		case !seen:
@@ -2970,9 +2974,9 @@ func agreedText(held, next string) string {
 
 // ordinalCode is what the C_DV_ORDINAL pairs at one path give one code: its
 // ordinal value, and its term text in the pair's terminology
-// ([codeTermText]), "" for none. A code that pairs there give two values is
-// ambiguous: the template gives it neither. Pairs that give it two texts
-// leave it with none.
+// ([tcimpl.CodeTermText]), "" for none. A code that pairs there give two
+// values is ambiguous: the template gives it neither. Pairs that give it two
+// texts leave it with none.
 type ordinalCode struct {
 	value     int
 	text      string
@@ -2994,8 +2998,8 @@ func (x *templateIndex) ordinalCodeAt(path, code string) (c ordinalCode, ok bool
 
 // codedTerms is what the template gives a coded value at one path: the
 // terminology that its defining_code constraint names, and the term text of
-// each code it lists that has one ([codeTermText]). The zero value gives no
-// terminology and no text.
+// each code it lists that has one ([tcimpl.CodeTermText]). The zero value
+// gives no terminology and no text.
 type codedTerms struct {
 	terminology string
 	texts       map[string]string
@@ -3016,7 +3020,7 @@ func codedTermsOf(n *templatecompile.CompiledNode) codedTerms {
 	}
 	t := codedTerms{terminology: phrase.Terminology, texts: make(map[string]string, len(phrase.CodeList))}
 	for _, code := range phrase.CodeList {
-		if text, ok := codeTermText(n, phrase.Terminology, code); ok {
+		if text, ok := tcimpl.CodeTermText(n, phrase.Terminology, code); ok {
 			t.texts[code] = text
 		}
 	}
@@ -3227,8 +3231,8 @@ func codedNameOf(n *templatecompile.CompiledNode) codedName {
 // DV_CODED_TEXT whose defining_code the template constrains through one
 // C_CODE_PHRASE, or one C_CODE_REFERENCE read as the code phrase it carries,
 // of a named terminology, that lists either exactly one code, or several of
-// which exactly one has a term text ([codeTermText]) equal to the text the
-// template pins on c's value: a closed C_STRING list of one entry. The
+// which exactly one has a term text ([tcimpl.CodeTermText]) equal to the
+// text the template pins on c's value: a closed C_STRING list of one entry. The
 // value's text is the pinned text, else the code's term text, and the
 // C_STRING on c's value, if any, must admit it. This is the name the
 // generator writes there. A code phrase that names no terminology or lists
@@ -3254,7 +3258,7 @@ func codedValueOf(c *templatecompile.CompiledNode) codedName {
 		code = phrase.CodeList[0]
 	case pinned != "":
 		for _, listed := range phrase.CodeList {
-			if term, ok := codeTermText(c, phrase.Terminology, listed); ok && term == pinned {
+			if term, ok := tcimpl.CodeTermText(c, phrase.Terminology, listed); ok && term == pinned {
 				if code != "" && code != listed {
 					return codedName{}
 				}
@@ -3267,7 +3271,7 @@ func codedValueOf(c *templatecompile.CompiledNode) codedName {
 	}
 	value := pinned
 	if value == "" {
-		if value, ok = codeTermText(c, phrase.Terminology, code); !ok {
+		if value, ok = tcimpl.CodeTermText(c, phrase.Terminology, code); !ok {
 			return codedName{}
 		}
 	}
@@ -3290,67 +3294,6 @@ func onePrimitive(n *templatecompile.CompiledNode, attr string) constraints.Prim
 		return nil
 	}
 	return children[0].PrimitiveConstraint()
-}
-
-// codeTermText returns the term text of code in terminologyID, as the
-// generator reads it for a coded name under the node n. A code of the openEHR
-// terminology takes its rubric ([openehrRubric]). Any other takes the text of
-// the term that n's own archetype, its nearest enclosing archetype root,
-// defines for it: under the code for a local code, else under
-// "<terminology>::<code>", or under the code alone where that is no at-code,
-// the key some OPTs give such a term. ok is false where none gives a text.
-func codeTermText(n *templatecompile.CompiledNode, terminologyID, code string) (string, bool) {
-	switch terminologyID {
-	case terminology.ID:
-		return openehrRubric(code)
-	case localTerminology:
-		text, ok := tcimpl.RootTermItem(n, code, "text")
-		return text, ok && text != ""
-	}
-	if text, ok := tcimpl.RootTermItem(n, terminologyID+"::"+code, "text"); ok && text != "" {
-		return text, true
-	}
-	if isAtCode(code) {
-		return "", false
-	}
-	text, ok := tcimpl.RootTermItem(n, code, "text")
-	return text, ok && text != ""
-}
-
-// openehrRubric returns the rubric the openEHR terminology gives code. A
-// rubric belongs to a code within a group, and the RM ties a node's name to
-// no group, so code has a rubric only where every group that holds it gives
-// it the same one: 532 is "complete" in one group and "completed" in another,
-// and has none.
-func openehrRubric(code string) (string, bool) {
-	rubric := ""
-	for g := range terminology.Groups() {
-		r, ok := g.Rubric(code)
-		if !ok {
-			continue
-		}
-		if rubric != "" && r != rubric {
-			return "", false
-		}
-		rubric = r
-	}
-	return rubric, rubric != ""
-}
-
-// isAtCode reports whether code is an archetype term code: "at" followed by
-// digits, with any dot extensions of digits for a specialisation, such as
-// at0010 or at0010.2 (ADL 1.4, Node Identification).
-func isAtCode(code string) bool {
-	rest, ok := strings.CutPrefix(code, "at")
-	if !ok {
-		return false
-	}
-	for part := range strings.SplitSeq(rest, ".") {
-		if part == "" || strings.Trim(part, "0123456789") != "" {
-			return false
-		}
-	}
-	return true
 }
 
 // rmType returns the one RM type the template gives the node at path, or ""

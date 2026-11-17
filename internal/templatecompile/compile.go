@@ -139,7 +139,7 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error)
 		implicit: map[implicitKey]*CompiledAttribute{},
 		paths:    map[string]pathMark{},
 	}
-	definition, err := objectOf(&opt.Definition)
+	definition, err := objectOf(&opt.Definition, nil)
 	if err != nil {
 		return nil, fmt.Errorf("definition: %w", err)
 	}
@@ -323,7 +323,7 @@ func (w *walker) descend(ob object, cn *CompiledNode, heldAs string, depth int) 
 		// Per-archetype-root terms live on the node; bindings flatten to
 		// the Compiled aggregate (binding records carry their own
 		// terminology + at-code/path, so collisions are non-issues).
-		cn.terms = termsFromModel(ob.root.TermDefinitions)
+		cn.terms = ob.terms
 		w.compiled.termBindings = appendTermBindings(w.compiled.termBindings, ob.root.TermBindings)
 	}
 	// A leaf, a constraint object of a kind with no attributes, gets the
@@ -518,7 +518,7 @@ func (w *walker) buildAttribute(parent *CompiledNode, owner, class string, requi
 	}
 	heldAs := heldType(class, rm)
 	for i, child := range ma.children {
-		ob, err := objectOf(child)
+		ob, err := objectOf(child, parent)
 		if err != nil {
 			return nil, fmt.Errorf("child %d of the attribute at %q: %w", i+1, base+"/"+ma.name, err)
 		}

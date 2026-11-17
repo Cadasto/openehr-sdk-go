@@ -2200,7 +2200,9 @@ func codeString(cp *rm.CodePhrase) string {
 // value of a C_CODE_PHRASE with an empty code list). An RM default
 // replaces such a code. at0000 is an archetype node code, never an ISO
 // 639-1, ISO 3166-1, IANA character-set or openEHR code, so an OPT cannot
-// give it as a real value of an attribute an RM default fills.
+// give it as a real value of an attribute an RM default fills. A coded
+// text's term text reads an at0000 the OPT lists, an archetype's concept
+// code, as a real code (placeholderCode).
 func noCode(code string) bool {
 	return code == "" || code == "at0000"
 }

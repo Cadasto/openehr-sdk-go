@@ -20,6 +20,12 @@ import (
 // ITEM_LIST / ITEM_SINGLE / ITEM_TABLE) while folding their node predicates
 // into descendant aqlPaths, and emits data-bearing RM attributes as leaves.
 //
+// An event that can occur at most once and is its history's only event, of
+// any event type, gives no node of its own: its children, its time and, for
+// an interval event, its math function and width sit under the entry, at
+// paths that keep the event's segment. An event beside other events stays a
+// node.
+//
 // An ELEMENT whose value admits one type collapses into a single value leaf
 // at the ELEMENT's path extended by /value. So does one admitting a coded
 // text and a free text, in either order: its leaf is the coded text, with an
@@ -54,7 +60,7 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 		ID:      idOf(root, "", text),
 	}
 	setOccurrences(tree, root)
-	setNames(tree, root, text, cfg)
+	setNames(tree, root, text, "", cfg)
 	tree.Children = childrenOf(root, "", cfg)
 	dedupeSiblingIDs(tree)
 	if err := checkIDCollisions(tree); err != nil {
@@ -461,8 +467,9 @@ func emit(dst []*Node, c *templatecompile.CompiledNode, attr *templatecompile.Co
 
 	case isCollapsedEvent(c):
 		// Lifted like a dropped wrapper, but through childrenOf: the
-		// reference still emits the EVENT's in-context `time` leaf under
-		// the (retained) events[…] path segment.
+		// reference still emits the event's in-context leaves (`time`, and
+		// an INTERVAL_EVENT's `math_function` and `width`) under the
+		// (retained) events[…] path segment.
 		return append(dst, childrenOf(c, path, cfg)...)
 
 	case c.RMTypeName() == "ELEMENT" && !c.IsSlot():
@@ -596,7 +603,7 @@ func newNode(c *templatecompile.CompiledNode, aqlPath string, attr *templatecomp
 		ID:      idOf(c, attr.Name(), text),
 	}
 	setOccurrences(node, c)
-	setNames(node, c, text, cfg)
+	setNames(node, c, text, attr.Name(), cfg)
 	return node
 }
 
@@ -622,8 +629,19 @@ func setOccurrences(node *Node, c *templatecompile.CompiledNode) {
 // name. The description is always the term's. A compiled template carries
 // one set of terms, in its default language, so every language reads the
 // same name and description, which are looked up once.
-func setNames(node *Node, c *templatecompile.CompiledNode, text string, cfg *config) {
+//
+// A node with no node id that neither names takes attrName, the RM attribute
+// that holds it, as its name and localized name, with no localized names or
+// descriptions, as the reference names it (OPTParser.buildNode); [idOf]
+// derives its id from the same attribute. attrName is "" for the root, which
+// the reference would name by its RM type: the root keeps an empty name
+// there, so FLAT decode still names a composition after its template id.
+func setNames(node *Node, c *templatecompile.CompiledNode, text, attrName string, cfg *config) {
 	name := cmp.Or(c.NodeName(), text)
+	if name == "" && c.NodeID() == "" {
+		node.Name, node.LocalizedName = attrName, attrName
+		return
+	}
 	node.Name = name
 	node.LocalizedName = name
 	desc, _ := impl.RootTermItem(c, c.NodeID(), "description")
@@ -692,26 +710,46 @@ func isDroppedContainer(rmType string) bool {
 	return false
 }
 
-// isCollapsedEvent reports whether c is an abstract EVENT that can occur at
-// most once — a degenerate wrapper the reference lifts rather than emitting
-// as a node, keeping its events[…] path segment and its `time` leaf.
+// isCollapsedEvent reports whether c is an event the reference lifts rather
+// than emitting as a node: an event of any subtype that can occur at most
+// once and is the only event its parent holds. The lifted event keeps its
+// events[…] path segment and its in-context leaves.
 //
-// Reverse-engineered from the goldens, and the discriminator is both the RM
-// type and the cardinality — neither alone fits. Every case across the three
-// vendored references agrees: corona drops 14 EVENT nodes, all max=1, and
-// keeps 2 EVENT at max=-1; constrain_test keeps 3 EVENT at max=-1 *and* an
-// INTERVAL_EVENT `a24_hour_average` at max=1. A concrete POINT_EVENT /
-// INTERVAL_EVENT names a clinical concept worth addressing even when single;
-// a bare EVENT that cannot repeat adds no addressable structure.
+// It is the reference's rule (openEHR_SDK Filter.skip at the commit
+// testkit/corpus/UPSTREAM_PINS.txt pins), which counts the events among the
+// parent's children whatever their occurrences, so an event at max 1 beside
+// another event stays a node, whatever its subtype. The vendored goldens
+// agree: corona lifts 14 sole EVENTs at max=1 and keeps 2 at max=-1, and
+// constrain_test keeps an INTERVAL_EVENT `a24_hour_average` at max=1 beside
+// three repeating EVENTs. The parent's type goes unchecked, as in the
+// reference: HISTORY.events is the only RM attribute an event can fill, so in
+// a template that meets the RM the parent is a HISTORY.
 func isCollapsedEvent(c *templatecompile.CompiledNode) bool {
-	if c.RMTypeName() != "EVENT" {
+	if !isEventType(c.RMTypeName()) || c.Parent() == nil {
 		return false
 	}
-	occ := c.Occurrences()
-	if occ == nil {
-		return true // absent occurrences default to 0..1
+	// Absent occurrences default to 0..1.
+	if occ := c.Occurrences(); occ != nil && (occ.UpperUnbounded() || occ.Upper() != 1) {
+		return false
 	}
-	return !occ.UpperUnbounded() && occ.Upper() == 1
+	events := 0
+	for _, attr := range impl.NodeAttributes(c.Parent()) {
+		for _, sibling := range impl.ChildNodes(attr) {
+			if isEventType(sibling.RMTypeName()) {
+				events++
+			}
+		}
+	}
+	return events == 1
+}
+
+// isEventType reports whether an RM type is EVENT or one of its subtypes.
+func isEventType(rmType string) bool {
+	switch rmType {
+	case "EVENT", "POINT_EVENT", "INTERVAL_EVENT":
+		return true
+	}
+	return false
 }
 
 // isValueLeaf reports whether an RM type is a data value emitted as a leaf

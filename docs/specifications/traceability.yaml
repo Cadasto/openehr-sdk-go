@@ -621,6 +621,7 @@ requirements:
       - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/leaf_rmtype_test.go
+      - openehr/serialize/simplified/lifted_event_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
       - openehr/serialize/simplified/mediatype_internal_test.go
       - openehr/serialize/simplified/mediatype_test.go
@@ -1379,6 +1380,7 @@ requirements:
       - openehr/composition/attribute_hold_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/builder_test.go
+      - openehr/composition/coded_name_path_test.go
       - openehr/composition/named_sibling_test.go
       - openehr/composition/optional_content_test.go
       - openehr/composition/set_binding_test.go
@@ -1554,6 +1556,7 @@ requirements:
       - openehr/serialize/simplified/composition_pinned_name_test.go
       - openehr/serialize/simplified/ism_transition_merged_test.go
       - openehr/serialize/simplified/ism_transition_test.go
+      - openehr/serialize/simplified/lifted_event_test.go
       - openehr/serialize/simplified/template_roundtrip_test.go
       - openehr/template/webtemplate/build_internal_test.go
       - openehr/template/webtemplate/build_test.go
@@ -1567,6 +1570,7 @@ requirements:
       - openehr/template/webtemplate/names_test.go
       - openehr/template/webtemplate/parity_test.go
       - openehr/template/webtemplate/req116_gap_test.go
+      - openehr/template/webtemplate/sole_event_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
       - testkit/probes/serialize/probe_086_upstream_flat_parity.go
 
@@ -1686,6 +1690,7 @@ requirements:
       - openehr/instance/party_related_relationship_test.go
       - openehr/instance/party_relationship_uid_test.go
       - openehr/instance/phase4_test.go
+      - openehr/instance/pinned_name_test.go
       - openehr/instance/placeholder_exact_test.go
       - openehr/instance/placeholder_test.go
       - openehr/instance/policy_names_test.go
@@ -1858,6 +1863,7 @@ requirements:
     tests:
       - internal/bmmtype/bmmtype_test.go
       - internal/bmmtype/formal_parameters_test.go
+      - internal/templatecompile/coded_name_test.go
       - internal/templatecompile/compile_generic_test.go
       - internal/templatecompile/compile_model_test.go
       - internal/templatecompile/compile_nodename_test.go
@@ -1879,13 +1885,14 @@ requirements:
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/aom/aom14/read_tokens_internal_test.go
       - openehr/aom/aom14/read_tolerant_test.go
+      - openehr/composition/coded_name_path_test.go
       - openehr/composition/named_sibling_test.go
       - openehr/instance/local_term_text_test.go
+      - openehr/instance/pinned_name_test.go
       - openehr/rm/rminfo/lookup_test.go
       - openehr/serialize/canxml/not_well_formed_test.go
       - openehr/serialize/simplified/coded_name_internal_test.go
       - openehr/serialize/simplified/coded_name_test.go
-      - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/ism_transition_merged_test.go

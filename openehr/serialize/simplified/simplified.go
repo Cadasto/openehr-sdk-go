@@ -98,7 +98,11 @@ func (c decodeConfig) tracked() bool {
 // DV_TEXT name, since the formats carry no name to read the rest from. A
 // structure the formats fold away takes the concrete ITEM_STRUCTURE subtype
 // the template gives it, such as an ITEM_LIST, which the path alone cannot
-// tell from an ITEM_TREE. The RM-mandatory attributes the formats omit
+// tell from an ITEM_TREE. An event the Web Template folds into its
+// OBSERVATION that the template types POINT_EVENT reads no
+// "<observation>/width", "<observation>/math_function" or
+// "<observation>|sample_count": those keys are unmatched content there. The
+// RM-mandatory attributes the formats omit
 // (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
 // EVENT_CONTEXT.setting, …) are completed from ctx defaults and RM
 // conventions; these are synthesised defaults, not recovered data. A
@@ -129,8 +133,10 @@ func (c decodeConfig) tracked() bool {
 //
 // Without this option decode omits names, defaults and empty structures,
 // completes no coded value, and infers a folded structure's subtype from its
-// path: the round-trip stays
-// format-idempotent but the result is not canonically complete.
+// path: the round-trip stays format-idempotent but the result is not
+// canonically complete. Nor can it tell a folded POINT_EVENT from a folded
+// abstract EVENT, since the Web Template gives either one leaf of its own,
+// its time, so any of the three keys above makes either an INTERVAL_EVENT.
 func WithTemplate(c *templatecompile.Compiled) Option {
 	return func(cfg *decodeConfig) { cfg.template = c }
 }

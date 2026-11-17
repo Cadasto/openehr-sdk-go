@@ -35,7 +35,12 @@ in this builder's spelling (§ Duplicate sibling ids).
   `Current_state`, below). The older `constrain_test`, `Corona_Anamnese` and `GECCO_Diagnose`
   goldens, from the reference's Better-era test resources, capitalise those names
   (`Start_time`); the builder follows the reference's code, which the
-  `test_all_types` golden, regenerated from it, shows.
+  `test_all_types` golden, regenerated from it, shows. The same holds for every
+  other node whose constraint carries no node id, such as `category`, `context`
+  and an archetyped transition step's `current_state`: it is named by its RM
+  attribute, with that name as its `localizedName` and no `localizedNames`, as
+  `test_all_types` names `category` and `context`, where the older goldens give it
+  no name (issue 455).
 - **inContext coverage** — the fixed RM-attribute leaf table covers COMPOSITION,
   EVENT_CONTEXT, the ENTRY types, the EVENT variants (INTERVAL_EVENT adds
   `math_function` / `width`), INSTRUCTION (`narrative` / `expiry_time`), ACTIVITY
@@ -110,7 +115,9 @@ in this builder's spelling (§ Duplicate sibling ids).
 
   - **EHRbase** uses the node's **template-level name** — the `name` attribute
     constrained to a fixed `C_STRING` in the OPT (`<item xsi:type="C_STRING">
-    <list>Husten</list></item>`). Sibling archetype roots therefore differ naturally.
+    <list>Husten</list></item>`), or to a `DV_CODED_TEXT` of one code, whose term
+    text is the name (the IDCR vital signs pulse rate's "Heart Rate", issue 455).
+    Sibling archetype roots therefore differ naturally.
   - **This builder** uses the *archetype's* concept term, looked up by `NodeID()`
     (`idOf` → `termText`). Every sibling sharing an archetype id gets the **same**
     text, hence the collision.
@@ -211,6 +218,21 @@ in this builder's spelling (§ Duplicate sibling ids).
   `<id>_<k-1>`. `TestREQ106ReferenceSiblingIDRenames` pins its renames whole per
   golden: the four above in `test_all_types`, none in the others.
 
+- **A name fixed by codes** — **diverges** from the reference in two cases. The
+  reference takes a node's name from the labels of its `name` constraint's `code`
+  input, each a listed code's term text (`OPTParser.parseCCOMPLEXOBJECT` at the
+  pinned commit); this builder takes it from `CompiledNode.NodeName`, which a name fixed by
+  one code sets (issue 455).
+
+  - **One code whose text the name's `value` rejects.** Where a `C_STRING` on the
+    `DV_CODED_TEXT`'s `value` rejects the code's term text, the reference still names
+    the node with that text. This builder pins no name, so the node keeps its
+    archetype term, the name FLAT decode gives such a node
+    (`TestREQ053CodedNameRules`), and its `aqlPath` carries no name predicate.
+  - **Several codes.** The reference emits one node per listed code, each named by its
+    code's term text, with that name in its `aqlPath`. This builder emits one node,
+    named by its archetype term.
+
 - **ELEMENT value alternatives** — match the reference (`OPTParser.updateChoiceId`,
   `addAnyNode`, `pushProperties`; `Filter.preHandle`, `skip`). By the value
   alternatives an ELEMENT's template constrains:
@@ -234,15 +256,19 @@ in this builder's spelling (§ Duplicate sibling ids).
   reference's own IPS test Web Template spelling, where its code writes
   `interval<dv_date_time>_value`. The reference's FLAT reader does not read that key.
 
-- **Single-occurrence `EVENT` containers are lifted, not emitted** — matches the
-  reference. An abstract `EVENT` constrained to at most one occurrence contributes
-  no node of its own; its `events[…]` path segment and its in-context `time` leaf
-  are retained and its children are lifted to the parent. A repeating `EVENT`, and
-  any concrete `POINT_EVENT` / `INTERVAL_EVENT`, is kept as a node even at `max=1`.
-  Both halves of the discriminator are needed: corona drops 14 EVENT nodes (all
-  `max=1`) and keeps 2 (`max=-1`); `constrain_test` keeps 3 EVENT at `max=-1` **and**
-  an INTERVAL_EVENT `a24_hour_average` at `max=1`; and the upstream FLAT corpus keys
-  `any_event` (repeating) in 424 places, which this builder still emits.
+- **A sole event that occurs at most once is lifted, not emitted** — matches the
+  reference (openEHR_SDK `Filter.skip`). An event of any type (`EVENT`, `POINT_EVENT`,
+  `INTERVAL_EVENT`) that is its HISTORY's only event and is constrained to at most one
+  occurrence contributes no node of its own; its `events[…]` path segment and its
+  in-context leaves (`time`, and an `INTERVAL_EVENT`'s `math_function` and `width`) are
+  retained and its children are lifted to the parent. An event at `max=1` beside another
+  event is kept as a node, whatever its type, and so is a repeating event. The goldens
+  agree: corona lifts 14 sole EVENTs (all `max=1`) and keeps 2 (`max=-1`);
+  `constrain_test` keeps an INTERVAL_EVENT `a24_hour_average` at `max=1` beside three
+  repeating EVENTs; and the upstream FLAT corpus keys `any_event` (repeating) in 424
+  places. Until issue 452 the builder, reading the rule off those goldens, lifted an
+  abstract `EVENT` alone: it kept a sole `POINT_EVENT` at `max=1`, such as the laboratory
+  test report's `any_event`, as a node, and lifted an abstract `EVENT` beside other events.
 
 - **GECCO golden marks in-context RM-attribute leaves `min=1`** — 14 nodes
   (`/language`, `/territory`, `/composer`, `/context/setting`, `/context/start_time`

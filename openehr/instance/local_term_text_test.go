@@ -238,8 +238,9 @@ const optOrdinal = `<children xsi:type="C_DV_ORDINAL"><rm_type_name>DV_ORDINAL</
 // that rejects the term text, the text the walk wrote stays (Precedence
 // 1), and a code its own archetype defines no term for, even where an
 // enclosing archetype does, the placeholder at0000 and a code of another
-// terminology keep the walk's text. It holds under every policy and both
-// value fills.
+// terminology keep the walk's text, while an at0000 the OPT lists, the
+// archetype's concept code, takes its term. It holds under every policy and
+// both value fills.
 func TestREQ107_LocalCodedTextTakesTheTermText(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -293,6 +294,14 @@ func TestREQ107_LocalCodedTextTakesTheTermText(t *testing.T) {
 			want:  []string{walkText},
 		},
 		{
+			// at0000 the OPT lists is the concept code, no placeholder.
+			name: "ELEMENT value with the concept code the OPT lists",
+			opt: optTemplate("ELEMENT", optTerms, `<term_definitions code="at0000"><items id="text">Concept</items></term_definitions>`,
+				optSingle("value", optCodedText("local", "at0000"))),
+			coded: elementCodedText,
+			want:  []string{"Concept"},
+		},
+		{
 			// A code of another terminology that reads like an at-code
 			// still names no term of the archetype.
 			name:  "ELEMENT value coded in another terminology",
@@ -325,6 +334,15 @@ func TestREQ107_LocalCodedTextTakesTheTermText(t *testing.T) {
 			opt:   optTemplate("ELEMENT", optTerms, optSingle("value", optOrdinal)),
 			coded: func(t *testing.T, out any) rm.DVCodedText { return rootValueAs[*rm.DVOrdinal](t, out).Symbol },
 			want:  []string{termOne, termTwo},
+		},
+		{
+			name: "DV_ORDINAL symbol with the concept code the OPT lists",
+			opt: optTemplate("ELEMENT", optTerms, `<term_definitions code="at0000"><items id="text">Concept</items></term_definitions>`,
+				optSingle("value", `<children xsi:type="C_DV_ORDINAL"><rm_type_name>DV_ORDINAL</rm_type_name><node_id></node_id>`+
+					`<list><value>0</value><symbol><value></value><defining_code><terminology_id><value>local</value></terminology_id><code_string>at0000</code_string></defining_code></symbol></list>`+
+					`</children>`)),
+			coded: func(t *testing.T, out any) rm.DVCodedText { return rootValueAs[*rm.DVOrdinal](t, out).Symbol },
+			want:  []string{"Concept"},
 		},
 		{
 			name: "LOCATABLE name",

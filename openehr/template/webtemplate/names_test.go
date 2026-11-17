@@ -6,6 +6,7 @@ package webtemplate_test
 
 import (
 	"maps"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -91,22 +92,28 @@ func TestREQ106RootNameIsThePinnedName(t *testing.T) {
 }
 
 // TestREQ106InContextNamesMatchTestAllTypes — REQ-106: every node without a
-// node id that the builder names carries the name of the test_all_types
-// golden, the one vendored golden the reference's own code regenerated: the
-// in-context leaves in lower case, as their RM attribute names, and the merged
-// ACTION node's `Careflow_step` and `Current_state`, which the reference
-// capitalises. The older goldens capitalise every in-context leaf, so they are
-// not compared here.
+// node id carries the name and localizedName of the test_all_types golden,
+// the one vendored golden the reference's own code regenerated: category and
+// context, named by their RM attribute (issue 455), the in-context leaves in
+// lower case, as their RM attribute names, and the merged ACTION node's
+// `Careflow_step` and `Current_state`, which the reference capitalises. The
+// leaves of an archetyped transition step are left out: the builder keeps the
+// step beside the merged node where the reference's filter drops it
+// (deviations.md, "Per-careflow-step ism_transition[atNNNN] nodes are kept"),
+// so the golden has no node there; they are named as
+// TestREQ106NodesWithoutNodeIDAreNamedByTheirAttribute says. The older
+// goldens capitalise every in-context leaf, so they are not compared here.
 func TestREQ106InContextNamesMatchTestAllTypes(t *testing.T) {
-	ref := map[string]string{}
+	type names struct{ name, localized string }
+	ref := map[string]names{}
 	walkRefTree(refTree(t, loadReferenceStem(t, actionParityStem)), func(m map[string]any) {
 		if refStr(m, "nodeId") == "" {
-			ref[refStr(m, "aqlPath")+" "+refStr(m, "id")] = refStr(m, "name")
+			ref[refStr(m, "aqlPath")+" "+refStr(m, "id")] = names{refStr(m, "name"), refStr(m, "localizedName")}
 		}
 	})
 	compared := map[string]bool{}
 	walkOurTree(buildOPT(t, readFile(t, testAllTypesOPT)).Tree, func(n *webtemplate.Node) {
-		if n.NodeID != "" || n.Name == "" {
+		if n.NodeID != "" || strings.Contains(n.AQLPath, "/ism_transition[") {
 			return
 		}
 		key := n.AQLPath + " " + n.ID
@@ -115,12 +122,13 @@ func TestREQ106InContextNamesMatchTestAllTypes(t *testing.T) {
 			t.Errorf("%s: named %q, but the golden has no node there", key, n.Name)
 			return
 		}
-		if n.Name != want {
-			t.Errorf("%s: name = %q, want the golden's %q", key, n.Name, want)
+		if got := (names{n.Name, n.LocalizedName}); got != want {
+			t.Errorf("%s: name, localizedName = %+v, want the golden's %+v", key, got, want)
 		}
 		compared[n.ID] = true
 	})
 	for _, id := range []string{
+		"category", "context",
 		"language", "territory", "composer", "start_time", "setting", "encoding", "subject", "time", "time_1",
 		"narrative", "expiry_time", "timing", "action_archetype_id",
 		"ism_transition", "careflow_step", "current_state", "transition",
@@ -187,4 +195,85 @@ func childByID(n *webtemplate.Node, id string) *webtemplate.Node {
 		}
 	}
 	return nil
+}
+
+// TestREQ106CodedPinnedNameNamesTheNode — REQ-106, issue 455: the IDCR - Vital
+// Signs Encounter.v1 template names the pulse rate ELEMENT, whose archetype
+// term is "Rate", with the local code at1027, whose term text is "Heart Rate".
+// The node takes that text as its name and localized names, derives its id
+// from it, and carries it as the name predicate of its aqlPath, as the
+// reference names it; its description stays the archetype term's.
+func TestREQ106CodedPinnedNameNamesTheNode(t *testing.T) {
+	const (
+		pinned = "Heart Rate"
+		path   = "/content[openEHR-EHR-SECTION.vital_signs.v1]/items[openEHR-EHR-OBSERVATION.pulse.v1]/data[at0002]/events[at0003]/data[at0001]/items[at0004,'Heart Rate']/value"
+	)
+	wt := buildOPT(t, readFile(t, "../../../testkit/corpus/templates/IDCR - Vital Signs Encounter.v1.opt"))
+	var rate *webtemplate.Node
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		if n.RMType == "DV_QUANTITY" && n.NodeID == "at0004" && strings.Contains(n.AQLPath, "OBSERVATION.pulse.v1") {
+			rate = n
+		}
+	})
+	if rate == nil {
+		t.Fatal("no DV_QUANTITY leaf at0004 under the pulse OBSERVATION — fixture changed?")
+	}
+	if rate.ID != "heart_rate" || rate.AQLPath != path {
+		t.Errorf("pulse rate id = %q, aqlPath = %q, want heart_rate at %s", rate.ID, rate.AQLPath, path)
+	}
+	got := nodeNames{rate.Name, rate.LocalizedName, rate.LocalizedNames}
+	want := nodeNames{pinned, pinned, map[string]string{wt.DefaultLanguage: pinned}}
+	if !got.equal(want) {
+		t.Errorf("pulse rate names = %+v, want %+v", got, want)
+	}
+	const description = "The rate, measured in beats per minute."
+	if d := rate.LocalizedDescriptions[wt.DefaultLanguage]; d != description {
+		t.Errorf("pulse rate description = %q, want the archetype term's %q", d, description)
+	}
+}
+
+// TestREQ106NodesWithoutNodeIDAreNamedByTheirAttribute — REQ-106, issue 455:
+// a node with no node id, which no archetype term names, is named by the RM
+// attribute that holds it, as the reference names it (OPTParser.buildNode):
+// its name and localizedName are the attribute's name, it carries no
+// localized names, and its id stays the one the attribute gives it. On
+// IDCR - Procedures List.v1 that is the COMPOSITION's category and context,
+// and each archetyped transition step's current_state and careflow_step.
+// Across the vendored OPTs Build accepts, no node without a node id is left
+// without a name.
+func TestREQ106NodesWithoutNodeIDAreNamedByTheirAttribute(t *testing.T) {
+	const step = "/content[openEHR-EHR-SECTION.procedures_rcp.v1]/items[openEHR-EHR-ACTION.procedure.v1]/ism_transition[at0034]"
+	wt := buildOPT(t, readFile(t, "../../../testkit/corpus/ehrbase-service/templates/IDCR - Procedures List.v1.opt"))
+	byPath := map[string]*webtemplate.Node{}
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) { byPath[n.AQLPath] = n })
+	for _, path := range []string{"/category", "/context", step + "/current_state", step + "/careflow_step"} {
+		attr := path[strings.LastIndexByte(path, '/')+1:]
+		n := byPath[path]
+		switch {
+		case n == nil:
+			t.Errorf("no node at %s — fixture or builder changed?", path)
+		case n.NodeID != "":
+			t.Errorf("%s: nodeId = %q, want none — fixture changed?", path, n.NodeID)
+		case n.ID != attr || n.Name != attr || n.LocalizedName != attr || len(n.LocalizedNames) != 0:
+			t.Errorf("%s: id %q, name %q, localizedName %q, localizedNames %v; want %s, %s, %s and none",
+				path, n.ID, n.Name, n.LocalizedName, n.LocalizedNames, attr, attr, attr)
+		}
+	}
+
+	built := 0
+	for _, path := range vendoredOPTs(t) {
+		_, w, refused := buildVendored(path)
+		if refused != nil {
+			continue
+		}
+		built++
+		walkOurTree(w.Tree, func(n *webtemplate.Node) {
+			if n.NodeID == "" && n.Name == "" {
+				t.Errorf("%s: %s (%s, id %s) has no name", filepath.Base(path), n.AQLPath, n.RMType, n.ID)
+			}
+		})
+	}
+	if built == 0 {
+		t.Fatal("Build accepted no vendored OPT — corpus layout changed?")
+	}
 }

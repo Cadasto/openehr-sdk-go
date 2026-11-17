@@ -943,10 +943,7 @@ The codecs **MUST**:
   - The third is a coded node name.
     Where the template constrains a rebuilt node's name as a `DV_CODED_TEXT`, through one child or alternatives that agree, and determines one coded value, decode gives the node that `DV_CODED_TEXT` name as the generator writes it, in place of the `DV_TEXT` name from the archetype terminology.
     The value is determined where the name's `C_CODE_PHRASE` lists exactly one code, or lists several of which exactly one has a term text equal to the text the template pins on the name.
-    Its terminology is the `C_CODE_PHRASE`'s, and its text is the pinned text, else the code's term text:
-    - for a `local` code, its archetype term;
-    - for an external code, the archetype term it has under `<terminology>::<code>` or its bare code;
-    - for an `openehr` code, the openEHR terminology rubric, where every terminology group that holds the code gives the same one.
+    Its terminology is the `C_CODE_PHRASE`'s, and its text is the pinned text, else the code's term text, read as [clinical-modeling.md § *Node names and name predicates*](clinical-modeling.md#node-names-and-name-predicates) reads it.
 
     No node name below the root has a key in the formats, so a coded name the template leaves open (a code from an external reference set, or several codes and no pinned text) comes back as `DV_TEXT`.
   - The fourth is an ordinal's terminology.
@@ -1060,24 +1057,32 @@ The codecs **MUST** read and write each, in FLAT and in STRUCTURED:
 
 | Key | RM attribute | Value |
 |---|---|---|
-| `<event>\|sample_count`, at an EVENT or INTERVAL_EVENT node or a folded EVENT | INTERVAL_EVENT `sample_count` | an RM `Integer`, refused where it does not fit, as a suffix value is (above) |
-| `<event>/math_function`, at an EVENT node or a folded EVENT | INTERVAL_EVENT `math_function` | a DV_CODED_TEXT leaf |
-| `<event>/width`, at an EVENT node or a folded EVENT | INTERVAL_EVENT `width` | a DV_DURATION leaf |
+| `<event>\|sample_count`, at an EVENT or INTERVAL_EVENT node or a folded event | INTERVAL_EVENT `sample_count` | an RM `Integer`, refused where it does not fit, as a suffix value is (above) |
+| `<event>/math_function`, at an EVENT node or a folded event | INTERVAL_EVENT `math_function` | a DV_CODED_TEXT leaf |
+| `<event>/width`, at an EVENT node or a folded event | INTERVAL_EVENT `width` | a DV_DURATION leaf |
 | `<observation>/history_origin` | `origin` of the OBSERVATION's `data` HISTORY | a DV_DATE_TIME leaf |
 
-An INTERVAL_EVENT node has `math_function` and `width` leaves of its own.
-A folded EVENT is the abstract EVENT the Web Template lifts into its OBSERVATION's node, one that occurs at most once ([clinical-modeling.md § *Output shape*](clinical-modeling.md#output-shape)); its `<event>` is the OBSERVATION's path, as the reference writes it.
-Decode **MUST** rebuild an event at an EVENT node or a folded EVENT as an INTERVAL_EVENT where the body gives it any of the three INTERVAL_EVENT keys, and as a POINT_EVENT otherwise.
+An INTERVAL_EVENT node has `math_function` and `width` leaves of its own, and a folded INTERVAL_EVENT has them among its OBSERVATION's node's children.
+A folded event is the event the Web Template lifts into its OBSERVATION's node: its HISTORY's only event, of any type, that occurs at most once ([clinical-modeling.md § *Output shape*](clinical-modeling.md#output-shape)).
+Its `<event>` is the OBSERVATION's path, as the reference writes it.
+Decode **MUST** rebuild an event at an EVENT node or a folded event as follows:
+
+- a folded INTERVAL_EVENT as an INTERVAL_EVENT;
+- in a decode with the template, a folded event the template types POINT_EVENT as a POINT_EVENT, where the three INTERVAL_EVENT keys are unmatched content (§ REQ-170);
+- any other as an INTERVAL_EVENT where the body gives it any of the three INTERVAL_EVENT keys, and as a POINT_EVENT otherwise.
+
+Without the template, a folded POINT_EVENT reads as a folded abstract EVENT, since the Web Template gives the two the same children.
 Each key is single-valued, so an index past `:0` on it is past its bound (§ REQ-170).
 
 Encode **MUST** write:
 
 - `|sample_count` where the INTERVAL_EVENT holds one;
-- `math_function` and `width` for an INTERVAL_EVENT at an EVENT node or a folded EVENT;
+- `math_function` and `width` for an INTERVAL_EVENT at an EVENT node or a folded event;
 - `history_origin`, unless the origin sets `value` alone and that value is, as written, the earliest time its events carry, the origin decode gives a HISTORY with no `history_origin`; an origin that sets any other attribute, such as `magnitude_status`, is written.
 
-Where an EVENT node, or the OBSERVATION node a folded EVENT is spelled at, has a child whose `id` is `math_function` or `width`, that key is the child's, which decode reads as the child, so encode refuses an INTERVAL_EVENT there, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
-An OBSERVATION that folds in two or more EVENTs gives the three keys to none of them: decode reads them there as unmatched content (§ REQ-170), and encode refuses an INTERVAL_EVENT among those events that holds any of the three, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+Where an EVENT node, or the OBSERVATION node a folded event is spelled at, holds no leaf of the event's own for `math_function` or `width` and has a child whose `id` is that attribute's name, that key is the child's, which decode reads as the child, so encode refuses an INTERVAL_EVENT there, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+Where the node holds the event's own leaf, as a folded INTERVAL_EVENT's does, encode writes the attribute at that leaf, whose `id` takes the duplicate-sibling suffix beside such a child (`width_1`, [clinical-modeling.md § *`id` generation*](clinical-modeling.md#id-generation-adr-0014)).
+An OBSERVATION that folds in two or more events, as one whose `data` and `state` HISTORYs each hold one, gives the three keys to none of them: decode reads them there as unmatched content (§ REQ-170), and encode refuses an INTERVAL_EVENT among those events that holds any of the three, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
 Every other spelling of the four, such as `<event>/sample_count` or `<observation>|history_origin`, is unmatched content (§ REQ-170).
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
 
@@ -1150,7 +1155,8 @@ An unrecognised `_`-segment and an unrecognised suffix inside a family are unmat
 
 Encode **MUST NOT** silently lose an in-scope attribute: a populated attribute is emitted in this grammar; what the grammar cannot carry either rides `|raw` (where a `|raw` carrier exists) or is a typed error, so a decorated value whose extras the grammar expresses (a `normal_range`, `mappings`, …) rides suffixes and `_`-attribute keys, not a whole `|raw` fragment.
 Three attribute classes are deliberately **out of scope**, and they are the only three.
-The first is the `_uid` / `_link:N` / `_feeder_audit` of a **folded structural wrapper** — an `ITEM_TREE`, `ITEM_LIST`, `ITEM_TABLE`, `ITEM_SINGLE`, `HISTORY` or lifted `max: 1` `EVENT`, none of which the Web Template models as a node: FLAT has no key for one, so encode drops those attributes with no error and decode can never read them back.
+The first is the `_uid` / `_link:N` / `_feeder_audit` of a **folded structural wrapper**, which the Web Template does not model as a node: an `ITEM_TREE`, `ITEM_LIST`, `ITEM_TABLE`, `ITEM_SINGLE` or `HISTORY`, or a lifted event, its `HISTORY`'s only event at `max: 1`, of any type (`EVENT`, `POINT_EVENT` or `INTERVAL_EVENT`).
+FLAT has no key for one, so encode drops those attributes with no error and decode can never read them back.
 This boundary cannot be closed codec-side at all — it needs a FLAT spelling for a folded wrapper, a reference-side change ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
 Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md) § folded structural wrappers.
 The second is `archetype_details` on any LOCATABLE: no FLAT key carries it, because decode rebuilds it from the Web Template ([§ REQ-053](#req-053)).

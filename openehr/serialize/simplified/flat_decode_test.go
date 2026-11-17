@@ -168,7 +168,7 @@ func TestResolveLeafPositionalPredicates(t *testing.T) {
 	wt := &webtemplate.WebTemplate{Tree: &webtemplate.Node{ID: "root", Children: []*webtemplate.Node{obs}}}
 
 	segs := []flatSeg{{"root", -1}, {"obs", 2}, {"ev", 5}, {"val", -1}}
-	node, predIndex, predType, err := resolveLeaf(wt, segs, reusedSiblingsOf(wt))
+	node, predIndex, predType, err := resolveLeaf(wt, segs, reusedSiblingsOf(wt), nil)
 	if err != nil || node != leaf {
 		t.Fatalf("resolveLeaf: err=%v node=%v", err, node)
 	}
