@@ -765,7 +765,7 @@ The rule of § Layer 2 binds this table too: each code is raised exactly when it
 | Check | Code | Severity | Fires when |
 |---|---|---|---|
 | Archetype membership | `aql_archetype_not_in_template` | Error | A literal archetype HRID in FROM/CONTAINS is absent from the compiled OPT (`Compiled.AllByArchetypeID`); a `$param` archetype predicate is not a literal HRID and does not fire it. |
-| Path in template | `aql_path_not_in_template` | Warning | An identified path does not resolve under its alias's archetype subtree, as the walk below decides. |
+| Path in template | `aql_path_not_in_template` | Warning | An identified path resolves under none of the archetype subtrees its alias's class names, as the walk below decides. |
 
 A `$param` archetype predicate (`[$name]`, `parse.ClassExpr.ParamArchetype`) anchors no `aql_path_not_in_template` resolution either: there is no literal subtree to walk, and the CDR resolves the bound scope at execution ([PROBE-021](conformance.md#probe-021--aql-parse-error-mapping)).
 
