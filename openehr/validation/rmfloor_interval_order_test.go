@@ -8,8 +8,9 @@ package validation_test
 // or both with none, are ordered at the precision they share instead; two
 // DV_TIME or DV_DATE_TIME values in different time zones are ordered as
 // instants, partial values and leap seconds included, and one with a zone is
-// not ordered against one without. A pair that is not strictly comparable
-// breaks DV_INTERVAL.Limits_consistent all the same
+// ordered against one without only where the two lie more than 14 hours
+// apart, as the REQ-103 temporal range check orders them. A pair that is not
+// strictly comparable breaks DV_INTERVAL.Limits_consistent all the same
 // (rmfloor_interval_comparable_test.go). BASE Interval.Limits_comparable,
 // which DV_INTERVAL.Limits_consistent restates, is not evaluated on the BASE
 // intervals, so Coverage.Unevaluated lists it (REQ-171 Coverage). PROBE-077
@@ -317,8 +318,10 @@ func TestValidateRM_REQ112_IntervalOrderAcrossZone(t *testing.T) {
 // REQ-112, REQ-171 — the floor neither orders nor reports a pair it reads as
 // strictly comparable but has no order for: one whose bound has no magnitude
 // to order, and a DV_TIME or DV_DATE_TIME with a time zone against one
-// without, although it orders two in different zones, partial values and
-// leap seconds included ([TestValidateRM_REQ112_IntervalOrderEveryBoundType]).
+// without that lies within 14 hours of it, an edge they share included,
+// although it orders two in different zones, partial values and leap seconds
+// included ([TestValidateRM_REQ112_IntervalOrderEveryBoundType]), and such a
+// pair more than 14 hours apart ([TestValidateRM_REQ112_IntervalOrderAcrossZone]).
 // It reports nothing for an unbounded side, nor for a bounded side that holds
 // no bound. DV_ORDINAL and DV_SCALE symbols are comparable only when they are
 // coded in one named terminology, and the RM leaves the rest undefined, so a
@@ -378,11 +381,24 @@ func TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs(t *testing.T)
 		{name: "DV_DATE_TIME, lower not a date-time", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "example"}, rm.DVDateTime{Value: "0000-01-01T00:00:00"}))},
 		// Each pair below reads lower above upper by the clocks, and also as
 		// instants with the value without a zone read as UTC, so a floor that
-		// ordered the pair either way would report it.
+		// ordered the pair either way would report it. Each lies within 14
+		// hours, so the value without a zone, read at +14:00 and at -14:00,
+		// falls on both sides of the one with a zone.
 		{name: "DV_TIME with a zone over one without", root: new(rm.NewClosedDVInterval(rm.DVTime{Value: "10:00:00Z"}, rm.DVTime{Value: "08:00:00"}))},
 		{name: "DV_TIME without a zone over one with", root: new(rm.NewClosedDVInterval(rm.DVTime{Value: "10:00:00"}, rm.DVTime{Value: "08:00:00+01:00"}))},
 		{name: "DV_DATE_TIME with a zone over one without", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2025-01-01T10:00:00+01:00"}, rm.DVDateTime{Value: "2025-01-01T08:00:00"}))},
 		{name: "DV_DATE_TIME without a zone over one with", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2025-01-01T10:00:00"}, rm.DVDateTime{Value: "2025-01-01T08:00:00Z"}))},
+		{name: "DV_DATE_TIME with a zone 13 hours over one without", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2025-01-02T13:00:00Z"}, rm.DVDateTime{Value: "2025-01-02T00:00:00"}))},
+		{name: "DV_TIME with a zone 13 hours over one without", root: new(rm.NewClosedDVInterval(rm.DVTime{Value: "21:00:00Z"}, rm.DVTime{Value: "08:00:00"}))},
+		// 14 hours apart exactly: the edge the two readings share.
+		{name: "DV_DATE_TIME with a zone 14 hours over one without", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2025-01-02T14:00:00Z"}, rm.DVDateTime{Value: "2025-01-02T00:00:00"}))},
+		{name: "DV_TIME without a zone 14 hours over one with", root: new(rm.NewClosedDVInterval(rm.DVTime{Value: "23:00:00"}, rm.DVTime{Value: "09:00:00Z"}))},
+		// A partial value covers its whole period: 2031-01-01T13:00Z is a
+		// year after 2030 starts but 13 hours after it ends, and 23:30Z is
+		// 14 hours and a half after 09 starts but 13 hours and a half after
+		// it ends.
+		{name: "DV_DATE_TIME with a zone 13 hours after the year without one ends", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2031-01-01T13:00Z"}, rm.DVDateTime{Value: "2030"}))},
+		{name: "DV_TIME with a zone 13 hours and a half after the hour without one ends", root: new(rm.NewClosedDVInterval(rm.DVTime{Value: "23:30:00Z"}, rm.DVTime{Value: "09"}))},
 		{name: "DV_DURATION, upper not a duration", root: new(rm.NewClosedDVInterval(rm.DVDuration{Value: "P2D"}, rm.DVDuration{Value: "example"}))},
 		{name: "DV_DURATION, lower not a duration", root: new(rm.NewClosedDVInterval(rm.DVDuration{Value: "example"}, rm.DVDuration{Value: "-P1D"}))},
 		{name: "nil lower bound on a bounded side", root: closed(nil, rm.DVCount{Magnitude: -1})},

@@ -223,10 +223,13 @@ type intervalOrder struct {
 	// magnitudes are the two values the order compares, lower first, and
 	// for two dates, times or date-times ordered at the precision they
 	// share, which compares no single value, their magnitudes, a zoned
-	// date-time's read in UTC. They are reported as read and need not show
-	// the inversion: two values closer than a float64 magnitude can tell
-	// apart read equal, and a leap second, which the magnitude counts into
-	// the next minute, can put 2021-12-31T23:59:60.5 above 2022-01-01.
+	// date-time's read in UTC; for a time or a date-time with a zone against
+	// one without, which compares no single value either, the one with a
+	// zone read in UTC and the other on its clock ([acrossZoneOrder]). They
+	// are reported as read and need not show the inversion: two values
+	// closer than a float64 magnitude can tell apart read equal, and a leap
+	// second, which the magnitude counts into the next minute, can put
+	// 2021-12-31T23:59:60.5 above 2022-01-01.
 	magnitudes [2]float64
 }
 
@@ -332,18 +335,19 @@ func intervalBounds(value any) (lower, upper rm.DVOrdered, bounded bool) {
 //     value with a bound the same way, so the two agree.
 //   - DV_TIME: always comparable. Two values written with one time zone
 //     designator, or both with none, are ordered at the precision they
-//     share, as two dates are, on their clocks as written. Two values whose
-//     designators differ are ordered as instants, each by its magnitude less
-//     its zone's offset from UTC, partial values and leap seconds included
-//     ([instantOrder]). A value with a zone is not ordered against one
-//     without.
+//     share, as two dates are, on their clocks as written. Two zoned values
+//     whose designators differ are ordered as instants, each by its
+//     magnitude less its zone's offset from UTC, partial values and leap
+//     seconds included ([instantOrder]). A value with a zone and one without
+//     are ordered as the REQ-103 temporal range check orders them
+//     ([acrossZoneOrder]): only where they lie more than 14 hours apart.
 //   - DV_DATE_TIME: always comparable. Two values written with one zone
 //     designator, or both with none, are ordered at the precision they
 //     share, as two dates are, a date with no time carrying no time fields.
 //     Two zoned values whose designators differ are ordered by their
 //     Compare, whose magnitude reads each in UTC, so as instants, partial
-//     values and leap seconds included. A value with a zone is not ordered
-//     against one without.
+//     values and leap seconds included. A value with a zone and one without
+//     are ordered as two such times are ([acrossZoneOrder]).
 //   - DV_DURATION: always comparable; ordered by its Compare, which reads
 //     the magnitude of each parsed value ([temporalOrder]).
 //
@@ -389,11 +393,15 @@ func orderBounds(lower, upper rm.DVOrdered) (intervalOrder, bool) {
 		return temporalOrder(class, sign, float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
 	case "DV_TIME":
 		lo, hi := boundAs[rm.DVTime](lower), boundAs[rm.DVTime](upper)
-		if loZone, hiZone := lo.Timezone(), hi.Timezone(); loZone != hiZone {
-			return instantOrder(class, loZone, hiZone, float64(lo.Magnitude()), float64(hi.Magnitude()))
+		loZone, hiZone := lo.Timezone(), hi.Timezone()
+		switch {
+		case loZone == hiZone:
+			sign := timeFields(lo.Value).Compare(timeFields(hi.Value))
+			return temporalOrder(class, sign, float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
+		case loZone == "" || hiZone == "":
+			return acrossZoneOrder(class, loZone, hiZone, timeSpan(lo.Value), timeSpan(hi.Value), lo.ValidISO8601() && hi.ValidISO8601())
 		}
-		sign := timeFields(lo.Value).Compare(timeFields(hi.Value))
-		return temporalOrder(class, sign, float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
+		return instantOrder(class, loZone, hiZone, float64(lo.Magnitude()), float64(hi.Magnitude()))
 	case "DV_DATE_TIME":
 		lo, hi := boundAs[rm.DVDateTime](lower), boundAs[rm.DVDateTime](upper)
 		loZone, hiZone := lo.Timezone(), hi.Timezone()
@@ -402,7 +410,7 @@ func orderBounds(lower, upper rm.DVOrdered) (intervalOrder, bool) {
 		case loZone == hiZone:
 			sign = dateTimeFields(lo.Value).Compare(dateTimeFields(hi.Value))
 		case loZone == "" || hiZone == "":
-			return intervalOrder{}, false
+			return acrossZoneOrder(class, loZone, hiZone, dateTimeSpan(lo.Value), dateTimeSpan(hi.Value), lo.ValidISO8601() && hi.ValidISO8601())
 		default:
 			sign = lo.Compare(hi)
 		}
@@ -453,9 +461,11 @@ func numberOrder[N ~int32 | ~int64 | ~float64](class string, lower, upper N) int
 // reported by the mandatory-presence rule, as `required` at the bound's
 // …/value; any other value the parse refuses, by the bound's own
 // Value_valid. The magnitude of a DV_TIME reads the clock in the value's own
-// time zone, so [orderBounds] sends two times whose designators differ to
-// [instantOrder] instead. The magnitude of a DV_DATE_TIME reads a value with
-// a zone in UTC, so its Compare orders two zoned date-times as instants.
+// time zone, so [orderBounds] sends two zoned times whose designators differ
+// to [instantOrder] instead. The magnitude of a DV_DATE_TIME reads a value
+// with a zone in UTC, so its Compare orders two zoned date-times as instants.
+// A time or a date-time with a zone against one without goes to
+// [acrossZoneOrder].
 func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerValid, upperValid bool) (intervalOrder, bool) {
 	if !lowerValid || !upperValid {
 		return intervalOrder{}, false
@@ -463,23 +473,20 @@ func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerVali
 	return intervalOrder{class: class, inverted: sign > 0, magnitudes: [2]float64{lowerMag, upperMag}}, true
 }
 
-// instantOrder orders two DV_TIME bounds of class whose time zone
-// designators, lowerZone and upperZone, differ. Their magnitudes,
-// lowerMag and upperMag, read each clock in its own zone, so they are not
-// compared as they stand: each value is ordered by its magnitude less its
-// zone's offset from UTC, which is its clock read in UTC, and those are the
-// magnitudes the order compares. That holds for every value the parse
-// accepts: a partial value is ordered by its magnitude, as it is in one zone,
-// and so is a value that holds a leap second. Two designators of one offset,
-// Z and +00:00 or +05:00 and +0500, order a pair as its clocks would. The
-// subtraction is [iso8601.UTCMagnitude], which the REQ-103 temporal range
-// check shares, so the two order zoned values alike.
-//
-// The pair is not ordered when either value has no zone: a value without one
-// names no instant to set against a value with one. A value the parse refuses
-// reads as having no zone, so it is not ordered either. It is reported as
-// [temporalOrder] says: an empty value as `required` at its …/value, any
-// other by its own Value_valid.
+// instantOrder orders two DV_TIME bounds of class that both carry a time
+// zone designator, lowerZone and upperZone, the two different. Their
+// magnitudes, lowerMag and upperMag, read each clock in its own zone, so
+// they are not compared as they stand: each value is ordered by its
+// magnitude less its zone's offset from UTC, which is its clock read in UTC,
+// and those are the magnitudes the order compares. That holds for every
+// value the parse accepts: a partial value is ordered by its magnitude, as
+// it is in one zone, and so is a value that holds a leap second. Two
+// designators of one offset, Z and +00:00 or +05:00 and +0500, order a pair
+// as its clocks would. The subtraction is [iso8601.UTCMagnitude], which the
+// REQ-103 temporal range check shares, so the two order zoned values alike.
+// [orderBounds] sends a pair of which one carries no zone to
+// [acrossZoneOrder] instead; a zone [iso8601.UTCMagnitude] refuses leaves
+// the pair unordered.
 func instantOrder(class, lowerZone, upperZone string, lowerMag, upperMag float64) (intervalOrder, bool) {
 	lowerUTC, lowerZoned := iso8601.UTCMagnitude(lowerMag, lowerZone)
 	upperUTC, upperZoned := iso8601.UTCMagnitude(upperMag, upperZone)
@@ -487,6 +494,64 @@ func instantOrder(class, lowerZone, upperZone string, lowerMag, upperMag float64
 		return intervalOrder{}, false
 	}
 	return intervalOrder{class: class, inverted: lowerUTC > upperUTC, magnitudes: [2]float64{lowerUTC, upperUTC}}, true
+}
+
+// acrossZoneOrder orders two DV_TIME or two DV_DATE_TIME bounds of class of
+// which one carries a zone designator and the other none: lowerZone or
+// upperZone is "", and lower and upper are the spans the two cover
+// ([timeSpan], [dateTimeSpan]). The pair is ordered as the REQ-103 temporal
+// range check orders a value against a bound of the other zoned-ness, by
+// [iso8601.OrderAcrossZone], after XML Schema 1.0 Part 2 §3.2.7.4: the value
+// with a zone read in UTC, the one without at +14:00 and at -14:00, a
+// partial value covering the whole period it names. It is ordered only where
+// both readings agree, so a pair within 14 hours of each other, an edge they
+// share included, is not ordered and reports nothing here.
+//
+// The finding's magnitudes are the bound with a zone read in UTC and the one
+// without on its clock, each at the start of the period it names: for a
+// DV_DATE_TIME the RM's magnitude of each, and for a DV_TIME the RM's
+// magnitude less the zone's offset for the one with a zone, and the RM's
+// magnitude for the other. valid is false where the parse refuses either
+// bound, whose span then names no time, and the pair is not ordered: a value
+// the parse refuses reads as having no zone, and is reported as
+// [temporalOrder] says.
+func acrossZoneOrder(class, lowerZone, upperZone string, lower, upper iso8601.Span, valid bool) (intervalOrder, bool) {
+	if !valid {
+		return intervalOrder{}, false
+	}
+	magnitudes := [2]float64{lower.Start, upper.Start}
+	var sign int
+	var ordered bool
+	if upperZone == "" {
+		sign, ordered = iso8601.OrderAcrossZone(lower, lowerZone, upper)
+		magnitudes[0], _ = iso8601.UTCMagnitude(lower.Start, lowerZone)
+	} else {
+		sign, ordered = iso8601.OrderAcrossZone(upper, upperZone, lower)
+		sign = -sign
+		magnitudes[1], _ = iso8601.UTCMagnitude(upper.Start, upperZone)
+	}
+	if !ordered {
+		return intervalOrder{}, false
+	}
+	return intervalOrder{class: class, inverted: sign > 0, magnitudes: magnitudes}, true
+}
+
+// timeSpan and dateTimeSpan read the stretch of time the value of a DV_TIME
+// or a DV_DATE_TIME covers, on its clock, a reduced value up to the start of
+// the next period it names ([iso8601.TimeSpan], [iso8601.DateTimeSpan]), for
+// the order of a bound with a zone against one without. A value the parse
+// refuses gives the span of a zero value, which names no time, so
+// [orderBounds] does not order it ([acrossZoneOrder]).
+func timeSpan(s string) iso8601.Span {
+	t, _ := iso8601.ParseTime(s)
+	return iso8601.TimeSpan(t)
+}
+
+// dateTimeSpan reads a date-time's time only where its text holds a "T", as
+// [dateTimeFields] does.
+func dateTimeSpan(s string) iso8601.Span {
+	d, t, _ := iso8601.ParseDateTime(s)
+	return iso8601.DateTimeSpan(d, t, strings.Contains(s, "T"))
 }
 
 // dateFields, timeFields and dateTimeFields read the value of a DV_DATE,
