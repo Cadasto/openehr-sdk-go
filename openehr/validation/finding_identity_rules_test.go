@@ -325,9 +325,9 @@ func TestValidate_REQ171_EmptyMandatoryListRule(t *testing.T) {
 
 // REQ-171 — each RM-layer rule the floor evaluates outside the coded
 // invariants, on the issue it draws: a rule the BMM names as CLASS.Invariant,
-// and the three the BMM states in an attribute's definition (mandatory,
-// cardinality, precision_range). The rule-specific codes carry their rule's
-// name; rm_invariant tells its rules apart by Rule alone.
+// and the four the BMM states in an attribute's definition (mandatory,
+// cardinality, precision_range, archetype_root_id). The rule-specific codes
+// carry their rule's name; rm_invariant tells its rules apart by Rule alone.
 func TestValidateRM_REQ171_RMLayerRules(t *testing.T) {
 	t.Parallel()
 	minus2 := rm.Integer(-2)
@@ -345,6 +345,22 @@ func TestValidateRM_REQ171_RMLayerRules(t *testing.T) {
 		want []string
 	}{
 		{name: "FOLDER without a name", root: &rm.Folder{ArchetypeNodeID: "at0001"}, want: []string{"required /name rm mandatory"}},
+		{
+			// A FOLDER is no root by its class, but is one by an archetype
+			// id as its archetype_node_id.
+			name: "FOLDER with an archetype id and no archetype_details",
+			root: &rm.Folder{ArchetypeNodeID: "openEHR-EHR-FOLDER.episode.v1", Name: &rm.DVText{Value: "f"}},
+			want: []string{"is_archetype_root /archetype_details rm LOCATABLE.Archetyped_valid"},
+		},
+		{
+			name: "FOLDER whose archetype_details names another archetype",
+			root: &rm.Folder{
+				ArchetypeNodeID:  "openEHR-EHR-FOLDER.episode.v1",
+				Name:             &rm.DVText{Value: "f"},
+				ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-FOLDER.generic.v1"}, RMVersion: "1.1.0"},
+			},
+			want: []string{"archetype_root_id /archetype_details/archetype_id/value rm archetype_root_id"},
+		},
 		{
 			name: "CLUSTER with an empty items list",
 			root: &rm.Cluster{ArchetypeNodeID: "at0001", Name: &rm.DVText{Value: "c"}, Items: []rm.Item{}},
