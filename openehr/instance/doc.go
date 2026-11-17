@@ -259,8 +259,15 @@
 // value the fill wrote, where the default meets the node's constraints: the
 // node's own primitive constraint, an attribute the node requires, one it
 // prohibits, and the constraint of the allowed child each attribute value
-// matches. A default that does not meet them leaves the fill's value. An
-// assumed value the template states on a primitive constraint is not read.
+// matches. It takes the default only where the default also keeps the
+// Reference Model rules the generator keeps its own values to: each
+// attribute the Reference Model marks mandatory is there, on the default
+// and on each value it holds, and the default already meets the rules the
+// generator settles its own values by, such as a proportion's kind rules, a
+// percentage accuracy, a normal range and the code set of a coded attribute
+// like a text's language. A default that does not meet its node's
+// constraints, or breaks such a rule, leaves the fill's value. An assumed
+// value the template states on a primitive constraint is not read.
 //
 // # Trust model
 //

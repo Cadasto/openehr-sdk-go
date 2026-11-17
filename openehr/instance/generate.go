@@ -2576,7 +2576,7 @@ func (g *generator) buildChild(child *tcimpl.CompiledNode) (any, error) {
 	if err := g.walkNode(child, rmChild); err != nil {
 		return nil, err
 	}
-	if def := templateDefault(child, rmChild); def != nil {
+	if def := g.templateDefault(child, rmChild); def != nil {
 		return def, nil
 	}
 	return rmChild, nil

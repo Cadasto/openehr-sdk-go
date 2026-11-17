@@ -49,7 +49,10 @@ func ordinalBody(value, text, code string) string {
 // C_INTEGER or C_CODE_PHRASE on an attribute, or a C_DV_ORDINAL or a
 // C_CODE_PHRASE on the node itself, that refuses it, an attribute the node
 // requires that it leaves out, or one the node prohibits that it carries.
-// The RM floor and the template validator pass.
+// A default that keeps the RM rules the walk settles its own value by is
+// written too: a text whose language is an ISO 639-1 code, a percent over
+// 100 and a fraction of whole numbers at precision 0. The RM floor and the
+// template validator pass.
 func TestREQ107_TemplateDefaultValueStandsInForTheFill(t *testing.T) {
 	text := func(attrs ...string) string { return optNode("DV_TEXT", "", attrs...) }
 	list := optSingle("value", optPrimitive("STRING", "C_STRING", "<list>Mild</list><list>Severe</list>"))
@@ -125,6 +128,23 @@ func TestREQ107_TemplateDefaultValueStandsInForTheFill(t *testing.T) {
 			name: "DV_TEXT whose template prohibits a language the default carries", value: text(optProhibitedSingle("language")), rmType: "DV_TEXT",
 			body: `<value>Leeds EPCCS</value><language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>`,
 			want: func(_ instance.ValueFill, got string) bool { return got != "Leeds EPCCS" }, about: "the fill's text, not the default",
+		},
+		{
+			name: "DV_TEXT left open whose language is an ISO 639-1 code", value: text(), rmType: "DV_TEXT",
+			body: `<value>Leeds EPCCS</value><language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>`,
+			want: func(_ instance.ValueFill, got string) bool { return got == "Leeds EPCCS" }, about: "the default Leeds EPCCS",
+		},
+		{
+			name: "DV_PROPORTION left open, a percent over 100", value: optNode("DV_PROPORTION", ""), rmType: "DV_PROPORTION",
+			body:  "<numerator>10.0</numerator><denominator>100.0</denominator><type>2</type>",
+			want:  func(_ instance.ValueFill, got string) bool { return got == "10/100 type 2" },
+			about: "the default 10/100 type 2",
+		},
+		{
+			name: "DV_PROPORTION left open, a fraction of whole numbers at precision 0", value: optNode("DV_PROPORTION", ""), rmType: "DV_PROPORTION",
+			body:  "<numerator>1.0</numerator><denominator>3.0</denominator><type>3</type><precision>0</precision>",
+			want:  func(_ instance.ValueFill, got string) bool { return got == "1/3 type 3" },
+			about: "the default 1/3 type 3",
 		},
 	}
 	for _, tc := range cases {
