@@ -9,14 +9,20 @@ import (
 )
 
 // TestREQ107_TemporalBoundsCompareAsInstants pins how the REQ-107 ordering
-// rule compares DV_DATE, DV_DATE_TIME and DV_TIME bounds, in the order the
-// RM floor reads them (REQ-112 DV_INTERVAL): at the precision the two share
-// when both are written with one zone designator or both with none
+// rule compares DV_DATE, DV_DATE_TIME and DV_TIME bounds, in the order the RM
+// floor reads them (REQ-112 DV_INTERVAL): at the precision the two share when
+// both are written with one zone designator or both with none
 // (TestREQ107_TemporalBoundsCompareAtSharedPrecision pins the partial
-// values); as instants when the designators differ, in any layout the ISO
-// 8601 parse accepts, without seconds or with a compact zone included; and
-// not at all for a zoned value against a zoneless one or a value the parse
-// refuses, so such a pair is left alone.
+// values); as instants when both carry a zone and the designators differ, in
+// any layout the ISO 8601 parse accepts, without seconds or with a compact
+// zone included; for a zoned value against a zoneless one as the temporal
+// range check of constraints.CTime and CDateTime orders them, after XML
+// Schema 1.0 Part 2 §3.2.7.4, the zoned one read in UTC and the other at
+// +14:00 and at -14:00, a partial value covering its whole period, so only
+// where the two lie more than 14 hours apart, or as equal where the zoned one
+// lies inside the other's period at both readings; and not at all for a
+// value the parse refuses. A pair that does not compare, a mixed pair within
+// 14 hours included, is left alone, and so is an equal pair.
 func TestREQ107_TemporalBoundsCompareAsInstants(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -57,17 +63,75 @@ func TestREQ107_TemporalBoundsCompareAsInstants(t *testing.T) {
 			want: [2]string{"2026-01-01T00:30:00Z", "2026-01-01T06:00:00+05:00"},
 		},
 		{
-			name:  "date-time: zoned and zoneless, left alone",
+			// 24 hours apart, so after the zoned upper bound at either
+			// reading of the zoneless lower one.
+			name:  "date-time: zoneless lower more than 14 hours after zoned upper, swapped",
 			apply: orderDateTimes,
 			lower: "2026-10-02T00:00:00", upper: "2026-10-01T00:00:00Z",
-			want: [2]string{"2026-10-02T00:00:00", "2026-10-01T00:00:00Z"},
+			want: [2]string{"2026-10-01T00:00:00Z", "2026-10-02T00:00:00"},
 		},
 		{
-			// A zoneless value names no instant, so it is not read as one.
-			name:  "date-time: zoned lower and zoneless upper, left alone",
+			// 13 hours apart: read at -14:00 the zoneless lower bound is
+			// after the upper one, and read at +14:00 before it, so the two
+			// do not compare.
+			name:  "date-time: zoneless lower within 14 hours after zoned upper, left alone",
+			apply: orderDateTimes,
+			lower: "2026-10-01T13:00:00", upper: "2026-10-01T00:00:00Z",
+			want: [2]string{"2026-10-01T13:00:00", "2026-10-01T00:00:00Z"},
+		},
+		{
+			// 2026-10-02T00:00+02:00 is 2026-10-01T22:00Z, 15 hours after
+			// 07:00, although the clocks are 17 hours apart.
+			name:  "date-time: zoned lower more than 14 hours after zoneless upper, swapped",
+			apply: orderDateTimes,
+			lower: "2026-10-02T00:00:00+02:00", upper: "2026-10-01T07:00:00",
+			want: [2]string{"2026-10-01T07:00:00", "2026-10-02T00:00:00+02:00"},
+		},
+		{
+			// 2026-10-02T00:00+02:00 is 2026-10-01T22:00Z, 13 hours after
+			// 09:00, although the clocks are 15 hours apart: reading the
+			// zoned clock, not the instant, would swap the pair.
+			name:  "date-time: zoned lower within 14 hours after zoneless upper, left alone",
+			apply: orderDateTimes,
+			lower: "2026-10-02T00:00:00+02:00", upper: "2026-10-01T09:00:00",
+			want: [2]string{"2026-10-02T00:00:00+02:00", "2026-10-01T09:00:00"},
+		},
+		{
+			// More than 14 hours before the zoneless upper bound: in order.
+			name:  "date-time: zoned lower and zoneless upper, in order, left alone",
 			apply: orderDateTimes,
 			lower: "2026-10-01T00:00:00Z", upper: "2026-10-02T00:00:00",
 			want: [2]string{"2026-10-01T00:00:00Z", "2026-10-02T00:00:00"},
+		},
+		{
+			// The year 2030 ends at 2031-01-01T00:00, 15 hours before the
+			// lower bound, which is a year after the year starts.
+			name:  "date-time: zoned lower more than 14 hours after a zoneless year ends, swapped",
+			apply: orderDateTimes,
+			lower: "2031-01-01T15:00Z", upper: "2030",
+			want: [2]string{"2030", "2031-01-01T15:00Z"},
+		},
+		{
+			// 13 hours after the year 2030 ends, although a year after it
+			// starts: a partial value covers its whole period.
+			name:  "date-time: zoned lower within 14 hours after a zoneless year ends, left alone",
+			apply: orderDateTimes,
+			lower: "2031-01-01T13:00Z", upper: "2030",
+			want: [2]string{"2031-01-01T13:00Z", "2030"},
+		},
+		{
+			// The year 2030 holds 2030-06-01T10:00Z at both readings, so the
+			// two are equal and in order either way round.
+			name:  "date-time: zoneless year lower holding the zoned upper, equal, left alone",
+			apply: orderDateTimes,
+			lower: "2030", upper: "2030-06-01T10:00Z",
+			want: [2]string{"2030", "2030-06-01T10:00Z"},
+		},
+		{
+			name:  "date-time: zoned lower inside the zoneless year upper, equal, left alone",
+			apply: orderDateTimes,
+			lower: "2030-06-01T10:00Z", upper: "2030",
+			want: [2]string{"2030-06-01T10:00Z", "2030"},
 		},
 		{
 			// 05:00 UTC then 07:00 UTC, in a layout without seconds that
@@ -138,16 +202,30 @@ func TestREQ107_TemporalBoundsCompareAsInstants(t *testing.T) {
 			want: [2]string{"10:00:00+02:00", "09:00:00Z"},
 		},
 		{
-			name:  "time: zoned and zoneless, left alone",
+			name:  "time: zoneless lower within 14 hours after zoned upper, left alone",
 			apply: orderTimes,
 			lower: "10:00:00", upper: "09:00:00Z",
 			want: [2]string{"10:00:00", "09:00:00Z"},
 		},
 		{
-			name:  "time: zoned lower and zoneless upper, left alone",
+			name:  "time: zoned lower and zoneless upper, within 14 hours, left alone",
 			apply: orderTimes,
 			lower: "09:00:00Z", upper: "10:00:00",
 			want: [2]string{"09:00:00Z", "10:00:00"},
+		},
+		{
+			// 20:00-05:00 is 25:00Z, 15 hours after 10:00.
+			name:  "time: zoned lower more than 14 hours after zoneless upper, swapped",
+			apply: orderTimes,
+			lower: "20:00:00-05:00", upper: "10:00:00",
+			want: [2]string{"10:00:00", "20:00:00-05:00"},
+		},
+		{
+			// 11:00+02:00 is 09:00Z, 14 hours and a half before 23:30.
+			name:  "time: zoneless lower more than 14 hours after zoned upper, swapped",
+			apply: orderTimes,
+			lower: "23:30:00", upper: "11:00:00+02:00",
+			want: [2]string{"11:00:00+02:00", "23:30:00"},
 		},
 		{
 			// On the month the two share, 2026-10 is after 2026-01-01.

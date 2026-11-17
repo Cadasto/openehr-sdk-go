@@ -94,10 +94,14 @@ func (c CDate) Validate(value any) []Violation {
 // seconds with their fraction as one field: "10:30" lies within the range
 // up to 10, included. When both carry a zone and the designators differ,
 // they are ordered as instants, each clock read in UTC, a minute or a second
-// left out counting as 0; when one carries a zone and the other does not,
-// they are not ordered, so that bound does not refuse the time. "08:00:00Z"
-// is after "09:30:00+02:00", and "09:00:00" is not ordered against it. A
-// value outside the range is a CodeOutOfRange.
+// left out counting as 0. When one carries a zone and the other does not,
+// they are ordered as XML Schema 1.0 Part 2 orders a dateTime: the one with
+// no zone is read at +14:00 and at -14:00, a reduced time covering the whole
+// hour or minute it names, and the two are ordered only where both readings
+// agree. Within 14 hours of each other they are not ordered, so that bound
+// does not refuse the time. "08:00:00Z" is after "09:30:00+02:00",
+// "09:00:00" is not ordered against it, and "20:00:00" is after
+// "02:00:00Z". A value outside the range is a CodeOutOfRange.
 //
 // TimezoneValidity is the AOM 1.4 timezone_validity: ValidityMandatory
 // refuses a time with no zone, and ValidityDisallowed one with a zone, as a
@@ -132,9 +136,9 @@ func (CTime) isPrimitive() {}
 // which names the same instant, so the time is compared with the bound as
 // an instant: under "hh:mm:XX±hh:mm" the range above 23:59Z gives
 // "23:00-01:00". A range that only a time its bounds do not order meets, a
-// time with a zone where they carry none, gives the sentinel, which
-// Validate refuses: the range below 00:00:00 gives "12:00:00", though
-// "00:00:00Z" is valid.
+// time with a zone within 14 hours of bounds that carry none, gives the
+// sentinel, which Validate refuses: the range below 00:00:00 gives
+// "12:00:00", though "00:00:00Z" is valid.
 func (c CTime) ExampleValue() any {
 	return clockExample(clockTime, c.Pattern, c.Range, c.TimezoneValidity, "12:00:00")
 }
@@ -164,9 +168,15 @@ func (c CTime) Validate(value any) []Violation {
 // one zone designator or none, so "2021-12-31T23:59:30" lies within the
 // range up to 2021-12-31T23:59, included; as instants, a reduced value
 // standing for the start of the period it names, when both carry a zone and
-// the designators differ; and not at all when one carries a zone and the
-// other does not. A date with no time carries none. A value outside the
-// range is a CodeOutOfRange.
+// the designators differ; and, when one carries a zone and the other does
+// not, a reduced value covering its whole period, as before or after where
+// they lie more than 14 hours apart, and as equal where the one with a zone
+// lies inside the other's period at both readings, 14 hours in from either
+// end of it. A date with no time carries none. So the range from
+// 2020-01-01T00:00 to 2021-12-31T23:59 refuses "2022-11-02T19:32:40Z", and
+// the range up to 2030 admits "2030-06-01T10:00Z", as it admits
+// "2030-06-01T10:00", while the range below 2030 refuses both. A value
+// outside the range is a CodeOutOfRange.
 //
 // TimezoneValidity is read as [CTime] reads it; a date-time with no time has
 // no zone, so ValidityMandatory refuses it.
@@ -187,11 +197,12 @@ func (CDateTime) isPrimitive() {}
 // [CTime.ExampleValue] does: the range between 2021-05-15T10:00:00Z and
 // 2021-05-15T10:00:01Z, both excluded, gives "2021-05-15T10:00:00.5Z". A
 // range that only a date-time its bounds do not order meets, one with no
-// zone where they carry one, gives the sentinel, which Validate refuses:
-// under "yyyy-mm-ddThh:mm:XX" that range gives it, though
+// zone within 14 hours of bounds that carry one, gives the sentinel, which
+// Validate refuses: under "yyyy-mm-ddThh:mm:XX" that range gives it, though
 // "2021-05-15T10:00" is valid. Where the bounds carry no zone, the
-// sentinel, which carries one, is not ordered against them, so Validate
-// does not refuse it for the range.
+// sentinel, which carries one, is ordered against them as any value is, so
+// Validate refuses it for the range only where it lies more than 14 hours
+// outside them.
 func (c CDateTime) ExampleValue() any {
 	return clockExample(clockDateTime, c.Pattern, c.Range, c.TimezoneValidity, "2020-01-01T12:00:00Z")
 }
@@ -809,6 +820,16 @@ func (v clockValue) fields(k clockKind) iso8601.Fields {
 	return iso8601.DateTimeFields(v.date, v.time, v.hasTime)
 }
 
+// extent returns the stretch of time the value covers, clock-local, a
+// reduced value up to the start of the next period it names, for the order
+// of a value with a zone against one with none.
+func (v clockValue) extent(k clockKind) iso8601.Span {
+	if k == clockTime {
+		return iso8601.TimeSpan(v.time)
+	}
+	return iso8601.DateTimeSpan(v.date, v.time, v.hasTime)
+}
+
 // zone returns the zone designator the value carries, as written, or ""
 // for a date, a time with no zone, or a date-time with no time.
 func (v clockValue) zone() string {
@@ -816,13 +837,16 @@ func (v clockValue) zone() string {
 }
 
 // clockOrder returns the order of the value v of kind k against a bound
-// (REQ-103): at the precision the two share (iso8601.Fields.Compare) when
-// they carry one zone designator or none, so a bound covers the whole
-// period it names; as instants (iso8601.UTCMagnitude), a partial value
-// standing for the start of its period, when both carry a zone and the
-// designators differ; and not ordered when one carries a zone and the other
-// does not. A date carries none, so dates are ordered at their shared
-// precision.
+// (REQ-103 § Validate contract): at the precision the two share
+// (iso8601.Fields.Compare) when they carry one zone designator or none, so
+// a bound covers the whole period it names; as instants
+// (iso8601.UTCMagnitude), a partial value standing for the start of its
+// period, when both carry a zone and the designators differ; and when one
+// carries a zone and the other does not, as XML Schema 1.0 Part 2 §3.2.7.4
+// orders a dateTime (iso8601.OrderAcrossZone): the one with no zone read at
+// +14:00 and at -14:00, a partial value covering its whole period, and not
+// ordered where the two readings disagree. A date carries none, so dates are
+// ordered at their shared precision.
 func clockOrder(k clockKind, v clockValue) boundOrder {
 	fields, zone := v.fields(k), v.zone()
 	return func(bound string) (sign int, ordered, ok bool) {
@@ -831,8 +855,15 @@ func clockOrder(k clockKind, v clockValue) boundOrder {
 			return 0, false, false
 		}
 		bzone := b.zone()
-		if zone == bzone {
+		switch {
+		case zone == bzone:
 			return fields.Compare(b.fields(k)), true, true
+		case bzone == "":
+			sign, ordered := iso8601.OrderAcrossZone(v.extent(k), zone, b.extent(k))
+			return sign, ordered, true
+		case zone == "":
+			sign, ordered := iso8601.OrderAcrossZone(b.extent(k), bzone, v.extent(k))
+			return -sign, ordered, true
 		}
 		utc, zoned := iso8601.UTCMagnitude(v.magnitude(k), zone)
 		butc, bzoned := iso8601.UTCMagnitude(b.magnitude(k), bzone)
@@ -971,10 +1002,9 @@ const secondsPerDay = 86400
 // with its clock and its zone moved by whole hours, so that it names the
 // same instant inside the day (zoneAcross). midway returns "" for a date,
 // for a pattern that leaves out the seconds, for a bound that carries no
-// seconds, so that it stands for a whole period, for bounds that are not
-// ordered against each other, one carrying a zone and the other none, for
-// edges that leave no room between them, and for a time that cannot be so
-// written.
+// seconds, so that it stands for a whole period, for bounds one of which
+// carries a zone and the other none, for edges that leave no room between
+// them, and for a time that cannot be so written.
 func (p clockPattern) midway(k clockKind, r TemporalRange, tz ValidityKind) string {
 	if k == clockDate || p.fields[fieldSecond].validity == fieldDisallowed {
 		return ""

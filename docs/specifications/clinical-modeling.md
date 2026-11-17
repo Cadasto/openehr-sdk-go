@@ -289,12 +289,16 @@ Concretely:
   A date, a time or a date-time is compared with a bound at the precision the two share: field by field from the largest down, over the fields both carry, the seconds with their fraction.
   The first field that differs decides, and two values equal on every shared field are equal.
   A bound so covers the whole period it names: `2021-05` lies within `1900..2021` and outside `1900..<2021`.
-  A time or a date-time is ordered against a bound as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* orders two DV_TIME or two DV_DATE_TIME values:
+  A time or a date-time is ordered against a bound as below, the order [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* follows for two DV_TIME or two DV_DATE_TIME values:
   - at that shared precision when the two are written with one zone designator, or both with none;
   - as instants, each read in UTC by the `magnitude()` of [REQ-123](reference-model.md#req-123--temporal-data-value-helpers), in which a partial value stands for the start of the period it names, when both carry a zone and the designators differ;
-  - not at all when one carries a zone and the other does not, so such a bound draws no `CodeOutOfRange`.
+  - as XML Schema 1.0 Part 2 §3.2.7.4 orders a `dateTime` when one carries a zone and the other does not: the one with a zone is read in UTC and the other at `+14:00` and at `-14:00`, a partial value covering the whole period it names, and the two are ordered only where both readings agree.
+    The one with a zone is equal to the other where it lies inside the other's period at both readings, as two values equal on every field they share are.
 
-  So a `CTime` with the range `>09:30:00+02:00` admits `08:00:00Z`, which is 10:00 at `+02:00`, and `09:00:00`, which has no zone.
+  Where the two readings disagree, the one with a zone lies within 14 hours of where the other's period starts or ends, an edge included, and the two are not ordered, so such a bound draws no `CodeOutOfRange`.
+  So a `CDateTime` with the range `2020-01-01T00:00..2021-12-31T23:59` refuses `2022-11-02T19:32:40Z`, more than 14 hours past its upper bound at either reading.
+  A `CDateTime` with the range `<=2030` admits `2030-06-01T10:00Z`, which lies inside the year 2030 at both readings, as it admits `2030-06-01T10:00`, and one with the range `<2030` refuses both.
+  A `CTime` with the range `>09:30:00+02:00` admits `08:00:00Z`, which is 10:00 at `+02:00`, and `09:00:00`, which has no zone and lies within 14 hours of the bound.
   ADL 1.4 asks a closed interval to give a zone on both bounds or on neither (*Intervals*); the SDK does not check that, and orders the value against each bound on its own.
   The compile step reads a bound that the ISO 8601 parse of the constrained type refuses as [§ REQ-111](#req-111--public-compiled-template-bridge) *What the compile step tolerates* says; on a `TemporalRange` built in code, such a bound on a side that is not unbounded is malformed (below).
 - `CBoolean.Validate` accepts Go `bool`.
@@ -382,7 +386,8 @@ Two cases are exceptions to the rule for bounded constraints, where the example 
 
 - a pattern that writes a field after the first as a literal number, beside a range, which can move a bound written to it out of the range (`CDate{Pattern: "yyyy-06-dd"}` with the range `<=2004-05-20` gives `"2020-01-01"`, though `"2003-06-01"` is valid).
   The ITS-XML pattern grammars admit no literal number, so only an OPT that breaks that schema, or a constraint built in code, reaches it;
-- a range that only a value its bounds do not order satisfies, a time with a zone where the bounds carry none, or a date-time with no zone where they carry one, since a candidate takes or drops a zone only where the pattern or the `TimezoneValidity` asks it to.
+- a range that only a value its bounds do not order satisfies: a time with a zone where the bounds carry none, or a date-time with no zone where they carry one, within 14 hours of a bound (§ *Validate contract*).
+  The example is then the sentinel because a candidate takes or drops a zone only where the pattern or the `TimezoneValidity` asks it to.
   `CTime` with the range `<00:00:00` gives `"12:00:00"`, though `"00:00:00Z"` is valid.
   An OPT reaches it where neither the pattern nor a `timezone_validity` constrains the zone, through an excluded bound that reaches the end of the day, such as `23:59`, or lies at its start, for a time, or through two bounds closer together than the last field the pattern writes.
 
@@ -1169,11 +1174,14 @@ The pairs it can compare are:
 - two DV_QUANTITY with equal `units`;
 - two DV_PROPORTION of one `type`, by ratio;
 - two DV_ORDINAL, by `value`;
-- two DV_DATE, two DV_TIME or two DV_DATE_TIME values the REQ-123 parse accepts, in the order [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* gives them: at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it, and two times or date-times written with different zone designators as instants;
+- two DV_DATE, two DV_TIME or two DV_DATE_TIME values the REQ-123 parse accepts, in the order [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* gives them:
+  - at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it;
+  - two zoned times or date-times written with different designators as instants;
+  - and a zoned time or date-time against a zoneless one as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* orders them;
 - and two DV_DURATION values the REQ-123 parse accepts, by the magnitude it gives, as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* orders them.
 
 The same holds in a `DV_INTERVAL<DV_ORDERED>` whose two bounds are one of those types.
-No other pair is one it can compare, for example, a zoned against a zoneless time or date-time, or a value the REQ-123 parse refuses.
+No other pair is one it can compare, for example, a zoned against a zoneless time or date-time within 14 hours of the start or end of the zoneless one, or a value the REQ-123 parse refuses.
 
 #### Precedence
 
@@ -1972,10 +1980,11 @@ When neither side is unbounded and each side holds a bound, the floor reports, e
 The RM leaves DV_ORDINAL's and DV_SCALE's undefined; the floor reads two of them as comparable when their symbols are coded in one named terminology, and **MUST NOT** report two whose symbols are coded in different terminologies or in none, which it does not order either.
 The order is the RM's `less_than` for the type: `magnitude` for the quantified types, `value` for DV_ORDINAL and DV_SCALE, and for a DV_DURATION the magnitude the REQ-123 parse gives.
 Two DV_DATE, two DV_TIME or two DV_DATE_TIME values written with one zone designator, or both with none, are ordered at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it, which departs from reading `less_than` by `magnitude()` for a partial value, whose magnitude is the start of the period it names.
-Two DV_TIME or two DV_DATE_TIME values whose zone designators differ are ordered as instants, each read in UTC, partial values and leap seconds included, and a zoned DV_TIME or DV_DATE_TIME is not ordered against one without a zone.
+Two DV_TIME or two DV_DATE_TIME values that both carry a zone, with designators that differ, are ordered as instants, each read in UTC, partial values and leap seconds included.
+A zoned DV_TIME or DV_DATE_TIME and one without a zone are ordered as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* orders a time or a date-time against a bound when one carries a zone and the other does not.
 Equal `units` is only part of DV_QUANTITY's `is_strictly_comparable_to`, which also needs a matching `units_system` where one is set.
 The floor does not compare `units_system`, so it orders a same-units pair whatever its `units_system`, although the RM makes two different systems not strictly comparable.
-Of the pairs it reads as strictly comparable, it orders none that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, nor a zoned DV_TIME or DV_DATE_TIME against one without a zone, and reports none of them here (see *What the floor does not evaluate* below).
+Of the pairs it reads as strictly comparable, it orders none that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, nor a zoned DV_TIME or DV_DATE_TIME within 14 hours of the start or end of one without a zone, and reports none of them here (see *What the floor does not evaluate* below).
 
 #### Interval flags
 
@@ -2136,7 +2145,7 @@ The inventory classifies `DV_INTERVAL.Limits_consistent` as evaluated, but the f
 
 - the `units_system` of two DV_QUANTITY;
 - the comparability of two DV_ORDINAL or DV_SCALE, which the RM leaves undefined;
-- and the order of a pair it reads as strictly comparable but cannot order, one that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, or a zoned DV_TIME or DV_DATE_TIME against one without a zone.
+- and the order of a pair it reads as strictly comparable but cannot order, one that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, or a zoned DV_TIME or DV_DATE_TIME within 14 hours of the start or end of one without a zone.
 
 ### Value-typed mandatory presence
 
@@ -2279,7 +2288,7 @@ On an `Issue` from the instance validators, `Value` **MUST** hold what this tabl
 | `rm_invariant` on a `DV_PROPORTION` `type` that is not a proportion kind (`Type_validity`) | the type |
 | `rm_invariant` on a `DV_PROPORTION` `denominator` its kind rejects, or of 0 (`Unitary_validity`, `Percent_validity`, `Valid_denominator`) | the denominator |
 | `rm_invariant` on a fraction or integer-fraction `DV_PROPORTION` with a fractional operand (`Fraction_validity`) | the numerator and the denominator, as a `[2]float64` |
-| `rm_invariant` on a `DV_INTERVAL` whose lower bound is above its upper bound | the two bounds' magnitudes, lower first, as a `[2]float64`, two DV_TIME written with different zone designators each read in UTC |
+| `rm_invariant` on a `DV_INTERVAL` whose lower bound is above its upper bound | the two bounds' magnitudes, lower first, as a `[2]float64`, a DV_TIME read in UTC where it carries a zone and the other bound carries a different one or none |
 | `rm_invariant` on a temporal `value` (`Value_valid`) | the `value` string |
 | `term_mapping_match` | the `match` |
 | `invalid_shape` from a failed decode | the decode error, which carries the literal through unwrapping where one of its causes records it, as a `*json.SemanticError` or a `*strconv.NumError` does ([wire.md § REQ-052](wire.md#req-052)) |

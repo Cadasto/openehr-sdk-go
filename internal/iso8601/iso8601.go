@@ -11,10 +11,12 @@
 // date-time magnitudes ([Date.Magnitude], [Time.Magnitude],
 // [DateTimeMagnitude]) with [DateOfMagnitude], their inverse on dates, the
 // instant order of two zoned values ([UTCMagnitude]), which the validation
-// floor (openehr/validation) uses too, and the order of two values at the
-// precision they share ([Fields]), which the template layer's range check
-// uses. The template layer may not import the RM package, which is why all
-// this lives here.
+// floor (openehr/validation) uses too, the order of two values at the
+// precision they share ([Fields]), and the order of a value with a zone
+// against one with none, each covering the [Span] of its period
+// ([OrderAcrossZone]), the last two of which the template layer's range
+// check uses. The template layer may not import the RM package, which is
+// why all this lives here.
 //
 // Every function works on the string in memory: none reads a clock, a file or
 // the time zone database, and none panics on malformed input.
