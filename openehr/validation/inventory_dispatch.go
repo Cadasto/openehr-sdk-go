@@ -57,6 +57,9 @@ type floorNode struct {
 	// path is the node's issue path, a handle valid while the walk visits
 	// the node ([issuePath]); an evaluator writes it only into an issue.
 	path issuePath
+	// classRoot is set when the node's class is always an archetype root
+	// ([classRules.classRoot]).
+	classRoot bool
 }
 
 // invariantCheck binds an evaluated invariant to the evaluator that
@@ -88,6 +91,13 @@ type invariantCheck struct {
 // run on every class.
 const mandatoryCheck = "checkMandatory"
 
+// archetypeRootCheck is the function that evaluates the Is_archetype_root
+// invariants, [findings.checkArchetypeRoot]. On a class it runs on,
+// [inventorySource.build] records the class as always an archetype root
+// ([classRules.classRoot]), so [findings.checkArchetypedValid] leaves the
+// absent archetype_details of its nodes to it.
+const archetypeRootCheck = "checkArchetypeRoot"
+
 // listMembersCheck is the function that evaluates the rules of the REQ-112
 // Non-empty lists entry, [findings.checkListMembers]. On a class one of them
 // runs on, [inventorySource.build] records the list the rule reads
@@ -107,6 +117,14 @@ func nodeCheck(function string, f func(*findings, any, issuePath)) invariantChec
 func typeCheck(function string, f func(*findings, any, string, issuePath)) invariantCheck {
 	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
 		f(into, n.value, n.rmType, n.path)
+	}}
+}
+
+// rootCheck binds an evaluator that also reads whether the node's class is
+// always an archetype root ([floorNode.classRoot]).
+func rootCheck(function string, f func(*findings, any, string, issuePath, bool)) invariantCheck {
+	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
+		f(into, n.value, n.rmType, n.path, n.classRoot)
 	}}
 }
 
@@ -181,6 +199,7 @@ var invariantChecks = map[string]invariantCheck{
 	"INSTRUCTION.Activities_valid":          ruleCheck("checkListMembers", (*findings).checkListMembers),
 	"Interval.Lower_included_valid":         typeCheck("checkDVInterval", (*findings).checkDVInterval),
 	"Interval.Upper_included_valid":         typeCheck("checkDVInterval", (*findings).checkDVInterval),
+	"LOCATABLE.Archetyped_valid":            rootCheck("checkArchetypedValid", (*findings).checkArchetypedValid),
 	"LOCATABLE.Links_valid":                 typeCheck("checkLinks", (*findings).checkLinks),
 	"PARTY.Is_archetype_root":               ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
 	"PARTY_IDENTIFIED.Basic_validity":       nodeCheck("checkPartyIdentified", (*findings).checkPartyIdentified),
@@ -266,17 +285,20 @@ type attributeCheck struct {
 	owns []string
 }
 
-// attributeChecks are the evaluators of the two rules the BMM states
+// attributeChecks are the evaluators of the three rules the BMM states
 // in an attribute's definition rather than as a named invariant, so the
 // inventory does not list them: the mandatory parts of a reference
-// ([findings.checkObjectRef], part of the mandatory-presence rule) and
-// the precision range of a DV_QUANTITY ([findings.checkDVQuantity]).
-// Each runs on the class it names and on every class the rminfo hierarchy
-// places below it; the reference check owns the three parts it reports, so
-// the required-set check leaves them out on exactly the classes it runs on.
+// ([findings.checkObjectRef], part of the mandatory-presence rule), the
+// precision range of a DV_QUANTITY ([findings.checkDVQuantity]), and the
+// archetype_node_id of an archetype root, which names the archetype its
+// archetype_details records ([findings.checkArchetypeRootID]). Each runs on
+// the class it names and on every class the rminfo hierarchy places below
+// it; the reference check owns the three parts it reports, so the
+// required-set check leaves them out on exactly the classes it runs on.
 var attributeChecks = []attributeCheck{
 	{class: "OBJECT_REF", check: nodeCheck("checkObjectRef", (*findings).checkObjectRef), owns: []string{"id", "namespace", "type"}},
 	{class: "DV_QUANTITY", check: nodeCheck("checkDVQuantity", (*findings).checkDVQuantity)},
+	{class: "LOCATABLE", check: typeCheck("checkArchetypeRootID", (*findings).checkArchetypeRootID)},
 }
 
 // indexSet is a set of small integers: the classes a walk visited, by their
@@ -332,6 +354,9 @@ type classRules struct {
 	coded       []*codedRule
 	owned       []string
 	unevaluated indexSet
+	// classRoot is set when the class is always an archetype root: the
+	// Is_archetype_root check ([archetypeRootCheck]) runs on it.
+	classRoot bool
 	// lists holds what each rule of the REQ-112 Non-empty lists entry the
 	// class is subject to reads, for [classRules.asksForMember].
 	lists []listMembers
@@ -581,6 +606,9 @@ func (src inventorySource) build() inventoryRules {
 			runs[c.function] = true
 			if c.function == listMembersCheck {
 				r.lists = append(r.lists, listMemberRules[key])
+			}
+			if c.function == archetypeRootCheck {
+				r.classRoot = true
 			}
 			id := c.function
 			if c.perRule {

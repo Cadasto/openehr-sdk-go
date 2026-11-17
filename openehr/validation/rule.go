@@ -30,7 +30,7 @@ const (
 )
 
 // The RM-layer rules the BMM states in an attribute's definition rather than
-// as a named invariant. The third, a mandatory list present and empty, is
+// as a named invariant. The fourth, a mandatory list present and empty, is
 // ruleCardinality.
 const (
 	// ruleMandatory is an RM-mandatory attribute the instance lacks, a
@@ -39,6 +39,11 @@ const (
 	// rulePrecisionRange is a precision below -1, which the BMM's
 	// definition of precision rules out (-1 means no limit).
 	rulePrecisionRange = "precision_range"
+	// ruleArchetypeRootID is an archetype root whose archetype_details
+	// names another archetype than its archetype_node_id, which the BMM's
+	// definition of LOCATABLE.archetype_node_id rules out: at a root it is
+	// the archetype id archetype_details records.
+	ruleArchetypeRootID = "archetype_root_id"
 )
 
 // The RM-layer rules the pinned RM and BASE BMMs name, written
@@ -62,6 +67,7 @@ const (
 	ruleTermMappingMatch      = "TERM_MAPPING.Match_valid"
 	ruleRMVersionValid        = "ARCHETYPED.Rm_version_valid"
 	ruleLinksValid            = "LOCATABLE.Links_valid"
+	ruleArchetypedValid       = "LOCATABLE.Archetyped_valid"
 	ruleLocationValid         = "EVENT_CONTEXT.location_valid"
 	ruleEHRSchemeValid        = "DV_EHR_URI.Scheme_valid"
 )

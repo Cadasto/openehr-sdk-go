@@ -282,13 +282,13 @@ type Issue struct {
 // and `cyclic_value`), which report where the walk stopped or turned back;
 // and the codes of the Reference Model rules (`rm_invariant`,
 // `mappings_valid`, `term_mapping_match`, `lower_included_valid`,
-// `upper_included_valid`, `code_not_in_value_set`, `is_archetype_root` and
-// `rm_version_valid`). The template-driven validators report those rule
-// codes as well as [ValidateRM], since they include the Reference Model
-// rules. A nil Err therefore does not mean the issue is harmless: read
-// [Result.OK], or the issue's Severity, for the verdict, and [Issue.Rule]
-// to tell the Reference Model rules apart. Callers wanting `errors.Is`
-// dispatch go through this method:
+// `upper_included_valid`, `code_not_in_value_set`, `is_archetype_root`,
+// `archetype_root_id` and `rm_version_valid`). The template-driven
+// validators report those rule codes as well as [ValidateRM], since they
+// include the Reference Model rules. A nil Err therefore does not mean the
+// issue is harmless: read [Result.OK], or the issue's Severity, for the
+// verdict, and [Issue.Rule] to tell the Reference Model rules apart.
+// Callers wanting `errors.Is` dispatch go through this method:
 //
 //	for _, i := range r.Issues {
 //	    if errors.Is(i.Err(), validation.ErrRequired) { ... }
