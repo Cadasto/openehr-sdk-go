@@ -943,13 +943,14 @@ The codecs **MUST**:
   - The third is a coded node name, for which the formats have no key below the root.
     Decode gives a rebuilt node, in place of the `DV_TEXT` name from the archetype terminology, the `DV_CODED_TEXT` name the generator writes there under `ExampleFill`, where the template constrains the node's name both of these ways:
     - as a `DV_CODED_TEXT`, through one child or through alternatives that agree on the name;
-    - with its `defining_code` constrained through one `C_CODE_PHRASE`, or one `C_CODE_REFERENCE` read as the code phrase it carries.
+    - with its `defining_code` constrained through one `C_CODE_PHRASE`, or one `C_CODE_REFERENCE` read as the code phrase it carries, or left unconstrained.
 
     The name's code is the phrase's first listed code, else the placeholder `at0000` in the terminology the phrase, or the reference set's `terminology:` URI, names, else in `local` ([clinical-modeling.md § REQ-107 *Placeholders*](clinical-modeling.md#placeholders)).
-    Its text is the code's term text where the `C_STRING` on the name's value admits it; the placeholder names no term.
+    A `defining_code` left unconstrained, with no attribute, no child, or one child that constrains nothing, gives the placeholder `at0000` in `local`, as the generator writes it.
+    The name's text is the code's term text where the `C_STRING` on the name's value admits it, read as the generator reads it: the first alternative the template allows there; the placeholder names no term.
     Where that `C_STRING` rejects the term text of a code outside `openehr`, the first listed code whose term text it admits takes the code's place, with that text, as [clinical-modeling.md § REQ-107 *The text of a coded value*](clinical-modeling.md#the-text-of-a-coded-value) has it for a coded `name`.
     Otherwise the text is the one the generator writes under that `C_STRING`, or `example` where none constrains the value.
-    A name whose alternatives disagree, or whose `defining_code` has alternatives, comes back as `DV_TEXT`.
+    A name whose alternatives disagree, or whose `defining_code` has alternatives or constrains the code other than through a code phrase, comes back as `DV_TEXT`.
   - The fourth is an ordinal's terminology.
     The formats carry the code and the ordinal value of a `DV_ORDINAL`, a leaf or a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, and its symbol's terminology only as an optional `|terminology`, which decode reads as written.
     Without one, decode without the template rebuilds the symbol in `local`, as the reference does.
