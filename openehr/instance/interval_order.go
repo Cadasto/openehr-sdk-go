@@ -35,11 +35,13 @@ import (
 // units, since magnitudes in different units do not compare. Proportions
 // are ordered by the ratio numerator/denominator, and only when both bounds
 // share their type (proportionScale). Dates, times and date-times are
-// ordered as the RM floor orders them: at the precision the two share, and
-// two times or date-times written with different zone designators as
-// instants (temporalCompare). Durations are ordered by their length in
-// seconds, as the RM floor orders them (compareDurations). A pair that does
-// not compare is left alone.
+// ordered as the RM floor orders them: at the precision the two share; two
+// zoned times or date-times written with different designators as instants;
+// and a zoned one against a zoneless one only where the two lie more than
+// 14 hours apart, as the REQ-103 temporal range check orders them
+// (temporalCompare). Durations are ordered by their length in seconds, as
+// the RM floor orders them (compareDurations). A pair that does not compare
+// is left alone.
 //
 // An inverted pair is replaced by the first of these pairs that is in order
 // and fits each side's OPT constraint:
@@ -680,28 +682,33 @@ func compareDurations(a, b string) (int, bool) {
 
 // temporalRead reads an ISO 8601 value of one type as the order of its
 // type reads it: its fields as written, the zone not applied
-// ([iso8601.Fields]); its magnitude read on its clock, the zone not applied,
-// as the RM's Compare reads a date or a time; the zone designator it is
-// written with, "" for none; and whether the REQ-123 parse accepts it.
-type temporalRead func(s string) (fields iso8601.Fields, magnitude float64, zone string, ok bool)
+// ([iso8601.Fields]); the span it covers on its clock, the zone not applied
+// ([iso8601.Span]), whose start is its magnitude as the RM's Compare reads a
+// date or a time; the zone designator it is written with, "" for none; and
+// whether the REQ-123 parse accepts it.
+type temporalRead func(s string) (fields iso8601.Fields, span iso8601.Span, zone string, ok bool)
 
-func dateOrderRead(s string) (iso8601.Fields, float64, string, bool) {
+// dateOrderRead reads a date's span as that of a date-time with no time,
+// in seconds. A date carries no zone, so temporalCompare orders two dates
+// by their fields alone and never reads the span.
+func dateOrderRead(s string) (iso8601.Fields, iso8601.Span, string, bool) {
 	d, err := iso8601.ParseDate(s)
-	return iso8601.DateFields(d), float64(d.Magnitude()), "", err == nil
+	return iso8601.DateFields(d), iso8601.DateTimeSpan(d, iso8601.Time{}, false), "", err == nil
 }
 
-func timeOrderRead(s string) (iso8601.Fields, float64, string, bool) {
+func timeOrderRead(s string) (iso8601.Fields, iso8601.Span, string, bool) {
 	t, err := iso8601.ParseTime(s)
-	return iso8601.TimeFields(t), t.Magnitude(), t.Zone, err == nil
+	return iso8601.TimeFields(t), iso8601.TimeSpan(t), t.Zone, err == nil
 }
 
-// dateTimeOrderRead reads a date-time's magnitude on its clock, which
+// dateTimeOrderRead reads a date-time's span on its clock, which
 // temporalCompare expects: the RM's Compare reads a zoned date-time in UTC,
 // and temporalCompare applies the zone itself. A date carries no "T", so a
 // date-time the parse accepts has a time exactly when its text holds one.
-func dateTimeOrderRead(s string) (iso8601.Fields, float64, string, bool) {
+func dateTimeOrderRead(s string) (iso8601.Fields, iso8601.Span, string, bool) {
 	d, t, err := iso8601.ParseDateTime(s)
-	return iso8601.DateTimeFields(d, t, strings.Contains(s, "T")), iso8601.DateTimeMagnitude(d, t), t.Zone, err == nil
+	hasTime := strings.Contains(s, "T")
+	return iso8601.DateTimeFields(d, t, hasTime), iso8601.DateTimeSpan(d, t, hasTime), t.Zone, err == nil
 }
 
 func dateKeyOf(d rm.DVDate) string { return d.Value }
@@ -990,23 +997,34 @@ func clockEnds(read func(s string) (clockParts, bool)) func(r constraints.Tempor
 // DV_INTERVAL): at the precision the two share ([iso8601.Fields.Compare])
 // when they are written with one zone designator, or both with none, so a
 // partial value covers the whole period it names and 2021-05 is equal to
-// 2021; and as instants, each by its magnitude less its zone's offset from
-// UTC ([iso8601.UTCMagnitude]), a partial value standing for the start of
-// the period it names, when both carry a zone and the designators differ.
-// A value with a zone does not compare with one without, nor does a value
-// the REQ-123 parse refuses with any.
+// 2021; as instants, each by its magnitude less its zone's offset from UTC
+// ([iso8601.UTCMagnitude]), a partial value standing for the start of the
+// period it names, when both carry a zone and the designators differ; and,
+// when one carries a zone and the other does not, as the REQ-103 temporal
+// range check orders them ([iso8601.OrderAcrossZone]), after XML Schema 1.0
+// Part 2 §3.2.7.4: the one with a zone read in UTC, the other at +14:00 and
+// at -14:00, a partial value covering the whole period it names. Such a pair
+// compares only where both readings agree, so not within 14 hours of each
+// other, an edge they share included. A value the REQ-123 parse refuses does
+// not compare with any.
 func temporalCompare(read temporalRead) func(a, b string) (int, bool) {
 	return func(a, b string) (int, bool) {
-		aFields, aMag, aZone, aOK := read(a)
-		bFields, bMag, bZone, bOK := read(b)
+		aFields, aSpan, aZone, aOK := read(a)
+		bFields, bSpan, bZone, bOK := read(b)
 		if !aOK || !bOK {
 			return 0, false
 		}
-		if aZone == bZone {
+		switch {
+		case aZone == bZone:
 			return aFields.Compare(bFields), true
+		case bZone == "":
+			return iso8601.OrderAcrossZone(aSpan, aZone, bSpan)
+		case aZone == "":
+			sign, ok := iso8601.OrderAcrossZone(bSpan, bZone, aSpan)
+			return -sign, ok
 		}
-		aUTC, aZoned := iso8601.UTCMagnitude(aMag, aZone)
-		bUTC, bZoned := iso8601.UTCMagnitude(bMag, bZone)
+		aUTC, aZoned := iso8601.UTCMagnitude(aSpan.Start, aZone)
+		bUTC, bZoned := iso8601.UTCMagnitude(bSpan.Start, bZone)
 		if !aZoned || !bZoned {
 			return 0, false
 		}

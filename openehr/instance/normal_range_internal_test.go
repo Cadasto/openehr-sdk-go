@@ -99,13 +99,28 @@ func TestREQ107_NormalRangeSettleEdges(t *testing.T) {
 			unsatisfiable: true,
 		},
 		{
-			name: "DV_DATE_TIME zoned against zoneless bounds, H, left as generated",
+			// A zoned value compares with a zoneless bound more than 14 hours
+			// from it, as the temporal range check orders the two: this one
+			// lies days inside the range, so H moves it a step above the
+			// upper bound, in that bound's layout.
+			name: "DV_DATE_TIME zoned, days inside zoneless bounds, H, the first step above the range",
 			v: &rm.DVDateTime{
 				Value: "2021-03-04T05:06:07Z", NormalStatus: normalStatusCode("H"),
 				NormalRange: closedRange[rm.DVOrdered](&rm.DVDateTime{Value: "2021-03-01T00:00:00"}, &rm.DVDateTime{Value: "2021-03-09T00:00:00"}),
 			},
 			value: func(v any) string { return v.(*rm.DVDateTime).Value },
-			want:  "2021-03-04T05:06:07Z",
+			want:  "2021-03-09T00:00:01",
+		},
+		{
+			// Within 14 hours of the zoneless upper bound the zoned value
+			// does not compare with it, so it is left as generated.
+			name: "DV_DATE_TIME zoned, within 14 hours of a zoneless bound, H, left as generated",
+			v: &rm.DVDateTime{
+				Value: "2021-03-08T20:00:00Z", NormalStatus: normalStatusCode("H"),
+				NormalRange: closedRange[rm.DVOrdered](&rm.DVDateTime{Value: "2021-03-01T00:00:00"}, &rm.DVDateTime{Value: "2021-03-09T00:00:00"}),
+			},
+			value: func(v any) string { return v.(*rm.DVDateTime).Value },
+			want:  "2021-03-08T20:00:00Z",
 		},
 		{
 			name: "DV_ORDINAL with DV_COUNT bounds, N, left as generated",
