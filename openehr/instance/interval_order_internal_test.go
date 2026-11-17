@@ -521,8 +521,18 @@ func TestOrderIntervalBoundsProportion(t *testing.T) {
 			want:   [2]rm.DVProportion{p(8, -1, 0), p(3, -1, 0)},
 		},
 		{
-			name:   "unsatisfiable: left alone",
+			// No numerator orders the pair over 1, but the lower side's
+			// denominator is open: 15/3 meets the upper side's highest, 5/1.
+			name:   "numerators out of order over one denominator: the lower denominator meets the upper ratio",
 			node:   node(RealRange(Closed(10), Closed(20)), RealRange(Closed(0), Closed(5))),
+			bounds: [2]rm.DVProportion{p(15, 1, 0), p(3, 1, 0)},
+			want:   [2]rm.DVProportion{p(15, 3, 0), p(5, 1, 0)},
+		},
+		{
+			name: "unsatisfiable: left alone",
+			node: intervalNode(t, RetargetInterval(t, opt, "DV_PROPORTION",
+				ProportionKindBoundOver(RealRange(Closed(10), Closed(20)), RealList(1), IntList(0), ""),
+				ProportionKindBoundOver(RealRange(Closed(0), Closed(5)), RealList(1), IntList(0), ""))),
 			bounds: [2]rm.DVProportion{p(15, 1, 0), p(3, 1, 0)},
 			want:   [2]rm.DVProportion{p(15, 1, 0), p(3, 1, 0)},
 		},
@@ -553,14 +563,22 @@ func TestOrderIntervalBoundsProportion(t *testing.T) {
 // rule on two DV_PROPORTION of one type, by ratio, whose only in-order form
 // changes a denominator: a side whose C_REAL on the denominator has an end,
 // or a list, takes there the denominator that puts its ratio furthest
-// toward its own end, as 5/10 lies below 1/1 where 5/1 does not. A pair
-// that is in order with each bound's own denominator keeps them. A
-// denominator stays where the kind fixes it, 100 for a percent, and is a
-// whole number where the kind or an is_integral pin needs whole numbers
-// (Precedence 4).
+// toward its own end, as 5/10 lies below 1/1 where 5/1 does not. Where no
+// such end orders the pair, a side takes the denominator that puts its
+// ratio at the other bound's, or just past it on its own side, as 5/50
+// meets 0.1/1 over an open denominator: the lower side first, then the
+// upper side. A pair that is in order with each bound's own denominator
+// keeps them. A denominator stays where the kind fixes it, 100 for a
+// percent, and is a whole number where the kind, a precision of 0 or an
+// is_integral pin needs whole numbers (Precedence 4).
 func TestREQ107_ProportionBoundsChangeADenominator(t *testing.T) {
 	p := func(num, den float64, kind int32) rm.DVProportion {
 		return rm.DVProportion{Numerator: rm.Real(num), Denominator: rm.Real(den), Type: rm.Integer(kind)}
+	}
+	p0 := func(num, den float64, kind int32) rm.DVProportion {
+		v := p(num, den, kind)
+		v.Precision = new(rm.Integer(0))
+		return v
 	}
 	opt := ReadVendoredOPT(t, CountIntervalOPT)
 	node := func(lower, upper string) *tcimpl.CompiledNode {
@@ -624,6 +642,59 @@ func TestREQ107_ProportionBoundsChangeADenominator(t *testing.T) {
 				ProportionKindBoundOver(RealList(1), RealList(1), IntList(3), "")),
 			bounds: [2]rm.DVProportion{p(5, 2, 3), p(1, 1, 3)},
 			want:   [2]rm.DVProportion{p(5, 10, 3), p(1, 1, 3)},
+		},
+		{
+			// The lower denominator is open, so no end of it lists 50.
+			name:   "an open lower denominator meets the upper ratio",
+			node:   node(ratio(RealList(5), ""), ratio(RealList(0.1), RealList(1))),
+			bounds: [2]rm.DVProportion{p(5, 1, 0), p(0.1, 1, 0)},
+			want:   [2]rm.DVProportion{p(5, 50, 0), p(0.1, 1, 0)},
+		},
+		{
+			// 5/17.5 is 2/7; the denominator range has no high end.
+			name:   "a lower denominator bounded below alone meets the upper ratio",
+			node:   node(ratio(RealList(5), RealRange(Closed(1), NoEnd)), ratio(RealList(2), RealList(7))),
+			bounds: [2]rm.DVProportion{p(5, 1, 0), p(2, 7, 0)},
+			want:   [2]rm.DVProportion{p(5, 17.5, 0), p(2, 7, 0)},
+		},
+		{
+			// 5/17.5 meets 2/7; the whole denominator that keeps 5 over it
+			// at or below 2/7 is 18, not 17.
+			name: "a fraction meets the other ratio over a whole denominator",
+			node: node(ProportionKindBoundOver(RealList(5), RealRange(Closed(1), NoEnd), IntList(3), ""),
+				ProportionKindBoundOver(RealList(2), RealList(7), IntList(3), "")),
+			bounds: [2]rm.DVProportion{p(5, 1, 3), p(2, 7, 3)},
+			want:   [2]rm.DVProportion{p(5, 18, 3), p(2, 7, 3)},
+		},
+		{
+			name: "an is_integral side meets the other ratio over a whole denominator",
+			node: node(ProportionKindBoundOver(RealList(5), RealRange(Closed(1), NoEnd), IntList(0), IntegralPin()),
+				ratio(RealList(2), RealList(7))),
+			bounds: [2]rm.DVProportion{p(5, 1, 0), p(2, 7, 0)},
+			want:   [2]rm.DVProportion{p(5, 18, 0), p(2, 7, 0)},
+		},
+		{
+			name: "a bound of precision 0 meets the other ratio over a whole denominator",
+			node: node(ProportionKindBoundOver(RealList(5), RealRange(Closed(1), NoEnd), IntList(0), RequiredPrecision(IntList(0))),
+				ratio(RealList(2), RealList(7))),
+			bounds: [2]rm.DVProportion{p0(5, 1, 0), p(2, 7, 0)},
+			want:   [2]rm.DVProportion{p0(5, 18, 0), p(2, 7, 0)},
+		},
+		{
+			// The lower side lists the denominator 1 alone, so the upper side
+			// meets 6/1 over 0.5.
+			name:   "the upper denominator meets the lower ratio",
+			node:   node(ratio(RealList(6), RealList(1)), ratio(RealList(3), "")),
+			bounds: [2]rm.DVProportion{p(6, 1, 0), p(3, 1, 0)},
+			want:   [2]rm.DVProportion{p(6, 1, 0), p(3, 0.5, 0)},
+		},
+		{
+			// 1000/100 is a percent's only denominator, so no side moves it.
+			name: "a percent keeps its denominator of 100 against an open one: left alone",
+			node: node(ProportionKindBoundOver(RealList(500), "", IntList(2), ""),
+				ProportionKindBoundOver(RealList(100), "", IntList(2), "")),
+			bounds: [2]rm.DVProportion{p(500, 100, 2), p(100, 100, 2)},
+			want:   [2]rm.DVProportion{p(500, 100, 2), p(100, 100, 2)},
 		},
 	}
 	for _, tc := range cases {

@@ -61,20 +61,24 @@ import (
 //   - for a proportion, the second pair with a side's denominator moved to
 //     the one the C_REAL on it gives that puts the side's ratio furthest
 //     toward its end (proportionWider): the lower side's alone, then the
-//     upper side's alone, then both.
+//     upper side's alone, then both;
+//   - for a proportion, a side's bound moved to meet the other side's
+//     bound in the second or third pair, over the denominator that puts its
+//     ratio there (proportionReach): the lower side's, then the upper
+//     side's.
 //
 // In a swap a proportion bound's precision moves with its numerator and
 // denominator, which were settled under it. In the second pair each
-// proportion bound keeps its type and denominator, and in the third its
-// type; in both it takes a precision its own side admits, one that needs no
-// more whole numbers than its type does wherever the side admits one
-// (proportionPrecision), so its numerator is rounded only where its type,
-// an is_integral its side pins to true, or every precision its side admits,
-// needs whole numbers. A pair fits a side only where that side's constraint
-// on precision admits the precision of its bound, so every bound written
-// keeps the whole numbers its precision needs. A denominator the third pair
-// moves is a whole number where the bound needs whole numbers, and stays
-// where its kind fixes it. An ordinal bound the second pair replaces takes
+// proportion bound keeps its type and denominator, and in the third and
+// fourth its type; in each it takes a precision its own side admits, one
+// that needs no more whole numbers than its type does wherever the side
+// admits one (proportionPrecision), so its numerator is rounded only where
+// its type, an is_integral its side pins to true, or every precision its
+// side admits, needs whole numbers. A pair fits a side only where that
+// side's constraint on precision admits the precision of its bound, so
+// every bound written keeps the whole numbers its precision needs. A
+// denominator the third or fourth pair moves is a whole number where the
+// bound needs whole numbers, and stays where its kind fixes it. An ordinal bound the second pair replaces takes
 // the symbol its side lists for the new value, with the text the nearest
 // archetype root's term gives a code in any terminology other than openehr
 // (useTermText), as the walk writes it.
@@ -102,21 +106,21 @@ import (
 // on a side with no end that way a value at the other side's current
 // bound, which the other side's extreme does not pass; on a side whose bound
 // keeps a normal_range rule it is the extreme among the values that keep
-// the rule. For a proportion the third pair holds each side's extreme over
-// its denominators too. An in-order pair of those types therefore exists
-// only if the second pair, or for a proportion the third, is in order: for
-// a proportion, among the pairs that keep each bound's type and take a
-// denominator the C_REAL on its side lists or bounds on both sides away
-// from 0, or keep their own where the side has no such C_REAL. For a date,
-// a time, a date-time or a duration the second pair holds the value nearest
-// each side's end among temporalEnd's candidates, which leave out a value
-// with a fraction of a second, one in another zone than the end, and a
-// duration in more than one designator other than the end itself, so an
-// in-order pair of those types can exist that no pair here finds. When no
-// pair is in order, the bounds are left as they are, and the interval
-// breaks Limits_consistent: the generator has no error for a constraint it
-// cannot satisfy (sampleValue, for one, falls back to the example value
-// without a signal).
+// the rule. An in-order pair of two counts, quantities or ordinals
+// therefore exists only if the second pair is in order. For a proportion
+// the third pair holds each side's extreme over the denominators the C_REAL
+// on its side lists or bounds on both sides away from 0 too, and the fourth
+// a ratio at the other side's bound over a denominator no such C_REAL need
+// give, from the side's own numerator or an end of the C_REAL on it. For a
+// date, a time, a date-time or a duration the second pair holds the value
+// nearest each side's end among temporalEnd's candidates, which leave out a
+// value with a fraction of a second, one in another zone than the end, and
+// a duration in more than one designator other than the end itself. So for
+// a proportion and for those types an in-order pair can exist that no pair
+// here finds. When no pair is in order, the bounds are left as they are,
+// and the interval breaks Limits_consistent: the generator has no error for
+// a constraint it cannot satisfy (sampleValue, for one, falls back to the
+// example value without a signal).
 func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any) {
 	shareComparable(optNode, rmValue)
 	switch iv := rmValue.(type) {
@@ -255,6 +259,14 @@ type scale[K any] struct {
 	// where the pairs lowest and highest give are not in order. A nil wider
 	// gives none.
 	wider func(node *tcimpl.CompiledNode, like K, low bool) (K, bool)
+	// reach returns a value a side's bound node accepts at other, the other
+	// side's bound in a pair orderPair tries, or past it on the side's own
+	// side (below it for the lower side, low), where the value may change
+	// more of like than adopt changes, as proportionReach changes a
+	// proportion's denominator, and false when there is none. orderPair
+	// tries it only where no pair lowest, highest and wider give is in order.
+	// A nil reach gives none.
+	reach func(node *tcimpl.CompiledNode, like, other K, low bool) (K, bool)
 }
 
 // adopted is s.adopt, or other where s has no adopt.
@@ -327,26 +339,56 @@ func orderPair[K any](lower, upper K, lowerSide, upperSide orderSide[K], s scale
 			return lo, hi, true
 		}
 	}
-	if s.wider == nil {
+	type bound struct {
+		k  K
+		ok bool
+	}
+	var wideLo, wideHi bound
+	if s.wider != nil {
+		// A side changes more of its bound only where that puts the pair in
+		// order: the lower side alone, then the upper side alone, then both.
+		wideLo.k, wideLo.ok = s.wider(lowerSide.node, lower, true)
+		wideHi.k, wideHi.ok = s.wider(upperSide.node, upper, false)
+		for _, pair := range []struct {
+			lo, hi K
+			ok     bool
+		}{
+			{wideLo.k, hi, wideLo.ok && hiOK},
+			{lo, wideHi.k, loOK && wideHi.ok},
+			{wideLo.k, wideHi.k, wideLo.ok && wideHi.ok},
+		} {
+			if !pair.ok {
+				continue
+			}
+			if lo, hi, ok := fitsInOrder(pair.lo, pair.hi); ok {
+				return lo, hi, true
+			}
+		}
+	}
+	if s.reach == nil {
 		return lower, upper, false
 	}
-	// A side changes more of its bound only where that puts the pair in
-	// order: the lower side alone, then the upper side alone, then both.
-	wideLo, wideLoOK := s.wider(lowerSide.node, lower, true)
-	wideHi, wideHiOK := s.wider(upperSide.node, upper, false)
-	for _, pair := range []struct {
-		lo, hi K
-		ok     bool
-	}{
-		{wideLo, hi, wideLoOK && hiOK},
-		{lo, wideHi, loOK && wideHiOK},
-		{wideLo, wideHi, wideLoOK && wideHiOK},
-	} {
-		if !pair.ok {
+	// A side moves its bound to meet the other side's bound in the pairs
+	// above: the lower side to the upper's, then the upper side to the
+	// lower's.
+	for _, other := range []bound{{hi, hiOK}, wideHi} {
+		if !other.ok {
 			continue
 		}
-		if lo, hi, ok := fitsInOrder(pair.lo, pair.hi); ok {
-			return lo, hi, true
+		if met, ok := s.reach(lowerSide.node, lower, other.k, true); ok {
+			if lo, hi, ok := fitsInOrder(met, other.k); ok {
+				return lo, hi, true
+			}
+		}
+	}
+	for _, other := range []bound{{lo, loOK}, wideLo} {
+		if !other.ok {
+			continue
+		}
+		if met, ok := s.reach(upperSide.node, upper, other.k, false); ok {
+			if lo, hi, ok := fitsInOrder(other.k, met); ok {
+				return lo, hi, true
+			}
 		}
 	}
 	return lower, upper, false
@@ -1026,6 +1068,9 @@ func setProportionKey(p *rm.DVProportion, k proportionKey) {
 // proportionEnd gives a side no bound, for whatever reason, the side takes
 // the other bound's ratio on its own type and denominator instead
 // (proportionAdopt), kept only where its constraints accept the result.
+// Where no such pair is in order, a side keeps its type and takes a
+// denominator that puts its ratio at the other bound's (proportionReach),
+// which no C_REAL on its denominator need list or bound.
 var proportionScale = scale[proportionKey]{
 	compare: compareProportions,
 	fits:    proportionFits,
@@ -1037,6 +1082,7 @@ var proportionScale = scale[proportionKey]{
 	},
 	adopt: proportionAdopt,
 	wider: proportionWider,
+	reach: proportionReach,
 }
 
 func compareProportions(a, b proportionKey) (int, bool) {
@@ -1166,6 +1212,74 @@ func proportionWider(node *tcimpl.CompiledNode, like proportionKey, low bool) (p
 		}
 	}
 	return best, found
+}
+
+// proportionReach returns the bound a side takes to meet other, the other
+// side's bound in a pair orderPair tries, where no denominator
+// proportionWider reads puts the pair in order: like's type, the precision
+// proportionPrecision gives, and a numerator over the denominator that puts
+// its ratio at other's. Where float64 or a whole denominator leaves that
+// ratio off, the denominator moves to put the ratio past other's on the
+// side's own side, below it for the lower side (low): away from 0 or toward
+// it, whichever moves the ratio that way, by rounding to a whole number where
+// the precision, the type or the side's is_integral pin needs whole numbers
+// (sideWhole), and then by one step, at most four times, of one float64 or
+// one whole number. The numerator is like's own, else the low end, else the
+// high end the C_REAL on the side's numerator accepts (realEndOf), the first
+// over which the bound fits the side (proportionFits). It returns false for
+// a unitary proportion or a percent, whose kind fixes the denominator, where
+// other's ratio is 0 or does not compare, where node admits no precision,
+// and where no numerator gives a bound that fits.
+func proportionReach(node *tcimpl.CompiledNode, like, other proportionKey, low bool) (proportionKey, bool) {
+	target, ok := proportionRatio(other)
+	if like.kind == pkUnitary || like.kind == pkPercent || !ok || target == 0 {
+		return proportionKey{}, false
+	}
+	precision, ok := proportionPrecision(node, like)
+	if !ok {
+		return proportionKey{}, false
+	}
+	whole := sideWhole(node, like.kind, precision)
+	numerators := []float64{like.numerator}
+	for _, end := range []bool{true, false} {
+		if n, ok := realEndOf(bindingChild(node, "numerator"), end, whole); ok {
+			numerators = append(numerators, n)
+		}
+	}
+	// A denominator further from 0 puts the ratio nearer 0, which lowers a
+	// positive ratio and raises a negative one.
+	away := low == (target > 0)
+	round := func(d float64) float64 {
+		switch {
+		case !whole:
+			return d
+		case away:
+			return math.Copysign(math.Ceil(math.Abs(d)), d)
+		}
+		return math.Trunc(d)
+	}
+	for _, n := range numerators {
+		if n == 0 || (whole && math.Trunc(n) != n) {
+			continue
+		}
+		k := proportionKey{numerator: n, denominator: round(n * other.denominator / other.numerator), kind: like.kind, precision: precision}
+		for range 4 {
+			if c, ok := compareProportions(k, other); !ok || (low && c <= 0) || (!low && c >= 0) {
+				break
+			}
+			toward := 0.0
+			if away {
+				toward = math.Copysign(math.Inf(1), k.denominator)
+			}
+			k.denominator = round(math.Nextafter(k.denominator, toward))
+		}
+		c, ok := compareProportions(k, other)
+		if !ok || math.IsInf(k.denominator, 0) || (low && c > 0) || (!low && c < 0) || !proportionFits(node, k) {
+			continue
+		}
+		return k, true
+	}
+	return proportionKey{}, false
 }
 
 // proportionPrecision returns the precision a bound of like's type takes
