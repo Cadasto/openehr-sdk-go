@@ -1160,7 +1160,7 @@ The type is chosen in the same way, among the lower bound's type, then the upper
 A side whose bound carries a `normal_range` of its own admits only its bound's own units and type.
 Where the two sides admit no one unit or type, the generator leaves the pair as generated; it leaves two bounds of different classes as generated too.
 
-When both sides of an interval are bounded, the generator puts the two bounds in order (BASE `Interval.Limits_consistent`) where it can compare them and an ordered pair fits both sides' OPT constraints, and leaves any other pair as generated.
+When both sides of an interval are bounded, the generator puts the two bounds in order (BASE `Interval.Limits_consistent`) where it can compare them and finds an ordered pair that fits both sides' OPT constraints among the pairs it tries, and leaves any other pair as generated (*Known gap: interval pairs the generator does not try*).
 A bound that carries a `normal_range` and a `normal_status` of its own fits its side only with a value that keeps its own `Normal_range_and_status_consistency` (§ [Precedence](#precedence) 3).
 The pairs it can compare are:
 
@@ -1315,6 +1315,17 @@ Validators report such a list `required` ([§ REQ-102](#req-102--composition-val
 
 An OPT node whose `rm_type_name` is a generic type other than a `DV_INTERVAL` instantiation, such as `POINT_EVENT<ITEM_TREE>` or `REFERENCE_RANGE<DV_QUANTITY>`, cannot be built, and `Generate` returns an error.
 Nor can a `DV_INTERVAL` over a type that is no `DV_ORDERED` class, such as `DV_INTERVAL<DV_TEXT>`, which the RM does not admit as its parameter; a `DV_INTERVAL` over an abstract `DV_ORDERED` class is built as *Generic and untyped types* above says.
+
+#### Known gap: interval pairs the generator does not try
+
+Where swapping two bounds does not fit, the generator tries each side's range ends, written to the side's pattern, and, for a DV_PROPORTION, a denominator that brings one side's ratio to the other's.
+It does not try:
+
+- a date, time or date-time with a fraction of a second, or in a zone other than its range end's;
+- a DV_DURATION in more than one designator, other than a range end as written;
+- a DV_PROPORTION pair whose order needs both denominators moved.
+
+An interval whose only ordered pairs are of these kinds is left as generated, as § *Exceptions and known gaps* allows; no vendored OPT has one.
 
 #### Known gap: slot occurrences
 
