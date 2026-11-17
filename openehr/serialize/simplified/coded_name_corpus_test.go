@@ -25,7 +25,7 @@ import (
 // codedNameCorpusFloor is the number of COMPOSITION templates the corpus gives
 // today. A corpus that silently empties, or a COMPOSITION OPT that stops
 // parsing, falls below it. Raise it when the corpus grows.
-const codedNameCorpusFloor = 75
+const codedNameCorpusFloor = 80
 
 // reusedSiblingTemplates are the corpus templates whose skeleton encode
 // refuses, as deviations.md registers it (§ Archetype-reuse siblings,
@@ -124,6 +124,7 @@ func TestREQ053CorpusCodedNamesRoundTrip(t *testing.T) {
 	if compared == 0 {
 		t.Error("no skeleton writes a DV_CODED_TEXT name; the guard compares nothing")
 	}
+	t.Logf("%d COMPOSITION templates under two policies, %d coded names compared in each format", len(opts), compared)
 }
 
 // codedNames returns the DV_CODED_TEXT names of the canonical JSON object doc,

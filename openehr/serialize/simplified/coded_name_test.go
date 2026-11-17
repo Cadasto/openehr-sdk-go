@@ -204,6 +204,13 @@ func TestREQ053CodedNameRules(t *testing.T) {
 			want:  codedNameJSON("Second option", "at0018", "local"),
 		},
 		{
+			// Only a term text the C_STRING rejects lets another listed
+			// code take the first one's place.
+			name:  "a first code with no term, the second with the pinned text as its term",
+			edits: []valuesEdit{withName(localCodes(pinnedValue("First option"), "at0099", "at0017"))},
+			want:  codedNameJSON("First option", "at0099", "local"),
+		},
+		{
 			name:  "several codes, no pinned text",
 			edits: []valuesEdit{withName(localCodes("", "at0017", "at0018"))},
 			want:  codedNameJSON("First option", "at0017", "local"),

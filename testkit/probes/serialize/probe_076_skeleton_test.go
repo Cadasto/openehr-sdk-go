@@ -8,6 +8,7 @@ package serializeprobes_test
 
 import (
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -130,6 +131,55 @@ func TestProbe076SkeletonLeg(t *testing.T) {
 	t.Logf("%d COMPOSITION templates, %d (template, policy) pairs pass, %d registered exclusions", len(opts), passes, len(serializeprobes.Probe076SkeletonExclusions))
 }
 
+// probe076ValuesTemplate is the corpus template whose ELEMENT at0016 has a
+// coded name: its text pinned to "Second option", its code one of the local
+// at0017 ("First option") and at0018 ("Second option"). Medium fills it.
+const probe076ValuesTemplate = "sdk_crosscheck_values.v1"
+
+// probe076ValuesNamePath is the path at which the round trip of
+// disagreeingNameAlternatives reports the name of the ELEMENT at0016.
+const probe076ValuesNamePath = "/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0016]/name"
+
+// probe076CodedNameEnd matches the end of the DV_CODED_TEXT that constrains
+// the name of the ELEMENT at0016: its last listed code, then the closing tags
+// of the code phrase, of the defining_code attribute and of the DV_CODED_TEXT.
+var probe076CodedNameEnd = regexp.MustCompile(`</code_list>\s*</children>\s*</attributes>\s*</children>`)
+
+// disagreeingNameAlternatives returns the OPT body of probe076ValuesTemplate,
+// edited in memory: the name of its ELEMENT at0016 gets a second DV_CODED_TEXT
+// alternative, a copy of the first whose pinned text "First option" gives the
+// code at0017 where the first gives at0018. The skeleton fills the first
+// alternative and validates; decode gives a name whose alternatives disagree
+// no coded name, so each round trip reports the DV_TEXT it decodes there as
+// matching neither alternative.
+func disagreeingNameAlternatives(t *testing.T) []byte {
+	t.Helper()
+	opt := string(corpusOPT(t, probe076ValuesTemplate))
+	element := strings.Index(opt, "<node_id>at0016</node_id>")
+	if element < 0 {
+		t.Fatalf("%s has no ELEMENT at0016; fixture changed?", probe076ValuesTemplate)
+	}
+	coded := strings.Index(opt[element:], "<rm_type_name>DV_CODED_TEXT</rm_type_name>")
+	if coded < 0 {
+		t.Fatalf("the ELEMENT at0016 of %s has no coded name; fixture changed?", probe076ValuesTemplate)
+	}
+	start := strings.LastIndex(opt[:element+coded], `<children xsi:type="C_COMPLEX_OBJECT">`)
+	if start < element {
+		t.Fatalf("cannot find the start of the coded name of the ELEMENT at0016 in %s; fixture changed?", probe076ValuesTemplate)
+	}
+	loc := probe076CodedNameEnd.FindStringIndex(opt[start:])
+	if loc == nil {
+		t.Fatalf("cannot find the end of the coded name of the ELEMENT at0016 in %s; fixture changed?", probe076ValuesTemplate)
+	}
+	end := start + loc[1]
+	first := opt[start:end]
+	second := strings.Replace(first, "<list>Second option</list>", "<list>First option</list>", 1)
+	if second == first {
+		t.Fatalf("the coded name of the ELEMENT at0016 of %s pins no text \"Second option\"; fixture changed?", probe076ValuesTemplate)
+	}
+	return []byte(opt[:end] + second + opt[end:])
+}
+
 // TestProbe076SkeletonLegFailsAnUnexcludedFinding pins that a finding no
 // exclusion names fails the pair, and that the failure names the template,
 // the policy, the format and the finding: an encode refusal by its error text,
@@ -137,23 +187,26 @@ func TestProbe076SkeletonLeg(t *testing.T) {
 func TestProbe076SkeletonLegFailsAnUnexcludedFinding(t *testing.T) {
 	cases := []struct {
 		name string
-		id   string
+		opt  func(t *testing.T) []byte
 		want []string
 	}{
 		{
 			name: "encode refusal",
-			id:   "sdk_crosscheck_siblings.v1",
+			opt:  func(t *testing.T) []byte { return corpusOPT(t, "sdk_crosscheck_siblings.v1") },
 			want: []string{"sdk_crosscheck_siblings.v1 medium FLAT: encode:", "sdk_crosscheck_siblings.v1 medium STRUCTURED: encode:", `FLAT id "twin" is one of several reused siblings`},
 		},
 		{
 			name: "validation issue",
-			id:   "Referral Request.v1",
-			want: []string{"Referral Request.v1 medium FLAT: rm_type_mismatch at /context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]/name", "Referral Request.v1 medium STRUCTURED: rm_type_mismatch at"},
+			opt:  disagreeingNameAlternatives,
+			want: []string{
+				probe076ValuesTemplate + " medium FLAT: alternative_mismatch at " + probe076ValuesNamePath,
+				probe076ValuesTemplate + " medium STRUCTURED: alternative_mismatch at " + probe076ValuesNamePath,
+			},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r, err := serializeprobes.Probe076SkeletonRoundTrip(t.Context(), corpusOPT(t, tc.id), instance.Medium, nil)
+			r, err := serializeprobes.Probe076SkeletonRoundTrip(t.Context(), tc.opt(t), instance.Medium, nil)
 			if err != nil {
 				t.Fatalf("probe framework error: %v", err)
 			}
@@ -173,20 +226,34 @@ func TestProbe076SkeletonLegFailsAnUnexcludedFinding(t *testing.T) {
 // longer fires fails its pair as stale, naming it, and that the finding it
 // stopped matching is reported as unexcluded.
 func TestProbe076SkeletonLegFailsAStaleExclusion(t *testing.T) {
-	const id = "Referral Request.v1"
-	var exclusions []serializeprobes.Probe076Exclusion
-	moved := false
-	for _, ex := range serializeprobes.Probe076SkeletonExclusions {
-		if ex.Finding.Template == id && ex.Finding.Format == "FLAT" {
-			ex.Finding.Path = "/context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0002]/name"
-			moved = true
+	const (
+		id    = probe076ValuesTemplate
+		moved = "/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0015]/name"
+	)
+	exclusion := func(format, path string) serializeprobes.Probe076Exclusion {
+		return serializeprobes.Probe076Exclusion{
+			Finding: serializeprobes.Probe076Finding{
+				Template: id, Policy: instance.Medium, Format: format,
+				Stage: "validate", Code: "alternative_mismatch", Path: path,
+			},
+			Reason:     "The test's own edit gives the name of the ELEMENT at0016 two coded alternatives that disagree.",
+			Registered: "testkit/probes/serialize/probe_076_skeleton_test.go",
 		}
-		exclusions = append(exclusions, ex)
 	}
-	if !moved {
-		t.Fatalf("Probe076SkeletonExclusions holds no FLAT exclusion for %s; the case asserts nothing", id)
+	opt := disagreeingNameAlternatives(t)
+	// The control: the same exclusions, the FLAT one where the finding fires,
+	// pass the pair, so the failure below is the stale FLAT exclusion alone.
+	control, err := serializeprobes.Probe076SkeletonRoundTrip(t.Context(), opt, instance.Medium, []serializeprobes.Probe076Exclusion{
+		exclusion("FLAT", probe076ValuesNamePath), exclusion("STRUCTURED", probe076ValuesNamePath),
+	})
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
 	}
-	r, err := serializeprobes.Probe076SkeletonRoundTrip(t.Context(), corpusOPT(t, id), instance.Medium, exclusions)
+	if control.Status != probe.StatusPass {
+		t.Fatalf("status = %q (detail: %s) with both exclusions where the findings fire; want pass", control.Status, control.Detail)
+	}
+	exclusions := []serializeprobes.Probe076Exclusion{exclusion("FLAT", moved), exclusion("STRUCTURED", probe076ValuesNamePath)}
+	r, err := serializeprobes.Probe076SkeletonRoundTrip(t.Context(), opt, instance.Medium, exclusions)
 	if err != nil {
 		t.Fatalf("probe framework error: %v", err)
 	}
@@ -194,8 +261,8 @@ func TestProbe076SkeletonLegFailsAStaleExclusion(t *testing.T) {
 		t.Fatalf("status = %q (detail: %s) with a stale exclusion; want fail", r.Status, r.Detail)
 	}
 	for _, w := range []string{
-		"stale exclusion " + id + " medium FLAT: rm_type_mismatch at /context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0002]/name",
-		id + " medium FLAT: rm_type_mismatch at /context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]/name",
+		"stale exclusion " + id + " medium FLAT: alternative_mismatch at " + moved,
+		id + " medium FLAT: alternative_mismatch at " + probe076ValuesNamePath,
 	} {
 		if !strings.Contains(r.Detail, w) {
 			t.Errorf("detail = %q; want it to name %q", r.Detail, w)

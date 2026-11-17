@@ -406,25 +406,28 @@ partially or silently accepted.
   archetype defines the same code; without it, those nodes are unnamed and the round-trip is merely
   **format-idempotent**. Their names never leak into FLAT, so idempotence is preserved either
   way. **A coded node name:** where the template constrains a node's name as a `DV_CODED_TEXT`
-  (one child, or alternatives that agree) and determines one coded value, decode gives the node
-  that coded name in place of the `DV_TEXT` one, as the generator writes it. The value is
-  determined where the name's `C_CODE_PHRASE` lists one code, or several of which exactly one has
-  the pinned name text as its term text. Its text is the pinned one, else the code's term text: a
-  `local` code's archetype term, an external code's term under `<terminology>::<code>` or the bare
-  code, or an `openehr` code's rubric where every terminology group that holds the code gives the
-  same one. Its terminology is the `C_CODE_PHRASE`'s. Reused siblings that share a bare path and
-  disagree on the coded name leave the bare path with none, as they do with a pinned name;
-  decode reads each node's own under its compiled path, every pinned name kept (§ Archetype-reuse
-  siblings).
+  (one child, or alternatives that agree) whose `defining_code` holds one `C_CODE_PHRASE`, or one
+  `C_CODE_REFERENCE` read as its code phrase, decode gives the node, in place of the `DV_TEXT`
+  one, the coded name the generator writes there under `ExampleFill`. Its code is the phrase's
+  first listed code, else the placeholder `at0000` in the terminology the phrase, or the
+  reference set's `terminology:` URI, names, else in `local`. Its text is the code's term text
+  where the `C_STRING` on the name's value admits it: a `local` code's archetype term, an
+  external code's term under `<terminology>::<code>` or the bare code, or an `openehr` code's
+  rubric where every terminology group that holds the code gives the same one; the placeholder
+  names no term. Where that `C_STRING` rejects the term text of a code outside `openehr`, the
+  first listed code whose term text it admits takes its place, with that text. Otherwise the
+  name keeps the text the generator writes under that `C_STRING`, or `example` where there is
+  none. Reused siblings that share a bare path and disagree on the coded name leave the bare
+  path with none, as they do with a pinned name; decode reads each node's own under its
+  compiled path, every pinned name kept (§ Archetype-reuse siblings). Before 2026-11-17
+  (issue 453) decode gave a coded name only where the template determined its code and text, so
+  a name the template leaves open came back as `DV_TEXT`: the `Referral Request.v1` annotation's,
+  whose code comes from an external reference set, and the `Vital signs monitoring` pulse
+  interpretation's, which lists two local codes and pins no text.
   **Registered format limit:** FLAT has no key for a node's name below the root, so a coded name
-  the template leaves open (a code from an external reference set, several codes and no pinned
-  text, a code with no term text) comes back as `DV_TEXT`, and the round trip reports
-  `rm_type_mismatch` on that name: decode invents no code. The corpus instances are
-  `Referral Request.v1`, whose annotation name
-  (`/context/other_context/items[openEHR-EHR-CLUSTER.annotations.v1]/items[at0001]/name`) takes
-  its code from an external reference set (`C_CODE_REFERENCE`, no code listed), and
-  `Vital signs monitoring`, whose pulse interpretation name (`…/items[at1023]/name` in
-  `openEHR-EHR-OBSERVATION.pulse.v2`) lists two local codes and pins no text. **The
+  whose alternatives disagree, or whose `defining_code` has alternatives, comes back as
+  `DV_TEXT`, which the template refuses when the round trip is validated: decode does not
+  choose among the alternatives. No corpus template writes one. **The
   composition's own name** travels as `<root>/_name` (REQ-140, since 2026-10-15), in both modes: decode sets the COMPOSITION's `name` from it, in the DV_TEXT leaf grammar
   (`\|formatting` beside a bare name, a coded name in the `\|code` + `\|value` +
   `\|terminology` substitution form, a name the suffixes cannot carry as `_name\|raw`), and a
@@ -763,16 +766,17 @@ itself OPT-valid, a `WithTemplate` decode must also validate against the OPT. Th
 leg catches dropped/mistyped leaves that idempotence alone (a symmetric omission) would miss.
 Its **skeleton leg** builds the `instance.Required` and `instance.Medium` skeletons of every
 COMPOSITION OPT in the corpus (80 templates, 160 pairs) and requires each to validate again
-after a FLAT and a STRUCTURED round trip under `WithTemplate` and `WithStrict`, except three
+after a FLAT and a STRUCTURED round trip under `WithTemplate` and `WithStrict`, except two
 named exclusions:
 
 - the encode refusal of reused siblings no name tells apart (§ Archetype-reuse siblings
   below, residual);
-- the coded name a template leaves open (§ `LOCATABLE.name` on decode, registered format
-  limit);
 - the `ITEM_SINGLE` whose item a template leaves unconstrained (§ RM-mandatory attributes not
   carried by FLAT, registered format limit).
 
+Over the same templates, under `Medium` and `Large`, `coded_name_corpus_test.go` requires every
+coded node name the skeleton writes to come back unchanged at its node (§ `LOCATABLE.name` on
+decode, a coded node name).
 PROBE-076 does **not** compare emitted FLAT/STRUCTURED against vendored upstream simplified
 output — that comparison is **PROBE-086** (Implemented, Sandbox): its harness at
 `testkit/conformance/webtemplate/` round-trips the corpus vendored at

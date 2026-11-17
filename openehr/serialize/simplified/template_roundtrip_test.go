@@ -8,10 +8,10 @@ package simplified_test
 // Template's node order; and the formats have no key for a structure with no
 // member, so decode rebuilds, empty, one the template requires and lets hold
 // no member; and the formats have no key for a node's name below the root, so
-// decode gives a node the coded name the template determines for it; and the
-// formats carry an ordinal's code and value but not its terminology, so decode
-// gives the symbol the terminology of the template's pair with that code and
-// value.
+// decode gives a node whose name the template codes the coded name the
+// generator writes there; and the formats carry an ordinal's code and value
+// but not its terminology, so decode gives the symbol the terminology of the
+// template's pair with that code and value.
 
 import (
 	"cmp"
