@@ -361,6 +361,15 @@ func TestREQ113_PathResolvesUnderNamedArchetype(t *testing.T) {
 	}
 }
 
+// The fourth Archetype reader, the archetype/class conformance check, sees the
+// named form's HRID too.
+func TestREQ113_NamedArchetypeClassMismatch(t *testing.T) {
+	r := lint.LintString("SELECT ev FROM EVALUATION ev[openEHR-EHR-OBSERVATION.blood_pressure.v1, 'x']", nil)
+	if !has(r, "aql_archetype_class_mismatch") {
+		t.Fatalf("a named OBSERVATION archetype on an EVALUATION must raise aql_archetype_class_mismatch, got %v", codes(r))
+	}
+}
+
 // REQ-109 Layer 3: [$arch] is bind-time scope, not a missing HRID.
 func TestLintParamArchetypeNotInTemplateClean(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
