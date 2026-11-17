@@ -47,6 +47,7 @@ package lint
 import (
 	"slices"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
@@ -55,8 +56,12 @@ import (
 // own; [Lint] turns these facts into [Issue]s.
 type Metadata struct {
 	// Archetypes are the distinct literal archetype HRIDs bound in the
-	// FROM / CONTAINS tree, in document order. $param archetype predicates
-	// are not listed here (see [parse.ClassExpr.ParamArchetype]).
+	// FROM / CONTAINS tree, in document order: the HRID of a bare or named
+	// archetype bracket, and each HRID an AND / OR bracket names among its
+	// operands, read from [parse.ClassExpr.ParsedPredicate]. $param archetype
+	// predicates are not listed here (see [parse.ClassExpr.ParamArchetype]),
+	// and neither is an HRID inside a bracket the parser leaves unstructured
+	// (a nil ParsedPredicate).
 	Archetypes []string
 	// Aliases maps each bound alias to its class expression. Anonymous
 	// class expressions (no alias) are absent.
@@ -91,13 +96,48 @@ func Extract(doc *parse.Document) Metadata {
 		if ce.Alias != "" {
 			md.Aliases[ce.Alias] = ce
 		}
-		if ce.Archetype != "" && !ce.ParamArchetype && !seen[ce.Archetype] {
-			seen[ce.Archetype] = true
-			md.Archetypes = append(md.Archetypes, ce.Archetype)
+		for _, hrid := range classArchetypes(ce) {
+			if !seen[hrid] {
+				seen[hrid] = true
+				md.Archetypes = append(md.Archetypes, hrid)
+			}
 		}
 	}
 	md.SelectAliases = slices.Clone(doc.SelectAliases)
 	md.Paths = slices.Clone(doc.Paths)
 	md.Params = slices.Clone(doc.Params)
 	return md
+}
+
+// classArchetypes returns the distinct literal archetype HRIDs ce names, in
+// source order. A bare or named archetype bracket names the one HRID on
+// ce.Archetype. A junction bracket (`[hrid and name/value='x']`,
+// `[hrid1 or hrid2]`) leaves Archetype empty, and its HRIDs are read from the
+// archetype operands of ce.ParsedPredicate, AND and OR alike. A `$param`, a
+// node id or a comparison names no HRID, and neither does a bracket the parser
+// leaves unstructured (a nil ParsedPredicate).
+//
+// Every reader of a class's archetypes goes through here: the
+// identifiable-scope check, [Extract], path resolution and the archetype/class
+// check.
+func classArchetypes(ce parse.ClassExpr) []string {
+	// REQ-113 § The class and alias-root brackets carry the same model.
+	if ce.Archetype != "" && !ce.ParamArchetype {
+		return []string{ce.Archetype}
+	}
+	var hrids []string
+	var visit func(p aql.SegmentPredicate)
+	visit = func(p aql.SegmentPredicate) {
+		switch p := p.(type) {
+		case aql.ArchetypePredicate:
+			if !slices.Contains(hrids, p.HRID) {
+				hrids = append(hrids, p.HRID)
+			}
+		case aql.JunctionPredicate:
+			visit(p.Left)
+			visit(p.Right)
+		}
+	}
+	visit(ce.ParsedPredicate)
+	return hrids
 }

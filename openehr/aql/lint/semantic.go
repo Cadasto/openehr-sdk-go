@@ -176,10 +176,12 @@ func (c *containCheck) walk(parent semcheck.Operand, role semcheck.Role, n parse
 
 // operand decides one class expression and records its operand-level issues:
 // the REQ-161 class-token check (aql_unknown_rm_class / aql_contains_not_containable,
-// via [semcheck.Checker.Operand]) and, when ce carries a literal archetype
-// predicate, the REQ-161 archetype/class-conformance check
+// via [semcheck.Checker.Operand]) and, for each literal archetype HRID ce
+// names ([classArchetypes]: a bare or named bracket's, or each one an AND / OR
+// bracket holds), the REQ-161 archetype/class-conformance check
 // (aql_archetype_class_mismatch, or the second arm of aql_unknown_rm_class,
-// via [semcheck.Checker.Archetype]).
+// via [semcheck.Checker.Archetype]). That second arm is kept to one finding
+// per class expression however many of its HRIDs the RM cannot decide.
 //
 // Both checks run from the SAME call, once per class expression — which is
 // what makes the "once per class-expression occurrence" rule (REQ-161
@@ -197,8 +199,17 @@ func (c *containCheck) operand(ce parse.ClassExpr, role semcheck.Role) semcheck.
 	for _, f := range o.Findings() {
 		c.issues = append(c.issues, semanticIssue(f, ce))
 	}
-	if ce.Archetype != "" {
-		for _, f := range c.ck.Archetype(ce.RMType, ce.Archetype) {
+	// REQ-161 § Checks: aql_unknown_rm_class fires once per class-expression
+	// occurrence, so a junction naming two undecidable HRIDs reports the first.
+	unknown := false
+	for _, hrid := range classArchetypes(ce) {
+		for _, f := range c.ck.Archetype(ce.RMType, hrid) {
+			if f.Code == semcheck.CodeUnknownRMClass {
+				if unknown {
+					continue
+				}
+				unknown = true
+			}
 			c.issues = append(c.issues, semanticIssue(f, ce))
 		}
 	}
