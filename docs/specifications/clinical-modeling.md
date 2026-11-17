@@ -1610,6 +1610,7 @@ A nil or empty compiled input, or an unresolvable default language, **MUST** ret
 The exported root **MUST** carry `templateId`, `version` (the string `"2.3"`), `defaultLanguage`, `languages`, and a `tree` of nodes.
 Each node **MUST** carry `id`, `rmType`, `min`, `max` (with `-1` denoting unbounded), and `aqlPath`; and where the compiled template supplies them, `name` / localized names, `nodeId`, `inputs`, and `children`.
 A node with a `nodeId` takes its `name` and localized names from the template-level name its template pins on it, where it pins one, else from its archetype term ([§ Node names and name predicates](#node-names-and-name-predicates)).
+A node below the root whose constraint carries no node id, such as the COMPOSITION's `category` and `context`, takes the name of the RM attribute that holds it as its `name` and localized name, and carries no localized names, as the reference names it.
 JSON field names are camelCase.
 Encoding **MUST** be deterministic: the same compiled template produces byte-identical output across runs and SDK patch releases (fixed field order; map keys sorted).
 
