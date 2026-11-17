@@ -19,9 +19,10 @@ import (
 // range check of constraints.CTime and CDateTime orders them, after XML
 // Schema 1.0 Part 2 §3.2.7.4, the zoned one read in UTC and the other at
 // +14:00 and at -14:00, a partial value covering its whole period, so only
-// where the two lie more than 14 hours apart; and not at all for a value the
-// parse refuses. A pair that does not compare, a mixed pair within 14 hours
-// included, is left alone.
+// where the two lie more than 14 hours apart, or as equal where the zoned one
+// lies inside the other's period at both readings; and not at all for a
+// value the parse refuses. A pair that does not compare, a mixed pair within
+// 14 hours included, is left alone, and so is an equal pair.
 func TestREQ107_TemporalBoundsCompareAsInstants(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -117,6 +118,20 @@ func TestREQ107_TemporalBoundsCompareAsInstants(t *testing.T) {
 			apply: orderDateTimes,
 			lower: "2031-01-01T13:00Z", upper: "2030",
 			want: [2]string{"2031-01-01T13:00Z", "2030"},
+		},
+		{
+			// The year 2030 holds 2030-06-01T10:00Z at both readings, so the
+			// two are equal and in order either way round.
+			name:  "date-time: zoneless year lower holding the zoned upper, equal, left alone",
+			apply: orderDateTimes,
+			lower: "2030", upper: "2030-06-01T10:00Z",
+			want: [2]string{"2030", "2030-06-01T10:00Z"},
+		},
+		{
+			name:  "date-time: zoned lower inside the zoneless year upper, equal, left alone",
+			apply: orderDateTimes,
+			lower: "2030-06-01T10:00Z", upper: "2030",
+			want: [2]string{"2030-06-01T10:00Z", "2030"},
 		},
 		{
 			// 05:00 UTC then 07:00 UTC, in a layout without seconds that

@@ -14,8 +14,14 @@ import (
 // one with no zone read at +14:00 and at -14:00, a reduced value covering
 // its whole period, and not ordered where the two readings disagree, an edge
 // they share included. So a value more than 14 hours outside the range is
-// refused, and one within 14 hours of a bound is not refused for it. The
-// first rows are those of GitHub issue 467.
+// refused, and one within 14 hours of a bound is not refused for it. A value
+// with a zone that lies inside a month or a year bound at both readings is
+// equal to it, as its twin with no zone is at the precision the two share:
+// an included bound admits it and an excluded one refuses it. The year 2030
+// holds, at both readings, from 2030-01-01T14:00Z up to 2030-12-31T10:00Z,
+// that instant itself left out, and a value within 14 hours of where the
+// year starts or ends is not ordered against it. The first rows are those of
+// GitHub issue 467.
 func TestREQ103TemporalRangeOrdersAcrossZone(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -51,17 +57,67 @@ func TestREQ103TemporalRangeOrdersAcrossZone(t *testing.T) {
 			name:     "date-time, up to the year 2030 with no zone",
 			c:        constraints.CDateTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "2030", UpperInclusive: true}},
 			detail:   "value outside (*..2030]",
-			admitted: []string{"2030-06-01T10:00Z", "2030-06-01T10:00", "2030-12-31T23:59:59-12:00", "2031-01-01T14:00:00Z"},
+			admitted: []string{"2030-06-01T10:00Z", "2030-06-01T10:00+02:00", "2030-06-01T10:00", "2030-12-31T23:59:59-12:00", "2031-01-01T14:00:00Z"},
 			refused:  []string{"2031-01-01T14:00:01Z", "2031-06-01T10:00Z", "2031-01-01T00:00", "2031"},
 		},
 		{
 			// A value with a zone inside the year 2030 at both readings is
 			// equal to the bound, as its twin with no zone is at the
 			// precision the two share, so the excluded bound refuses both.
-			name:    "date-time, below the year 2030 with no zone",
-			c:       constraints.CDateTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "2030"}},
-			detail:  "value outside (*..2030)",
-			refused: []string{"2030-06-01T10:00Z", "2030-06-01T10:00"},
+			// 2030-12-31T09:59Z ends where the year ends at +14:00, and
+			// 2030-12-31T10:00:00Z is where the next year starts there.
+			name:   "date-time, below the year 2030 with no zone",
+			c:      constraints.CDateTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "2030"}},
+			detail: "value outside (*..2030)",
+			admitted: []string{
+				"2029-06-01T10:00Z", "2029-06-01T10:00", "2030-01-01T10:00Z", "2030-01-01T13:59:59Z",
+				"2030-12-31T10:00:00Z", "2030-12-31T10:00Z", "2030-12-31T20:00Z", "2030-12-31T23:59:59-12:00",
+			},
+			refused: []string{
+				"2030-06-01T10:00Z", "2030-06-01T10:00+02:00", "2030-06-01T10:00", "2030",
+				"2030-01-01T14:00:00Z", "2030-12-31T09:59Z", "2030-12-31T09:59:59Z", "2031-01-01T14:00:01Z",
+			},
+		},
+		{
+			// 2029-12-31T10:00:00Z is 14 hours before the year starts, an
+			// edge the two share, and the minute 2029-12-31T09:59Z ends
+			// there: neither is ordered against the bound.
+			name:   "date-time, from the year 2030 with no zone",
+			c:      constraints.CDateTime{Range: constraints.TemporalRange{Lower: "2030", LowerInclusive: true, UpperUnbounded: true}},
+			detail: "value outside [2030..*)",
+			admitted: []string{
+				"2030-06-01T10:00Z", "2030-06-01T10:00+02:00", "2030-06-01T10:00", "2030-01-01T14:00:00Z",
+				"2030-01-01T10:00Z", "2029-12-31T10:00:00Z", "2029-12-31T09:59Z", "2031-06-01T10:00Z",
+			},
+			refused: []string{"2029-12-31T09:59:59Z", "2029-06-01T10:00Z", "2029-12-31T23:59", "2029"},
+		},
+		{
+			name:   "date-time, after the year 2030 with no zone",
+			c:      constraints.CDateTime{Range: constraints.TemporalRange{Lower: "2030", UpperUnbounded: true}},
+			detail: "value outside (2030..*)",
+			admitted: []string{
+				"2031-01-01T14:00:01Z", "2031-06-01T10:00Z", "2031", "2030-12-31T10:00:00Z",
+				"2030-12-31T20:00Z", "2030-01-01T10:00Z", "2030-01-01T13:59:59Z",
+			},
+			refused: []string{
+				"2030-06-01T10:00Z", "2030-06-01T10:00+02:00", "2030-06-01T10:00", "2030",
+				"2030-01-01T14:00:00Z", "2030-12-31T09:59Z", "2029-06-01T10:00Z",
+			},
+		},
+		{
+			// The month 2030-06 holds, at both readings, from
+			// 2030-06-01T14:00Z up to 2030-06-30T10:00Z, that instant left
+			// out; the minute 2030-06-01T13:59Z starts before that.
+			name:   "date-time, below the month 2030-06 with no zone",
+			c:      constraints.CDateTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "2030-06"}},
+			detail: "value outside (*..2030-06)",
+			admitted: []string{
+				"2030-05-15T12:00Z", "2030-05-15T12:00", "2030-06-01T13:59Z", "2030-06-30T10:00:00Z", "2030-06-30T20:00Z",
+			},
+			refused: []string{
+				"2030-06-15T12:00Z", "2030-06-15T14:00+02:00", "2030-06-15T12:00", "2030-06",
+				"2030-06-01T14:00Z", "2030-06-30T09:59:59Z", "2030-07-01T14:00:01Z",
+			},
 		},
 		{
 			name:     "time, up to 02:00 in UTC",

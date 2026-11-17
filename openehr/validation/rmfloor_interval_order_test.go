@@ -8,8 +8,9 @@ package validation_test
 // or both with none, are ordered at the precision they share instead; two
 // DV_TIME or DV_DATE_TIME values in different time zones are ordered as
 // instants, partial values and leap seconds included, and one with a zone is
-// ordered against one without only where the two lie more than 14 hours
-// apart, as the temporal range check orders them. A pair that is not
+// ordered against one without as the temporal range check orders them: where
+// the two lie more than 14 hours apart, and as equal where the one with a
+// zone lies inside the other's period at both readings. A pair that is not
 // strictly comparable breaks DV_INTERVAL.Limits_consistent all the same
 // (rmfloor_interval_comparable_test.go). BASE Interval.Limits_comparable,
 // which DV_INTERVAL.Limits_consistent restates, is not evaluated on the BASE
@@ -291,9 +292,11 @@ func TestValidateRM_REQ112_IntervalOrderAtSharedPrecision(t *testing.T) {
 // only where both readings agree. Each pair below lies more than 14 hours out
 // of order, so it draws Limits_consistent, and reversed it is in order. Value
 // holds the bound with a zone read in UTC and the one without on its clock,
-// each at the start of the period it names. The pairs within 14 hours of each
-// other, which are not ordered, are rows of
-// [TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs].
+// each at the start of the period it names. A pair in which the one with a
+// zone lies inside the other's period at both readings is equal, as a pair
+// is at the precision it shares, and in order either way round. The pairs
+// within 14 hours of where one starts or ends, which are not ordered, are
+// rows of [TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs].
 func TestValidateRM_REQ112_IntervalOrderAcrossZone(t *testing.T) {
 	t.Parallel()
 	checkOrder(t, "DV_DATE_TIME with a zone, two years after one without", "DV_DATE_TIME",
@@ -314,6 +317,13 @@ func TestValidateRM_REQ112_IntervalOrderAcrossZone(t *testing.T) {
 	// 11:00+02:00 is 09:00Z, 14 hours and a half before 23:30.
 	checkOrder(t, "DV_TIME without a zone, 14 hours and a half after one with", "DV_TIME",
 		rm.DVTime{Value: "23:30:00"}, rm.DVTime{Value: "11:00:00+02:00"}, [2]float64{84600, 32400})
+
+	// The year 2030 holds 2030-06-01T10:00Z at both readings, and the month
+	// 2030-06 holds 2030-06-15T12:00+02:00.
+	checkSharedEqual(t, "DV_DATE_TIME with a zone inside the year without one",
+		rm.DVDateTime{Value: "2030"}, rm.DVDateTime{Value: "2030-06-01T10:00Z"})
+	checkSharedEqual(t, "DV_DATE_TIME with a zone inside the month without one",
+		rm.DVDateTime{Value: "2030-06"}, rm.DVDateTime{Value: "2030-06-15T12:00+02:00"})
 }
 
 // REQ-112, REQ-171 — the floor neither orders nor reports a pair it reads as
