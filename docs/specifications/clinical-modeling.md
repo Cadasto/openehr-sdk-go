@@ -1171,11 +1171,14 @@ The pairs it can compare are:
 - two DV_QUANTITY with equal `units`;
 - two DV_PROPORTION of one `type`, by ratio;
 - two DV_ORDINAL, by `value`;
-- two DV_DATE, two DV_TIME or two DV_DATE_TIME values the REQ-123 parse accepts, in the order [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* gives them: at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it, and two times or date-times written with different zone designators as instants;
+- two DV_DATE, two DV_TIME or two DV_DATE_TIME values the REQ-123 parse accepts, in the order [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* gives them:
+  - at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it;
+  - two zoned times or date-times written with different designators as instants;
+  - and a zoned time or date-time against a zoneless one as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* orders them;
 - and two DV_DURATION values the REQ-123 parse accepts, by the magnitude it gives, as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_INTERVAL* orders them.
 
 The same holds in a `DV_INTERVAL<DV_ORDERED>` whose two bounds are one of those types.
-No other pair is one it can compare, for example, a zoned against a zoneless time or date-time, or a value the REQ-123 parse refuses.
+No other pair is one it can compare, for example, a zoned against a zoneless time or date-time within 14 hours of each other, or a value the REQ-123 parse refuses.
 
 #### Precedence
 
@@ -1967,10 +1970,11 @@ When neither side is unbounded and each side holds a bound, the floor reports, e
 The RM leaves DV_ORDINAL's and DV_SCALE's undefined; the floor reads two of them as comparable when their symbols are coded in one named terminology, and **MUST NOT** report two whose symbols are coded in different terminologies or in none, which it does not order either.
 The order is the RM's `less_than` for the type: `magnitude` for the quantified types, `value` for DV_ORDINAL and DV_SCALE, and for a DV_DURATION the magnitude the REQ-123 parse gives.
 Two DV_DATE, two DV_TIME or two DV_DATE_TIME values written with one zone designator, or both with none, are ordered at the precision they share, as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* defines it, which departs from reading `less_than` by `magnitude()` for a partial value, whose magnitude is the start of the period it names.
-Two DV_TIME or two DV_DATE_TIME values whose zone designators differ are ordered as instants, each read in UTC, partial values and leap seconds included, and a zoned DV_TIME or DV_DATE_TIME is not ordered against one without a zone.
+Two DV_TIME or two DV_DATE_TIME values that both carry a zone, with designators that differ, are ordered as instants, each read in UTC, partial values and leap seconds included.
+A zoned DV_TIME or DV_DATE_TIME and one without a zone are ordered as [§ REQ-103](#req-103--primitive-constraint-introspection) *Validate contract* orders a time or a date-time against a bound when one carries a zone and the other does not.
 Equal `units` is only part of DV_QUANTITY's `is_strictly_comparable_to`, which also needs a matching `units_system` where one is set.
 The floor does not compare `units_system`, so it orders a same-units pair whatever its `units_system`, although the RM makes two different systems not strictly comparable.
-Of the pairs it reads as strictly comparable, it orders none that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, nor a zoned DV_TIME or DV_DATE_TIME against one without a zone, and reports none of them here (see *What the floor does not evaluate* below).
+Of the pairs it reads as strictly comparable, it orders none that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, nor a zoned DV_TIME or DV_DATE_TIME against one without a zone within 14 hours of it, and reports none of them here (see *What the floor does not evaluate* below).
 
 #### Interval flags
 
@@ -2107,7 +2111,7 @@ The inventory classifies `DV_INTERVAL.Limits_consistent` as evaluated, but the f
 
 - the `units_system` of two DV_QUANTITY;
 - the comparability of two DV_ORDINAL or DV_SCALE, which the RM leaves undefined;
-- and the order of a pair it reads as strictly comparable but cannot order, one that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, or a zoned DV_TIME or DV_DATE_TIME against one without a zone.
+- and the order of a pair it reads as strictly comparable but cannot order, one that holds a DV_PROPORTION with a zero denominator or a temporal value the REQ-123 parse refuses, or a zoned DV_TIME or DV_DATE_TIME against one without a zone within 14 hours of it.
 
 ### Value-typed mandatory presence
 
