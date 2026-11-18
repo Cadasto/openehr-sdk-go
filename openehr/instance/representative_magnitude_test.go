@@ -16,7 +16,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// generateExample generates c under every policy with ExampleFill and calls
+// generateExample generates opt under every policy with ExampleFill and calls
 // check with each root.
 func generateExample(t *testing.T, opt string, check func(t *testing.T, what string, out any)) {
 	t.Helper()
@@ -142,6 +142,11 @@ func TestREQ107_ExampleAttributeQuantityMagnitudeIsRepresentative(t *testing.T) 
 		{name: ">30 no precision", opt: quantity(r(open(30), noEnd)), want: 30.01},
 		{name: "list holding 10", opt: quantity(instance.RealList(3, 10)), want: 3},
 		{name: "no magnitude constraint", opt: optElementValue(optNode("DV_QUANTITY", "", units)), want: 10},
+		{
+			// The middle, 0.5, rounds to 1 and steps back to 0, both
+			// excluded: the magnitude the walk wrote, the middle, stays.
+			name: "(0..1) precision 0", opt: quantity(r(open(0), open(1)), precision0), want: 0.5,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

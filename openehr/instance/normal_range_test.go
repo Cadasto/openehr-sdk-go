@@ -550,8 +550,8 @@ var placeholderStatusNode = optSingle("normal_status", optCodePhrase("local", "a
 // itself before both, so where the range excludes its lower bound, which
 // lies outside it, a placeholder takes that bound and a low status the step
 // below it. Each range holds the value a count or a quantity takes where
-// the OPT leaves its magnitude unconstrained, 10, or for a count under
-// RandomFill a draw from 1 to 100, so each fill starts from a value inside
+// the OPT leaves its magnitude unconstrained, 10, or under RandomFill a
+// draw from 1 to 100, so each fill starts from a value inside
 // it. It holds for a DV_COUNT, a DV_QUANTITY and
 // a DV_PROPORTION, under every policy, both value fills, and with and
 // without the implicit attributes.
