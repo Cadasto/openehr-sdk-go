@@ -153,9 +153,11 @@ var policyNames = [...]struct {
 type ValueFill int
 
 const (
-	// ExampleFill is the default: each primitive leaf gets its
-	// PrimitiveConstraint.ExampleValue, a single representative value
-	// that is byte-identical across calls for one OPT.
+	// ExampleFill is the default: each primitive leaf gets a single
+	// representative value that is byte-identical across calls for one
+	// OPT, its PrimitiveConstraint.ExampleValue, but for the magnitude of
+	// a quantity or a count, which takes a representative value of its
+	// range, as the package documentation describes.
 	ExampleFill ValueFill = iota
 	// RandomFill draws each leaf from within its constraint (in-range
 	// magnitudes, value-set-member codes, enumeration entries), valid by
