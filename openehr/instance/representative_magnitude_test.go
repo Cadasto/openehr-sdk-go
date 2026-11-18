@@ -3,8 +3,9 @@ package instance_test
 // representative_magnitude_test.go: the REQ-107 Primitive-leaf value fill
 // rule on the magnitude of a DV_QUANTITY and of a DV_COUNT. ExampleFill
 // gives a bounded range its middle, rounded to the precision, and any other
-// range, or none, 10 moved into it; RandomFill never draws a count as 0
-// where its range is open.
+// range, or none, 10 moved into it; RandomFill never draws a count, or a
+// quantity the template builds attribute by attribute or leaves
+// unconstrained, as 0 where its range is open or there is none.
 
 import (
 	"fmt"
@@ -251,5 +252,68 @@ func TestREQ107_IntervalNewUnitTakesExampleMagnitude(t *testing.T) {
 			t.Errorf("%v: interval %s, want 6 g..10 g", policy, intervalString(iv))
 		}
 		checkValid(t, out, c)
+	}
+}
+
+// quantitySeeds is how many RandomFill seeds each open quantity magnitude
+// case runs: enough that a draw which rounds to 0 about once in 200, as a
+// whole number drawn from 0 up to 100 does, shows among them.
+const quantitySeeds = 200
+
+// TestREQ107_RandomQuantityIsNotZeroWhereItsMagnitudeIsOpen is the REQ-107
+// Primitive-leaf value fill check on the magnitude RandomFill draws for a
+// DV_QUANTITY the template leaves unconstrained, or builds attribute by
+// attribute with no constraint on its magnitude or a C_REAL whose range is
+// open or bounded on one side: it is drawn as an open C_DV_QUANTITY entry's
+// is, inside the range away from its bound, or from 1 to 100 where it is
+// open, rounded to the precision, and is never 0. The draws vary between
+// seeds.
+func TestREQ107_RandomQuantityIsNotZeroWhereItsMagnitudeIsOpen(t *testing.T) {
+	r, closed, open, noEnd := instance.RealRange, instance.Closed, instance.Open, instance.NoEnd
+	units := optSingle("units", optPrimitive("STRING", "C_STRING", "<list>mm</list>"))
+	precision0 := optProportionPart("precision", instance.IntList(0))
+	quantity := func(magnitude string, precision ...string) string {
+		attrs := append([]string{optSingle("magnitude", optPrimitive("REAL", "C_REAL", magnitude)), units}, precision...)
+		return optNode("DV_QUANTITY", "", attrs...)
+	}
+	cases := []struct {
+		name     string
+		opt      string
+		decimals int
+		lo, hi   float64 // the magnitude lies from lo to hi
+	}{
+		{name: "no constraint", opt: optNode("DV_QUANTITY", ""), decimals: 2, lo: 1, hi: 100},
+		{name: "no magnitude constraint", opt: optNode("DV_QUANTITY", "", units), decimals: 2, lo: 1, hi: 100},
+		{name: "no magnitude constraint precision 0", opt: optNode("DV_QUANTITY", "", units, precision0), decimals: 0, lo: 1, hi: 100},
+		{name: "open C_REAL", opt: quantity(""), decimals: 2, lo: 1, hi: 100},
+		{name: "open C_REAL precision 0", opt: quantity("", precision0), decimals: 0, lo: 1, hi: 100},
+		{name: ">=0 precision 0", opt: quantity(r(closed(0), noEnd), precision0), decimals: 0, lo: 1, hi: 100},
+		{name: ">30", opt: quantity(r(open(30), noEnd)), decimals: 2, lo: 30.01, hi: 130},
+		{name: "<=0 precision 0", opt: quantity(r(noEnd, closed(0)), precision0), decimals: 0, lo: -100, hi: -1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, optElementValue(tc.opt), true)
+			seen := map[float64]bool{}
+			for _, policy := range everyPolicy {
+				for seed := range uint64(quantitySeeds) {
+					opts := instance.Options{Policy: policy, ValueFill: instance.RandomFill, ValueSource: mrand.NewPCG(seed, corpusStream), Now: defaultsNow}
+					what := fmt.Sprintf("%v/seed=%d", policy, seed)
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("%s: Generate: %v", what, err)
+					}
+					m := float64(onlyQuantity(t, what, out).Magnitude)
+					if m == 0 || m < tc.lo || m > tc.hi || !decimalsAtMost(m, tc.decimals) {
+						t.Errorf("%s: DV_QUANTITY magnitude %v, want one from %v to %v with at most %d decimals and not 0", what, m, tc.lo, tc.hi, tc.decimals)
+					}
+					seen[m] = true
+					checkValid(t, out, c)
+				}
+			}
+			if len(seen) < 2 {
+				t.Errorf("DV_QUANTITY magnitudes %v over %d seeds, want draws that vary", seen, quantitySeeds)
+			}
+		})
 	}
 }
