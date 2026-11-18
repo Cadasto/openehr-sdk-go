@@ -41,10 +41,13 @@ func wholeNumber(v rm.Real) bool {
 // pins is_integral to true, and a fraction or an integer fraction, gets a
 // whole-number numerator and denominator and the precision 0 wherever the
 // template admits 0, under both value fills, a fraction the template
-// requires a precision of with no child included; where the template
-// admits no precision of 0 the precision it admits stays, and a ratio
-// with no pin keeps no precision. The RM floor and the template validator
-// pass.
+// requires a precision of with no child included. Where the template
+// admits no precision of 0, a ratio that pins is_integral keeps the
+// precision the template admits, and a fraction with a precision gives way
+// to another type the template admits: the RM floor reads is_integral as a
+// precision of 0 where the precision is set (REQ-112), so no fraction or
+// integer fraction is written at another precision. A ratio with no pin
+// keeps no precision. The RM floor and the template validator pass.
 func TestREQ107_IntegralProportionTakesPrecisionZero(t *testing.T) {
 	r, closed := instance.RealRange, instance.Closed
 	// Draws from this numerator range are rarely whole numbers.
@@ -94,6 +97,11 @@ func TestREQ107_IntegralProportionTakesPrecisionZero(t *testing.T) {
 			whole:     true,
 		},
 		{
+			name:      "fraction whose template admits precision 2 alone gives way to a ratio",
+			attrs:     []string{fractional, optProportionPart("type", instance.IntList(3, 0)), optProportionPart("precision", instance.IntList(2))},
+			precision: new(rm.Integer(2)),
+		},
+		{
 			name:      "ratio with no pin",
 			attrs:     []string{fractional, optProportionPart("type", instance.IntList(0))},
 			precision: nil,
@@ -108,6 +116,9 @@ func TestREQ107_IntegralProportionTakesPrecisionZero(t *testing.T) {
 					t.Errorf("%s: DV_PROPORTION %s, want no precision", what, proportionText(p))
 				case tc.precision != nil && (p.Precision == nil || *p.Precision != *tc.precision):
 					t.Errorf("%s: DV_PROPORTION %s, want precision %d", what, proportionText(p), *tc.precision)
+				}
+				if (p.Type == 3 || p.Type == 4) && p.Precision != nil && *p.Precision != 0 {
+					t.Errorf("%s: DV_PROPORTION %s, a fraction kind at a precision other than 0", what, proportionText(p))
 				}
 				if tc.whole && !(wholeNumber(p.Numerator) && wholeNumber(p.Denominator)) {
 					t.Errorf("%s: DV_PROPORTION %s, want a whole-number numerator and denominator", what, proportionText(p))

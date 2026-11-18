@@ -51,8 +51,10 @@ func ordinalBody(value, text, code string) string {
 // requires that it leaves out, or one the node prohibits that it carries.
 // A default that keeps the RM rules the walk settles its own value by is
 // written too: a text whose language is an ISO 639-1 code, a percent over
-// 100 and a fraction of whole numbers at precision 0. The RM floor and the
-// template validator pass.
+// 100, and a fraction of whole numbers at precision 0 or with no
+// precision. The fraction with no precision is written with none, though
+// the walk gives a fraction of its own the precision 0. The RM floor and
+// the template validator pass.
 func TestREQ107_TemplateDefaultValueStandsInForTheFill(t *testing.T) {
 	text := func(attrs ...string) string { return optNode("DV_TEXT", "", attrs...) }
 	list := optSingle("value", optPrimitive("STRING", "C_STRING", "<list>Mild</list><list>Severe</list>"))
@@ -143,8 +145,14 @@ func TestREQ107_TemplateDefaultValueStandsInForTheFill(t *testing.T) {
 		{
 			name: "DV_PROPORTION left open, a fraction of whole numbers at precision 0", value: optNode("DV_PROPORTION", ""), rmType: "DV_PROPORTION",
 			body:  "<numerator>1.0</numerator><denominator>3.0</denominator><type>3</type><precision>0</precision>",
+			want:  func(_ instance.ValueFill, got string) bool { return got == "1/3 type 3 precision 0" },
+			about: "the default 1/3 type 3 precision 0",
+		},
+		{
+			name: "DV_PROPORTION left open, a fraction of whole numbers with no precision", value: optNode("DV_PROPORTION", ""), rmType: "DV_PROPORTION",
+			body:  "<numerator>1.0</numerator><denominator>3.0</denominator><type>3</type>",
 			want:  func(_ instance.ValueFill, got string) bool { return got == "1/3 type 3" },
-			about: "the default 1/3 type 3",
+			about: "the default 1/3 type 3, with no precision",
 		},
 	}
 	for _, tc := range cases {
@@ -165,8 +173,9 @@ func TestREQ107_TemplateDefaultValueStandsInForTheFill(t *testing.T) {
 // root passes the RM floor and the template validator. The defaults leave
 // an attribute the BMM marks mandatory empty (a DV_TEXT's value, the code
 // string of a DV_ORDINAL's symbol), or break a rule the walk settles its
-// own value by (a DV_PROPORTION's Valid_denominator and Percent_validity, a
-// DV_TEXT's Language_valid).
+// own value by (a DV_PROPORTION's Valid_denominator, Percent_validity and
+// Fraction_validity, which a fraction at a precision other than 0 breaks,
+// and a DV_TEXT's Language_valid).
 func TestREQ107_TemplateDefaultThatBreaksAnRMRuleLeavesTheFill(t *testing.T) {
 	text := optNode("DV_TEXT", "")
 	proportion := optNode("DV_PROPORTION", "")
@@ -187,6 +196,10 @@ func TestREQ107_TemplateDefaultThatBreaksAnRMRuleLeavesTheFill(t *testing.T) {
 		{
 			name: "DV_PROPORTION, a percent whose denominator is not 100", value: proportion, rmType: "DV_PROPORTION",
 			body: "<numerator>10.0</numerator><denominator>50.0</denominator><type>2</type>", fault: "10/50 type 2",
+		},
+		{
+			name: "DV_PROPORTION, a fraction of whole numbers at precision 1", value: proportion, rmType: "DV_PROPORTION",
+			body: "<numerator>1.0</numerator><denominator>3.0</denominator><type>3</type><precision>1</precision>", fault: "1/3 type 3 precision 1",
 		},
 		{
 			name: "DV_ORDINAL whose symbol has no code string", value: optNode("DV_ORDINAL", ""), rmType: "DV_ORDINAL",
@@ -212,7 +225,8 @@ func TestREQ107_TemplateDefaultThatBreaksAnRMRuleLeavesTheFill(t *testing.T) {
 // commentText renders the value of the one ELEMENT under the CLUSTER root
 // out as the check above compares it: a text's value, a coded text's value
 // and code, a count's magnitude, an ordinal's value, symbol text and code,
-// or a proportion's numerator, denominator and type.
+// or a proportion's numerator, denominator and type, and its precision
+// where it has one.
 func commentText(t *testing.T, out any) string {
 	t.Helper()
 	cluster, ok := out.(*rm.Cluster)
@@ -234,6 +248,9 @@ func commentText(t *testing.T, out any) string {
 		code := v.Symbol.DefiningCode
 		return fmt.Sprintf("%d %s %s::%s", v.Value, v.Symbol.Value, code.TerminologyID.Value, code.CodeString)
 	case *rm.DVProportion:
+		if v.Precision != nil {
+			return fmt.Sprintf("%v/%v type %d precision %d", v.Numerator, v.Denominator, v.Type, *v.Precision)
+		}
 		return fmt.Sprintf("%v/%v type %d", v.Numerator, v.Denominator, v.Type)
 	}
 	t.Fatalf("ELEMENT.value is %T, want a DV_TEXT, a DV_CODED_TEXT, a DV_COUNT, a DV_ORDINAL or a DV_PROPORTION", element.Value)
