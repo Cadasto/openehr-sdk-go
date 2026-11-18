@@ -670,22 +670,16 @@ func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) boo
 }
 
 // nodeClass is the bare BMM class of the value the walk builds for
-// optNode (builtRMType): the class it names, or its concrete substitute
-// where it is held (nodeConcrete), without generic parameters, or, for an
+// optNode (builtRMType), without generic parameters: the class it names, or
+// its concrete substitute where it is held (nodeConcrete), or, for an
 // untyped node, the class of the type the BMM declares for its attribute
-// (untypedRMType), and
-// for a bound of a DV_INTERVAL over an abstract DV_ORDERED class, the class
-// the interval is built over (intervalBoundType). A DV_INTERVAL is one class
-// whatever its parameter, so its parameter is not resolved here.
+// (untypedRMType), and for a bound of a DV_INTERVAL over an abstract
+// DV_ORDERED class, the class the interval is built over
+// (intervalBoundType). It is resolved with builtRMType, once per node
+// (resolveBuiltType), and read from the compiled node after.
 func nodeClass(optNode *tcimpl.CompiledNode) string {
-	declared := strings.TrimSpace(optNode.RMTypeName())
-	if declared == "" {
-		return bmmtype.Class(untypedRMType(optNode))
-	}
-	if bound := intervalBoundType(optNode, declared); bound != "" {
-		return bound
-	}
-	return bmmtype.Class(nodeConcrete(optNode, declared))
+	_, class := tcimpl.BuiltType(optNode, resolveBuiltType)
+	return class
 }
 
 // rootComposer reports whether attr is the composer of optNode, a
@@ -1015,21 +1009,37 @@ func bindingAlternative(children []*tcimpl.CompiledNode, built string) *tcimpl.C
 // over one concrete class that holds both its bounds (concreteInterval). A
 // bound of such an interval that names an abstract class is built as that
 // concrete class (intervalBoundType), as an untyped bound is, so one
-// interval holds both.
+// interval holds both. The answer depends only on node and the pinned RM,
+// so it is resolved once per node (resolveBuiltType) and kept on the
+// compiled node, where every later call reads it, from this Generate or
+// from another on the same compiled template.
 func builtRMType(node *tcimpl.CompiledNode) string {
+	built, _ := tcimpl.BuiltType(node, resolveBuiltType)
+	return built
+}
+
+// resolveBuiltType resolves, by the rules builtRMType states, the type the
+// walk builds for node, and its bare class, which nodeClass returns.
+// tcimpl.BuiltType runs it the first time either is asked for node. It
+// reads the answer of node's parent alone (untypedRMType,
+// intervalBoundType, nodeConcrete), never one of node itself or of a node
+// below it, so a resolution never waits on its own, nor two on each other.
+func resolveBuiltType(node *tcimpl.CompiledNode) (rmType, class string) {
 	declared := strings.TrimSpace(node.RMTypeName())
 	if declared == "" {
-		return untypedRMType(node)
+		built := untypedRMType(node)
+		return built, bmmtype.Class(built)
 	}
 	if param, ok := abstractIntervalParameter(declared); ok {
 		if built := concreteInterval(node, param); built != "" {
-			return built
+			return built, bmmtype.Class(built)
 		}
 	}
 	if bound := intervalBoundType(node, declared); bound != "" {
-		return bound
+		return bound, bmmtype.Class(bound)
 	}
-	return nodeConcrete(node, declared)
+	built := nodeConcrete(node, declared)
+	return built, bmmtype.Class(built)
 }
 
 // intervalBoundType returns the class the walk builds node as where node,

@@ -3,6 +3,7 @@ package templatecompile
 import (
 	"maps"
 	"slices"
+	"sync"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -81,6 +82,18 @@ type CompiledNode struct {
 	// it.
 	conforming         classBits
 	conformingResolved bool
+
+	// built is the RM type the instance generator builds for the node,
+	// and its bare class, kept the first time the generator asks
+	// ([BuiltType]).
+	built builtType
+}
+
+// builtType is the slot [BuiltType] fills once per node.
+type builtType struct {
+	once   sync.Once
+	rmType string
+	class  string
 }
 
 // slotInfo is what a slot node carries beyond the fields every node has:
@@ -315,6 +328,22 @@ func RootTermItem(n *CompiledNode, code, key string) (string, bool) {
 // root that names no type. It is a function rather than a method so that
 // the public alias of [CompiledNode] gains no method.
 func ReadAsRMType(n *CompiledNode) string { return n.readAs }
+
+// BuiltType returns the RM type the instance generator builds for n, and
+// that type's bare class. The first call for n runs resolve and keeps its
+// answer; every later call returns the kept answer and does not run
+// resolve. The generator is the one caller. Its answer depends only on n
+// and the pinned RM, so callers that share one compiled template, at once
+// or in turn, get the same answer. resolve may ask BuiltType of the
+// ancestors of n, as the generator's does, but not of n itself, which
+// would wait on its own call. It is a function rather than a method so
+// that the public alias of [CompiledNode] gains no method.
+func BuiltType(n *CompiledNode, resolve func(*CompiledNode) (rmType, class string)) (rmType, class string) {
+	n.built.once.Do(func() {
+		n.built.rmType, n.built.class = resolve(n)
+	})
+	return n.built.rmType, n.built.class
+}
 
 // CompiledAttribute is one attribute on a CompiledNode. Carries the
 // OPT-declared cardinality + existence when the OPT had an
