@@ -3,7 +3,6 @@ package rm
 import (
 	"bytes"
 	"encoding"
-	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -477,8 +476,8 @@ func (r *Real) UnmarshalText(text []byte) error {
 // NaN, the xs:double spellings, and a finite value as the shortest decimal
 // that reads back as the same float64, as encoding/xml writes a float64.
 //
-// encoding/json prefers [Real.MarshalJSONTo] and [Real.MarshalJSON] over this
-// method, so canonical JSON is unchanged by its presence.
+// encoding/json prefers [Real.MarshalJSON] over this method, so canonical
+// JSON is unchanged by its presence.
 func (r Real) MarshalText() ([]byte, error) {
 	f := float64(r)
 	switch {
@@ -495,39 +494,4 @@ func (r Real) MarshalText() ([]byte, error) {
 // MarshalJSON emits a JSON number.
 func (r Real) MarshalJSON() ([]byte, error) {
 	return json.Marshal(float64(r))
-}
-
-// MarshalJSONTo writes the JSON number [Real.MarshalJSON] returns straight to
-// enc, without building it in a slice of its own; encoding/json prefers this
-// method to MarshalJSON. A NaN or an infinity, which JSON cannot spell, makes
-// it return errors.ErrUnsupported without writing: encoding/json then calls
-// MarshalJSON, which refuses the value exactly as it would without this
-// method.
-func (r Real) MarshalJSONTo(enc *jsontext.Encoder) error {
-	f := float64(r)
-	if math.IsNaN(f) || math.IsInf(f, 0) {
-		return errors.ErrUnsupported
-	}
-	var buf [32]byte
-	return enc.WriteValue(appendJSONFloat(buf[:0], f))
-}
-
-// appendJSONFloat appends f to dst in the form encoding/json/v2 marshals a
-// finite float64 in: the shortest decimal that reads back as f, written
-// without an exponent from 1e-6 up to but excluding 1e21 and with one
-// outside that range, its exponent stripped of a leading zero (1e-7, not
-// 1e-07). It mirrors the internal jsonwire.AppendFloat at 64 bits;
-// TestNumericMarshalJSONToWritesMarshalJSONBytes holds the two to the same
-// bytes.
-func appendJSONFloat(dst []byte, f float64) []byte {
-	format := byte('f')
-	if abs := math.Abs(f); abs != 0 && (abs < 1e-6 || abs >= 1e21) {
-		format = 'e'
-	}
-	dst = strconv.AppendFloat(dst, f, format, -1, 64)
-	if n := len(dst); format == 'e' && n >= 4 && dst[n-4] == 'e' && dst[n-3] == '-' && dst[n-2] == '0' {
-		dst[n-2] = dst[n-1]
-		dst = dst[:n-1]
-	}
-	return dst
 }

@@ -2,7 +2,6 @@ package rm
 
 import (
 	"bytes"
-	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -110,12 +109,4 @@ func (i *Integer64) UnmarshalJSON(b []byte) error {
 // MarshalJSON emits a JSON number.
 func (i Integer64) MarshalJSON() ([]byte, error) {
 	return json.Marshal(int64(i))
-}
-
-// MarshalJSONTo writes the JSON number [Integer64.MarshalJSON] returns
-// straight to enc, without building it in a slice of its own; encoding/json
-// prefers this method to MarshalJSON.
-func (i Integer64) MarshalJSONTo(enc *jsontext.Encoder) error {
-	var buf [24]byte
-	return enc.WriteValue(strconv.AppendInt(buf[:0], int64(i), 10))
 }
