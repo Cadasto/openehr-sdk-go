@@ -18,10 +18,10 @@ var schemaDocuments = flag.String("schema-documents", "",
 	"write the re-encoded operational templates PROBE-111's schema leg validates to this folder, relative to the module root (make operational-template-schema-check)")
 
 // probe111CorpusFloor is the number of operational templates PROBE-111
-// covers today: 84, the corpus's 82 and the 2 generic templates. A walk that
+// covers today: 91, the corpus's 89 and the 2 generic templates. A walk that
 // finds fewer fails, so a corpus that silently empties, or a walk that stops
 // finding a folder, cannot pass as clean. Raise it when the corpus grows.
-const probe111CorpusFloor = 84
+const probe111CorpusFloor = 91
 
 // probe111Templates returns the names of every operational template PROBE-111
 // covers, the corpus's and the generic ones, sorted.
