@@ -10,11 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.51.0] - 2026-11-18
 
-Fifty-first `v0.x` minor: ID-token verification can trust a named project, validating compositions no longer links the AQL parser, the instance generator writes representative magnitudes, and canonical JSON encode is faster. **Breaking:** the AQL entry points of `openehr/validation` move to `aqlvalidation`, the RM floor reads `is_integral` as a precision of 0, and `rminfo`'s class lists are shared.
+Fifty-first `v0.x` minor: ID-token verification can trust a named project, validating compositions no longer links the AQL parser, the generic EHR_STATUS and FOLDER templates ship in a package, the instance generator writes representative magnitudes, and the FLAT codec and canonical JSON encode are faster. **Breaking:** the AQL entry points of `openehr/validation` move to `aqlvalidation`, the RM floor reads `is_integral` as a precision of 0, and `rminfo`'s class lists are shared.
 
 ### Added
 
 - **ID-token verification in `auth/smart` and `smart`** can trust a named project, accepting every audience of a token whose `aud` lists that project and whose `azp` is the client ID (REQ-062, REQ-064).
+- **`openehr/template/generic`** ships the generic `EHR_STATUS` and `FOLDER` templates as operational template XML and compiled once, under ids that never start refusing an instance they accepted (REQ-178).
 
 ### Changed
 
@@ -23,6 +24,8 @@ Fifty-first `v0.x` minor: ID-token verification can trust a named project, valid
 - **Breaking: `rminfo.RequiredAttributes` and `ConcreteDescendants`** return one list per class, shared by every call, which a caller must not modify (REQ-048).
 - **Template validation** reports an omitted or `null` data value part once, as `required` with no `primitive_*` finding beside it, and admits any value under a primitive constraint with no item (REQ-102, REQ-171).
 - **The instance generator** gives quantity and count magnitudes a representative value, writes each performer as a `PARTY_IDENTIFIED` named `example`, prefers an ordinal pair with a code and writes no fraction the RM floor refuses (REQ-107).
+- **`instance.Generate`** resolves each node's built type once and sizes its lists up front, running about 28% faster on a large template with the same output (REQ-107).
+- **The FLAT codec** allocates less on encode and decode, reading each leaf's canonical JSON in place, and writes the same bodies (REQ-053).
 - **Canonical JSON encode** of RM and AOM 1.4 values writes the same bytes faster, from generated code that writes each member, and a binary that encodes it grows by about 14% (REQ-052).
 
 ## [0.50.0] - 2026-11-17
