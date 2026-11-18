@@ -2789,6 +2789,7 @@ requirements:
       - openehr/aom/aom14/operational_template_shapes_xml_test.go
       - openehr/aom/aom14/primitive_profile_shapes_xml_test.go
       - openehr/aom/aom14/quantity_item_units_xml_test.go
+      - openehr/aom/aom14/read_rewind_internal_test.go
       - openehr/aom/aom14/read_rewind_test.go
       - openehr/aom/aom14/read_test.go
       - openehr/aom/aom14/schema_names_xml_test.go
