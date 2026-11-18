@@ -83,15 +83,24 @@ On the Demonstration composition these were about two thirds of encode allocatio
 Writing the members of three classes directly (CODE_PHRASE, DV_TEXT, ELEMENT) cut its encode from 114 to 82 µs and from 835 to 366 allocations (darwin/arm64), with every corpus document encoded to the same bytes.
 The generated `MarshalJSONTo` therefore writes `{`, `_type` and each member in struct declaration order as tokens on the encoder:
 - a string, a boolean or a pointer to one, as a token;
+- `rm.Real`, `rm.Integer` and `rm.Integer64` in `openehr/rm`, through unexported writers that write the bytes their `MarshalJSON` writes, so the three types keep no `MarshalJSONTo` of their own;
 - a generated class, by calling its `MarshalJSONTo`;
 - a value in an interface slot, through the `json.MarshalerTo` it implements;
-- a `Hash` map, an `Any` member, `[]byte` and `rm.Character`, through `json.MarshalEncode`, so `json.Deterministic` still sorts `Hash` keys.
+- a `Hash` map, an `Any` member, `[]byte`, `rm.Character`, an AOM 1.4 number and an integer enumeration, through `json.MarshalEncode`, so `json.Deterministic` still sorts `Hash` keys and json/v2 names the type in a failure.
 
 The generated code applies each field's omit rule as json/v2 applies its tag (§ *Why pointer and container fields differ*), a typed-nil pointer in an interface slot included.
-It writes directly only when the encoder carries no option that changes how a member is written: a caller's marshalers, `OmitZeroStructFields`, `StringifyNumbers` or v1's legacy `omitempty`.
-Under any of those it takes the wrapper above, so the output is the same bytes under every option set; the encoder's own options, indentation and escaping, apply to the tokens either way.
+It takes the wrapper above instead, so the output and the error are those of json/v2 under every option set:
+- when the encoder carries an option that changes how a member is written or a failure reported: a caller's marshalers, `OmitZeroStructFields`, v1's legacy `omitempty`, or v1's legacy error reporting;
+- when it carries `StringifyNumbers`, which json/v2 also reports for a caller's `,string` tag, a tag it refuses on a class;
+- when the value sits more than 900 levels deep, so a pointer cycle fails as json/v2's cycle, not as the encoder's depth limit;
+- when an interface or type-parameter member holds a type the registry does not list, before anything is written.
+
+The encoder's own options, indentation and escaping, apply to the tokens either way.
 A failure names the class whose method failed, as json/v2 does at a method boundary.
-A test encodes every corpus document both ways and compares the bytes.
+Tests encode every corpus document and every registered class both ways and compare the bytes, under each option the gate checks.
+
+Generated for every class, it cut the Demonstration composition's encode from 123 to 60 µs and from 835 to 6 allocations (darwin/arm64).
+The cost is code: the generated JSON encoders grew from 4,883 to 19,572 lines, and a program that encodes canonical JSON from 8.46 to 9.63 MB (+13.9%; +12.0% stripped).
 
 ### D9 — The generated XML decoders hand what they do not read to an internal runtime
 
