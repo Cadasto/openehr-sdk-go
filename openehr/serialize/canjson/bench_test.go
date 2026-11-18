@@ -188,6 +188,27 @@ func BenchmarkDecodeWithMissing(b *testing.B) {
 // it decodes and encodes cleanly, which is all this benchmark asks of it. The
 // setup decode and encode below are the control: a fixture that stopped
 // decoding would fail here rather than quietly measuring an error path.
+// BenchmarkEncodeCompositionFixture measures encode alone of the
+// benchFixture composition, whose ELEMENT, DV_TEXT and CODE_PHRASE values
+// make up most of a real composition, unlike the synthetic width-400 payload.
+func BenchmarkEncodeCompositionFixture(b *testing.B) {
+	payload, err := os.ReadFile(fixtures.CompositionJSON(benchFixture))
+	if err != nil {
+		b.Fatalf("read fixture %s: %v", benchFixture, err)
+	}
+	var c rm.Composition
+	if err := canjson.Unmarshal(payload, &c); err != nil {
+		b.Fatalf("setup decode of %s: %v", benchFixture, err)
+	}
+	b.SetBytes(int64(len(payload)))
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := canjson.Marshal(&c); err != nil {
+			b.Fatalf("Marshal: %v", err)
+		}
+	}
+}
+
 func BenchmarkDecodeCompositionFixture(b *testing.B) {
 	payload, err := os.ReadFile(fixtures.CompositionJSON(benchFixture))
 	if err != nil {
