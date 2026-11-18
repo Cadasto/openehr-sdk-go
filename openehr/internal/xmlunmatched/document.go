@@ -114,8 +114,12 @@ func decodeAgain(data []byte, v any, err error) error {
 }
 
 // afterRoot holds rest, the bytes of a document after its root element, to
-// the rule [epilogue] describes.
+// the rule [epilogue] describes. Whitespace alone, or nothing, the usual end
+// of a document, passes without a decoder.
 func afterRoot(rest []byte) error {
+	if isXMLSpace(rest) {
+		return nil
+	}
 	return epilogue(xml.NewDecoder(bytes.NewReader(rest)), func(from, to int64) []byte { return rest[from:to] })
 }
 

@@ -139,13 +139,14 @@ func rootStartElement(v any) xml.StartElement {
 	if n, ok := v.(BMMNamer); ok {
 		local = rootElementName(n.BMMName())
 	}
-	return xml.StartElement{
-		Name: xml.Name{Local: local},
-		Attr: []xml.Attr{
-			{Name: xml.Name{Local: "xmlns"}, Value: NSDefault},
-			XSINamespaceDecl(),
-		},
+	n := 2
+	if _, ok := v.(locatable); ok {
+		n = 3 // room for the archetype_node_id its MarshalXML appends
 	}
+	attrs := make([]xml.Attr, 2, n)
+	attrs[0] = xml.Attr{Name: xml.Name{Local: "xmlns"}, Value: NSDefault}
+	attrs[1] = XSINamespaceDecl()
+	return xml.StartElement{Name: xml.Name{Local: local}, Attr: attrs}
 }
 
 // ElementName converts a BMM class or property name to its canonical
@@ -176,11 +177,21 @@ func EncodePoly(e *xml.Encoder, name string, v any) error {
 	if !ok {
 		return fmt.Errorf("canxml: EncodePoly %s: %T does not implement BMMNamer/xml.Marshaler", name, v)
 	}
-	start := xml.StartElement{
-		Name: xml.Name{Local: name},
-		Attr: []xml.Attr{{Name: XSITypeAttrName(), Value: bn.BMMName()}},
+	// A LOCATABLE's MarshalXML appends its archetype_node_id: leave it room.
+	n := 1
+	if _, ok := m.(locatable); ok {
+		n = 2
 	}
+	attrs := make([]xml.Attr, 1, n)
+	attrs[0] = xml.Attr{Name: XSITypeAttrName(), Value: bn.BMMName()}
+	start := xml.StartElement{Name: xml.Name{Local: name}, Attr: attrs}
 	return m.MarshalXML(e, start)
+}
+
+// locatable is implemented by every generated LOCATABLE class, whose
+// MarshalXML adds the archetype_node_id attribute to its start element.
+type locatable interface {
+	IsArchetypeRoot() bool
 }
 
 // bmmNamerAndMarshaler resolves v to its (BMMNamer, xml.Marshaler)
