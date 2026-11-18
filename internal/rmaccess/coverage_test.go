@@ -54,7 +54,7 @@ func TestAccess_REQ171_CoversEveryRegisteredClass(t *testing.T) {
 			case !container && !bySingle:
 				t.Errorf("single(%T, %q) does not serve the attribute %s.%s", v, attr, name, attr)
 			case bySingle && byMultiple:
-				t.Errorf("%s.%s is served by both single and multiple", name, attr)
+				t.Errorf("%s.%s is served by both single and appendMultiple", name, attr)
 			}
 			if isHash := rmType == "Hash"; byHash != isHash {
 				t.Errorf("hash(%T, %q) serves = %t for %s.%s declared %s, want %t", v, attr, byHash, name, attr, rmType, isHash)

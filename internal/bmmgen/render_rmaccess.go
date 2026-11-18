@@ -158,10 +158,10 @@ var goPredeclaredKinds = map[string]accessKind{
 // It emits, for every class in [Plan.ConcreteClasses] and every instantiation
 // [reverseRegistryArms] lists for it, a reader of the single-valued
 // attributes and a reader of the containers the class declares, the type
-// switches single, multiple, hash and covers that dispatch on a value's Go
-// type (pointer and value form alike), a reader of the entries of every Hash
-// attribute, and a field-by-field zero test for every class an attribute
-// holds by value. Which attributes a class has, whether each is a container
+// switches single, appendMultiple, hash and covers that dispatch on a
+// value's Go type (pointer and value form alike), a reader of the entries of
+// every Hash attribute, and a field-by-field zero test for every class an
+// attribute holds by value. Which attributes a class has, whether each is a container
 // and which are Hash attributes is read from the same fold rminfo is
 // generated from ([effectiveProperties]).
 //
@@ -463,8 +463,8 @@ type armAttrs struct {
 }
 
 // split sorts the attributes of arm by the reader that answers them: a
-// container by multiple, any other attribute by single, and a Hash attribute
-// by hash as well, so a walk can enter its entries. It refuses a container
+// container by appendMultiple, any other attribute by single, and a Hash
+// attribute by hash as well, so a walk can enter its entries. It refuses a container
 // that is not a Go slice, a Hash that is not a map keyed by string, held
 // directly or through a pointer, and a Go map on an attribute not declared
 // Hash: a map whose entries no reader serves would reach a walk as one opaque

@@ -117,7 +117,7 @@ func TestRenderRMAccessFile_REQ171_Deterministic(t *testing.T) {
 // pointer and value form, exactly the Go types the reverse registry
 // recognises for the classes the type registry decodes, and that every arm's
 // readers answer exactly the attributes the class declares (the fold rminfo
-// is generated from), containers through multiple and every other attribute
+// is generated from), containers through appendMultiple and every other attribute
 // through single, and every Hash attribute through hash as well.
 func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 	plan, _, file := rmAccessOutput(t)
