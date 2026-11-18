@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"unicode"
 )
 
 // Split, Class and Substitute take shortcuts for the names they meet most.
@@ -67,6 +68,52 @@ func referenceSubstitute(owner, declared string) string {
 	return declared
 }
 
+// referenceWellFormed is wellFormed as it read every character before its
+// shortcut for ASCII: a rune at a time, with white space as
+// unicode.IsSpace reports it.
+func referenceWellFormed(s string) bool {
+	depth := 0
+	named, spaced, closed := false, false, false
+	for _, r := range s {
+		switch {
+		case r == '<':
+			if !named || closed {
+				return false
+			}
+			depth++
+			named, spaced = false, false
+		case r == ',':
+			if !named || depth == 0 {
+				return false
+			}
+			named, spaced, closed = false, false, false
+		case r == '>':
+			if !named || depth == 0 {
+				return false
+			}
+			depth--
+			closed = true
+		case unicode.IsSpace(r):
+			spaced = named
+		default:
+			if closed || spaced {
+				return false
+			}
+			named = true
+		}
+	}
+	return named && depth == 0
+}
+
+// wellFormedDiff describes how wellFormed differs from referenceWellFormed
+// on name, or is empty when they agree.
+func wellFormedDiff(name string) string {
+	if got, want := wellFormed(name), referenceWellFormed(name); got != want {
+		return fmt.Sprintf("wellFormed(%q) = %t, reference gives %t", name, got, want)
+	}
+	return ""
+}
+
 // edgeNames are type names at the edges of the shortcuts: plain names that
 // take them, and names one character away from plain that must not.
 var edgeNames = []string{
@@ -89,6 +136,10 @@ var edgeNames = []string{
 	// the closing bracket.
 	"<>", "<", ">", "A<", "A>", "A<>", "A< >", "<A>", "A<B", "A<B>>", "A<B<C>", "A<B>C",
 	"A<B><C>", "A<B<C> D>", "A<,B>", "A<B,>", "A<\v>", "DV_INTERVAL<DV_QUANTITY>junk",
+	// White space of every ASCII kind and beyond it, and bytes that are no
+	// UTF-8, inside a generic name.
+	"A<\tB\n>", "A<B\v>\f", "A<B\r,C>", "A<B C>", "A<B\u2028C>", "A<B>\u2029", "A\u1680<B>",
+	"A<\x85B>", "A<B\xc2>", "A<\xe2\x80B>", "A\x1c<B>", "A<B\x7f>",
 }
 
 // declaredNames are the declared types Substitute is compared on: every
@@ -170,6 +221,14 @@ func paramDiff(name string) string {
 	return ""
 }
 
+func TestWellFormedMatchesReference(t *testing.T) {
+	for _, name := range edgeNames {
+		if d := wellFormedDiff(name); d != "" {
+			t.Error(d)
+		}
+	}
+}
+
 func TestParamMatchesSplit(t *testing.T) {
 	for _, name := range edgeNames {
 		if d := paramDiff(name); d != "" {
@@ -205,12 +264,16 @@ func TestSubstituteMatchesReference(t *testing.T) {
 }
 
 // FuzzClassMatchesReference also holds Split to its reference, since Class
-// and Split share the shortcut for a plain name, and Param to Split.
+// and Split share the shortcut for a plain name, Param to Split, and
+// wellFormed to its reference.
 func FuzzClassMatchesReference(f *testing.F) {
 	for _, name := range edgeNames {
 		f.Add(name)
 	}
 	f.Fuzz(func(t *testing.T, name string) {
+		if d := wellFormedDiff(name); d != "" {
+			t.Error(d)
+		}
 		if d := classDiff(name); d != "" {
 			t.Error(d)
 		}

@@ -1151,7 +1151,10 @@ func precisionFits(node *tcimpl.CompiledNode, precision *rm.Integer) bool {
 	return !prohibited(node, "precision") && componentFits(bindingChild(node, "precision"), int64(*precision))
 }
 
-func componentFits(node *tcimpl.CompiledNode, v any) bool {
+// componentFits reports whether node's primitive constraint accepts v, and
+// true where node carries none. v is typed so that it is boxed only where
+// a constraint reads it.
+func componentFits[T any](node *tcimpl.CompiledNode, v T) bool {
 	pc := primitiveOf(node)
 	return pc == nil || len(pc.Validate(v)) == 0
 }
@@ -1754,13 +1757,16 @@ func orderedPair[T any](iv *rm.DVInterval[rm.DVOrdered], read func(rm.DVOrdered)
 // shareUnits gives two DV_QUANTITY bounds one unit both sides admit, and
 // reports whether it changed them. It tries, in this order, the lower
 // bound's units, the upper bound's, the units the lower side lists and then
-// those the upper side lists (listedUnits). Of those that both sides admit
+// those the upper side lists (appendListedUnits). Of those that both sides admit
 // (inUnits), it takes the first in which the two bounds can be put in order
 // (orderable), and the first of them where none can. A pair with none is left
 // as it is, and so is a pair in one unit that is the one it takes.
 func shareUnits(lower, upper *rm.DVQuantity, lowerNode, upperNode *tcimpl.CompiledNode) bool {
-	candidates := append([]string{lower.Units, upper.Units}, listedUnits(lowerNode)...)
-	candidates = append(candidates, listedUnits(upperNode)...)
+	// Room for the units of most pairs of sides, so the list needs no heap.
+	var buf [32]string
+	candidates := append(buf[:0], lower.Units, upper.Units)
+	candidates = appendListedUnits(candidates, lowerNode)
+	candidates = appendListedUnits(candidates, upperNode)
 	lo, hi, ok := firstOrderable(candidates, func(units string) (rm.DVQuantity, rm.DVQuantity, bool) {
 		lo, loOK := inUnits(lowerNode, *lower, units)
 		hi, hiOK := inUnits(upperNode, *upper, units)
@@ -1813,26 +1819,26 @@ func orderable[T, K any](lower, upper T, lowerNode, upperNode *tcimpl.CompiledNo
 	return ok
 }
 
-// listedUnits returns the units a side lists: those of the entries of the
-// C_DV_QUANTITY on its bound node, or, where it lists none, the units of the
-// property it names (PropertyUnits), which are the units it admits, or the
-// list of the C_STRING on the units of a bound the OPT builds attribute by
-// attribute. A side that lists none returns nil.
-func listedUnits(node *tcimpl.CompiledNode) []string {
+// appendListedUnits appends to dst the units a side lists, and returns the
+// result: those of the entries of the C_DV_QUANTITY on its bound node, or,
+// where it lists none, the units of the property it names (PropertyUnits),
+// which are the units it admits, or the list of the C_STRING on the units of
+// a bound the OPT builds attribute by attribute. A side that lists none
+// appends nothing.
+func appendListedUnits(dst []string, node *tcimpl.CompiledNode) []string {
 	if c, ok := primitiveOf(node).(constraints.DvQuantity); ok {
 		if len(c.Units) == 0 {
-			return c.PropertyUnits
+			return append(dst, c.PropertyUnits...)
 		}
-		units := make([]string, 0, len(c.Units))
 		for _, u := range c.Units {
-			units = append(units, u.Units)
+			dst = append(dst, u.Units)
 		}
-		return units
+		return dst
 	}
 	if c, ok := primitiveOf(bindingChild(node, "units")).(constraints.CString); ok {
-		return c.List
+		return append(dst, c.List...)
 	}
-	return nil
+	return dst
 }
 
 // inUnits returns q in units, and whether its side admits that: whether

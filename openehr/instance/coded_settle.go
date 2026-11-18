@@ -165,88 +165,95 @@ type codedSlot struct {
 // ELEMENT's null flavour only when it has no value, and a PARTICIPATION's
 // function only when it is a DV_CODED_TEXT, as the rules themselves read
 // them. Any other value holds none.
-func codedSlots(v any) []codedSlot {
+func codedSlots(v any) []codedSlot { return appendCodedSlots(nil, v) }
+
+// maxCodedSlots is the most slots appendCodedSlots appends for one value,
+// those of a DV_MULTIMEDIA.
+const maxCodedSlots = 5
+
+// appendCodedSlots appends to out the slots codedSlots lists for v, and
+// returns the result.
+func appendCodedSlots(out []codedSlot, v any) []codedSlot {
 	switch x := v.(type) {
 	case *rm.Composition:
-		return []codedSlot{
+		return append(out,
 			textSlot(&ruleCompositionCategory, &x.Category),
 			phraseSlot(&ruleCompositionLanguage, &x.Language),
 			phraseSlot(&ruleCompositionTerritory, &x.Territory),
-		}
+		)
 	case *rm.EventContext:
-		return []codedSlot{textSlot(&ruleEventContextSetting, &x.Setting)}
+		return append(out, textSlot(&ruleEventContextSetting, &x.Setting))
 	case *rm.Observation:
-		return entrySlots(&x.Language, &x.Encoding)
+		return appendEntrySlots(out, &x.Language, &x.Encoding)
 	case *rm.Evaluation:
-		return entrySlots(&x.Language, &x.Encoding)
+		return appendEntrySlots(out, &x.Language, &x.Encoding)
 	case *rm.Instruction:
-		return entrySlots(&x.Language, &x.Encoding)
+		return appendEntrySlots(out, &x.Language, &x.Encoding)
 	case *rm.Action:
-		return entrySlots(&x.Language, &x.Encoding)
+		return appendEntrySlots(out, &x.Language, &x.Encoding)
 	case *rm.AdminEntry:
-		return entrySlots(&x.Language, &x.Encoding)
+		return appendEntrySlots(out, &x.Language, &x.Encoding)
 	case *rm.Element:
 		if x.Value != nil && !rm.IsTypedNil(x.Value) {
-			return nil
+			return out
 		}
-		return appendText(nil, &ruleElementNullFlavour, x.NullFlavour)
+		return appendText(out, &ruleElementNullFlavour, x.NullFlavour)
 	case *rm.IntervalEvent[rm.ItemStructure]:
 		// typereg builds every INTERVAL_EVENT with this instantiation.
-		return []codedSlot{textSlot(&ruleEventMathFunction, &x.MathFunction)}
+		return append(out, textSlot(&ruleEventMathFunction, &x.MathFunction))
 	case *rm.IsmTransition:
-		return appendText([]codedSlot{textSlot(&ruleISMCurrentState, &x.CurrentState)}, &ruleISMTransition, x.Transition)
+		return appendText(append(out, textSlot(&ruleISMCurrentState, &x.CurrentState)), &ruleISMTransition, x.Transition)
 	case *rm.Participation:
-		var out []codedSlot
 		if f, ok := x.Function.(*rm.DVCodedText); ok {
 			out = appendText(out, &ruleParticipationFunc, f)
 		}
 		return appendText(out, &ruleParticipationMode, x.Mode)
 	case *rm.PartyRelated:
-		return []codedSlot{textSlot(&rulePartyRelationship, &x.Relationship)}
+		return append(out, textSlot(&rulePartyRelationship, &x.Relationship))
 	case *rm.TermMapping:
-		return appendText(nil, &ruleTermMappingPurpose, x.Purpose)
+		return appendText(out, &ruleTermMappingPurpose, x.Purpose)
 	case *rm.DVText:
-		return appendPhrase(appendPhrase(nil, &ruleTextLanguage, x.Language), &ruleTextEncoding, x.Encoding)
+		return appendPhrase(appendPhrase(out, &ruleTextLanguage, x.Language), &ruleTextEncoding, x.Encoding)
 	case *rm.DVCodedText:
-		return appendPhrase(appendPhrase(nil, &ruleTextLanguage, x.Language), &ruleTextEncoding, x.Encoding)
+		return appendPhrase(appendPhrase(out, &ruleTextLanguage, x.Language), &ruleTextEncoding, x.Encoding)
 	case *rm.DVQuantity:
-		return appendPhrase(nil, &ruleNormalStatus, x.NormalStatus)
+		return appendPhrase(out, &ruleNormalStatus, x.NormalStatus)
 	case *rm.DVCount:
-		return appendPhrase(nil, &ruleNormalStatus, x.NormalStatus)
+		return appendPhrase(out, &ruleNormalStatus, x.NormalStatus)
 	case *rm.DVProportion:
-		return appendPhrase(nil, &ruleNormalStatus, x.NormalStatus)
+		return appendPhrase(out, &ruleNormalStatus, x.NormalStatus)
 	case *rm.DVOrdinal:
-		return appendPhrase(nil, &ruleNormalStatus, x.NormalStatus)
+		return appendPhrase(out, &ruleNormalStatus, x.NormalStatus)
 	case *rm.DVScale:
-		return appendPhrase(nil, &ruleNormalStatus, x.NormalStatus)
+		return appendPhrase(out, &ruleNormalStatus, x.NormalStatus)
 	case *rm.DVDateTime:
-		return appendPhrase(nil, &ruleNormalStatus, x.NormalStatus)
+		return appendPhrase(out, &ruleNormalStatus, x.NormalStatus)
 	case *rm.DVDate:
-		return appendPhrase(nil, &ruleNormalStatus, x.NormalStatus)
+		return appendPhrase(out, &ruleNormalStatus, x.NormalStatus)
 	case *rm.DVTime:
-		return appendPhrase(nil, &ruleNormalStatus, x.NormalStatus)
+		return appendPhrase(out, &ruleNormalStatus, x.NormalStatus)
 	case *rm.DVDuration:
-		return appendPhrase(nil, &ruleNormalStatus, x.NormalStatus)
+		return appendPhrase(out, &ruleNormalStatus, x.NormalStatus)
 	case *rm.DVMultimedia:
-		out := encapsulatedSlots(x.Language, x.Charset)
+		out = appendEncapsulatedSlots(out, x.Language, x.Charset)
 		out = append(out, phraseSlot(&ruleMediaType, &x.MediaType))
 		out = appendPhrase(out, &ruleCompression, x.CompressionAlgorithm)
 		return appendPhrase(out, &ruleIntegrityCheck, x.IntegrityCheckAlgorithm)
 	case *rm.DVParsable:
-		return encapsulatedSlots(x.Language, x.Charset)
+		return appendEncapsulatedSlots(out, x.Language, x.Charset)
 	}
-	return nil
+	return out
 }
 
-// entrySlots lists an ENTRY's mandatory language and encoding.
-func entrySlots(language, encoding *rm.CodePhrase) []codedSlot {
-	return []codedSlot{phraseSlot(&ruleEntryLanguage, language), phraseSlot(&ruleEntryEncoding, encoding)}
+// appendEntrySlots appends an ENTRY's mandatory language and encoding.
+func appendEntrySlots(out []codedSlot, language, encoding *rm.CodePhrase) []codedSlot {
+	return append(out, phraseSlot(&ruleEntryLanguage, language), phraseSlot(&ruleEntryEncoding, encoding))
 }
 
-// encapsulatedSlots lists a DV_ENCAPSULATED's language and charset, each
-// when present.
-func encapsulatedSlots(language, charset *rm.CodePhrase) []codedSlot {
-	return appendPhrase(appendPhrase(nil, &ruleEncapsulatedLanguage, language), &ruleEncapsulatedCharset, charset)
+// appendEncapsulatedSlots appends a DV_ENCAPSULATED's language and charset,
+// each when present.
+func appendEncapsulatedSlots(out []codedSlot, language, charset *rm.CodePhrase) []codedSlot {
+	return appendPhrase(appendPhrase(out, &ruleEncapsulatedLanguage, language), &ruleEncapsulatedCharset, charset)
 }
 
 // textSlot is a DV_CODED_TEXT attribute under rule.
@@ -291,7 +298,8 @@ func appendPhrase(out []codedSlot, rule *codedRule, cp *rm.CodePhrase) []codedSl
 // OPT names the attribute with no code to choose. An attribute the OPT
 // prohibits that no RM rule needs admits no value, so its code stays.
 func (g *generator) settleCoded(opt *tcimpl.CompiledNode, v any) {
-	for _, s := range codedSlots(v) {
+	var buf [maxCodedSlots]codedSlot
+	for _, s := range appendCodedSlots(buf[:0], v) {
 		g.settleSlot(opt, v, s)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Split parses a BMM type name into its class name and its actual generic
@@ -251,7 +252,14 @@ func wellFormed(s string) bool {
 	named := false  // the type being read has a class name
 	spaced := false // white space followed that class name
 	closed := false // the type being read has had its parameter list closed
-	for _, r := range s {
+	for i := 0; i < len(s); {
+		// An ASCII byte is read as it is; anything else is decoded as range
+		// over a string decodes it, an invalid byte as utf8.RuneError.
+		r, size := rune(s[i]), 1
+		if r >= utf8.RuneSelf {
+			r, size = utf8.DecodeRuneInString(s[i:])
+		}
+		i += size
 		switch {
 		case r == '<':
 			if !named || closed {
@@ -272,7 +280,7 @@ func wellFormed(s string) bool {
 			// now had its parameter list closed.
 			depth--
 			closed = true
-		case unicode.IsSpace(r):
+		case isSpace(r):
 			spaced = named
 		default:
 			// A class name is one unbroken run: nothing may follow a closed
@@ -284,4 +292,13 @@ func wellFormed(s string) bool {
 		}
 	}
 	return named && depth == 0
+}
+
+// isSpace reports whether r is white space, as [unicode.IsSpace] does,
+// without a call for an ASCII rune.
+func isSpace(r rune) bool {
+	if r < utf8.RuneSelf {
+		return r == ' ' || '\t' <= r && r <= '\r'
+	}
+	return unicode.IsSpace(r)
 }

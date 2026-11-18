@@ -63,14 +63,17 @@ func (g *generator) needsUndescribed(node *tcimpl.CompiledNode) bool {
 	if undescribedNode(node) {
 		return true
 	}
-	if v, seen := g.undescribed[node]; seen {
-		return v
+	if m := g.memo[node]; m.undescribed != memoUnknown {
+		return m.undescribed == memoTrue
 	}
 	v := g.ownContentUndescribed(node)
-	if g.undescribed == nil {
-		g.undescribed = make(map[*tcimpl.CompiledNode]bool)
+	// Read again: deciding may have kept another answer for node.
+	m := g.memo[node]
+	m.undescribed = memoFalse
+	if v {
+		m.undescribed = memoTrue
 	}
-	g.undescribed[node] = v
+	g.keep(node, m)
 	return v
 }
 
