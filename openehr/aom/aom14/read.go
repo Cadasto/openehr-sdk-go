@@ -232,7 +232,8 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	}()
 	grow := func() {
 		if l, ok := r.(interface{ Len() int }); ok {
-			in.Grow(min(l.Len(), readMaxBytes) + 1)
+			// bytes.MinRead: ReadFrom grows the buffer unless that much is free.
+			in.Grow(min(l.Len(), readMaxBytes) + bytes.MinRead)
 		}
 	}
 	seeker, start, rewinds := rewindable(r)
