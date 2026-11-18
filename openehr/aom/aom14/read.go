@@ -212,8 +212,8 @@ const inputBufferMax = 4 << 20
 // what the decode reports to a function, which sees each item once. The
 // second decode reads the input again from where the read started when r is
 // a [*bytes.Reader], a [*strings.Reader], an [*io.SectionReader] or an
-// [*os.File] that can seek, which one holding a pipe cannot, and from a copy
-// the reader keeps of it as the first decode reads it otherwise. Where the
+// [*os.File] holding a regular file, and from a copy the reader keeps of it
+// as the first decode reads it otherwise, as for a pipe or a terminal. Where the
 // first decode fails in a way no second reading mends, the second one reads
 // only the bytes the first one read, so it fails as the first one did.
 //
@@ -344,9 +344,11 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 // rewindable reports whether r can seek back to where it is now, and if so
 // returns it as an [io.Seeker] with that offset. Only the readers whose Seek
 // is known to go back can: a [*bytes.Reader], a [*strings.Reader], an
-// [*io.SectionReader], and an [*os.File] whose Seek reports its offset, which
-// a pipe's does not. Another reader's Seek may report its offset and still
-// fail to go back.
+// [*io.SectionReader], and an [*os.File] that is a regular file whose Seek
+// reports its offset. A pipe's Seek fails, and a character device, such as
+// a terminal, can report its offset and still give other bytes when read
+// again. Another reader's Seek may report its offset and still fail to go
+// back.
 func rewindable(r io.Reader) (io.Seeker, int64, bool) {
 	var s io.Seeker
 	switch r := r.(type) {
@@ -357,6 +359,9 @@ func rewindable(r io.Reader) (io.Seeker, int64, bool) {
 	case *io.SectionReader:
 		s = r
 	case *os.File:
+		if fi, err := r.Stat(); err != nil || !fi.Mode().IsRegular() {
+			return nil, 0, false
+		}
 		s = r
 	default:
 		return nil, 0, false
