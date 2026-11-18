@@ -2412,12 +2412,15 @@ func (g *generator) materialiseMultiple(
 		return err
 	}
 	plan := g.planMembers(optNode, attr, children)
+	// The list makes room for every member the plan builds when it takes
+	// its first, so it does not grow as the others arrive.
+	members := plan.members()
 	for _, child := range plan.own {
 		rmChild, err := g.buildChild(child)
 		if err != nil {
 			return err
 		}
-		if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
+		if err := rmwrite.AppendMultipleHint(parentRM, attr.Name(), rmChild, members); err != nil {
 			return fmt.Errorf("append %s.%s: %w", builtRMType(optNode), attr.Name(), err)
 		}
 	}
@@ -2426,7 +2429,7 @@ func (g *generator) materialiseMultiple(
 		if err != nil {
 			return err
 		}
-		if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
+		if err := rmwrite.AppendMultipleHint(parentRM, attr.Name(), rmChild, members); err != nil {
 			// Silent skip — the BMM-fallback child may not satisfy
 			// the OPT-pinned attribute slot (e.g. an ELEMENT
 			// fallback into ITEM_TREE.items where the attribute

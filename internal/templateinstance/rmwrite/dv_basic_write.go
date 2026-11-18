@@ -26,9 +26,9 @@ func writeDVStateSingle(s *rm.DVState, attr string, child any) error {
 
 // writeDVParagraphMultiple appends a text to a DV_PARAGRAPH's items. A
 // DV_CODED_TEXT is taken as well as a DV_TEXT.
-func writeDVParagraphMultiple(p *rm.DVParagraph, attr string, child any) error {
+func writeDVParagraphMultiple(p *rm.DVParagraph, attr string, child any, hint int) error {
 	if attr == "items" {
-		return assignDVTextLike(child, func(v rm.DVTextLike) { p.Items = append(p.Items, v) }, attr)
+		return assignDVTextLike(child, func(v rm.DVTextLike) { p.Items = appendHinted(p.Items, v, hint) }, attr)
 	}
 	return fmt.Errorf("%w: *rm.DVParagraph has no multiple attr %q", ErrUnknownAttribute, attr)
 }
