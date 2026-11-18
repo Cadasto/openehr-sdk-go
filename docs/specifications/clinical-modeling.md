@@ -1406,7 +1406,7 @@ It keeps the RM rules where:
 - the settles § [Precedence](#precedence) 3 and 4 run on the walk's own value (a percentage `accuracy`, a DV_PROPORTION's kind, a DV_PERIODIC_TIME_SPECIFICATION's formalism, a coded attribute's group or code set, and `Normal_range_and_status_consistency`) leave it as it is, but for the `precision` 0 they give a DV_PROPORTION that has none, which no RM rule asks for.
 
 A default that does not validate, or breaks such a rule, leaves the value the `ValueFill` gives.
-Compile captures an OPT `<assumed_value>` into the constraint's `Default` field, but the generator does not read it.
+Compile captures an OPT `<assumed_value>` into the `Default` field of a `C_BOOLEAN`, `C_INTEGER`, `C_REAL` or `C_STRING` constraint, the only constraints that have one, but the generator does not read it.
 
 The generator is **sound** (every root it returns meets § Contract's output rule, apart from § [Exceptions and known gaps](#exceptions-and-known-gaps)), not **complete** (it does not enumerate every valid instance — different policies may produce different but equally valid trees).
 Sound × validator-aligned ⇒ PROBE-027 cross-checks the contract.
