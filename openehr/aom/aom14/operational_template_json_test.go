@@ -105,10 +105,10 @@ func TestREQ176_REQ052_CorpusOperationalTemplatesCanonicalJSON(t *testing.T) {
 	for _, path := range shipped {
 		docs = append(docs, document{name: "generic/" + filepath.Base(path), path: path})
 	}
-	// The corpus holds 82 operational templates and the generic package 2;
+	// The corpus holds 89 operational templates and the generic package 2;
 	// fewer means the walk lost some.
-	if len(docs) < 84 {
-		t.Fatalf("found %d operational templates under %s and %s; want at least 84", len(docs), corpus, generic)
+	if len(docs) < 91 {
+		t.Fatalf("found %d operational templates under %s and %s; want at least 91", len(docs), corpus, generic)
 	}
 	for _, doc := range docs {
 		path := doc.path
