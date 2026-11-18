@@ -52,6 +52,12 @@ All in the implementing PR:
 - `docs/roadmap.md` is updated when the change lands a roadmap row or opens new tracked work ([roadmap.md § Updating this page](roadmap.md#updating-this-page)).
 - `make ci` passes (it includes `make spec-check`).
 
+## The PR body
+
+A pull request's body follows [`.github/pull_request_template.md`](../.github/pull_request_template.md), which GitHub puts in every new pull request: a Summary ending with the `Lane:` line, then Changes, Verification and Notes for review.
+The template's comments hold the rules for each part, the length (about 450 words) among them, so they are not repeated here.
+The [Two lanes](#two-lanes) table says what each lane names in the body.
+
 ## superpowers + SDD
 
 The superpowers skills own the build, verify and branch loop (brainstorming, planning, TDD, execution, verification, code review, finishing a branch). The `sdd-*` skills own the specification and its traceability. superpowers writes under a `docs/superpowers/` tree by default; that tree must never become a second source of truth:
