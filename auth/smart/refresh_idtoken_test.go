@@ -1,8 +1,10 @@
 package smart_test
 
 import (
+	"cmp"
 	"crypto/rsa"
 	"errors"
+	"maps"
 	"net/url"
 	"reflect"
 	"testing"
@@ -239,12 +241,20 @@ func TestRefreshKeepsTheRedeemedRefreshToken(t *testing.T) { // REQ-063 REQ-064
 // carries aud, then marks the access token expired, as exchangeSession does.
 func exchangeWithAudience(t *testing.T, p *oidcProvider, src *smart.Source, aud any) {
 	t.Helper()
+	exchangeWithClaims(t, p, src, map[string]any{"aud": aud})
+}
+
+// exchangeWithClaims completes a launch on src whose ID token for user-1
+// carries the claims of set, then marks the access token expired, as
+// exchangeSession does.
+func exchangeWithClaims(t *testing.T, p *oidcProvider, src *smart.Source, set map[string]any) {
+	t.Helper()
 	req, err := src.BeginAuthorization("")
 	if err != nil {
 		t.Fatalf("BeginAuthorization: %v", err)
 	}
 	c := idClaims(req.Nonce)
-	c["aud"] = aud
+	maps.Copy(c, set)
 	p.setBody(tokenBody(t, "at-1", "rt-1", p.sign(t, c)))
 	if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req); err != nil {
 		t.Fatalf("ExchangeAuthorizationCode() error = %v, want success", err)
@@ -287,6 +297,58 @@ func TestRefreshComparesAudiencesAsASet(t *testing.T) { // REQ-064
 			}
 			if err != nil {
 				t.Errorf("Token() error = %v, want aud %v accepted after %v", err, tc.refreshAud, tc.sessionAud)
+			}
+		})
+	}
+}
+
+// TestRefreshUnderTrustedProjectComparesSubjectOnly pins REQ-064: with a
+// trusted project named, a refreshed ID token must name the session's
+// subject, but may list other audiences than the session's, since an
+// application that registers in between joins the list. It must still meet
+// the trusted-project rule of REQ-062. A refusal matches auth.ErrRefreshFailed
+// and auth.ErrJWKSValidationFailed and is not terminal.
+func TestRefreshUnderTrustedProjectComparesSubjectOnly(t *testing.T) { // REQ-062 REQ-064
+	const project = "project-1"
+	tests := []struct {
+		name        string
+		sessionAud  []string
+		refreshAud  []string
+		refreshSub  string // empty means the session's user-1
+		noAzp       bool   // the refreshed token carries no azp
+		wantRefused bool
+	}{
+		{name: "an application added", sessionAud: []string{"client-id", project}, refreshAud: []string{"client-id", project, "app-new"}},
+		{name: "an application dropped", sessionAud: []string{"client-id", project, "app-2"}, refreshAud: []string{project, "client-id"}},
+		{name: "another subject", sessionAud: []string{"client-id", project}, refreshAud: []string{"client-id", project}, refreshSub: "user-2", wantRefused: true},
+		{name: "the project dropped", sessionAud: []string{"client-id", project, "app-2"}, refreshAud: []string{"client-id", "app-2"}, wantRefused: true},
+		{name: "azp dropped", sessionAud: []string{"client-id", project}, refreshAud: []string{"client-id", project}, noAzp: true, wantRefused: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newOIDCProvider(t)
+			src := p.source(t, p.endpoints(), smart.WithIDTokenTrustedProject(project))
+			exchangeWithClaims(t, p, src, map[string]any{"aud": tc.sessionAud, "azp": "client-id"})
+			heldAccess, _ := src.HeldTokens()
+			c := refreshClaims(cmp.Or(tc.refreshSub, "user-1"))
+			c["aud"] = tc.refreshAud
+			if !tc.noAzp {
+				c["azp"] = "client-id"
+			}
+			p.setBody(tokenBody(t, "at-2", "rt-2", p.sign(t, c)))
+
+			tok, err := src.Token(t.Context())
+			if !tc.wantRefused {
+				if err != nil || tok.Value != "at-2" {
+					t.Fatalf("Token() = %q, %v; want at-2 for aud %q after %q", tok.Value, err, tc.refreshAud, tc.sessionAud)
+				}
+				return
+			}
+			if !errors.Is(err, auth.ErrRefreshFailed) || !errors.Is(err, auth.ErrJWKSValidationFailed) || errors.Is(err, auth.ErrReauthRequired) {
+				t.Fatalf("Token() error = %v, want one matching auth.ErrRefreshFailed and auth.ErrJWKSValidationFailed, not terminal", err)
+			}
+			if access, refresh := src.HeldTokens(); access != heldAccess || refresh != "rt-1" {
+				t.Errorf("held tokens after the refused refresh = %q, %q; want the previous %q, rt-1", access.Value, refresh, heldAccess.Value)
 			}
 		})
 	}

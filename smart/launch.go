@@ -30,6 +30,10 @@ type ValidateConfig struct {
 	// besides ClientID. When empty, a token whose aud lists any other
 	// audience is rejected.
 	TrustedAudiences []string
+	// TrustedProject names the project the client belongs to, whose ID and
+	// applications the ID token's aud claim may list besides ClientID, as
+	// [authsmart.WithTrustedProject] describes. Empty means none.
+	TrustedProject string
 }
 
 // ValidateOption mutates [ValidateConfig].
@@ -75,6 +79,18 @@ func WithIDTokenSigningAlgs(algs []string) ValidateOption {
 func WithTrustedAudiences(aud ...string) ValidateOption {
 	trusted := slices.Clone(aud)
 	return func(c *ValidateConfig) { c.TrustedAudiences = trusted }
+}
+
+// WithTrustedProject names the project the client belongs to, for an
+// authorization server that lists in the ID token's aud claim the project's
+// ID beside the client ID of every application in that project. The token
+// must then list the project ID in aud and carry an azp claim equal to the
+// client ID, and every other audience in aud is accepted, as
+// [authsmart.WithTrustedProject] describes. An empty projectID names no
+// project. A projectID equal to the client ID fails the verification with
+// auth.ErrInvalidConfig.
+func WithTrustedProject(projectID string) ValidateOption {
+	return func(c *ValidateConfig) { c.TrustedProject = projectID }
 }
 
 // WithPrincipalClaimNames overrides principal_uid / principal_type keys.
@@ -142,7 +158,7 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 		// before the token, so a missing one is a configuration error.
 		var err error
 		claims, err = authsmart.ValidateIDToken(ctx, tr.IDToken, cfg.JWKS, cfg.Issuer, cfg.ClientID, cfg.Nonce, cfg.Now, cfg.AllowedIDTokenAlgs,
-			authsmart.WithTrustedAudiences(cfg.TrustedAudiences...))
+			authsmart.WithTrustedAudiences(cfg.TrustedAudiences...), authsmart.WithTrustedProject(cfg.TrustedProject))
 		if err != nil {
 			return nil, fmt.Errorf("smart: id_token: %w", err)
 		}

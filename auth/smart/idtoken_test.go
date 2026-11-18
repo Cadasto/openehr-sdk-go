@@ -799,6 +799,126 @@ func TestWithTrustedAudiencesKeepsItsOwnCopy(t *testing.T) {
 	}
 }
 
+// TestValidateIDTokenTrustedProject walks the audience rules with a trusted
+// project named: aud must list the project ID beside the client ID and the
+// token must carry azp naming the client; every other non-empty audience is
+// then accepted, whatever the trusted set holds. Without a project the
+// trusted set alone decides. Each refused case is otherwise valid, so only
+// these rules refuse it. REQ-062
+func TestValidateIDTokenTrustedProject(t *testing.T) {
+	const project = "project-1"
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+
+	cases := []struct {
+		name    string
+		set     map[string]any
+		project string
+		trusted []string
+		wantErr bool
+	}{
+		{name: "client, project and other applications", project: project, set: map[string]any{"aud": []string{"client-id", project, "app-2", "app-3"}, "azp": "client-id"}},
+		{name: "client and project only", project: project, set: map[string]any{"aud": []string{project, "client-id"}, "azp": "client-id"}},
+		{name: "other applications accepted whatever the trusted set holds", project: project, trusted: []string{"unrelated"}, set: map[string]any{"aud": []string{"client-id", project, "app-2"}, "azp": "client-id"}},
+		{name: "aud does not list the project", project: project, wantErr: true, set: map[string]any{"aud": []string{"client-id", "app-2"}, "azp": "client-id"}},
+		{name: "aud is the client alone", project: project, wantErr: true, set: map[string]any{"aud": "client-id", "azp": "client-id"}},
+		{name: "a trusted audience does not stand in for the project", project: project, trusted: []string{"app-2"}, wantErr: true, set: map[string]any{"aud": []string{"client-id", "app-2"}, "azp": "client-id"}},
+		{name: "azp is missing", project: project, wantErr: true, set: map[string]any{"aud": []string{"client-id", project}}},
+		{name: "azp names another application", project: project, wantErr: true, set: map[string]any{"aud": []string{"client-id", project, "app-2"}, "azp": "app-2"}},
+		{name: "azp names the project", project: project, wantErr: true, set: map[string]any{"aud": []string{"client-id", project}, "azp": project}},
+		{name: "azp is null", project: project, wantErr: true, set: map[string]any{"aud": []string{"client-id", project}, "azp": nil}},
+		{name: "aud lists an empty string", project: project, wantErr: true, set: map[string]any{"aud": []any{"client-id", project, ""}, "azp": "client-id"}},
+		{name: "aud lists null", project: project, wantErr: true, set: map[string]any{"aud": []any{"client-id", project, nil}, "azp": "client-id"}},
+		{name: "aud lists a number", project: project, wantErr: true, set: map[string]any{"aud": []any{"client-id", project, 7}, "azp": "client-id"}},
+		{name: "the project without the client", project: project, wantErr: true, set: map[string]any{"aud": []string{project, "app-2"}, "azp": "client-id"}},
+		{name: "no project: the project ID is an untrusted audience", wantErr: true, set: map[string]any{"aud": []string{"client-id", project}, "azp": "client-id"}},
+		{name: "no project: the trusted set alone decides", trusted: []string{project}, set: map[string]any{"aud": []string{"client-id", project}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			claims := defaultIDClaims(now)
+			maps.Copy(claims, tc.set)
+			tok := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
+
+			_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
+				"https://issuer.example", "client-id", "nonce-xyz", now, nil,
+				smart.WithTrustedAudiences(tc.trusted...), smart.WithTrustedProject(tc.project))
+			// REQ-062: with a project named, aud must list it and azp must be present; other non-empty audiences pass.
+			switch {
+			case tc.wantErr && (err == nil || !errors.Is(err, auth.ErrJWKSValidationFailed)):
+				t.Fatalf("ValidateIDToken(%s, project %q, trusted %q) error = %v, want ErrJWKSValidationFailed", tc.name, tc.project, tc.trusted, err)
+			case !tc.wantErr && err != nil:
+				t.Fatalf("ValidateIDToken(%s, project %q, trusted %q) error = %v, want nil", tc.name, tc.project, tc.trusted, err)
+			}
+		})
+	}
+}
+
+// TestWithTrustedProjectLaterReplacesEarlier checks that a later
+// WithTrustedProject replaces an earlier one, and that an empty one names no
+// project. REQ-062
+func TestWithTrustedProjectLaterReplacesEarlier(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+	claims := defaultIDClaims(now)
+	claims["aud"] = []string{"client-id", "project-1", "app-2"}
+	claims["azp"] = "client-id"
+	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
+
+	cases := []struct {
+		name    string
+		opts    []smart.IDTokenOption
+		wantErr bool
+	}{
+		{name: "another project, then the token's", opts: []smart.IDTokenOption{smart.WithTrustedProject("project-9"), smart.WithTrustedProject("project-1")}},
+		{name: "the token's project, then another", opts: []smart.IDTokenOption{smart.WithTrustedProject("project-1"), smart.WithTrustedProject("project-9")}, wantErr: true},
+		{name: "the token's project, then none", opts: []smart.IDTokenOption{smart.WithTrustedProject("project-1"), smart.WithTrustedProject("")}, wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
+				"https://issuer.example", "client-id", "nonce-xyz", now, nil, tc.opts...)
+			// REQ-062: the last project named decides.
+			switch {
+			case tc.wantErr && !errors.Is(err, auth.ErrJWKSValidationFailed):
+				t.Fatalf("ValidateIDToken(aud [client-id project-1 app-2], %s) error = %v, want ErrJWKSValidationFailed", tc.name, err)
+			case !tc.wantErr && err != nil:
+				t.Fatalf("ValidateIDToken(aud [client-id project-1 app-2], %s) error = %v, want nil", tc.name, err)
+			}
+		})
+	}
+}
+
+// TestValidateIDTokenTrustedProjectIsTheClient checks that a trusted project
+// equal to the client ID is a configuration error, reported before the token
+// is read: it matches auth.ErrInvalidConfig, never
+// auth.ErrJWKSValidationFailed, for a token that would otherwise pass and
+// for an empty one, and the key set is not fetched. REQ-062
+func TestValidateIDTokenTrustedProjectIsTheClient(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks, fetches := countingJWKSServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+	claims := defaultIDClaims(now)
+	claims["azp"] = "client-id"
+	valid := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
+
+	for name, raw := range map[string]string{"a token whose aud and azp name the client": valid, "an empty token": ""} {
+		t.Run(name, func(t *testing.T) {
+			_, err := smart.ValidateIDToken(t.Context(), raw, jwks,
+				"https://issuer.example", "client-id", "nonce-xyz", now, nil, smart.WithTrustedProject("client-id"))
+			// REQ-062: a project equal to the client ID is the caller's configuration error.
+			if !errors.Is(err, auth.ErrInvalidConfig) || errors.Is(err, auth.ErrJWKSValidationFailed) {
+				t.Fatalf("ValidateIDToken(%s, project = client ID) error = %v, want ErrInvalidConfig and not ErrJWKSValidationFailed", name, err)
+			}
+		})
+	}
+	if n := fetches.Load(); n != 0 {
+		t.Errorf("JWKS fetched %d times, want none for a configuration error", n)
+	}
+}
+
 // TestValidateIDTokenSurfacesOwnNonce checks that IDTokenClaims.Nonce holds the
 // token's own nonce claim, whether or not the caller expected one, and is
 // empty when the token has none. The claim stays out of Extra. REQ-062

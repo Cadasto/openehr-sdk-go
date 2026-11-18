@@ -99,6 +99,10 @@ type Config struct {
 	// may list besides ClientID when the source verifies it. Empty means
 	// only ClientID is accepted. See [WithIDTokenTrustedAudiences].
 	IDTokenTrustedAudiences []string
+	// IDTokenTrustedProject names the project the client belongs to, whose
+	// ID and applications an ID token's aud claim may list when the source
+	// verifies it. Empty means none. See [WithIDTokenTrustedProject].
+	IDTokenTrustedProject string
 
 	// clientAssertion carries the asymmetric private_key_jwt credential, set
 	// via WithClientAssertionKey. Mutually exclusive with ClientSecret.
@@ -125,9 +129,10 @@ type Config struct {
 // other fields are shown as they are.
 func (c Config) String() string {
 	return fmt.Sprintf("smart.Config{ClientID: %q, ClientSecret: %q, ClientAssertion: %s, RedirectURI: %q, Scopes: %q, Audience: %q, "+
-		"AuthorizationEndpoint: %q, TokenEndpoint: %q, Issuer: %q, RefreshThreshold: %s, IDTokenTrustedAudiences: %q}",
+		"AuthorizationEndpoint: %q, TokenEndpoint: %q, Issuer: %q, RefreshThreshold: %s, IDTokenTrustedAudiences: %q, IDTokenTrustedProject: %q}",
 		c.ClientID, redact(c.ClientSecret), c.clientAssertion.text(), urlredact.String(c.RedirectURI), c.Scopes, urlredact.String(c.Audience),
-		redactedURL(c.Auth.AuthorizationEndpoint), redactedURL(c.Auth.TokenEndpoint), urlredact.String(c.Issuer), c.RefreshThreshold, c.IDTokenTrustedAudiences)
+		redactedURL(c.Auth.AuthorizationEndpoint), redactedURL(c.Auth.TokenEndpoint), urlredact.String(c.Issuer), c.RefreshThreshold, c.IDTokenTrustedAudiences,
+		c.IDTokenTrustedProject)
 }
 
 // GoString returns the text of [Config.String], so that printing c in Go
@@ -161,6 +166,7 @@ func (c Config) LogValue() slog.Value {
 		slog.String("Issuer", urlredact.String(c.Issuer)),
 		slog.Duration("RefreshThreshold", c.RefreshThreshold),
 		slog.Any("IDTokenTrustedAudiences", c.IDTokenTrustedAudiences),
+		slog.String("IDTokenTrustedProject", c.IDTokenTrustedProject),
 	)
 }
 
@@ -337,6 +343,23 @@ func WithIssuer(iss string) Option {
 func WithIDTokenTrustedAudiences(aud ...string) Option {
 	trusted := slices.Clone(aud)
 	return func(cfg *Config) { cfg.IDTokenTrustedAudiences = trusted }
+}
+
+// WithIDTokenTrustedProject names the project the client belongs to, so the
+// source accepts an ID token whose aud claim lists the project's ID beside
+// the client ID of every application in that project, at the code exchange
+// and on refresh. [WithTrustedProject] describes the checks: the token must
+// list the project ID in aud and carry an azp claim equal to the client ID,
+// and every other audience in aud is then accepted. A refreshed ID token
+// must still name the session's subject, but may list other audiences than
+// the session's, since an application that registers in between joins the
+// list.
+//
+// An empty projectID names no project, and a later call replaces an earlier
+// one. [FromConfig] fails with [auth.ErrInvalidConfig] when projectID equals
+// the client ID.
+func WithIDTokenTrustedProject(projectID string) Option {
+	return func(cfg *Config) { cfg.IDTokenTrustedProject = projectID }
 }
 
 // WithRefreshThreshold sets how long before its expiry the held access token
@@ -692,10 +715,11 @@ func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Sour
 // FromConfig validates cfg and returns a Source.
 //
 // It fails with [auth.ErrInvalidConfig] when cfg has no HTTPClient, no
-// ClientID, no token or authorization endpoint, or no Audience. SMART
-// requires the `aud` parameter on the authorization request, and
-// FromConfig does not guess one: set Audience to the Platform base URL or
-// to an audience identifier the authorization server knows.
+// ClientID, no token or authorization endpoint, or no Audience, or when its
+// IDTokenTrustedProject is its ClientID. SMART requires the `aud` parameter
+// on the authorization request, and FromConfig does not guess one: set
+// Audience to the Platform base URL or to an audience identifier the
+// authorization server knows.
 //
 // The SDK always uses the S256 PKCE method. When cfg.Auth lists the
 // server's supported methods (CodeChallengeMethodsSupported) and S256 is
@@ -721,6 +745,11 @@ func FromConfig(cfg Config) (*Source, error) {
 	}
 	if cfg.ClientID == "" {
 		return nil, fmt.Errorf("%w: ClientID is required", auth.ErrInvalidConfig)
+	}
+	if cfg.IDTokenTrustedProject == cfg.ClientID {
+		// REQ-062: a project equal to the client would make the project check
+		// a second check of the client ID.
+		return nil, fmt.Errorf("%w: IDTokenTrustedProject is the ClientID", auth.ErrInvalidConfig)
 	}
 	if cfg.Auth.TokenEndpoint == nil {
 		return nil, fmt.Errorf("%w: TokenEndpoint is required", auth.ErrInvalidConfig)
@@ -1022,7 +1051,9 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 //     the server lists in id_token_signing_alg_values_supported when it
 //     lists any;
 //   - the issuer against the source's issuer;
-//   - the audience against the client ID and [WithIDTokenTrustedAudiences];
+//   - the audience against the client ID, [WithIDTokenTrustedAudiences]
+//     and [WithIDTokenTrustedProject], and the azp claim against the client
+//     ID;
 //   - the nonce against req.Nonce.
 //
 // Any failure there is an [*auth.ExchangeError] matching
@@ -1077,12 +1108,13 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 }
 
 // verifyIDToken checks an ID token from the token endpoint against the
-// source's JWKS, issuer, client ID, trusted audiences and the server's
-// advertised signing algorithms. nonce is the launch's nonce at
+// source's JWKS, issuer, client ID, trusted audiences, trusted project and
+// the server's advertised signing algorithms. nonce is the launch's nonce at
 // the code exchange, and empty on refresh, where none is checked.
 func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDTokenClaims, error) {
 	return ValidateIDToken(ctx, raw, s.cfg.JWKS, s.cfg.Issuer, s.cfg.ClientID, nonce, time.Time{},
-		s.cfg.Auth.IDTokenSigningAlgValuesSupported, WithTrustedAudiences(s.cfg.IDTokenTrustedAudiences...))
+		s.cfg.Auth.IDTokenSigningAlgValuesSupported, WithTrustedAudiences(s.cfg.IDTokenTrustedAudiences...),
+		WithTrustedProject(s.cfg.IDTokenTrustedProject))
 }
 
 // LastTokenResponse returns SMART fields from the most recent successful
@@ -1593,15 +1625,25 @@ func (s *Source) refreshGrant(ctx context.Context, refresh string, binding *idTo
 
 // verifyRefreshedIDToken verifies an ID token from a refresh response like
 // one from the code exchange, without a nonce, and, when prev holds the
-// session's earlier verified ID token, requires the same subject and
-// audience (OpenID Connect Core 1.0 §12.2).
+// session's earlier verified ID token, requires the same subject and,
+// unless the source names a trusted project, the same audience (OpenID
+// Connect Core 1.0 §12.2). Under a trusted project the audience set is not
+// compared: an application that registers between the sign-in and the
+// refresh joins it, and the new token has met the trusted-project rule in
+// verifyIDToken (REQ-064).
 func (s *Source) verifyRefreshedIDToken(ctx context.Context, raw string, prev *idTokenBinding) (*IDTokenClaims, error) {
 	claims, err := s.verifyIDToken(ctx, raw, "")
 	if err != nil {
 		return nil, err
 	}
-	if prev != nil && (claims.Subject != prev.subject || !slices.Equal(audienceSet(claims.Audience), prev.audience)) {
-		return nil, fmt.Errorf("%w: the refreshed ID token names another subject or audience than the session's", auth.ErrJWKSValidationFailed)
+	if prev == nil {
+		return claims, nil
+	}
+	if claims.Subject != prev.subject {
+		return nil, fmt.Errorf("%w: the refreshed ID token names another subject than the session's", auth.ErrJWKSValidationFailed)
+	}
+	if s.cfg.IDTokenTrustedProject == "" && !slices.Equal(audienceSet(claims.Audience), prev.audience) {
+		return nil, fmt.Errorf("%w: the refreshed ID token names another audience than the session's", auth.ErrJWKSValidationFailed)
 	}
 	return claims, nil
 }
