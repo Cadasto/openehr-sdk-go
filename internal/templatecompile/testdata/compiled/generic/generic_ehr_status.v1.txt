@@ -1,4 +1,4 @@
-# compiled tree of templates/generic_ehr_status.v1.opt
+# compiled tree of generic/generic_ehr_status.v1.opt
 template_id="generic_ehr_status.v1" concept="Generic EHR status" language="en" uid="70c19cf1-96fe-40ea-ae17-e7effd31896b" num_nodes=2
 
 node /

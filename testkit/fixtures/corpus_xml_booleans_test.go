@@ -90,9 +90,12 @@ func booleanFindings(r io.Reader) ([]string, error) {
 }
 
 // TestCorpusOPTBooleansAreLexicallyValid guards REQ-176 fixture hygiene: no
-// vendored OPT may spell an xs:boolean element as an empty element.
+// vendored OPT, and no generic template the SDK ships in
+// openehr/template/generic, may spell an xs:boolean element as an empty
+// element.
 func TestCorpusOPTBooleansAreLexicallyValid(t *testing.T) {
-	var files []string
+	type document struct{ rel, path string }
+	var files []document
 	err := filepath.WalkDir(fixtures.CorpusRoot(), func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -104,7 +107,8 @@ func TestCorpusOPTBooleansAreLexicallyValid(t *testing.T) {
 			return fs.SkipDir
 		}
 		if !d.IsDir() && strings.HasSuffix(p, ".opt") {
-			files = append(files, p)
+			rel, _ := filepath.Rel(fixtures.CorpusRoot(), p)
+			files = append(files, document{rel: rel, path: p})
 		}
 		return nil
 	})
@@ -114,8 +118,15 @@ func TestCorpusOPTBooleansAreLexicallyValid(t *testing.T) {
 	if len(files) == 0 {
 		t.Fatalf("no .opt files under %s", fixtures.CorpusRoot())
 	}
-	for _, p := range files {
-		rel, _ := filepath.Rel(fixtures.CorpusRoot(), p)
+	generic, err := filepath.Glob(filepath.Join(fixtures.GenericTemplatesDir(), "*.opt"))
+	if err != nil || len(generic) == 0 {
+		t.Fatalf("no .opt files in %s (error %v)", fixtures.GenericTemplatesDir(), err)
+	}
+	for _, p := range generic {
+		files = append(files, document{rel: "generic/" + filepath.Base(p), path: p})
+	}
+	for _, doc := range files {
+		rel, p := doc.rel, doc.path
 		t.Run(rel, func(t *testing.T) {
 			t.Parallel()
 			f, err := os.Open(p)

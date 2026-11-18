@@ -7,14 +7,15 @@ package templatecompile_test
 // placement REQ-111 § Reading the model names.
 //
 // For every operational template the corpus vendors, walked as PROBE-111
-// walks them, for every parity fixture (testdata/parity) and for every
-// fixture of the model's reader (openehr/aom/aom14/testdata/reader), the
-// test renders the compiled tree as line-oriented text and holds it equal
-// to testdata/compiled/<corpus path>.txt, parity/<fixture>.txt or
-// reader/<fixture>.txt. Each node is one block in walk order: its path, RM
-// type, node id, archetype id, node name, occurrences, slot marks and
-// rules, primitive constraint, default value, terms and bindings, then one
-// line per attribute. A primitive constraint renders as its Go type and
+// walks them, for every generic template the SDK ships
+// (openehr/template/generic), for every parity fixture (testdata/parity) and
+// for every fixture of the model's reader (openehr/aom/aom14/testdata/reader),
+// the test renders the compiled tree as line-oriented text and holds it equal
+// to testdata/compiled/<corpus path>.txt, generic/<template>.txt,
+// parity/<fixture>.txt or reader/<fixture>.txt. Each node is one block in
+// walk order: its path, RM type, node id, archetype id, node name,
+// occurrences, slot marks and rules, primitive constraint, default value,
+// terms and bindings, then one line per attribute. A primitive constraint renders as its Go type and
 // exported fields, a default value as its Go type and canonical JSON. A
 // change to the compile step that moves any of it shows as a diff on the
 // golden, reviewed rather than assumed. Regenerate with:
@@ -67,6 +68,13 @@ func TestCompiledGolden(t *testing.T) {
 	if len(names) == 0 {
 		t.Fatal("Probe111OperationalTemplates found no operational template: corpus layout changed?")
 	}
+	generic, err := templateprobes.Probe111GenericTemplates()
+	if err != nil {
+		t.Fatalf("Probe111GenericTemplates: %v", err)
+	}
+	if len(generic) == 0 {
+		t.Fatalf("Probe111GenericTemplates found no operational template in %s", fixtures.GenericTemplatesDir())
+	}
 	// The goldens of the parity fixtures and of the reader's fixtures were
 	// recorded on the v0.45.0 code, in the commit that added them, when
 	// template.ParseOPT, removed in 0.46.0, read each of these fixtures and
@@ -76,6 +84,7 @@ func TestCompiledGolden(t *testing.T) {
 	// only for a reason the change under review gives.
 	sources := []goldenSource{
 		{root: fixtures.CorpusRoot(), label: "<corpus>", names: names},
+		{root: filepath.Dir(fixtures.GenericTemplatesDir()), label: "<openehr/template>", names: generic},
 		fixtureGoldenSource(t, "testdata", "parity"),
 		fixtureGoldenSource(t, readerFixturesRoot, "reader"),
 	}

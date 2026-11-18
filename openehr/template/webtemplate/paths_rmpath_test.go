@@ -97,11 +97,16 @@ type refusal struct {
 	err   error
 }
 
-// vendoredOPTs lists every OPT this repository vendors: the template corpus and
-// the PROBE-086 FLAT conformance template.
+// vendoredOPTs lists every OPT this repository vendors: the template corpus,
+// the generic templates the SDK ships in openehr/template/generic and the
+// PROBE-086 FLAT conformance template.
 func vendoredOPTs(t *testing.T) []string {
 	t.Helper()
 	corpus, err := filepath.Glob("../../../testkit/corpus/templates/*.opt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	generic, err := filepath.Glob("../generic/*.opt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +114,7 @@ func vendoredOPTs(t *testing.T) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	all := append(corpus, flat...)
+	all := slices.Concat(corpus, generic, flat)
 	if len(all) == 0 {
 		t.Fatal("no vendored OPT found — corpus layout changed?")
 	}

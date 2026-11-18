@@ -284,15 +284,17 @@ terminology-check: ## Verify the vendored terminology (offline sha256)
 # PROBE-111's schema leg. In a fresh folder under the gitignored .tmp/, which
 # the dev container sees too, it writes the pinned ITS-XML schemas with their
 # namespace read as the http://schemas.openehr.org/v1 that OPTs and the SDK
-# write, and the SDK's re-encoding of every corpus OPT the ratchet
+# write, and the SDK's re-encoding of every OPT PROBE-111 covers, the corpus's
+# and those in openehr/template/generic, that the ratchet
 # (testkit/probes/template/probe_111_schema_ratchet.txt) does not list. Then
-# xmllint validates those documents, and every corpus OPT as written, against
-# AM/Release-1.4/Template.xsd. It fails on a re-encoded document the schemas
-# refuse, on an OPT they refuse as written that the ratchet does not list, and
-# on a ratchet entry they now accept. mktemp makes the folder private to the
-# host user; it is opened to all so that the dev container's user, whose uid
-# need not be the host's, can read it.
-operational-template-schema-check: ## Validate the corpus OPTs, as written and re-encoded, against the pinned AM 1.4 schemas (xmllint)
+# xmllint validates those documents, and each of those OPTs as written,
+# against AM/Release-1.4/Template.xsd. It fails on a re-encoded document the
+# schemas refuse, on an OPT they refuse as written that the ratchet does not
+# list, and on a ratchet entry they now accept. The ratchet names a corpus OPT
+# by its path below testkit/corpus and a generic one as generic/<file>.
+# mktemp makes the folder private to the host user; it is opened to all so
+# that the dev container's user, whose uid need not be the host's, can read it.
+operational-template-schema-check: ## Validate the corpus and generic OPTs, as written and re-encoded, against the pinned AM 1.4 schemas (xmllint)
 	@set -e; mkdir -p .tmp; \
 	dir="$$(mktemp -d .tmp/operational-template-schema-check.XXXXXX)"; \
 	trap '[ -n "$$dir" ] && rm -rf "$$dir"' EXIT; \
@@ -303,8 +305,8 @@ operational-template-schema-check: ## Validate the corpus OPTs, as written and r
 	done; \
 	out="$$($(GO) test ./testkit/probes/template -run '^TestProbe111WriteSchemaDocuments$$' -count=1 -args -schema-documents "$$dir" 2>&1)" \
 	  || { printf '%s\n' "$$out"; echo "operational-template-schema-check: writing the re-encoded documents failed"; exit 1; }; \
-	files="$$(find testkit/corpus "$$dir/re-encoded" -name '*.opt' | wc -l | tr -d ' ')"; \
-	$(XMLLINT_RUN) find testkit/corpus "$$dir/re-encoded" -name '*.opt' \
+	files="$$(find testkit/corpus openehr/template/generic "$$dir/re-encoded" -name '*.opt' | wc -l | tr -d ' ')"; \
+	$(XMLLINT_RUN) find testkit/corpus openehr/template/generic "$$dir/re-encoded" -name '*.opt' \
 	  -exec xmllint --noout --nonet --schema "$$dir/schemas/components/AM/Release-1.4/Template.xsd" {} + \
 	  > "$$dir/xmllint.log" 2>&1 || true; \
 	judged="$$(grep -cE ' (validates|fails to validate)$$' "$$dir/xmllint.log" || true)"; \
@@ -316,12 +318,17 @@ operational-template-schema-check: ## Validate the corpus OPTs, as written and r
 	  grep -F "$$dir/re-encoded/" "$$dir/xmllint.log" | grep -v ' validates$$'; \
 	  echo "operational-template-schema-check: the pinned schemas refuse the SDK's re-encoding of the OPTs above"; exit 1; \
 	fi; \
-	sed -n 's|^testkit/corpus/\(.*\) fails to validate$$|\1|p' "$$dir/xmllint.log" | LC_ALL=C sort > "$$dir/refused.txt"; \
+	sed -n -e 's|^testkit/corpus/\(.*\) fails to validate$$|\1|p' \
+	  -e 's|^openehr/template/generic/\(.*\) fails to validate$$|generic/\1|p' \
+	  "$$dir/xmllint.log" | LC_ALL=C sort > "$$dir/refused.txt"; \
 	LC_ALL=C sort "$$dir/ratchet.txt" > "$$dir/listed.txt"; \
 	unlisted="$$(LC_ALL=C comm -23 "$$dir/refused.txt" "$$dir/listed.txt")"; \
 	stale="$$(LC_ALL=C comm -13 "$$dir/refused.txt" "$$dir/listed.txt")"; \
 	if [ -n "$$unlisted" ]; then \
-	  printf '%s\n' "$$unlisted" | while IFS= read -r f; do grep -F "testkit/corpus/$$f" "$$dir/xmllint.log"; done; \
+	  printf '%s\n' "$$unlisted" | while IFS= read -r f; do \
+	    case "$$f" in generic/*) p="openehr/template/$$f" ;; *) p="testkit/corpus/$$f" ;; esac; \
+	    grep -F "$$p" "$$dir/xmllint.log"; \
+	  done; \
 	  echo "operational-template-schema-check: the pinned schemas refuse these OPTs as written; list each in the ratchet with its reason:"; \
 	  printf '%s\n' "$$unlisted" | sed 's/^/  /'; exit 1; \
 	fi; \

@@ -1,7 +1,8 @@
 // Package fixtures resolves paths to the vendored fixture documents under
-// testkit/corpus/.
+// testkit/corpus/, and to the generic operational templates the SDK ships in
+// openehr/template/generic/, which the corpus holds no copy of.
 //
-// Layout:
+// Layout of testkit/corpus/:
 //
 //	templates/{template-id}.opt
 //	compositions/{template-id}.json
@@ -22,6 +23,9 @@
 //	ehrbase-service/              # pinned EHRbase server test templates (MANIFEST.txt)
 //	  templates/{template-id}.opt
 //
+// Outside it, [GenericTemplatesDir] is openehr/template/generic/, holding
+// {template-id}.opt for the generic EHR_STATUS and FOLDER templates.
+//
 // Vendor provenance is indexed in testkit/corpus/README.md (not in paths).
 package fixtures
 
@@ -36,11 +40,25 @@ import (
 // CorpusRoot returns the absolute path of testkit/corpus, the root of the
 // vendored fixture tree.
 func CorpusRoot() string {
+	return filepath.Join(packageDir(), "..", "corpus")
+}
+
+// GenericTemplatesDir returns the absolute path of openehr/template/generic,
+// the package that ships the SDK's generic EHR_STATUS and FOLDER operational
+// templates. Those templates have that one copy: the fixture tree holds none,
+// and [ListAllOPTs] lists them under the generic label.
+func GenericTemplatesDir() string {
+	return filepath.Join(packageDir(), "..", "..", "openehr", "template", "generic")
+}
+
+// packageDir returns the absolute path of this package's folder,
+// testkit/fixtures.
+func packageDir() string {
 	_, here, _, ok := runtime.Caller(0)
 	if !ok {
 		panic("fixtures: cannot resolve package path")
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(here), "..", "corpus"))
+	return filepath.Dir(here)
 }
 
 // CassettesRoot returns the same path as [CorpusRoot].
@@ -169,6 +187,7 @@ func optDirs() []optDir {
 		{label: "flat-conformance", path: filepath.Join(FlatConformanceRoot(), "templates")},
 		{label: "ehrbase-service", path: filepath.Join(CorpusRoot(), "ehrbase-service", "templates")},
 		{label: "definition", path: filepath.Join(CorpusRoot(), "its_rest", "definition")},
+		{label: "generic", path: GenericTemplatesDir()},
 	}
 }
 
@@ -184,11 +203,12 @@ type OPTRef struct {
 // ListAllOPTs returns every operational template vendored under
 // [CorpusRoot] (across templates/, webtemplate/, the FLAT
 // conformance corpus, the EHRbase server's test templates, and the ITS-REST
-// definition fixtures), sorted by Name. The operational templates of the
-// cross-format sets are not listed. Callers that must cover the whole corpus
-// (such as the compiled-path regression guard for name-predicated template
-// paths) use this rather than naming templates individually, so a newly
-// vendored OPT is picked up automatically.
+// definition fixtures) and the generic templates of [GenericTemplatesDir],
+// named generic/{template-id}, sorted by Name. The operational templates of
+// the cross-format sets are not listed. Callers that must cover the whole
+// corpus (such as the compiled-path regression guard for name-predicated
+// template paths) use this rather than naming templates individually, so a
+// newly vendored OPT is picked up automatically.
 func ListAllOPTs() ([]OPTRef, error) {
 	var refs []OPTRef
 	for _, dir := range optDirs() {

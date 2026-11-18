@@ -83,10 +83,10 @@ var corpusCompileFailures = []string{}
 // an ELEMENT only where the template makes one mandatory. The other 58
 // compiling templates get a body with none by design: COMPOSITION templates
 // whose entries leave every ELEMENT optional, such as social, nested.en.v1
-// and the minimal_* and Test_dv_* templates; generic_ehr_status.v1 and
-// generic_folder.v1, which constrain no ELEMENT; and Address.v2, which is
-// ADDRESS-rooted and leaves its details optional. The list is the shorter
-// side. A listed template that becomes hollow under Required fails the
+// and the minimal_* and Test_dv_* templates; generic/generic_ehr_status.v1
+// and generic/generic_folder.v1, which constrain no ELEMENT; and Address.v2,
+// which is ADDRESS-rooted and leaves its details optional. The list is the
+// shorter side. A listed template that becomes hollow under Required fails the
 // ratchet, and so does an unlisted one that stops being hollow, as a
 // listed row that now passes does.
 var requiredBodies = []string{
@@ -124,13 +124,13 @@ var requiredBodies = []string{
 // multi-valued attribute a member of each optional archetype that needs no
 // undescribed content (REQ-107 What a visit writes), so only a template
 // that constrains no ELEMENT at all gets a body with none:
-// generic_ehr_status.v1 and generic_folder.v1, whose body is hollow under
-// every policy. A listed template that stops being hollow under Medium
+// generic/generic_ehr_status.v1 and generic/generic_folder.v1, whose body is
+// hollow under every policy. A listed template that stops being hollow under Medium
 // fails the ratchet, and so does an unlisted one that becomes hollow, as an
 // unlisted row does.
 var mediumHollowBodies = []string{
-	"templates/generic_ehr_status.v1",
-	"templates/generic_folder.v1",
+	"generic/generic_ehr_status.v1",
+	"generic/generic_folder.v1",
 }
 
 // corpusRatchet is the failure set measured on this tree. A row's entry is
@@ -154,10 +154,10 @@ var mediumHollowBodies = []string{
 // SECTION.adhoc.v1 roots of Corona_Anamnese, whose roots all validate. The
 // two members of each identifier cluster stand side by side among the
 // details' items, so the floor names them by position. Under Large no
-// template's body is hollow but those of generic_ehr_status.v1 and
-// generic_folder.v1, which constrain no ELEMENT by design and have their
-// hollow_body rows: any other hollow_body failure there fails the ratchet.
-// The builder builds on Large when no WithPolicy is given, short of its
+// template's body is hollow but those of generic/generic_ehr_status.v1
+// and generic/generic_folder.v1, which constrain no ELEMENT by design and
+// have their hollow_body rows: any other hollow_body failure there fails the
+// ratchet. The builder builds on Large when no WithPolicy is given, short of its
 // repeats and its optional RM attributes (REQ-101), so its rows are Large
 // rows, under either fill. It has none: every COMPOSITION root it builds
 // passes under both fills and every seed, and each row below is on a root
@@ -195,10 +195,10 @@ var mediumHollowBodies = []string{
 // the text/plain default, so Media_type_valid (REQ-112 Coded invariants)
 // breaks.
 var corpusRatchet = []ratchetFailure{
-	{template: "templates/generic_ehr_status.v1", entry: "generate", policy: "large", fill: "example", reason: "hollow_body:/"},
-	{template: "templates/generic_ehr_status.v1", entry: "generate", policy: "large", fill: "random", reason: "hollow_body:/"},
-	{template: "templates/generic_folder.v1", entry: "generate", policy: "large", fill: "example", reason: "hollow_body:/"},
-	{template: "templates/generic_folder.v1", entry: "generate", policy: "large", fill: "random", reason: "hollow_body:/"},
+	{template: "generic/generic_ehr_status.v1", entry: "generate", policy: "large", fill: "example", reason: "hollow_body:/"},
+	{template: "generic/generic_ehr_status.v1", entry: "generate", policy: "large", fill: "random", reason: "hollow_body:/"},
+	{template: "generic/generic_folder.v1", entry: "generate", policy: "large", fill: "example", reason: "hollow_body:/"},
+	{template: "generic/generic_folder.v1", entry: "generate", policy: "large", fill: "random", reason: "hollow_body:/"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[18]/items[at0001]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[19]/items[at0001]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[20]/items[at0006]/value/media_type"},

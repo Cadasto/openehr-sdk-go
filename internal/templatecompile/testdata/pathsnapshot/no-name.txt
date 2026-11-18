@@ -283,6 +283,14 @@
 /content[openEHR-EHR-SECTION.conformance_section.v0]/items[openEHR-EHR-OBSERVATION.conformance_observation.v0]/protocol/items[at0021]
 /content[openEHR-EHR-SECTION.conformance_section.v0]/items[openEHR-EHR-OBSERVATION.conformance_observation.v0]/protocol/items[at0021]/value
 
+## generic/generic_ehr_status.v1  nodes=2
+/
+/other_details
+
+## generic/generic_folder.v1  nodes=2
+/
+/details
+
 ## templates/Address.v2  nodes=27
 /
 /name
@@ -1799,14 +1807,6 @@
 /content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0053]
 /content[openEHR-EHR-EVALUATION.family_history.v2]/protocol
 /content[openEHR-EHR-EVALUATION.family_history.v2]/protocol/items[at0045]
-
-## templates/generic_ehr_status.v1  nodes=2
-/
-/other_details
-
-## templates/generic_folder.v1  nodes=2
-/
-/details
 
 ## templates/minimal_action_2  nodes=10
 /

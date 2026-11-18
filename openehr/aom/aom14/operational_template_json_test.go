@@ -75,30 +75,44 @@ func TestREQ176_REQ052_OperationalTemplateCanonicalJSON(t *testing.T) {
 }
 
 // TestREQ176_REQ052_CorpusOperationalTemplatesCanonicalJSON pins the canonical
-// JSON round trip of every operational template under testkit/corpus: each,
+// JSON round trip of every operational template under testkit/corpus and of
+// the generic templates the SDK ships in openehr/template/generic: each,
 // read from canonical XML, writes canonical JSON that decodes, strictly, to
 // the value read. A typed EXPR_LEAF item compares by its text and the
 // primitive its Type reads as, since canonical JSON keeps neither the prefix
 // nor which of the primitive's built-ins Type names.
 func TestREQ176_REQ052_CorpusOperationalTemplatesCanonicalJSON(t *testing.T) {
-	const corpus = "../../../testkit/corpus"
-	var paths []string
+	const (
+		corpus  = "../../../testkit/corpus"
+		generic = "../../template/generic"
+	)
+	type document struct{ name, path string }
+	var docs []document
 	err := filepath.WalkDir(corpus, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && !d.IsDir() && strings.HasSuffix(path, ".opt") {
-			paths = append(paths, path)
+			name, _ := filepath.Rel(corpus, path)
+			docs = append(docs, document{name: name, path: path})
 		}
 		return err
 	})
 	if err != nil {
 		t.Fatalf("walking %s: %v", corpus, err)
 	}
-	// The corpus holds 84 operational templates; fewer means the walk lost some.
-	if len(paths) < 84 {
-		t.Fatalf("found %d operational templates under %s; want at least 84", len(paths), corpus)
+	shipped, err := filepath.Glob(filepath.Join(generic, "*.opt"))
+	if err != nil {
+		t.Fatalf("listing %s: %v", generic, err)
 	}
-	for _, path := range paths {
-		name, _ := filepath.Rel(corpus, path)
-		t.Run(name, func(t *testing.T) {
+	for _, path := range shipped {
+		docs = append(docs, document{name: "generic/" + filepath.Base(path), path: path})
+	}
+	// The corpus holds 82 operational templates and the generic package 2;
+	// fewer means the walk lost some.
+	if len(docs) < 84 {
+		t.Fatalf("found %d operational templates under %s and %s; want at least 84", len(docs), corpus, generic)
+	}
+	for _, doc := range docs {
+		path := doc.path
+		t.Run(doc.name, func(t *testing.T) {
 			raw, err := os.ReadFile(path)
 			if err != nil {
 				t.Fatalf("read: %v", err)

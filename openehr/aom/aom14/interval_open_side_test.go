@@ -389,13 +389,18 @@ func b2i(b bool) int {
 }
 
 // corpusIntervals returns the `occurrences`, `existence` and cardinality
-// `interval` elements of every OPT in the vendored corpus, each with Integer
+// `interval` elements of every OPT in the vendored corpus and of the generic
+// templates the SDK ships in openehr/template/generic, each with Integer
 // bounds or none.
 func corpusIntervals(t *testing.T) []corpusInterval {
 	t.Helper()
-	files, err := filepath.Glob("../../../testkit/corpus/templates/*.opt")
-	if err != nil || len(files) == 0 {
-		t.Fatalf("no OPT corpus found (%d files, error %v)", len(files), err)
+	var files []string
+	for _, pattern := range []string{"../../../testkit/corpus/templates/*.opt", "../../template/generic/*.opt"} {
+		matched, err := filepath.Glob(pattern)
+		if err != nil || len(matched) == 0 {
+			t.Fatalf("no OPT found at %s (%d files, error %v)", pattern, len(matched), err)
+		}
+		files = append(files, matched...)
 	}
 	var out []corpusInterval
 	for _, file := range files {
