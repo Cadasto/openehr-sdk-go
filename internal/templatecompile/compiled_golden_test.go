@@ -6,15 +6,17 @@ package templatecompile_test
 // § What the compile step tolerates allow, and for each default-value
 // placement REQ-111 § Reading the model names.
 //
-// For every operational template the corpus vendors, walked as PROBE-111
-// walks them, for every parity fixture (testdata/parity) and for every
-// fixture of the model's reader (openehr/aom/aom14/testdata/reader), the
-// test renders the compiled tree as line-oriented text and holds it equal
-// to testdata/compiled/<corpus path>.txt, parity/<fixture>.txt or
-// reader/<fixture>.txt. Each node is one block in walk order: its path, RM
-// type, node id, archetype id, node name, occurrences, slot marks and
-// rules, primitive constraint, default value, terms and bindings, then one
-// line per attribute. A primitive constraint renders as its Go type and
+// For every operational template PROBE-111 covers, the ones the corpus
+// vendors and the generic ones the SDK ships (openehr/template/generic),
+// named as Probe111OperationalTemplates names them, for every parity fixture
+// (testdata/parity) and for every fixture of the model's reader
+// (openehr/aom/aom14/testdata/reader), the test renders the compiled tree as
+// line-oriented text and holds it equal to
+// testdata/compiled/<corpus path>.txt, generic/<template>.txt,
+// parity/<fixture>.txt or reader/<fixture>.txt. Each node is one block in
+// walk order: its path, RM type, node id, archetype id, node name,
+// occurrences, slot marks and rules, primitive constraint, default value,
+// terms and bindings, then one line per attribute. A primitive constraint renders as its Go type and
 // exported fields, a default value as its Go type and canonical JSON. A
 // change to the compile step that moves any of it shows as a diff on the
 // golden, reviewed rather than assumed. Regenerate with:
@@ -50,13 +52,15 @@ const compiledGoldenDir = "testdata/compiled"
 // readerFixturesRoot holds the folder of the model reader's fixtures.
 const readerFixturesRoot = "../../openehr/aom/aom14/testdata"
 
-// goldenSource is a folder of operational templates TestCompiledGolden
-// holds to goldens. Each name is a slash-separated path below root, whose
-// golden is that path below compiledGoldenDir with .txt for .opt; label
-// stands for root in the text of a refusal.
+// goldenSource is a set of operational templates TestCompiledGolden holds to
+// goldens. Each name is a slash-separated path, whose golden is that path
+// below compiledGoldenDir with .txt for .opt; path returns the file of a
+// name, and labels rewrites each folder the files sit in to the label that
+// stands for it in the text of a refusal.
 type goldenSource struct {
-	root, label string
-	names       []string
+	names  []string
+	path   func(name string) string
+	labels *strings.Replacer
 }
 
 func TestCompiledGolden(t *testing.T) {
@@ -75,7 +79,14 @@ func TestCompiledGolden(t *testing.T) {
 	// them changes what the compile step makes of a template: regenerate them
 	// only for a reason the change under review gives.
 	sources := []goldenSource{
-		{root: fixtures.CorpusRoot(), label: "<corpus>", names: names},
+		{
+			names: names,
+			path:  templateprobes.Probe111TemplatePath,
+			labels: strings.NewReplacer(
+				fixtures.CorpusRoot(), "<corpus>",
+				filepath.Dir(fixtures.GenericTemplatesDir()), "<openehr/template>",
+			),
+		},
 		fixtureGoldenSource(t, "testdata", "parity"),
 		fixtureGoldenSource(t, readerFixturesRoot, "reader"),
 	}
@@ -89,7 +100,7 @@ func TestCompiledGolden(t *testing.T) {
 			}
 			expected[golden] = true
 			t.Run(name, func(t *testing.T) {
-				got := dumpCompiledTemplate(src.root, src.label, name)
+				got := dumpCompiledTemplate(src.path(name), name, src.labels)
 				if *updateSnapshot {
 					if err := os.MkdirAll(filepath.Dir(golden), 0o755); err != nil {
 						t.Fatal(err)
@@ -147,7 +158,10 @@ func fixtureGoldenSource(t *testing.T, root, dir string) goldenSource {
 	if err != nil {
 		t.Fatal(err)
 	}
-	src := goldenSource{root: abs, label: "<" + filepath.ToSlash(root) + ">"}
+	src := goldenSource{
+		path:   func(name string) string { return filepath.Join(abs, filepath.FromSlash(name)) },
+		labels: strings.NewReplacer(abs, "<"+filepath.ToSlash(root)+">"),
+	}
 	for _, f := range files {
 		if strings.HasSuffix(f, ".read.opt") {
 			continue
@@ -183,22 +197,21 @@ func firstDifference(got, want []byte) (line int, g, w string, differ bool) {
 	return 0, "", "", false
 }
 
-// dumpCompiledTemplate reads the operational template name, a
-// slash-separated path below root, into the model, compiles it and renders
-// the result. A template that does not read or compile renders as that
-// error, label standing for root in it, so a change in which templates
-// compile shows on the golden too.
-func dumpCompiledTemplate(root, label, name string) []byte {
+// dumpCompiledTemplate reads the operational template name from the file
+// path into the model, compiles it and renders the result. A template that
+// does not read or compile renders as that error, rewritten by labels, so a
+// change in which templates compile shows on the golden too.
+func dumpCompiledTemplate(path, name string, labels *strings.Replacer) []byte {
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "# compiled tree of %s\n", name)
-	model, err := readModelFile(filepath.Join(root, filepath.FromSlash(name)))
+	model, err := readModelFile(path)
 	if err != nil {
-		fmt.Fprintf(&b, "!! does not read: %s\n", strings.ReplaceAll(err.Error(), root, label))
+		fmt.Fprintf(&b, "!! does not read: %s\n", labels.Replace(err.Error()))
 		return b.Bytes()
 	}
 	c, err := templatecompile.Compile(model)
 	if err != nil {
-		fmt.Fprintf(&b, "!! does not compile: %s\n", strings.ReplaceAll(err.Error(), root, label))
+		fmt.Fprintf(&b, "!! does not compile: %s\n", labels.Replace(err.Error()))
 		return b.Bytes()
 	}
 	lang := c.Language()

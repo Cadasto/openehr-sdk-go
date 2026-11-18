@@ -553,7 +553,7 @@ Its client scenarios map to SDK coverage as follows:
   On the compiling vendored corpus the same generated value also passes `validation.ValidateRM`, the output rule of [§ REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), outside the cases its *Exceptions and known gaps* lists.
 - **Modes:** In-repo (generator and validator agreement over fixture OPTs; no backend).
 - **Status:** Implemented (inline) — a corpus census beside the probe runs every vendored OPT through the generator, the composition builder and both validators, and pins each remaining failure and each hollow body with its reason.
-- **Satisfies:** REQ-107.
+- **Satisfies:** REQ-107, REQ-178.
 
 #### PROBE-074 — Template-driven validation of non-COMPOSITION roots
 
@@ -631,8 +631,8 @@ Its client scenarios map to SDK coverage as follows:
 
 #### PROBE-111 — Operational template corpus round trip
 
-- **Title:** Every ADL 1.4 OPT the corpus vendors decodes into the generated operational template types with no unmatched content, and encodes back to a document that validates against the pinned AM Release-1.4 schemas and holds the content of the input, as [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) defines.
-- **Preconditions:** Every `.opt` file under `testkit/corpus/`, found by walking the tree rather than from `fixtures.ListAllOPTs`, which leaves out those under `crossformat/`, and the pinned ITS-XML closure under `resources/its-xml/` with `Template.xsd` among its roots.
+- **Title:** Every ADL 1.4 OPT the corpus vendors, and each generic template the SDK ships, decodes into the generated operational template types with no unmatched content, and encodes back to a document that validates against the pinned AM Release-1.4 schemas and holds the content of the input, as [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) defines.
+- **Preconditions:** Every `.opt` file under `testkit/corpus/`, found by walking the tree rather than from `fixtures.ListAllOPTs`, which leaves out those under `crossformat/`; the generic templates of `openehr/template/generic/` ([clinical-modeling.md § REQ-178](clinical-modeling.md#req-178--generic-templates-shipped-with-the-sdk)), which the corpus holds no copy of; and the pinned ITS-XML closure under `resources/its-xml/` with `Template.xsd` among its roots.
   An OPT the pinned schemas refuse as written is listed in a ratchet with its reason and goes through the round-trip leg only, until a re-pin admits it.
 - **Wire assertion:** In-repo property, two legs.
   Round trip: `canxml.Unmarshal` with the report option returns no unmatched item, and with `WithStrict` refuses nothing.
@@ -642,7 +642,7 @@ Its client scenarios map to SDK coverage as follows:
   A can-fail control: with one operational template member withheld from the decoder, the round-trip leg fails on a corpus file that carries it.
 - **Modes:** In-repo (property across the vendored corpus; no backend).
 - **Status:** Implemented (inline).
-- **Satisfies:** REQ-176.
+- **Satisfies:** REQ-176, REQ-178.
 
 ### Simplified formats and upstream parity
 

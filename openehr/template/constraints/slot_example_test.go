@@ -64,21 +64,25 @@ var slotExampleEdgePatterns = []string{
 }
 
 // corpusSlotPatterns returns every include and exclude pattern of every
-// corpus OPT that reads into the operational template model and compiles.
+// corpus OPT, and of every generic template the SDK ships in
+// openehr/template/generic, that reads into the operational template model
+// and compiles.
 func corpusSlotPatterns(t *testing.T) []string {
 	t.Helper()
 	var paths []string
-	err := filepath.WalkDir(fixtures.CorpusRoot(), func(path string, d fs.DirEntry, err error) error {
+	for _, root := range []string{fixtures.CorpusRoot(), fixtures.GenericTemplatesDir()} {
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() && strings.EqualFold(filepath.Ext(path), ".opt") {
+				paths = append(paths, path)
+			}
+			return nil
+		})
 		if err != nil {
-			return err
+			t.Fatalf("walk %s: %v", root, err)
 		}
-		if !d.IsDir() && strings.EqualFold(filepath.Ext(path), ".opt") {
-			paths = append(paths, path)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk corpus: %v", err)
 	}
 	var out []string
 	for _, path := range paths {

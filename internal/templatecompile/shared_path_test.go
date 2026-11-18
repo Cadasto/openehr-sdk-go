@@ -16,7 +16,8 @@ import (
 	templateprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
 )
 
-// sharedPathTypeExceptions lists, by corpus template and path, the nodes
+// sharedPathTypeExceptions lists, by template name, as
+// Probe111OperationalTemplates gives it, and path, the nodes
 // below an earlier node's sibling that share its path with a node of another
 // RM type. Each value is the reason the census tolerates it.
 var sharedPathTypeExceptions = map[[2]string]string{
@@ -25,8 +26,9 @@ var sharedPathTypeExceptions = map[[2]string]string{
 		"the composition builder's Set reaches the first use alone there, as its skeleton policy says, which the composition tests pin",
 }
 
-// TestREQ111_NodesBelowSharedPathsShareRMType is a census over the corpus
-// templates of the nodes NodeAt cannot reach: for each node whose path
+// TestREQ111_NodesBelowSharedPathsShareRMType is a census over the
+// operational templates PROBE-111 covers, the corpus's and the generic ones
+// the SDK ships, of the nodes NodeAt cannot reach: for each node whose path
 // NodeAt resolves to an earlier node with another parent, a node below an
 // alternative or below a same-id sibling, it fails when the two have
 // different RM types, except where sharedPathTypeExceptions names the path.
@@ -40,11 +42,10 @@ func TestREQ111_NodesBelowSharedPathsShareRMType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Probe111OperationalTemplates: %v", err)
 	}
-	root := fixtures.CorpusRoot()
 	var shared, below int
 	met := map[[2]string]bool{}
 	for _, name := range names {
-		c, err := templatecompile.Compile(mustReadModelFile(t, filepath.Join(root, filepath.FromSlash(name))))
+		c, err := templatecompile.Compile(mustReadModelFile(t, templateprobes.Probe111TemplatePath(name)))
 		if err != nil {
 			t.Errorf("Compile(%s) = %v, want a compiled template to census", name, err)
 			continue

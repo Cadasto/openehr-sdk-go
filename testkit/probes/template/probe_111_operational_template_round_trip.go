@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -16,12 +17,34 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
 
-// Probe111OperationalTemplates returns every ADL 1.4 operational template the
-// corpus vendors: each `.opt` file under [fixtures.CorpusRoot], found by
-// walking the whole tree, as a slash-separated path relative to that root,
-// sorted. It reaches the files [fixtures.ListAllOPTs] leaves out, the ones
-// beside the cross-format sets among them.
-func Probe111OperationalTemplates() ([]string, error) { // PROBE-111 (REQ-176)
+// Probe111OperationalTemplates returns the name of every ADL 1.4 operational
+// template PROBE-111 covers, sorted, and [Probe111TemplatePath] resolves each
+// name to its file. The list holds two kinds of name:
+//
+//   - each `.opt` file under [fixtures.CorpusRoot], found by walking the whole
+//     tree, as a slash-separated path relative to that root; the walk reaches
+//     the files [fixtures.ListAllOPTs] leaves out, the ones beside the
+//     cross-format sets among them;
+//   - each `.opt` file of [fixtures.GenericTemplatesDir], the generic
+//     templates the SDK ships, which the corpus holds no copy of, as generic/
+//     and its file name.
+func Probe111OperationalTemplates() ([]string, error) { // PROBE-111 (REQ-176, REQ-178)
+	corpus, err := probe111CorpusTemplates()
+	if err != nil {
+		return nil, err
+	}
+	generic, err := probe111GenericTemplates()
+	if err != nil {
+		return nil, err
+	}
+	names := slices.Concat(corpus, generic)
+	slices.Sort(names)
+	return names, nil
+}
+
+// probe111CorpusTemplates returns the name of each `.opt` file under
+// [fixtures.CorpusRoot]: its slash-separated path relative to that root.
+func probe111CorpusTemplates() ([]string, error) {
 	root := fixtures.CorpusRoot()
 	var names []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -41,31 +64,62 @@ func Probe111OperationalTemplates() ([]string, error) { // PROBE-111 (REQ-176)
 	if err != nil {
 		return nil, fmt.Errorf("PROBE-111: walk the corpus: %w", err)
 	}
-	slices.Sort(names)
 	return names, nil
 }
 
-// probe111SchemaRatchetFile lists the corpus operational templates the pinned
-// AM Release-1.4 schemas refuse as written (REQ-176 § Round trip, PROBE-111).
+// probe111GenericPrefix starts the name of each generic template, as
+// [fixtures.ListAllOPTs] labels them.
+const probe111GenericPrefix = "generic/"
+
+// probe111GenericTemplates returns the name of each `.opt` file of
+// [fixtures.GenericTemplatesDir], the operational templates the SDK ships in
+// openehr/template/generic: generic/ and its file name.
+func probe111GenericTemplates() ([]string, error) {
+	entries, err := os.ReadDir(fixtures.GenericTemplatesDir())
+	if err != nil {
+		return nil, fmt.Errorf("PROBE-111: list the generic templates: %w", err)
+	}
+	var names []string
+	for _, e := range entries {
+		if !e.Type().IsRegular() || filepath.Ext(e.Name()) != ".opt" {
+			continue
+		}
+		names = append(names, probe111GenericPrefix+e.Name())
+	}
+	return names, nil
+}
+
+// Probe111TemplatePath returns the file of the operational template name, as
+// [Probe111OperationalTemplates] gives it: a generic/ name in
+// [fixtures.GenericTemplatesDir], any other below [fixtures.CorpusRoot].
+func Probe111TemplatePath(name string) string { // PROBE-111 (REQ-176, REQ-178)
+	if file, ok := strings.CutPrefix(name, probe111GenericPrefix); ok {
+		return filepath.Join(fixtures.GenericTemplatesDir(), filepath.FromSlash(file))
+	}
+	return filepath.Join(fixtures.CorpusRoot(), filepath.FromSlash(name))
+}
+
+// probe111SchemaRatchetFile lists the operational templates PROBE-111 covers
+// that the pinned AM Release-1.4 schemas refuse as written (REQ-176 § Round
+// trip, PROBE-111).
 // make operational-template-schema-check holds the list to what xmllint
 // reports, so an entry that no longer fires fails as stale.
 //
 //go:embed probe_111_schema_ratchet.txt
 var probe111SchemaRatchetFile string
 
-// Probe111SchemaRatchetEntry is one corpus operational template the pinned
-// AM Release-1.4 schemas refuse as written.
+// Probe111SchemaRatchetEntry is one operational template PROBE-111 covers
+// that the pinned AM Release-1.4 schemas refuse as written.
 type Probe111SchemaRatchetEntry struct {
-	// Name is the template's path relative to the corpus root, as
-	// [Probe111OperationalTemplates] gives it.
+	// Name is the template's name, as [Probe111OperationalTemplates] gives it.
 	Name string
 	// Reason says why the schemas refuse the document.
 	Reason string
 }
 
-// Probe111SchemaRatchet returns the corpus operational templates the pinned
-// AM Release-1.4 schemas refuse as written, each with its reason, in file
-// order. PROBE-111 runs only its round-trip leg on them, and its schema leg
+// Probe111SchemaRatchet returns the operational templates PROBE-111 covers
+// that the pinned AM Release-1.4 schemas refuse as written, each with its
+// reason, in file order. PROBE-111 runs only its round-trip leg on them, and its schema leg
 // on every other one. The list lives in probe_111_schema_ratchet.txt beside
 // the probe: one template per line, its name and its reason separated by a
 // tab, with blank lines and lines starting with `#` ignored.
