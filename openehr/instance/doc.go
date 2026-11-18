@@ -174,10 +174,10 @@
 // or one that rejects that value, keeps its own example. A quantity's
 // drawn magnitude is rounded to the template's precision, with no decimals
 // where the precision admits 0 alone and at most two otherwise. Under a
-// quantity constraint, under a real constraint with no list whose range is
-// open or bounded on one side, or where the template leaves it
-// unconstrained, it lies inside its range away from 0 and from the range's
-// bounds, or from 1 to 100 where the range is open or there is none; a
+// quantity constraint, under a real constraint with no list, whether its
+// range has bounds or not, or where the template leaves it unconstrained,
+// it lies inside its range away from 0 and from the range's bounds, or
+// from 1 to 100 where the range is open or there is none; a
 // count's drawn magnitude, where its range is open or bounded on one side
 // or the template leaves it unconstrained, is drawn the same way as a whole
 // number, so it is never 0; a proportion's drawn numerator and denominator

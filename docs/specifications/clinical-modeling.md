@@ -1385,7 +1385,7 @@ The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill`
     Its precision is the upper bound of the precision range of the `C_DV_QUANTITY` entry it is drawn in, or the `precision` the walk wrote where the OPT builds the quantity attribute by attribute.
     A magnitude is drawn inside its range, away from 0 and from the range's bounds, or from 1 to 100 where the range is open or there is none, where it is:
     - a `C_DV_QUANTITY` entry's `magnitude`;
-    - a `DV_QUANTITY`'s `magnitude` that nothing constrains, with no `C_DV_QUANTITY` and nothing on the `magnitude`, or that a `C_REAL` constrains with no list and a range open or bounded on one side;
+    - a `DV_QUANTITY`'s `magnitude` that nothing constrains, with no `C_DV_QUANTITY` and nothing on the `magnitude`, or that a `C_REAL` with no list constrains, whatever its range;
     - a `DV_COUNT`'s `magnitude`, as a whole number, where its range is open or bounded on one side or the OPT leaves it unconstrained;
   - a `DV_PROPORTION`'s `numerator` and `denominator`: to whole numbers where its kind or a `precision` of 0 asks for them (§ Contract *Precedence* 4), and otherwise as a magnitude is, to its `precision` up to two decimals.
 
