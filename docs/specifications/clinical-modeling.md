@@ -2202,7 +2202,7 @@ The floor does **not** evaluate:
 ## REQ-168 — Value-free validation diagnostics
 
 A diagnostic **MUST NOT** carry a submitted value (§ Submitted values and structure) outside a field its type names value-bearing (§ Field classes).
-The rule binds [§ REQ-103](#req-103--primitive-constraint-introspection)'s `Violation`, the `Issue` that [§ REQ-102](#req-102--composition-validation) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) return, and the AQL diagnostics: the `lint.Issue` of [§ REQ-109](aql.md#req-109--aql-static-lint), which the `Issue` that `ValidateAQL` returns carries over, and the drop record of [§ REQ-113](aql.md#value-free-structured-drop-records).
+The rule binds [§ REQ-103](#req-103--primitive-constraint-introspection)'s `Violation`, the `Issue` that [§ REQ-102](#req-102--composition-validation) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) return, and the AQL diagnostics: the `lint.Issue` of [§ REQ-109](aql.md#req-109--aql-static-lint), which the `Issue` that `aqlvalidation.Validate` returns carries over, and the drop record of [§ REQ-113](aql.md#value-free-structured-drop-records).
 Diagnostics travel to places a caller does not choose for clinical data: an HTTP error body, a log line, a monitoring event.
 The values they describe are clinical data (a date of birth, a measured magnitude, a free-text name), and an AQL literal can be one, so a message that quotes one carries it to each of those places, in callers that never meant to send it.
 A consumer whose refusal reasons may name structure but never a value would otherwise discard the diagnostics wholesale, and its clients would get a generic refusal where the SDK knew what was wrong and where.
