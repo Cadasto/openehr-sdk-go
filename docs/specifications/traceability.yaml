@@ -1799,6 +1799,7 @@ requirements:
       - internal/templatecompile/compile_model_test.go
       - internal/templatecompile/resolve_internal_test.go
       - internal/templatecompile/resolve_test.go
+      - openehr/aom/aom14/read_rewind_test.go
       - openehr/aom/aom14/read_test.go
       - openehr/bmm/load_test.go
       - openehr/client/definition/template_cap_test.go
@@ -2790,6 +2791,7 @@ requirements:
       - openehr/aom/aom14/operational_template_shapes_xml_test.go
       - openehr/aom/aom14/primitive_profile_shapes_xml_test.go
       - openehr/aom/aom14/quantity_item_units_xml_test.go
+      - openehr/aom/aom14/read_rewind_test.go
       - openehr/aom/aom14/read_test.go
       - openehr/aom/aom14/schema_names_xml_test.go
       - openehr/aom/aom14/symbol_json_test.go

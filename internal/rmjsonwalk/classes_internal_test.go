@@ -137,3 +137,24 @@ func TestMemberNamesWithEscapesReadAsTheirText(t *testing.T) {
 		t.Errorf("Walk(%s) reported %q, want %q", doc, got, want)
 	}
 }
+
+// TestRequiredLeavesTheLookupListIntact pins that filtering a class's
+// required attributes for a walk leaves the lookup's own list as it was: the
+// lookup shares one list per class with every caller, and the walk drops
+// names from its copy.
+func TestRequiredLeavesTheLookupListIntact(t *testing.T) {
+	m, err := New(rminfo.Default)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, class := range rminfo.Default.KnownRMTypes() {
+		want := slices.Clone(rminfo.Default.RequiredAttributes(class))
+		walked := m.required(class)
+		if got := rminfo.Default.RequiredAttributes(class); !slices.Equal(got, want) {
+			t.Fatalf("RequiredAttributes(%s) after the walk filtered it = %v, want %v", class, got, want)
+		}
+		if len(walked) > len(want) {
+			t.Errorf("walk's required(%s) = %v, longer than the lookup's %v", class, walked, want)
+		}
+	}
+}

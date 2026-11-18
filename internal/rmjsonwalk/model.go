@@ -132,7 +132,8 @@ func (m *Model) required(class string) []string {
 	if cached, ok := m.lists.Load(class); ok {
 		return cached.([]string)
 	}
-	attrs := slices.DeleteFunc(m.lookup.RequiredAttributes(class), func(attr string) bool {
+	// Clone: DeleteFunc filters in place, and the lookup's list is shared.
+	attrs := slices.DeleteFunc(slices.Clone(m.lookup.RequiredAttributes(class)), func(attr string) bool {
 		return rminfo.IsNonStorableAttr(class, attr) || slices.Contains(intervalFlags, attr)
 	})
 	cached, _ := m.lists.LoadOrStore(class, slices.Clip(attrs))

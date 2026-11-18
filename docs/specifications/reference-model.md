@@ -608,7 +608,9 @@ A name reporting an absence reason **MUST** report not-known on every `Lookup` a
 
 #### Determinism and independence
 
-- Answers **MUST** be deterministic across runs and processes, every returned ordering fixed (BMM declaration order for immediate parents, sorted otherwise), and a returned collection **MUST NOT** alias package state a caller could mutate.
+- Answers **MUST** be deterministic across runs and processes, every returned ordering fixed (BMM declaration order for immediate parents and for a class's attributes, sorted otherwise).
+- A returned collection **MUST NOT** alias package state a caller could mutate, except the lists `RequiredAttributes` and `ConcreteDescendants` return, which are shared, read-only results: a caller **MUST NOT** modify them.
+  Each is built once per class and shared by every caller.
 - The surface uses no reflection beyond the exceptions of [idiom.md § Generics and reflection](idiom.md#generics-and-reflection), and keeps to the building-block rules of [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence); that is what makes it importable from any building block.
 - Its class-graph questions sit on an **optional capability interface** discovered by assertion, rather than on the existing attribute-lookup interface, so an external implementer of that interface does not break ([module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)), following the precedent already set for attribute enumeration.
   Each question is reachable through the same seam that admits synthetic model data, so the negative space above is testable without the pinned RM.

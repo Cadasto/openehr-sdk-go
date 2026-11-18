@@ -10,6 +10,8 @@ import (
 	"bytes"
 	"cmp"
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 	"iter"
@@ -1624,7 +1626,37 @@ func codePhraseJSON(code, terminologyID string) map[string]any {
 // magnitudes exactly (json.Number) rather than routing every number through
 // float64 — a DV_COUNT above 2^53 would otherwise be silently rounded before it
 // reaches the canonical RM (or the other simplified variant, in interconversion).
+//
+// It first decodes data in place with json/v2 under v1's options
+// ([objectOptions]), which gives the map the v1 decoder gives for any document
+// it accepts; the v1 decoder copies the whole body into its own buffer first.
+// A document the first pass refuses goes to [unmarshalObjectV1], so a refusal
+// keeps v1's error text and v1's leniencies, such as a `]` after the object.
 func unmarshalObject(data []byte) (map[string]any, error) {
+	var m map[string]any
+	if err := jsonv2.Unmarshal(data, &m, objectOptions); err == nil {
+		return m, nil
+	}
+	return unmarshalObjectV1(data)
+}
+
+// objectOptions are v1's options, with each number read into an any kept as
+// json.Number, as v1's UseNumber keeps it.
+var objectOptions = jsonv2.JoinOptions(json.DefaultOptionsV1(), jsonv2.WithUnmarshalers(
+	jsonv2.UnmarshalFromFunc(func(dec *jsontext.Decoder, v *any) error {
+		if dec.PeekKind() != '0' {
+			return errors.ErrUnsupported
+		}
+		val, err := dec.ReadValue()
+		if err != nil {
+			return err
+		}
+		*v = json.Number(val)
+		return nil
+	})))
+
+// unmarshalObjectV1 is unmarshalObject through the v1 decoder.
+func unmarshalObjectV1(data []byte) (map[string]any, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	var m map[string]any
@@ -3901,31 +3933,10 @@ func rmRequires(node map[string]any, attr string) bool {
 	return slices.Contains(requiredAttributes(bmmtype.Class(t)), attr)
 }
 
-// requiredByClass holds what [rminfo.Default] answers RequiredAttributes with
-// for each class it knows, built on first use: the pinned RM does not change,
-// and it answers a fresh list on every call. A class it does not know is not
-// held, so the map stays within the pin's classes. requiredFrom is the Lookup
-// the answers come from; a Default replaced since is asked directly.
-var (
-	requiredByClass sync.Map // class → []string, read-only
-	requiredFrom    = rminfo.Default
-)
-
-// requiredAttributes is rminfo.Default.RequiredAttributes(class), for a caller
-// that only reads the list.
+// requiredAttributes is rminfo.Default.RequiredAttributes(class): a shared
+// list the caller only reads.
 func requiredAttributes(class string) []string {
-	if rminfo.Default != requiredFrom {
-		return rminfo.Default.RequiredAttributes(class)
-	}
-	if v, ok := requiredByClass.Load(class); ok {
-		return v.([]string)
-	}
-	attrs := requiredFrom.RequiredAttributes(class)
-	if attrs == nil {
-		return nil
-	}
-	v, _ := requiredByClass.LoadOrStore(class, attrs)
-	return v.([]string)
+	return rminfo.Default.RequiredAttributes(class)
 }
 
 // checkNoPhantoms walks the rebuilt tree and rejects any container element that

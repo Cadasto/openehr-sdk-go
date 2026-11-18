@@ -15,7 +15,8 @@ type Lookup interface {
 	// declares as mandatory on the given RM type, including
 	// inherited attributes from ancestors. Order is BMM declaration
 	// order (own attributes follow ancestors). Returns nil when
-	// rmType is unknown.
+	// rmType is unknown. The slice may be shared with every other
+	// caller, so it must not be modified.
 	RequiredAttributes(rmType string) []string
 
 	// AttributeRMType returns the RM type of an attribute on a
@@ -168,20 +169,40 @@ type lookup struct {
 	// list — see ancestorIndex in hierarchy.go.
 	ancestorOnce sync.Once
 	ancestors    map[string][]string
+	// requiredOnce/required memoise each class's RequiredAttributes answer,
+	// shared by every caller.
+	requiredOnce sync.Once
+	required     map[string][]string
+	// descendantOnce/descendants memoise each class's ConcreteDescendants
+	// answer, shared by every caller — see descendantIndex in hierarchy.go.
+	descendantOnce sync.Once
+	descendants    map[string][]string
 }
 
 func (l *lookup) RequiredAttributes(rmType string) []string {
-	meta, ok := l.data[rmType]
-	if !ok {
-		return nil
-	}
-	out := make([]string, 0, len(meta.AttrOrder))
-	for _, name := range meta.AttrOrder {
-		if meta.Attributes[name].Required {
-			out = append(out, name)
+	return l.requiredIndex()[rmType]
+}
+
+// requiredIndex returns the shared, memoised RequiredAttributes answers, one
+// per class in data. A known class with no mandatory attribute maps to an
+// empty, non-nil list, so a lookup of an unknown class alone answers nil.
+// Each list's capacity is its length, so a caller that appends to one gets a
+// new array rather than writing into the shared one. Built on first use, like
+// [lookup.childIndex], so importing the package stays free.
+func (l *lookup) requiredIndex() map[string][]string {
+	l.requiredOnce.Do(func() {
+		l.required = make(map[string][]string, len(l.data))
+		for class, meta := range l.data {
+			out := make([]string, 0, len(meta.AttrOrder))
+			for _, name := range meta.AttrOrder {
+				if meta.Attributes[name].Required {
+					out = append(out, name)
+				}
+			}
+			l.required[class] = slices.Clip(out)
 		}
-	}
-	return out
+	})
+	return l.required
 }
 
 func (l *lookup) AttributeRMType(parentRMType, attrName string) (string, bool) {
