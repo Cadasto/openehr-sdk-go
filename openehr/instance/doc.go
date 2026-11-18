@@ -207,7 +207,8 @@
 // template gives as the abstract PARTY_PROXY, or leaves to the Reference
 // Model, which types it so, is a PARTY_SELF, such as an entry's subject,
 // but for the composer, which is Options.Composer, and a participation's
-// performer, which is a PARTY_IDENTIFIED named example. A coded
+// performer, which is a PARTY_IDENTIFIED, named example unless the
+// template gives it an external reference. A coded
 // attribute the RM keeps within a group or a code set of the openEHR
 // terminology, such as a participation's mode, a text's language or a
 // multimedia value's media type, keeps a code the walk wrote that the set
