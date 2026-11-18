@@ -97,7 +97,8 @@ type Config struct {
 	JWKS             *JWKS
 	// IDTokenTrustedAudiences names the audiences an ID token's aud claim
 	// may list besides ClientID when the source verifies it. Empty means
-	// only ClientID is accepted. See [WithIDTokenTrustedAudiences].
+	// only ClientID is accepted, unless IDTokenTrustedProject names a
+	// project. See [WithIDTokenTrustedAudiences].
 	IDTokenTrustedAudiences []string
 	// IDTokenTrustedProject names the project the client belongs to, whose
 	// ID and applications an ID token's aud claim may list when the source
@@ -338,8 +339,9 @@ func WithIssuer(iss string) Option {
 // WithIDTokenTrustedAudiences names the audiences, besides the client ID,
 // that an ID token's aud claim may list when the source verifies it at the
 // code exchange or on refresh. A token whose aud lists any other audience
-// is refused, so without this option only the client ID is accepted. A
-// later call replaces an earlier one.
+// is refused, so without this option only the client ID is accepted, unless
+// [WithIDTokenTrustedProject] names a project. A later call replaces an
+// earlier one.
 func WithIDTokenTrustedAudiences(aud ...string) Option {
 	trusted := slices.Clone(aud)
 	return func(cfg *Config) { cfg.IDTokenTrustedAudiences = trusted }

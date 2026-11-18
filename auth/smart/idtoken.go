@@ -56,8 +56,9 @@ type idTokenConfig struct {
 
 // WithTrustedAudiences names the audiences an ID token's aud claim may list
 // besides the client ID. A token whose aud lists any other audience is
-// rejected, so with no trusted audiences only the client ID is accepted. A
-// later WithTrustedAudiences replaces an earlier one.
+// rejected, so with no trusted audiences only the client ID is accepted,
+// unless [WithTrustedProject] names a project. A later WithTrustedAudiences
+// replaces an earlier one.
 func WithTrustedAudiences(aud ...string) IDTokenOption {
 	trusted := slices.Clone(aud)
 	return func(c *idTokenConfig) { c.trustedAudiences = trusted }

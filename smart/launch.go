@@ -28,7 +28,7 @@ type ValidateConfig struct {
 	AllowedIDTokenAlgs []string
 	// TrustedAudiences names the audiences the ID token's aud claim may list
 	// besides ClientID. When empty, a token whose aud lists any other
-	// audience is rejected.
+	// audience is rejected, unless TrustedProject names a project.
 	TrustedAudiences []string
 	// TrustedProject names the project the client belongs to, whose ID and
 	// applications the ID token's aud claim may list besides ClientID, as
@@ -75,7 +75,7 @@ func WithIDTokenSigningAlgs(algs []string) ValidateOption {
 
 // WithTrustedAudiences names the audiences the ID token's aud claim may list
 // besides the client ID. Without it, a token whose aud lists any other
-// audience is rejected.
+// audience is rejected, unless [WithTrustedProject] names a project.
 func WithTrustedAudiences(aud ...string) ValidateOption {
 	trusted := slices.Clone(aud)
 	return func(c *ValidateConfig) { c.TrustedAudiences = trusted }
