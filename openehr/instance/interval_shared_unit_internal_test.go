@@ -25,8 +25,9 @@ func listedUnitsBound(itemBody string) string {
 // has one, the first that both admit: two bounds in one unit take another
 // only for an ordered pair. A side whose C_DV_QUANTITY names a property and
 // lists no entry lists the property's units. A side whose C_DV_QUANTITY lists
-// units takes the magnitude ExampleValue gives for its first entry in the new
-// unit; any other side keeps its magnitude. A bound that carries a
+// units takes the magnitude ExampleFill gives for its first entry in the new
+// unit, the middle of a range with both bounds; any other side keeps its
+// magnitude. A bound that carries a
 // normal_range keeps its units. Where the two sides admit no one unit, the
 // pair is left as it is. The bounds are set directly, and only
 // shareComparable runs, so no order is put on them.
@@ -53,19 +54,19 @@ func TestREQ107_ShareComparableQuantity(t *testing.T) {
 		{
 			name:   "the lower bound's units, which the upper side admits",
 			node:   listed(entry("mg", 0, 1000)+entry("g", 0, 10), entry("g", 1, 10)+entry("mg", 0, 1000)),
-			bounds: [2]quantityKey{q(5, "mg"), q(3, "g")}, want: [2]quantityKey{q(5, "mg"), q(0, "mg")},
+			bounds: [2]quantityKey{q(5, "mg"), q(3, "g")}, want: [2]quantityKey{q(5, "mg"), q(500, "mg")},
 		},
 		{
 			name:   "else the upper bound's units, which the lower side admits",
 			node:   listed(entry("mg", 0, 1000)+entry("g", 2, 10), entry("g", 1, 10)+entry("kg", 0, 1)),
-			bounds: [2]quantityKey{q(5, "mg"), q(3, "g")}, want: [2]quantityKey{q(2, "g"), q(3, "g")},
+			bounds: [2]quantityKey{q(5, "mg"), q(3, "g")}, want: [2]quantityKey{q(6, "g"), q(3, "g")},
 		},
 		{
 			// Both sides admit g and cg; g comes first in the lower side's
 			// list, cg in the upper side's.
 			name:   "else the first units the lower side lists that both admit",
 			node:   listed(entry("mg", 0, 1000)+entry("g", 2, 10)+entry("cg", 0, 100), entry("kg", 0, 1)+entry("cg", 0, 100)+entry("g", 1, 10)),
-			bounds: [2]quantityKey{q(5, "mg"), q(0.5, "kg")}, want: [2]quantityKey{q(2, "g"), q(1, "g")},
+			bounds: [2]quantityKey{q(5, "mg"), q(0.5, "kg")}, want: [2]quantityKey{q(6, "g"), q(5.5, "g")},
 		},
 		{
 			// The lower side's C_STRING admits mg and g by its pattern and
@@ -73,25 +74,25 @@ func TestREQ107_ShareComparableQuantity(t *testing.T) {
 			// side keeps its magnitude.
 			name:   "then the first units the upper side lists that both admit",
 			node:   retarget(listedUnitsBound("<pattern>m?g</pattern>"), listedQuantityBound(entry("kg", 0, 1)+entry("g", 1, 10))),
-			bounds: [2]quantityKey{q(5, "mg"), q(0.5, "kg")}, want: [2]quantityKey{q(5, "g"), q(1, "g")},
+			bounds: [2]quantityKey{q(5, "mg"), q(0.5, "kg")}, want: [2]quantityKey{q(5, "g"), q(5.5, "g")},
 		},
 		{
 			// No ordered pair fits both sides in g, the lower side starting at
 			// 5 g and the upper one ending at 1 g; one fits in kg.
 			name:   "the first units both admit in which an ordered pair fits",
 			node:   listed(entry("g", 5, 10)+entry("kg", 0, 1), entry("kg", 0, 1)+entry("g", 0, 1)),
-			bounds: [2]quantityKey{q(5, "g"), q(0, "kg")}, want: [2]quantityKey{q(0, "kg"), q(0, "kg")},
+			bounds: [2]quantityKey{q(5, "g"), q(0, "kg")}, want: [2]quantityKey{q(0.5, "kg"), q(0, "kg")},
 		},
 		{
 			name:   "two bounds in one unit with no ordered pair take another",
 			node:   listed(entry("g", 5, 10)+entry("kg", 0, 1), entry("kg", 0, 1)+entry("g", 0, 1)),
-			bounds: [2]quantityKey{q(5, "g"), q(0.5, "g")}, want: [2]quantityKey{q(0, "kg"), q(0, "kg")},
+			bounds: [2]quantityKey{q(5, "g"), q(0.5, "g")}, want: [2]quantityKey{q(0.5, "kg"), q(0.5, "kg")},
 		},
 		{
 			// No ordered pair fits both sides in g or in kg.
 			name:   "no units both admit hold an ordered pair: the first both admit",
 			node:   listed(entry("g", 5, 10)+entry("kg", 2, 3), entry("kg", 0, 1)+entry("g", 0, 1)),
-			bounds: [2]quantityKey{q(5, "g"), q(0.5, "kg")}, want: [2]quantityKey{q(5, "g"), q(0, "g")},
+			bounds: [2]quantityKey{q(5, "g"), q(0.5, "kg")}, want: [2]quantityKey{q(5, "g"), q(0.5, "g")},
 		},
 		{
 			name:   "two bounds in one unit with no ordered pair anywhere: left alone",

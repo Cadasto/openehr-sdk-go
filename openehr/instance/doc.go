@@ -163,14 +163,27 @@
 //
 // Under every policy, every primitive leaf the walk reaches is valued as
 // [Options.ValueFill] says: the constraint's example value under
-// [ExampleFill], an in-constraint draw under [RandomFill]. A quantity's
+// [ExampleFill], an in-constraint draw under [RandomFill]. Under
+// [ExampleFill] the magnitude of a quantity or a count takes a
+// representative value of its range instead: the middle of a range with
+// both bounds, rounded to the decimals a draw keeps, a count's to a whole
+// number; and otherwise 10, or the range's bound nearest 10 where the range
+// does not admit 10. A value on a bound the range excludes moves one step, a unit in
+// its last decimal, inside it. So a range from 0 to 1000 gives 500, one
+// from 0 up gives 10, and no constraint gives 10; a constraint with a list,
+// or one that rejects that value, keeps its own example. A quantity's
 // drawn magnitude is rounded to the template's precision, with no decimals
-// where the precision admits 0 alone and at most two otherwise, and lies
-// inside its range away from 0 and from the range's bounds, or from 1 to
-// 100 where the range is open; a proportion's drawn numerator and
-// denominator are rounded the same way; and a duration's drawn value is
-// not zero, a count of one designator its constraint accepts, such as P3Y
-// or PT7H, from 1 to 12 where the constraint has no range and spread across
+// where the precision admits 0 alone and at most two otherwise. Under a
+// quantity constraint, under a real constraint with no list, whether its
+// range has bounds or not, or where the template leaves it unconstrained,
+// it lies inside its range away from 0 and from the range's bounds, or
+// from 1 to 100 where the range is open or there is none; a
+// count's drawn magnitude, where its range is open or bounded on one side
+// or the template leaves it unconstrained, is drawn the same way as a whole
+// number, so it is never 0; a proportion's drawn numerator and denominator
+// are rounded the same way; and a duration's drawn value is not zero, a
+// count of one designator its constraint accepts, such as P3Y or PT7H,
+// from 1 to 12 where the constraint has no range and spread across
 // the range where it has one, in a designator the range is written in where
 // the constraint accepts it. A duration whose value the template leaves
 // unconstrained is drawn under [RandomFill] too, from 1 to 12 of any

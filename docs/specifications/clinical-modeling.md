@@ -1173,7 +1173,7 @@ Of these, it takes the first that both sides admit and in which an ordered pair 
 So two bounds that share their units keep them, unless an ordered pair fits both sides only in another unit.
 A side admits the units its OPT constraint accepts: its C_DV_QUANTITY ([§ REQ-103](#req-103--primitive-constraint-introspection)), or the C_STRING on the bound's `units` where the OPT builds the bound attribute by attribute; a side the OPT leaves without a constraint on units admits any.
 A side lists the units of its C_DV_QUANTITY's entries; where its C_DV_QUANTITY constrains a `property` and lists no entry, the units § REQ-103 gives that property (`PropertyUnits`), which are the units such a side admits; and where the OPT builds the bound attribute by attribute, the list of the C_STRING on its `units`.
-A side whose C_DV_QUANTITY lists units takes, in a new unit, the magnitude `ExampleValue` gives for the first entry in that unit, and any other side keeps its magnitude.
+A side whose C_DV_QUANTITY lists units takes, in a new unit, the magnitude `ExampleFill` gives for the first entry in that unit (§ [Primitive-leaf value fill](#primitive-leaf-value-fill)), and any other side keeps its magnitude.
 The type is chosen in the same way, among the lower bound's type, then the upper bound's, then every kind in code order, and a side admits a type where its bound can be settled as that kind inside its OPT constraints, as § [Precedence](#precedence) 4 settles a kind, and is then so settled.
 A side whose bound carries a `normal_range` of its own admits only its bound's own units and type.
 Where the two sides admit no one unit or type, the generator leaves the pair as generated; it leaves two bounds of different classes as generated too.
@@ -1366,7 +1366,15 @@ The template validator reads the same compiled tree, so it cannot count a slot's
 `Policy` selects *which* nodes are materialised; an orthogonal **`ValueFill`** selects *how* primitive leaves are valued.
 The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill` as `ExampleFill`, with no error:
 
-- `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue`, a single representative value, byte-identical across calls for one OPT.
+- `ExampleFill` (default) populates each leaf with a single representative value, byte-identical across calls for one OPT: its REQ-103 `PrimitiveConstraint.ExampleValue`, but for the `magnitude` of a `DV_QUANTITY` and of a `DV_COUNT`.
+  That magnitude, whether a `C_DV_QUANTITY` entry, a `C_REAL` or `C_INTEGER` on the `magnitude`, or nothing constrains it, is:
+  - where its range has both bounds, the middle of the range, rounded to the decimals a `RandomFill` draw keeps below, a count's to a whole number, and moved one step inside a bound the range excludes;
+  - otherwise, 10 where the range admits it, and else the range's bound nearest 10, moved one step inside it where the range excludes it.
+
+  A step is a unit in the last decimal the magnitude keeps, so 1 for a count and for a precision of 0.
+  So `0..1000` gives 500, `>=0` gives 10, `>30` with a precision of 0 gives 31, and no constraint gives 10.
+  Under a `C_DV_QUANTITY` the magnitude is in the units of the entry `ExampleValue` takes them from.
+  A constraint with a list keeps its `ExampleValue`, and so does one that rejects the magnitude this gives.
 - `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls.
   A `DV_DURATION`'s `value` under a `C_DURATION` is a duration that is not zero: a count of one designator the constraint accepts it in, drawn, such as `P3Y` or `PT7H`.
   Where the constraint has no range, the count is from 1 to 12; where it has one, it is drawn among the counts of that designator inside the range, between its bounds or twelve from its one bound, a designator a bound is written in tried first.
@@ -1375,7 +1383,10 @@ The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill`
   It rounds what it draws where a precision applies, and keeps a draw unrounded where the rounded one would leave the constraint:
   - a `DV_QUANTITY`'s `magnitude`: to as many decimals as its precision allows where that is 0 or 1, so to none where the precision admits 0 alone, and to two otherwise.
     Its precision is the upper bound of the precision range of the `C_DV_QUANTITY` entry it is drawn in, or the `precision` the walk wrote where the OPT builds the quantity attribute by attribute.
-    A `C_DV_QUANTITY` entry's `magnitude` is drawn inside the entry's range, away from 0 and from the range's bounds, or from 1 to 100 where the range is open;
+    A magnitude is drawn inside its range, away from 0 and from the range's bounds, or from 1 to 100 where the range is open or there is none, where it is:
+    - a `C_DV_QUANTITY` entry's `magnitude`;
+    - a `DV_QUANTITY`'s `magnitude` that nothing constrains, with no `C_DV_QUANTITY` and nothing on the `magnitude`, or that a `C_REAL` with no list constrains, whatever its range;
+    - a `DV_COUNT`'s `magnitude`, as a whole number, where its range is open or bounded on one side or the OPT leaves it unconstrained;
   - a `DV_PROPORTION`'s `numerator` and `denominator`: to whole numbers where its kind or a `precision` of 0 asks for them (§ Contract *Precedence* 4), and otherwise as a magnitude is, to its `precision` up to two decimals.
 
 `RandomFill` reproducibility is caller-controlled via **`Options.ValueSource`** (a `math/rand/v2.Source`): a fixed source makes leaf values byte-reproducible (§ Contract *Reproducible uids*); `nil`, or a typed-nil source such as a nil `*rand.PCG`, draws from the auto-seeded package global so successive calls differ — mirroring the `UIDSource` determinism seam.

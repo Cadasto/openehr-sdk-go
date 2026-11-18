@@ -1671,7 +1671,9 @@ func partyNamed(name *string, identifiers int, externalRef *rm.PartyRef) bool {
 // populatePrimitiveDefault stamps a minimal-valid sentinel on a
 // freshly-built DV value so its primary "value" channel is
 // non-empty. Mirrors the REQ-103 ExampleValue sentinels for the
-// unbounded cases. RM types that carry no primary value (CLUSTER,
+// unbounded cases, but for the magnitude of a DV_COUNT and of a
+// DV_QUANTITY, which take openMagnitude, the one ExampleFill gives an
+// unconstrained magnitude. RM types that carry no primary value (CLUSTER,
 // ELEMENT, party proxies) silently no-op.
 func (g *generator) populatePrimitiveDefault(rmValue any) {
 	if f, ok := intervalFlags(rmValue); ok {
@@ -1706,7 +1708,7 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 	case *rm.DVBoolean:
 		v.Value = true
 	case *rm.DVCount:
-		v.Magnitude = 0
+		v.Magnitude = openMagnitude
 	case *rm.DVOrdinal:
 		if symbolBlank(v.Symbol) {
 			v.Symbol = localSymbol()
@@ -1716,7 +1718,9 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 			v.Symbol = localSymbol()
 		}
 	case *rm.DVQuantity:
-		// Leave zero — the OPT primitive constraint may further pin.
+		// The magnitude ExampleFill gives where nothing constrains it; a
+		// constraint the walk reaches values it.
+		v.Magnitude = openMagnitude
 	case *rm.DVProportion:
 		v.Numerator = 1
 		v.Denominator = 1
@@ -3143,13 +3147,7 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 	if err != nil {
 		return err
 	}
-	if g.opts.ValueFill == RandomFill {
-		// A value sampled inside the constraint, in the Go shape of
-		// ExampleValue so the switch below is unchanged (REQ-107). A
-		// CString draw can be a list entry its pattern refuses, which
-		// applyStringLeaf replaces (stringForConstraint).
-		ex = sampleValue(pc, g.valueSampler)
-	}
+	ex = g.leafValue(rmValue, attr, pc, ex)
 	if cs, ok := pc.(constraints.CString); ok {
 		if def, ok := g.openStringDefault(rmValue, attr); ok {
 			// A C_STRING that gives no example of its own leaves the
@@ -3248,6 +3246,46 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 	// generator stays sound on RM types REQ-103 does not yet have a
 	// typed primitive for.
 	return nil
+}
+
+// leafValue returns the value the ValueFill in force gives a primitive
+// leaf under pc on attr of rmValue, ex being the value narrowedLeaf takes
+// from pc, in the Go shape of ExampleValue so applyPrimitiveExample writes
+// either fill's value alike (REQ-107 Primitive-leaf value fill).
+// ExampleFill gives a DV_QUANTITY under a C_DV_QUANTITY, and a DV_COUNT's
+// magnitude under a C_INTEGER, a representative magnitude
+// (quantityExample, countExample), and any other leaf ex. RandomFill draws
+// a DV_COUNT's magnitude as count does, and any other leaf inside pc
+// (sampleValue), but for a C_REAL with no list on a DV_QUANTITY's
+// magnitude, which it draws once the walk has written the quantity's
+// precision (randomQuantityMagnitude) and keeps ex until then. A CString
+// draw can be a list entry its pattern refuses, which applyStringLeaf
+// replaces (stringForConstraint).
+func (g *generator) leafValue(rmValue any, attr string, pc constraints.PrimitiveConstraint, ex any) any {
+	random := g.opts.ValueFill == RandomFill
+	switch c := pc.(type) {
+	case constraints.CReal:
+		if _, isQuantity := rmValue.(*rm.DVQuantity); isQuantity && attr == "magnitude" && random {
+			if _, drawn := quantityMagnitudeRange(c); drawn {
+				return ex
+			}
+		}
+	case constraints.CInteger:
+		if _, isCount := rmValue.(*rm.DVCount); isCount && attr == "magnitude" {
+			if random {
+				return g.valueSampler.count(c)
+			}
+			return countExample(c, ex)
+		}
+	case constraints.DvQuantity:
+		if _, isQuantity := rmValue.(*rm.DVQuantity); isQuantity && !random {
+			return quantityExample(c)
+		}
+	}
+	if random {
+		return sampleValue(pc, g.valueSampler)
+	}
+	return ex
 }
 
 // routedPrimitive reports whether a primitive leaf on attr of rmValue is
@@ -3963,8 +4001,12 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 // finishValue fills the RM-mandatory fields of rmValue, whose OPT node is
 // opt, that the OPT walk left empty, but for its coded attributes, which
 // finishNode settles next (settleCoded), and a DV_MULTIMEDIA's content,
-// which it settles after them (settleMultimedia). Under RandomFill it also
-// draws a DV_DURATION's value that the OPT leaves unconstrained.
+// which it settles after them (settleMultimedia). It gives a DV_QUANTITY
+// the OPT builds attribute by attribute, or leaves without a constraint,
+// its magnitude, drawn under RandomFill (randomQuantityMagnitude) and
+// representative under ExampleFill. Under RandomFill it also
+// draws a DV_DURATION's value and a DV_COUNT's magnitude that the OPT
+// leaves unconstrained.
 func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	switch v := rmValue.(type) {
 	case *rm.DVIdentifier:
@@ -3974,11 +4016,28 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.DVPeriodicTimeSpecification:
 		fillPeriodicFormalism(opt, v)
 	case *rm.DVQuantity:
-		// A C_DV_QUANTITY's draw is rounded where it is drawn
-		// (quantityMagnitude); one built attribute by attribute is rounded
-		// here.
-		if g.opts.ValueFill == RandomFill && primitiveOf(opt) == nil {
-			roundQuantity(opt, v)
+		// A C_DV_QUANTITY's value is given where its leaf is valued
+		// (leafValue). One the OPT builds attribute by attribute, or leaves
+		// without a constraint, is settled here, once the walk has written
+		// its precision: RandomFill draws or rounds it, and ExampleFill
+		// gives it a representative magnitude.
+		if primitiveOf(opt) == nil {
+			if g.opts.ValueFill == RandomFill {
+				g.randomQuantityMagnitude(opt, v)
+			} else {
+				exampleQuantityMagnitude(opt, v)
+			}
+		}
+	case *rm.DVCount:
+		// REQ-107 Primitive-leaf value fill: a magnitude the OPT leaves
+		// unconstrained holds the value populatePrimitiveDefault wrote;
+		// RandomFill draws it as under an open C_INTEGER, so it is never 0.
+		// As for a DV_DURATION, a bound of an interval is drawn before the
+		// interval's walk puts its two bounds in order.
+		if g.opts.ValueFill == RandomFill && primitiveOf(bindingChild(opt, "magnitude")) == nil {
+			if n, ok := g.valueSampler.count(constraints.CInteger{}).(int64); ok {
+				v.Magnitude = rm.Integer64(n)
+			}
 		}
 	case *rm.DVProportion:
 		// A bound of an interval is settled here too, before the interval's

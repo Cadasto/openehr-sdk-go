@@ -251,11 +251,13 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			want: "DV_COUNT 2; normal_status openehr_normal_statuses::N; normal_range (DV_COUNT 1 .. DV_COUNT 9]" + noRefs,
 		},
 		{
-			name: "DV_COUNT magnitude 0..100, range [0..9], H",
+			// The example, 50, lies inside the range; the step above its
+			// upper bound, 61, is the first value outside it.
+			name: "DV_COUNT magnitude 0..100, range [0..60], H",
 			value: optNode("DV_COUNT", "", optSingle("magnitude", integerFrom(0, 100)),
-				normalRangeOver("DV_COUNT", countValue("0"), countValue("9")), normalStatus("H")),
-			want:       "DV_COUNT 10; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 0 .. DV_COUNT 9]" + noRefs,
-			wantRandom: "DV_COUNT 77; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 0 .. DV_COUNT 9]" + noRefs,
+				normalRangeOver("DV_COUNT", countValue("0"), countValue("60")), normalStatus("H")),
+			want:       "DV_COUNT 61; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 0 .. DV_COUNT 60]" + noRefs,
+			wantRandom: "DV_COUNT 77; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 0 .. DV_COUNT 60]" + noRefs,
 		},
 		{
 			name: "DV_QUANTITY magnitude 0..100 mm, range [1 mm..9 mm], N",
@@ -334,15 +336,15 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 		},
 		{
 			// The bounds are the OPT's own C_REAL on each magnitude, which
-			// the swapped pair 0..5 would break: the lower side admits 5..10.
-			// Of the candidates 5, 4, 6, 20, 19 and 21, only 4 is outside the
-			// range and below the value's own 6..30, so 21 is the first.
-			name: "DV_QUANTITY magnitude 6..30 mm, range of bounds built per attribute 5..10 and 0..20, H",
+			// the swapped pair 10..17.5 would break: the lower side admits
+			// 15..20. The example, 18, lies inside the range 15..20, and the
+			// step above its upper bound, 21, is the first value outside it.
+			name: "DV_QUANTITY magnitude 6..30 mm, range of bounds built per attribute 15..20 and 0..20, H",
 			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(6, 30)), optSingle("units", guardString("mm")),
-				normalRangeOver("DV_QUANTITY", expandedQuantity(realFrom(5, 10)), expandedQuantity(realFrom(0, 20))), normalStatus("H")),
-			want: "DV_QUANTITY 21 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 20 mm]" + noRefs,
-			wantRandom: "DV_QUANTITY 22.23 mm; normal_status openehr_normal_statuses::H; " +
-				"normal_range [DV_QUANTITY 7.54 mm .. DV_QUANTITY 15.96 mm]" + noRefs,
+				normalRangeOver("DV_QUANTITY", expandedQuantity(realFrom(15, 20)), expandedQuantity(realFrom(0, 20))), normalStatus("H")),
+			want: "DV_QUANTITY 21 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 15 mm .. DV_QUANTITY 20 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 24.13 mm; normal_status openehr_normal_statuses::H; " +
+				"normal_range [DV_QUANTITY 15 mm .. DV_QUANTITY 20 mm]" + noRefs,
 		},
 		{
 			// As above for a DV_ORDINAL: the swapped pair would hand the lower
@@ -358,13 +360,14 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 				"normal_range [*DV_ORDINAL 5 local::at0001 .. *DV_ORDINAL 20 local::at0002]" + noRefs,
 		},
 		{
-			// 10 is the first value outside the range that the value's own
-			// constraint accepts: -1, below the lower bound, is rejected by it.
-			name: "DV_QUANTITY magnitude 0..100 mm, range [0 mm..9 mm], H",
+			// The example, 50, lies inside the range; 61, the step above its
+			// upper bound, is the first value outside it that the value's own
+			// constraint accepts.
+			name: "DV_QUANTITY magnitude 0..100 mm, range [0 mm..60 mm], H",
 			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(0, 100)), optSingle("units", guardString("mm")),
-				normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("9")), normalStatus("H")),
-			want:       "DV_QUANTITY 10 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 9 mm]" + noRefs,
-			wantRandom: "DV_QUANTITY 67.65 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 9 mm]" + noRefs,
+				normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("60")), normalStatus("H")),
+			want:       "DV_QUANTITY 61 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 60 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 75.54 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 60 mm]" + noRefs,
 		},
 		{
 			name: "DV_PROPORTION unitary numerator 0..100, range [0/1..9/1], H",
@@ -386,21 +389,26 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 		},
 		{
 			// A high status takes the step above the upper bound before any
-			// other candidate: 1, not the -1 below the lower bound, and for a
+			// other candidate: 11, not the 9 below the lower bound, and for a
 			// quantity and a proportion as well, where the unconstrained
-			// example is 0 and 1. The rows of
+			// example is 10 and 1. RandomFill draws the count, 44, above the
+			// range, where it stays. The rows of
 			// TestREQ107_NormalStatusSteersTheValueToItsSide pin the order for
 			// the other statuses.
-			name: "DV_COUNT with no magnitude constraint, range [0..0], H",
-			value: optNode("DV_COUNT", "", normalRangeOver("DV_COUNT", countValue("0"), countValue("0")),
+			name: "DV_COUNT with no magnitude constraint, range [10..10], H",
+			value: optNode("DV_COUNT", "", normalRangeOver("DV_COUNT", countValue("10"), countValue("10")),
 				normalStatus("H")),
-			want: "DV_COUNT 1; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 0 .. DV_COUNT 0]" + noRefs,
+			want:       "DV_COUNT 11; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 10 .. DV_COUNT 10]" + noRefs,
+			wantRandom: "DV_COUNT 44; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 10 .. DV_COUNT 10]" + noRefs,
 		},
 		{
-			name: "DV_QUANTITY with no magnitude constraint, range [0 mm..0 mm], H",
+			// RandomFill draws the quantity, 82.11 mm, above the range, where
+			// it stays.
+			name: "DV_QUANTITY with no magnitude constraint, range [10 mm..10 mm], H",
 			value: optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
-				normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("0")), normalStatus("H")),
-			want: "DV_QUANTITY 1 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 0 mm]" + noRefs,
+				normalRangeOver("DV_QUANTITY", quantityValue("10"), quantityValue("10")), normalStatus("H")),
+			want:       "DV_QUANTITY 11 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 10 mm .. DV_QUANTITY 10 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 82.11 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 10 mm .. DV_QUANTITY 10 mm]" + noRefs,
 		},
 		{
 			name: "DV_PROPORTION unitary with no numerator constraint, range [1/1..1/1], H",
@@ -409,11 +417,15 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			want: "DV_PROPORTION 2/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 1/1 type 1 .. DV_PROPORTION 1/1 type 1]" + noRefs,
 		},
 		{
-			// A low status takes the step below the lower bound: -1 mm.
-			name: "DV_QUANTITY with no magnitude constraint, range [0 mm..0 mm], L",
+			// A low status takes the step below the lower bound: 9 mm.
+			// RandomFill draws the quantity, 82.11 mm, outside the range,
+			// where it stays: the rule asks the value to be outside, on no
+			// side in particular.
+			name: "DV_QUANTITY with no magnitude constraint, range [10 mm..10 mm], L",
 			value: optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
-				normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("0")), normalStatus("L")),
-			want: "DV_QUANTITY -1 mm; normal_status openehr_normal_statuses::L; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 0 mm]" + noRefs,
+				normalRangeOver("DV_QUANTITY", quantityValue("10"), quantityValue("10")), normalStatus("L")),
+			want:       "DV_QUANTITY 9 mm; normal_status openehr_normal_statuses::L; normal_range [DV_QUANTITY 10 mm .. DV_QUANTITY 10 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 82.11 mm; normal_status openehr_normal_statuses::L; normal_range [DV_QUANTITY 10 mm .. DV_QUANTITY 10 mm]" + noRefs,
 		},
 		{
 			// The OPT lists 0, 7, 5 and 20. The middle of the range, 5, is
@@ -449,14 +461,15 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 					optNode("DV_QUANTITY", "", optSingle("magnitude", dvReal("1")), optSingle("units", guardString("cm"))),
 					optNode("DV_QUANTITY", "", optSingle("magnitude", dvReal("9")), optSingle("units", guardString("cm")))),
 				normalStatus("N")),
-			want:        "DV_QUANTITY 0 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
-			wantRandom:  "DV_QUANTITY 67.65 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
+			want:        "DV_QUANTITY 50 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
+			wantRandom:  "DV_QUANTITY 75.54 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
 			asGenerated: true,
 		},
 		{
 			name:        "DV_COUNT range named with no child, H, left as generated",
 			value:       optNode("DV_COUNT", "", optSingle("normal_range"), normalStatus("H")),
-			want:        "DV_COUNT 0; normal_status openehr_normal_statuses::H; normal_range (open .. open)" + noRefs,
+			want:        "DV_COUNT 10; normal_status openehr_normal_statuses::H; normal_range (open .. open)" + noRefs,
+			wantRandom:  "DV_COUNT 47; normal_status openehr_normal_statuses::H; normal_range (open .. open)" + noRefs,
 			asGenerated: true,
 		},
 		{
@@ -536,8 +549,10 @@ var placeholderStatusNode = optSingle("normal_status", optCodePhrase("local", "a
 // below the lower bound before the step above the upper, but the lower bound
 // itself before both, so where the range excludes its lower bound, which
 // lies outside it, a placeholder takes that bound and a low status the step
-// below it. Each range holds the unconstrained example value, so each fill
-// starts from a value inside it. It holds for a DV_COUNT, a DV_QUANTITY and
+// below it. Each range holds the value a count or a quantity takes where
+// the OPT leaves its magnitude unconstrained, 10, or under RandomFill a
+// draw from 1 to 100, so each fill starts from a value inside
+// it. It holds for a DV_COUNT, a DV_QUANTITY and
 // a DV_PROPORTION, under every policy, both value fills, and with and
 // without the implicit attributes.
 func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
@@ -555,26 +570,26 @@ func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
 	}
 	kinds := []kind{
 		{
-			name: "DV_COUNT with no magnitude constraint, range [0..0]",
+			name: "DV_COUNT with no magnitude constraint, range [1..100]",
 			build: func(status string) string {
-				return optNode("DV_COUNT", "", normalRangeOver("DV_COUNT", countValue("0"), countValue("0")), status)
+				return optNode("DV_COUNT", "", normalRangeOver("DV_COUNT", countValue("1"), countValue("100")), status)
 			},
 			render: func(value, status string) string {
-				return "DV_COUNT " + value + "; normal_status " + status + "; normal_range [DV_COUNT 0 .. DV_COUNT 0]" + noRefs
+				return "DV_COUNT " + value + "; normal_status " + status + "; normal_range [DV_COUNT 1 .. DV_COUNT 100]" + noRefs
 			},
-			below: "-1", above: "1", other: "-1",
+			below: "0", above: "101", other: "0",
 		},
 		{
-			name: "DV_QUANTITY with no magnitude constraint, range [0 mm..0 mm]",
+			name: "DV_QUANTITY with no magnitude constraint, range [1 mm..100 mm]",
 			build: func(status string) string {
 				return optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
-					normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("0")), status)
+					normalRangeOver("DV_QUANTITY", quantityValue("1"), quantityValue("100")), status)
 			},
 			render: func(value, status string) string {
 				return "DV_QUANTITY " + value + " mm; normal_status " + status +
-					"; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 0 mm]" + noRefs
+					"; normal_range [DV_QUANTITY 1 mm .. DV_QUANTITY 100 mm]" + noRefs
 			},
-			below: "-1", above: "1", other: "-1",
+			below: "0", above: "101", other: "0",
 		},
 		{
 			name: "DV_PROPORTION unitary with no numerator constraint, range [1/1..1/1]",
@@ -589,26 +604,26 @@ func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
 			below: "0", above: "2", other: "0",
 		},
 		{
-			name: "DV_COUNT with no magnitude constraint, range (-5..5]",
+			name: "DV_COUNT with no magnitude constraint, range (0..100]",
 			build: func(status string) string {
-				return optNode("DV_COUNT", "", normalRangeOver("DV_COUNT", countValue("-5"), countValue("5"), excludesLower), status)
+				return optNode("DV_COUNT", "", normalRangeOver("DV_COUNT", countValue("0"), countValue("100"), excludesLower), status)
 			},
 			render: func(value, status string) string {
-				return "DV_COUNT " + value + "; normal_status " + status + "; normal_range (DV_COUNT -5 .. DV_COUNT 5]" + noRefs
+				return "DV_COUNT " + value + "; normal_status " + status + "; normal_range (DV_COUNT 0 .. DV_COUNT 100]" + noRefs
 			},
-			below: "-6", above: "6", other: "-5",
+			below: "-1", above: "101", other: "0",
 		},
 		{
-			name: "DV_QUANTITY with no magnitude constraint, range (-5 mm..5 mm]",
+			name: "DV_QUANTITY with no magnitude constraint, range (0 mm..100 mm]",
 			build: func(status string) string {
 				return optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
-					normalRangeOver("DV_QUANTITY", quantityValue("-5"), quantityValue("5"), excludesLower), status)
+					normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("100"), excludesLower), status)
 			},
 			render: func(value, status string) string {
 				return "DV_QUANTITY " + value + " mm; normal_status " + status +
-					"; normal_range (DV_QUANTITY -5 mm .. DV_QUANTITY 5 mm]" + noRefs
+					"; normal_range (DV_QUANTITY 0 mm .. DV_QUANTITY 100 mm]" + noRefs
 			},
-			below: "-6", above: "6", other: "-5",
+			below: "-1", above: "101", other: "0",
 		},
 		{
 			name: "DV_PROPORTION unitary with no numerator constraint, range (-5/1..5/1]",
