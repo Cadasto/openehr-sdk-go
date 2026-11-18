@@ -1957,12 +1957,13 @@ The floor reports an ELEMENT that carries both, and one that carries neither, as
 #### DV_PROPORTION
 
 Two precision arms and the proportion-kind rules.
-`precision`, when set, ≥ -1 under the same RM rule as DV_QUANTITY (-1 means no limit); and the RM invariant `Precision_validity` (`precision = 0 implies is_integral`), read through `Is_integral_validity` as whole-number operands, so the floor reports a `precision` of 0 over a non-integral `numerator` or `denominator`.
+The floor reads the RM function `is_integral` as a `precision` of 0 where `precision` is set, as the RM defines it, and as a whole-number `numerator` and `denominator` where it is not.
+`precision`, when set, ≥ -1 under the same RM rule as DV_QUANTITY (-1 means no limit); and the RM invariants `Precision_validity` (`precision = 0 implies is_integral`) and `Is_integral_validity`, which the floor reports together as `Precision_validity`: a `precision` of 0 over a non-integral `numerator` or `denominator`.
 It also reports the proportion-kind rules:
 
 - a `type` that is not a `PROPORTION_KIND` value, 0 to 4 (`Type_validity`);
 - a `denominator` other than 1 on a unitary proportion (`Unitary_validity`) and other than 100 on a percent (`Percent_validity`);
-- a `numerator` or `denominator` that is not a whole number on a fraction or an integer fraction (`Fraction_validity`, `is_integral` read as for `Precision_validity`);
+- a fraction or an integer fraction that is not `is_integral` (`Fraction_validity`): one whose `precision` is set and is not 0, or one with no `precision` over a `numerator` or `denominator` that is not a whole number;
 - and a `denominator` of 0 (`Valid_denominator`).
 
 The *DV_INTERVAL* entry below leaves a pair of bounds unordered when either has a zero denominator.
@@ -2287,7 +2288,7 @@ On an `Issue` from the instance validators, `Value` **MUST** hold what this tabl
 | `rm_invariant` on a `DV_PROPORTION` with precision 0 and a fractional operand | the numerator and the denominator, as a `[2]float64` |
 | `rm_invariant` on a `DV_PROPORTION` `type` that is not a proportion kind (`Type_validity`) | the type |
 | `rm_invariant` on a `DV_PROPORTION` `denominator` its kind rejects, or of 0 (`Unitary_validity`, `Percent_validity`, `Valid_denominator`) | the denominator |
-| `rm_invariant` on a fraction or integer-fraction `DV_PROPORTION` with a fractional operand (`Fraction_validity`) | the numerator and the denominator, as a `[2]float64` |
+| `rm_invariant` on a fraction or integer-fraction `DV_PROPORTION` that is not `is_integral` (`Fraction_validity`) | the precision where it is set, and else the numerator and the denominator, as a `[2]float64` |
 | `rm_invariant` on a `DV_INTERVAL` whose lower bound is above its upper bound | the two bounds' magnitudes, lower first, as a `[2]float64`, a DV_TIME read in UTC where it carries a zone and the other bound carries a different one or none |
 | `rm_invariant` on a temporal `value` (`Value_valid`) | the `value` string |
 | `term_mapping_match` | the `match` |
