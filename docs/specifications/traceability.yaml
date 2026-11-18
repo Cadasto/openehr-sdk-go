@@ -69,7 +69,7 @@ requirements:
     canonical: docs/specifications/module-layout.md#req-013--building-block-independence
     status: draft
     implementation: landed
-    packages: [openehr/rm, openehr/bmm, openehr/serialize, openehr/validation, openehr/instance, openehr/composition, openehr/template, openehr/templatecompile, openehr/template/webtemplate, openehr/terminology, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck, openehr/rm/rminfo, openehr/template/constraints]
+    packages: [openehr/rm, openehr/bmm, openehr/serialize, openehr/validation, openehr/validation/aqlvalidation, openehr/instance, openehr/composition, openehr/template, openehr/templatecompile, openehr/template/webtemplate, openehr/terminology, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/aql/internal/semcheck, openehr/rm/rminfo, openehr/template/constraints]
     tests:
       - internal/cstringvalue/cstringvalue_test.go
       - internal/importguard/anybuild_internal_test.go
@@ -93,6 +93,7 @@ requirements:
       - openehr/template/webtemplate/independence_test.go
       - openehr/templatecompile/imports_test.go
       - openehr/terminology/imports_test.go
+      - openehr/validation/aqlvalidation/imports_test.go
       - openehr/validation/imports_test.go
 
   - id: REQ-014
@@ -1430,7 +1431,7 @@ requirements:
       - openehr/internal/rmbind/tier_test.go
       - openehr/templatecompile/compile_readings_test.go
       - openehr/validation/absent_part_test.go
-      - openehr/validation/aql_test.go
+      - openehr/validation/aqlvalidation/aqlvalidation_test.go
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/binding_trial_test.go
       - openehr/validation/character_binding_test.go
@@ -1814,6 +1815,7 @@ requirements:
       - openehr/aql/parse/gen
       - openehr/aql/lint
       - openehr/validation
+      - openehr/validation/aqlvalidation
       - openehr/templatecompile
       - internal/templatecompile
       - testkit/probes/aql
@@ -1833,7 +1835,7 @@ requirements:
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/roundtrip_test.go
       - openehr/aql/parse/sll_internal_test.go
-      - openehr/validation/aql_test.go
+      - openehr/validation/aqlvalidation/aqlvalidation_test.go
       - testkit/probes/aql/probe_028_aql_lint.go
       - testkit/probes/aql/probe_099_path_shape_lint.go
       - testkit/probes/aql/probe_107_suite_corpus.go
@@ -2362,7 +2364,7 @@ requirements:
       - openehr/aql/lint/semantic_internal_test.go
       - openehr/aql/lint/semantic_test.go
       - openehr/aql/verify_test.go
-      - openehr/validation/aql_test.go
+      - openehr/validation/aqlvalidation/aqlvalidation_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probe_107_suite_corpus.go
       - testkit/probes/aql/probe_107_suite_corpus_test.go
@@ -2377,7 +2379,7 @@ requirements:
     packages:
       - openehr/aql/lint
       - openehr/aql/internal/semcheck
-      - openehr/validation
+      - openehr/validation/aqlvalidation
       - testkit/probes/aql
       - openehr/aql
       - openehr/aql/contain
@@ -2404,7 +2406,7 @@ requirements:
       - openehr/aql/verify_parity_test.go
       - openehr/aql/verify_test.go
       - openehr/aql/version_test.go
-      - openehr/validation/aql_test.go
+      - openehr/validation/aqlvalidation/aqlvalidation_test.go
       - testkit/probes/aql/probe_088_builder_containment_paging.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probe_099_path_shape_lint.go
