@@ -125,18 +125,22 @@
 // them. An attribute both layers find missing or empty is one finding: a
 // node the template requires and the instance lacks is the template's
 // `required` alone, and an empty list the template counts is the
-// template's finding alone. The other way round, an empty part of a value
-// a primitive constraint reads (a code phrase's code string, a quantity's
-// units, the value of a temporal type a short name binds, an ordinal
-// symbol's code string) is the Reference Model rules' `required` alone:
-// the constraint does not judge that part, though it still judges a code
-// phrase's terminology and an ordinal's value, unless a limit stops the
-// walk before those rules reach the part. A Reference Model rule's own
-// finding at that path, such as the terminology check of a coded
-// attribute, is reported beside it. A value held from two places is
-// validated at each, so a defect in it is reported at each path. No option
-// leaves the Reference Model rules out. Callers without a template run
-// [ValidateRM], which applies them alone.
+// template's finding alone. The other way round, an absent or empty part
+// of a value a primitive constraint reads (a code phrase's code string, a
+// quantity's units or magnitude, the magnitude of a count, the value of a
+// boolean or of a temporal type a short name binds, an ordinal's value,
+// its symbol or the symbol's code string) is the Reference Model rules'
+// `required` alone: the constraint does not judge that part, though it
+// still judges what the part leaves, such as a code phrase's terminology,
+// a quantity's units and precision, or an ordinal's value or symbol,
+// unless a limit stops the walk before those rules reach the part. A
+// number or a boolean is absent only where the decode's report names it:
+// in a value built in Go its zero is a value, judged as any value is. A
+// Reference Model rule's own finding at that path, such as the terminology
+// check of a coded attribute, is reported beside it. A value held from two
+// places is validated at each, so a defect in it is reported at each path.
+// No option leaves the Reference Model rules out. Callers without a
+// template run [ValidateRM], which applies them alone.
 //
 // The template-driven validators and [ValidateRM] write [Issue.Path] by
 // one rule, so a node has one path whichever of them reports it: an

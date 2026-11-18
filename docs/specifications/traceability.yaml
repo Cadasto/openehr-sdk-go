@@ -1429,6 +1429,7 @@ requirements:
       - openehr/internal/rmbind/bind_test.go
       - openehr/internal/rmbind/tier_test.go
       - openehr/templatecompile/compile_readings_test.go
+      - openehr/validation/absent_part_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/binding_trial_test.go
@@ -1458,6 +1459,7 @@ requirements:
       - openehr/validation/pointer_primitive_test.go
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/primitive_input_test.go
+      - openehr/validation/primitive_no_item_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/quantity_property_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
@@ -1757,6 +1759,7 @@ requirements:
       - openehr/validation/issuepath_test.go
       - openehr/validation/optional_list_counts_test.go
       - openehr/validation/optional_string_test.go
+      - openehr/validation/primitive_no_item_test.go
       - openehr/validation/quantity_property_test.go
       - openehr/validation/subtype_conformance_corpus_test.go
       - openehr/validation/subtype_conformance_test.go
@@ -1919,6 +1922,7 @@ requirements:
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/open_name_list_test.go
+      - openehr/validation/primitive_no_item_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_chained_test.go
       - testkit/probes/template/probe_022_opt_path_resolution.go
@@ -1971,6 +1975,7 @@ requirements:
       - openehr/template/constraints/temporal_parity_test.go
       - openehr/template/constraints/temporal_validate_test.go
       - openehr/templatecompile/compile_test.go
+      - openehr/validation/absent_part_test.go
       - openehr/validation/attribute_not_in_rm_test.go
       - openehr/validation/constraint_ref_walk_test.go
       - openehr/validation/coverage_test.go
@@ -2624,6 +2629,7 @@ requirements:
       - internal/rmaccess/reads_test.go
       - internal/templatecompile/walkfacts_test.go
       - openehr/instance/rm_defaults_yield_test.go
+      - openehr/validation/absent_part_test.go
       - openehr/validation/attribute_not_in_rm_test.go
       - openehr/validation/binding_trial_cost_internal_test.go
       - openehr/validation/binding_trial_test.go
@@ -2652,6 +2658,7 @@ requirements:
       - openehr/validation/noncomposition_test.go
       - openehr/validation/optional_list_counts_test.go
       - openehr/validation/primitive_empty_part_test.go
+      - openehr/validation/primitive_no_item_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/registry_roots_test.go
       - openehr/validation/rm_class_names_internal_test.go

@@ -110,9 +110,10 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 // for o: the value and the symbol's defining_code as one
 // [constraints.OrdinalSymbol], so a symbol that does not match its value is
 // reported; a code naming no terminology matches a listed pair by its code
-// (REQ-103) while the RM rules report the missing terminology. A code with
-// an empty code string is passed on as it is: where the RM rules report it,
-// the walk has the constraint judge the value alone
+// (REQ-103) while the RM rules report the missing terminology. An absent
+// part, an omitted symbol, a code with an empty code string or a value a
+// decode reports missing, is passed on as it is: where the RM rules report
+// it, the walk has the constraint judge only what the other part leaves
 // ([engine.judgeLeaf]).
 //
 // DV_ORDINAL.value is Integer (int32) per the RM; widening it to int is

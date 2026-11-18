@@ -482,7 +482,7 @@ func primitiveLeaf(value any, a *engineAttr) bool {
 // finding of theirs at the node's own path stays, though the rule read the
 // refused content to reach it.
 //
-// A value constraint that leaves an empty part of the value to the RM rules
+// A value constraint that leaves an absent part of the value to the RM rules
 // is settled once the attributes are visited too ([engine.settle]); its
 // findings are at the node's own path, never at or below refused content.
 //
@@ -582,7 +582,7 @@ func (e *engine) checkIdentityAndType(n engineNode) (scalar bool) {
 	if iss, ok := identityIssue(n.bound, n.value, n.path); ok {
 		e.found.emit(iss)
 	}
-	if _, scalar = scalarLeaf(n.bound, n.value); scalar {
+	if scalar = scalarLeaf(n.bound, n.value); scalar {
 		return true
 	}
 	if iss, ok := rmTypeIssue(n.bound, n.value, n.path); ok {
@@ -597,8 +597,10 @@ func (e *engine) checkIdentityAndType(n engineNode) (scalar bool) {
 // template constrains nothing below the node. A slot leaf carries no
 // structure below it, and a leaf with a primitive constraint checks the
 // value by that constraint ([engine.judgeLeaf]); below either, the node's
-// attributes are walked with the RM rules alone. Where the part of the value
-// the constraint reads is empty, checkLeaf also returns the judgement the
+// attributes are walked with the RM rules alone. A scalar leaf with no
+// primitive constraint, a C_PRIMITIVE_OBJECT with no item, allows any value
+// of its type and checks nothing. Where a part of the value
+// the constraint reads is absent, checkLeaf also returns the judgement the
 // walk holds until it has visited the node's attributes, and nil otherwise.
 // A CONSTRAINT_REF names a value set outside the SDK and checks nothing
 // locally: its path is listed in [Coverage.External], and the bound value's
@@ -611,6 +613,9 @@ func (e *engine) checkLeaf(n engineNode, scalar bool, class string) (*tcimpl.Com
 	}
 	pc := n.bound.PrimitiveConstraint()
 	if pc == nil {
+		if scalar {
+			return nil, nil
+		}
 		return n.bound, nil
 	}
 	held := e.judgeLeaf(n, class, pc)
@@ -625,30 +630,52 @@ func (e *engine) checkLeaf(n engineNode, scalar bool, class string) (*tcimpl.Com
 	return n.bound, held
 }
 
-// constrainedPart names, for each RM class whose value a primitive
-// constraint reads by its parts, the attributes that lead from the value to
-// the part the constraint reads that the RM rules may report as absent or
-// empty: a CODE_PHRASE's code_string, a DV_QUANTITY's units, the value of
-// the DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION an AOM 1.4 short name
-// binds, and the code string of a DV_ORDINAL's symbol, two levels down.
-var constrainedPart = map[string][]string{
-	"CODE_PHRASE":  {"code_string"},
-	"DV_QUANTITY":  {"units"},
-	"DV_DATE":      {"value"},
-	"DV_TIME":      {"value"},
-	"DV_DATE_TIME": {"value"},
-	"DV_DURATION":  {"value"},
-	"DV_ORDINAL":   {"symbol", "defining_code", "code_string"},
+// constrainedParts names, for each RM class whose value a primitive
+// constraint reads by its parts, each part the constraint reads that the RM
+// makes mandatory, as the attributes that lead from the value to the part:
+// a CODE_PHRASE's code_string; a DV_QUANTITY's units, then its magnitude;
+// the magnitude of the DV_COUNT and the value of the DV_BOOLEAN that the
+// INTEGER and BOOLEAN short names bind; the value of the DV_DATE, DV_TIME,
+// DV_DATE_TIME and DV_DURATION a temporal short name binds; and the code
+// string of a DV_ORDINAL's symbol, three levels down, then its value. The
+// position of a part in its class's list is its bit in a [partSet].
+var constrainedParts = map[string][][]string{
+	"CODE_PHRASE":  {{"code_string"}},
+	"DV_QUANTITY":  {{"units"}, {"magnitude"}},
+	"DV_COUNT":     {{"magnitude"}},
+	"DV_BOOLEAN":   {{"value"}},
+	"DV_DATE":      {{"value"}},
+	"DV_TIME":      {{"value"}},
+	"DV_DATE_TIME": {{"value"}},
+	"DV_DURATION":  {{"value"}},
+	"DV_ORDINAL":   {{"symbol", "defining_code", "code_string"}, {"value"}},
 }
 
-// heldJudgement is the judgement of a primitive constraint whose part the RM
-// rules may still report as absent or empty, held by the walk until it has
+// The positions in [constrainedParts] of the parts [appendLeftIssues] tells
+// apart.
+const (
+	quantityUnits = 0 // a DV_QUANTITY's units
+	ordinalSymbol = 0 // a DV_ORDINAL's symbol, down to its code string
+	ordinalValue  = 1 // a DV_ORDINAL's value
+)
+
+// partSet holds the absent parts of a value: bit i for the part at position
+// i of its class's list in [constrainedParts].
+type partSet uint8
+
+// has reports whether s holds the part at position i.
+func (s partSet) has(i int) bool {
+	return s&(1<<i) != 0
+}
+
+// heldJudgement is the judgement of a primitive constraint whose parts the
+// RM rules may still report as absent, held by the walk until it has
 // visited the node's attributes ([engine.judgeLeaf], [engine.settle]).
 type heldJudgement struct {
-	// part is the issue path of the empty part.
-	part string
+	// parts holds the issue path of each absent part.
+	parts []string
 	// from and to bound, in the issues the walk reported, those the
-	// constraint drew on what the part leaves.
+	// constraint drew on what the absent parts leave.
 	from, to int
 	// whole holds the issues the constraint draws on the whole value.
 	whole []Issue
@@ -656,24 +683,25 @@ type heldJudgement struct {
 
 // judgeLeaf applies the primitive constraint pc to node n, of the bare RM
 // class class, and reports its issues. Where the walk visits the node's
-// attributes and the part of the value pc reads is absent or empty
-// ([engine.emptyPart]), the RM rules may report that part, and their
+// attributes and a part of the value pc reads is absent
+// ([engine.absentParts]), the RM rules may report that part, and their
 // `required` there then stands for pc's finding: judgeLeaf reports what pc
-// judges of what the part leaves ([appendLeftIssues]) and returns what pc
-// judges of the whole value, which the walk holds until it has visited the
-// attributes and seen whether the part was reported ([engine.settle]).
-// Otherwise pc judges the whole value at once, as at the depth limit, where
-// the attributes are not visited, and judgeLeaf returns nil.
+// judges of what the absent parts leave ([appendLeftIssues]) and returns
+// what pc judges of the whole value, which the walk holds until it has
+// visited the attributes and seen whether each absent part was reported
+// ([engine.settle]). Otherwise pc judges the whole value at once, as at the
+// depth limit, where the attributes are not visited, and judgeLeaf returns
+// nil.
 func (e *engine) judgeLeaf(n engineNode, class string, pc constraints.PrimitiveConstraint) *heldJudgement {
-	part, empty := e.emptyPart(n, class)
-	if !empty {
+	absent, parts := e.absentParts(n, class)
+	if absent == 0 {
 		e.found.issues = appendPrimitiveIssues(e.found.issues, n.value, n.path, pc)
 		return nil
 	}
 	from := len(e.found.issues)
-	e.found.issues = appendLeftIssues(e.found.issues, n, class, pc)
+	e.found.issues = appendLeftIssues(e.found.issues, n, class, absent, pc)
 	return &heldJudgement{
-		part:  part,
+		parts: parts,
 		from:  from,
 		to:    len(e.found.issues),
 		whole: appendPrimitiveIssues(nil, n.value, n.path, pc),
@@ -681,74 +709,130 @@ func (e *engine) judgeLeaf(n engineNode, class string, pc constraints.PrimitiveC
 }
 
 // appendLeftIssues appends to issues what the primitive constraint pc,
-// bound to node n of the bare RM class class, judges of what the empty part
-// of n's value leaves: a C_CODE_PHRASE, or the one a C_CODE_REFERENCE
-// carries, judges the terminology by its own rule, its code list set aside,
-// and the constraint of a DV_ORDINAL judges the ordinal's value alone, which
-// [primitiveInput] passes on as it is. Any other constraint is left nothing
-// to judge: a C_DV_QUANTITY's ranges are per unit, and a temporal short name
-// reads the value alone.
-func appendLeftIssues(issues []Issue, n engineNode, class string, pc constraints.PrimitiveConstraint) []Issue {
+// bound to node n of the bare RM class class, judges of what the absent
+// parts of n's value leave:
+//
+//   - of a CODE_PHRASE, the terminology: a C_CODE_PHRASE, or the one a
+//     C_CODE_REFERENCE carries, judges it by its own rule, its code list set
+//     aside;
+//   - of a DV_QUANTITY whose units are present, the units and the precision:
+//     a C_DV_QUANTITY judges them as a copy of it whose magnitude ranges are
+//     unbounded does; with the units absent, nothing, its ranges being per
+//     unit;
+//   - of a DV_ORDINAL whose symbol alone is absent, the value, which
+//     [primitiveInput] passes on as it is and the constraint judges alone;
+//     of one whose value alone is absent, the symbol: nothing where the
+//     constraint admits the symbol beside the value of a pair it lists
+//     ([ordinalAdmitsSymbol]), and what it judges of the whole value where
+//     it does not; with both absent, nothing.
+//
+// Any other constraint is left nothing to judge: those of a DV_COUNT, a
+// DV_BOOLEAN and a temporal short name read the one part.
+func appendLeftIssues(issues []Issue, n engineNode, class string, absent partSet, pc constraints.PrimitiveConstraint) []Issue {
 	switch class {
 	case "CODE_PHRASE":
 		if cp, ok := constraints.CodePhraseOf(pc); ok {
 			return appendPrimitiveIssues(issues, n.value, n.path, constraints.CodePhrase{Terminology: cp.Terminology})
 		}
+	case "DV_QUANTITY":
+		if q, ok := pc.(constraints.DvQuantity); ok && !absent.has(quantityUnits) {
+			return appendPrimitiveIssues(issues, n.value, n.path, unboundedMagnitudes(q))
+		}
 	case "DV_ORDINAL":
-		if in, ok := primitiveInput(n.value).(constraints.OrdinalSymbol); ok {
+		in, ok := primitiveInput(n.value).(constraints.OrdinalSymbol)
+		if !ok || (absent.has(ordinalSymbol) && absent.has(ordinalValue)) {
+			return issues
+		}
+		if absent.has(ordinalSymbol) {
 			return appendPrimitiveIssues(issues, in.Value, n.path, pc)
+		}
+		if !ordinalAdmitsSymbol(pc, in.Symbol) {
+			return appendPrimitiveIssues(issues, n.value, n.path, pc)
 		}
 	}
 	return issues
 }
 
-// emptyPart returns the issue path of the part of node n's value, of the
-// bare RM class class, that a primitive constraint reads ([constrainedPart])
-// and reports whether the RM rules may report it as absent or empty. They
-// may when the walk visits the node's attributes, which it does on a value
-// of a registered RM class short of the depth limit, and the part is absent
-// through the generated access, which reads an empty string as absent.
-// Whether they do depends on the role of the node that holds the part, a
+// unboundedMagnitudes returns a copy of q whose entries' magnitude ranges
+// are the zero [constraints.NumericRange], which is unbounded, so that the
+// copy judges the units and the precision of a quantity alone.
+func unboundedMagnitudes(q constraints.DvQuantity) constraints.DvQuantity {
+	q.Units = slices.Clone(q.Units)
+	for i := range q.Units {
+		q.Units[i].Magnitude = constraints.NumericRange{}
+	}
+	return q
+}
+
+// ordinalAdmitsSymbol reports whether pc, the constraint of a DV_ORDINAL,
+// admits symbol beside the value of a pair it lists, by its own rule
+// ([constraints.CDvOrdinal.Validate]): the rule a listed symbol that names
+// no terminology meets is applied as it is, not copied. It reports false
+// for any other constraint, and for one that lists no pair.
+func ordinalAdmitsSymbol(pc constraints.PrimitiveConstraint, symbol constraints.CodedTermRef) bool {
+	c, ok := pc.(constraints.CDvOrdinal)
+	return ok && slices.ContainsFunc(c.Values, func(p constraints.OrdinalSymbol) bool {
+		return len(c.Validate(constraints.OrdinalSymbol{Value: p.Value, Symbol: symbol})) == 0
+	})
+}
+
+// absentParts returns the parts of node n's value, of the bare RM class
+// class, that a primitive constraint reads ([constrainedParts]) and that are
+// absent where the RM rules may report them, with the issue path of each, in
+// the order of the class's list. They may when the walk visits the node's
+// attributes, which it does on a value of a registered RM class short of the
+// depth limit. A part is absent when the generated access reads a step on
+// the way to it as absent, nil, a nil pointer, an empty string or a value
+// struct it reads as empty, such as an omitted ordinal symbol, or when the
+// call's report of missing members names a step ([WithMissing]): a number
+// or a boolean is absent only where the report names it, its zero being a
+// value in a value built in Go. The part's path is the path of the first
+// absent step, where the RM rules report a missing mandatory attribute.
+// Whether they do depends on the role of the node that holds the step, a
 // DV_SCALE symbol's code_string being one they let be blank, and on whether
-// the walk reaches the part before a limit stops it: the walk sees that
-// once it has visited the attributes ([engine.settle]). The part's path is
-// written only when the part is empty.
-func (e *engine) emptyPart(n engineNode, class string) (string, bool) {
-	steps, ok := constrainedPart[class]
+// the walk reaches the step before a limit stops it: the walk sees that once
+// it has visited the attributes ([engine.settle]). A primitive leaf is read
+// without its value ([rmaccess.Peek]), and a path is written only for an
+// absent part, so nothing is allocated while no part is absent.
+func (e *engine) absentParts(n engineNode, class string) (absent partSet, paths []string) {
+	parts, ok := constrainedParts[class]
 	if !ok || n.depth >= e.maxDepth || !rmaccess.Covers(n.value) {
-		return "", false
+		return 0, nil
 	}
-	value, path := n.value, n.path
-	for i, name := range steps {
-		path = e.path.attribute(path, name)
-		v, present := rmaccess.Single(value, name)
-		if !present || v == nil || rmaccess.IsTypedNilPointer(v) {
-			if i < len(steps)-1 {
-				return "", false
+	for i, steps := range parts {
+		value, path, missing := n.value, n.path, n.missing
+		for _, name := range steps {
+			path = e.path.attribute(path, name)
+			missing = missing.child(name)
+			v, present, leaf := rmaccess.Peek(value, name)
+			if !present || missing.marked() || (!leaf && (v == nil || rmaccess.IsTypedNilPointer(v))) {
+				absent |= 1 << i
+				paths = append(paths, path.String())
+				break
 			}
-			return path.String(), true
+			value = v
 		}
-		value = v
 	}
-	return "", false
+	return absent, paths
 }
 
 // settle settles the judgement h held at a node once the walk has visited
-// the node's attributes. Where the walk reported the empty part as
-// `required`, that finding stands for the constraint's, and the issues the
-// constraint drew on what the part leaves stay as they are. Where it did
-// not, because the part is one the RM rules let be blank or a limit stopped
-// the walk before it reached the part, the issues the constraint draws on
-// the whole value take their place, so the part is reported either way, in
-// walk order. No issue at or before h's was removed while the attributes
-// were visited: a node below withdraws only issues reported after its own
-// visit began ([engine.withdrawInside]).
+// the node's attributes. Where the walk reported each absent part as
+// `required`, those findings stand for the constraint's, and the issues the
+// constraint drew on what the parts leave stay as they are. Where it did
+// not report one, because the part is one the RM rules let be blank or a
+// limit stopped the walk before it reached the part, the issues the
+// constraint draws on the whole value take their place, so each part is
+// reported either way, in walk order. No issue at or before h's was removed
+// while the attributes were visited: a node below withdraws only issues
+// reported after its own visit began ([engine.withdrawInside]).
 func (e *engine) settle(h *heldJudgement) {
-	reported := slices.ContainsFunc(e.found.issues[h.to:], func(iss Issue) bool {
-		return iss.Code == "required" && iss.Path == h.part
-	})
-	if !reported {
-		e.found.issues = slices.Replace(e.found.issues, h.from, h.to, h.whole...)
+	later := e.found.issues[h.to:]
+	for _, part := range h.parts {
+		if !slices.ContainsFunc(later, func(iss Issue) bool { return iss.Code == "required" && iss.Path == part }) {
+			e.found.issues = slices.Replace(e.found.issues, h.from, h.to, h.whole...)
+			return
+		}
 	}
 }
 

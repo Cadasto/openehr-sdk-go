@@ -45,8 +45,11 @@ func elementValueChildren(t *testing.T, types ...string) []*tcimpl.CompiledNode 
 // REQ-102: Tier gives the nodes of the first of Bind's three tiers that
 // admits the value, in template order, so its first node is the one Bind
 // returns: every node naming the value's own type, else every node naming
-// the short name it wraps, else every node its type conforms to. It gives
-// none where no node admits the value, and it appends to what dst holds.
+// the short name it wraps, else every node its type conforms to. A node
+// naming an AOM 1.4 short name names the type of a Go primitive of that
+// type too, whether or not it carries a primitive constraint, as one with
+// no item allows any value of its type. It gives none where no node admits
+// the value, and it appends to what dst holds.
 func TestREQ102_TierHoldsTheNodesBindChoosesAmong(t *testing.T) {
 	t.Parallel()
 	children := elementValueChildren(t, "DATA_VALUE", "DV_TEXT", "DV_QUANTITY", "DURATION", "DV_QUANTITY", "DV_CODED_TEXT")
@@ -59,8 +62,9 @@ func TestREQ102_TierHoldsTheNodesBindChoosesAmong(t *testing.T) {
 		{name: "own type, twice", value: &rm.DVQuantity{Magnitude: 1, Units: "kg"}, want: []int{2, 4}},
 		{name: "own type, once", value: &rm.DVCodedText{Value: "x"}, want: []int{5}},
 		{name: "short name", value: &rm.DVDuration{Value: "PT1H"}, want: []int{3}},
+		{name: "short name over a Go primitive", value: "PT1H", want: []int{3}},
 		{name: "conformance", value: &rm.DVCount{Magnitude: 1}, want: []int{0}},
-		{name: "no node", value: "text"},
+		{name: "no node", value: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

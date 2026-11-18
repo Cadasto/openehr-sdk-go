@@ -15,11 +15,13 @@ import (
 // RM rules report as absent or empty, so the RM's `required` at that part is
 // the one finding for it: a CODE_PHRASE's code_string, whose terminology the
 // constraint still judges, a DV_QUANTITY's units, the value of the temporal
-// type an AOM 1.4 short name binds, and the code string of a DV_ORDINAL's
-// symbol, whose value the constraint still judges alone. A part the RM rules
-// let be blank, a DV_SCALE symbol's code_string, and a part the RM does not
-// require, an optional String, are judged as before; so are a zero number
-// and false, which are values, and a temporal value that is not empty.
+// type an AOM 1.4 short name binds, and a DV_ORDINAL's symbol, omitted or
+// with an empty code string, whose value the constraint still judges alone.
+// A part the RM rules let be blank, a DV_SCALE symbol's code_string, and a
+// part the RM does not require, an optional String, are judged as before; so
+// are a zero number and false, which are values in a value built in Go, and
+// a temporal value that is not empty. A number or a boolean a decode reports
+// missing is absent; absent_part_test.go holds those rows.
 // REQ-171 — where the depth or the visit limit stops the walk before the RM
 // rules reach the part, they report nothing there, and the constraint judges
 // the part as it judges any value, at its place in walk order.
@@ -220,6 +222,23 @@ func TestValidate_REQ102_REQ112_PrimitiveLeavesTheEmptyPartToTheRM(t *testing.T)
 			want: []pinnedIssue{
 				templateFinding("not_in_list", "/value"),
 				rmRequired("/value/symbol/defining_code/code_string"),
+			},
+		},
+		{
+			// The access reads the zero DV_CODED_TEXT as absent.
+			name:  "C_DV_ORDINAL list, omitted symbol",
+			child: ordinalChild,
+			value: &rm.DVOrdinal{Value: 1},
+			want:  []pinnedIssue{rmRequired("/value/symbol")},
+		},
+		{
+			// The constraint still judges the value alone.
+			name:  "C_DV_ORDINAL list, unlisted value with an omitted symbol",
+			child: ordinalChild,
+			value: &rm.DVOrdinal{Value: 3},
+			want: []pinnedIssue{
+				templateFinding("not_in_list", "/value"),
+				rmRequired("/value/symbol"),
 			},
 		},
 		{

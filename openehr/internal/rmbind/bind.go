@@ -139,9 +139,11 @@ func admits(tier int, c *tcimpl.CompiledNode, gotType string, v any) bool {
 // present has no parameter, so only a bare DV_INTERVAL node names its type,
 // and a typed node admits it in the third tier ([conformsToChild]). An AOM
 // 1.4 primitive short name over a primitive val (an integer under INTEGER, a
-// string under DURATION) also names val's type. val is read as the RM holds
-// it, so DV_COUNT.magnitude arrives as an rm.Integer64, not as the int64 the
-// validator later hands a C_INTEGER. An untyped node names no type.
+// string under DURATION) also names val's type, whether or not the node
+// carries a primitive constraint: one with no item allows any value of its
+// type. val is read as the RM holds it, so DV_COUNT.magnitude arrives as an
+// rm.Integer64, not as the int64 the validator later hands a C_INTEGER. An
+// untyped node names no type.
 func namesRMType(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	want := c.RMTypeName()
 	if want == "" {
@@ -163,8 +165,7 @@ func namesRMType(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	// pinned under a BMM-typed attribute channel: the RM value
 	// may be a Go string, integer, real, or bool rather than an
 	// RM wrapper type.
-	return tcimpl.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil &&
-		PrimitiveValueMatchesShortName(want, val)
+	return tcimpl.IsAOMPrimitiveShortName(want) && PrimitiveValueMatchesShortName(want, val)
 }
 
 // wrapsShortName reports whether the node c names an AOM 1.4 primitive
