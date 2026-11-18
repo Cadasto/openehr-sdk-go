@@ -9,6 +9,7 @@ package simplified
 import (
 	"bytes"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 	"maps"
@@ -30,7 +31,51 @@ func MarshalFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(m)
+	return marshalSized(m)
+}
+
+// marshalSized returns json.Marshal(v) for v built of maps, lists and
+// scalars, written into a buffer sized for v up front rather than one grown by
+// doubling as the document is written.
+func marshalSized(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	// A quarter more than the document needs: the encoder grows a buffer
+	// with less than that free once it has written the whole value.
+	n := jsonSizeHint(v)
+	buf.Grow(n + n/4)
+	// The v1 options make this json.Marshal byte for byte.
+	if err := jsonv2.MarshalWrite(&buf, v, json.DefaultOptionsV1()); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// jsonSizeHint estimates the size of v's JSON form. An escaped character or a
+// value of another type can make it short, in which case the buffer grows.
+func jsonSizeHint(v any) int {
+	switch v := v.(type) {
+	case map[string]any:
+		n := 2 // the braces
+		for k, e := range v {
+			n += len(k) + 4 + jsonSizeHint(e) // quotes, colon and comma
+		}
+		return n
+	case []any:
+		n := 2 // the brackets
+		for _, e := range v {
+			n += jsonSizeHint(e) + 1 // and a comma
+		}
+		return n
+	case string:
+		return len(v) + 2
+	case json.Number:
+		return len(v)
+	case bool:
+		return 5
+	case nil:
+		return 4
+	}
+	return 24
 }
 
 // encodeFlat builds the FLAT path->value map. The root COMPOSITION is the

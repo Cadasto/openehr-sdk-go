@@ -110,13 +110,17 @@ func StructuredToFlat(data []byte) ([]byte, error) {
 func flatToStructured(flat map[string]any, spelling bareSpelling) (map[string]any, error) {
 	// A key that is no path in the FLAT grammar has no STRUCTURED member to
 	// become: refused, as decode refuses it (REQ-170).
-	if err := checkFlatKeys(flat); err != nil {
+	keys := slices.Sorted(maps.Keys(flat))
+	if err := checkFlatKeys(keys); err != nil {
 		return nil, err
 	}
 	// `x|` spells the bare value of `x`: the two are one key here, and differing
 	// values are refused, since restructuring cannot tell which one a decode
 	// would read.
-	flat, fold := foldEmptySuffix(flat)
+	flat, fold := foldEmptySuffix(flat, keys)
+	if fold.spellings != nil {
+		keys = slices.Sorted(maps.Keys(flat))
+	}
 	if err := fold.settle(nil); err != nil {
 		return nil, err
 	}
@@ -127,7 +131,7 @@ func flatToStructured(flat map[string]any, spelling bareSpelling) (map[string]an
 	// [spellBareValues] to respell once every key is placed, where spelling
 	// asks for it.
 	var bares []map[string]any
-	for _, key := range slices.Sorted(maps.Keys(flat)) {
+	for _, key := range keys {
 		val := flat[key]
 		// Context is grouped under a ctx object with direct (non-arrayified)
 		// values, unlike clinical data (spec §Structured format).
