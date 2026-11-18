@@ -63,11 +63,9 @@ type TypeRelation struct {
 	// by graph nodes or BMM-known classes only, never by an unknown name a
 	// caller passed, so it stays bounded by the relation's own class set.
 	//
-	// succ holds each node's successor list per route mode, expanded each
-	// BMM-known class's sorted concrete descendants, and operands the
+	// succ holds each node's successor list per route mode, and operands the
 	// containable verdict of each BMM-known class.
 	succ     [2]sync.Map
-	expanded sync.Map
 	operands sync.Map
 }
 
@@ -549,20 +547,15 @@ func (r *TypeRelation) findSuccessors(c string, allowRef bool) []string {
 
 // expand returns the concrete descendants of a BMM-known class, sorted, or the
 // class itself (exact) for a name the pin does not know — a dialect/consumer
-// endpoint. A known class's list is cached and MUST NOT be mutated.
+// endpoint. A known class's list is the hierarchy's shared one and must not be
+// modified.
 func (r *TypeRelation) expand(class string) []string {
 	s, ok := r.known[canon(class)]
 	if !ok {
 		return []string{class}
 	}
-	if v, ok := r.expanded.Load(s); ok {
-		return v.([]string)
-	}
 	ds, _ := r.h.ConcreteDescendants(s)
-	ds = slices.Clone(ds)
-	slices.Sort(ds)
-	v, _ := r.expanded.LoadOrStore(s, ds)
-	return v.([]string)
+	return ds
 }
 
 // endpointMatches reports whether node matches an overlay-edge endpoint:

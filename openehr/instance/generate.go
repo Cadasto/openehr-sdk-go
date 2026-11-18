@@ -7,7 +7,6 @@ import (
 	"math"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 	"uuid"
 
@@ -1502,23 +1501,9 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 }
 
 // requiredAttributes returns the attributes the pinned RM marks mandatory on
-// the bare class class, in declaration order, as
-// rminfo.Default.RequiredAttributes does, and nil for a class it does not
-// know. It reads them from a table built once rather than building a slice
-// per call. The caller must not change the slice.
-func requiredAttributes(class string) []string { return requiredAttrTable()[class] }
-
-// requiredAttrTable holds what rminfo.Default.RequiredAttributes answers for
-// each class rminfo.Default knows. The pinned RM does not change, so it is
-// built on first use and only read after, by any number of goroutines.
-var requiredAttrTable = sync.OnceValue(func() map[string][]string {
-	known := rminfo.Default.KnownRMTypes()
-	table := make(map[string][]string, len(known))
-	for _, class := range known {
-		table[class] = rminfo.Default.RequiredAttributes(class)
-	}
-	return table
-})
+// the bare class class, in declaration order, and nil for a class it does not
+// know: rminfo.Default's shared list, which the caller must not change.
+func requiredAttributes(class string) []string { return rminfo.Default.RequiredAttributes(class) }
 
 // fillBMMAttr builds a default for attrName of parent from its BMM type
 // alone, fills that default's own BMM-mandatory attributes, and attaches

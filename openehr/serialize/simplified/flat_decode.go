@@ -3901,31 +3901,10 @@ func rmRequires(node map[string]any, attr string) bool {
 	return slices.Contains(requiredAttributes(bmmtype.Class(t)), attr)
 }
 
-// requiredByClass holds what [rminfo.Default] answers RequiredAttributes with
-// for each class it knows, built on first use: the pinned RM does not change,
-// and it answers a fresh list on every call. A class it does not know is not
-// held, so the map stays within the pin's classes. requiredFrom is the Lookup
-// the answers come from; a Default replaced since is asked directly.
-var (
-	requiredByClass sync.Map // class → []string, read-only
-	requiredFrom    = rminfo.Default
-)
-
-// requiredAttributes is rminfo.Default.RequiredAttributes(class), for a caller
-// that only reads the list.
+// requiredAttributes is rminfo.Default.RequiredAttributes(class): a shared
+// list the caller only reads.
 func requiredAttributes(class string) []string {
-	if rminfo.Default != requiredFrom {
-		return rminfo.Default.RequiredAttributes(class)
-	}
-	if v, ok := requiredByClass.Load(class); ok {
-		return v.([]string)
-	}
-	attrs := requiredFrom.RequiredAttributes(class)
-	if attrs == nil {
-		return nil
-	}
-	v, _ := requiredByClass.LoadOrStore(class, attrs)
-	return v.([]string)
+	return rminfo.Default.RequiredAttributes(class)
 }
 
 // checkNoPhantoms walks the rebuilt tree and rejects any container element that
