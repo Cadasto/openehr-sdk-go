@@ -2,6 +2,7 @@ package lint
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -52,6 +53,40 @@ func TestBindingsAgreeWithExtract(t *testing.T) {
 				if ok != wantOK || got.RMType != wantCE.RMType || got.Pos != wantCE.Pos {
 					t.Errorf("lookup(%q) = %s at %v, %v; Extract binds %s at %v, %v",
 						alias, got.RMType, got.Pos, ok, wantCE.RMType, wantCE.Pos, wantOK)
+				}
+			}
+		})
+	}
+}
+
+// TestNameSetAgreesWithList holds the SELECT-alias lookup Lint uses to a scan
+// of the list, below and above the length at which the set indexes.
+func TestNameSetAgreesWithList(t *testing.T) {
+	t.Parallel()
+	long := make([]string, bindingIndexMin+2)
+	for i := range long {
+		long[i] = fmt.Sprintf("a%d", i)
+	}
+	cases := []struct {
+		name    string
+		names   []string
+		indexed bool
+	}{
+		{name: "empty", names: nil},
+		{name: "short", names: []string{"score", "when", "score"}},
+		{name: "indexed", names: long, indexed: true},
+	}
+	ask := []string{"score", "when", "a0", fmt.Sprintf("a%d", bindingIndexMin+1), "x", ""}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			s := newNameSet(tc.names)
+			if (s.index != nil) != tc.indexed {
+				t.Fatalf("premise gone: %d names, indexed = %v", len(tc.names), s.index != nil)
+			}
+			for _, name := range ask {
+				if got, want := s.has(name), slices.Contains(tc.names, name); got != want {
+					t.Errorf("has(%q) = %v, the list holds it: %v", name, got, want)
 				}
 			}
 		})

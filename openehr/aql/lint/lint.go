@@ -423,11 +423,11 @@ func topIssues(doc *parse.Document, q *aql.Query) []Issue {
 // labels a projected column, not a path root, so `ORDER BY score/magnitude`
 // (or a predicated key) stays aql_unknown_alias. The fallback is scoped to
 // ORDER BY — a SELECT alias is not a SELECT or WHERE operand root.
-func namesSelectAlias(p parse.IdentifiedPath, selectAliases []string) bool {
+func namesSelectAlias(p parse.IdentifiedPath, selectAliases nameSet) bool {
 	if p.Clause != parse.ClauseOrderBy || len(p.Segments) > 0 || p.Predicate != "" {
 		return false
 	}
-	return slices.Contains(selectAliases, p.Alias)
+	return selectAliases.has(p.Alias)
 }
 
 // hasIdentifiableScope reports whether FROM / CONTAINS names a literal

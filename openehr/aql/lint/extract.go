@@ -112,7 +112,7 @@ func Extract(doc *parse.Document) Metadata {
 type queryFacts struct {
 	classes       []parse.ClassExpr
 	aliases       bindings
-	selectAliases []string
+	selectAliases nameSet
 	paths         []parse.IdentifiedPath
 	params        []string
 }
@@ -122,7 +122,7 @@ func factsOf(doc *parse.Document) queryFacts {
 	return queryFacts{
 		classes:       doc.Classes,
 		aliases:       newBindings(doc.Classes),
-		selectAliases: doc.SelectAliases,
+		selectAliases: newNameSet(doc.SelectAliases),
 		paths:         doc.Paths,
 		params:        doc.Params,
 	}
@@ -144,9 +144,37 @@ func documentArchetypes(classes []parse.ClassExpr) []string {
 	return hrids
 }
 
-// bindingIndexMin is the class-list length from which [bindings] indexes the
-// aliases in a map instead of scanning the list.
+// bindingIndexMin is the list length from which [bindings] and [nameSet]
+// index the names in a map instead of scanning the list.
 const bindingIndexMin = 16
+
+// nameSet answers whether a name is in a list, scanning a short list and
+// indexing a long one, as [bindings] does.
+type nameSet struct {
+	names []string
+	index map[string]struct{} // nil below bindingIndexMin names
+}
+
+// newNameSet returns the set of names.
+func newNameSet(names []string) nameSet {
+	s := nameSet{names: names}
+	if len(names) >= bindingIndexMin {
+		s.index = make(map[string]struct{}, len(names))
+		for _, n := range names {
+			s.index[n] = struct{}{}
+		}
+	}
+	return s
+}
+
+// has reports whether name is in the set.
+func (s nameSet) has(name string) bool {
+	if s.index != nil {
+		_, ok := s.index[name]
+		return ok
+	}
+	return slices.Contains(s.names, name)
+}
 
 // bindings maps each bound alias to its class expression, as
 // [Metadata.Aliases] does: when two class expressions carry one alias, the
