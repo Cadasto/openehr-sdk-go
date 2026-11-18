@@ -5,9 +5,10 @@ package validation_test
 // invariants on DV_PROPORTION beside its precision ones: Type_validity (type
 // is a PROPORTION_KIND, 0 to 4), Unitary_validity (a unitary proportion has
 // denominator 1), Percent_validity (a percent has denominator 100),
-// Fraction_validity (a fraction or an integer fraction has whole-number
-// operands) and Valid_denominator (no denominator is 0). Each breached rule
-// is its own rm_invariant issue on the DV_PROPORTION, told apart by Rule.
+// Fraction_validity (a fraction or an integer fraction is_integral: a
+// precision of 0 where precision is set, whole-number operands where it is
+// not) and Valid_denominator (no denominator is 0). Each breached rule is its
+// own rm_invariant issue on the DV_PROPORTION, told apart by Rule.
 
 import (
 	"slices"
@@ -26,6 +27,7 @@ const (
 	proportionFraction  = "DV_PROPORTION.Fraction_validity"
 	proportionZero      = "DV_PROPORTION.Valid_denominator"
 	proportionPrecision = "DV_PROPORTION.Precision_validity"
+	precisionRange      = "precision_range"
 )
 
 // decodeProportion decodes, through the type registry, the canonical JSON
@@ -70,13 +72,23 @@ func TestValidateRM_REQ112_DVProportionKindRules(t *testing.T) {
 		{name: "percent over denominator 100", members: `"numerator":12.5,"denominator":100,"type":2`},
 
 		// Fraction_validity: (type = pk_fraction or type =
-		// pk_integer_fraction) implies is_integral, read as whole-number
-		// operands. One issue however many operands are not whole.
+		// pk_integer_fraction) implies is_integral. The RM's is_integral
+		// is a precision of 0 where precision is set, and whole-number
+		// operands where it is not. With no precision: one issue however
+		// many operands are not whole.
 		{name: "fraction with a fractional numerator", members: `"numerator":1.5,"denominator":2,"type":3`, want: []string{proportionFraction}},
 		{name: "fraction with a fractional denominator", members: `"numerator":1,"denominator":2.5,"type":3`, want: []string{proportionFraction}},
 		{name: "fraction with both operands fractional", members: `"numerator":1.5,"denominator":2.5,"type":3`, want: []string{proportionFraction}},
 		{name: "integer fraction with a fractional denominator", members: `"numerator":3,"denominator":2.5,"type":4`, want: []string{proportionFraction}},
 		{name: "fraction with whole operands", members: `"numerator":1,"denominator":2,"type":3`},
+		// With a precision: a fraction is_integral at precision 0 alone,
+		// whatever its operands.
+		{name: "fraction of precision 1 over whole operands", members: `"numerator":1,"denominator":2,"type":3,"precision":1`, want: []string{proportionFraction}},
+		{name: "integer fraction of precision 1 over whole operands", members: `"numerator":1,"denominator":2,"type":4,"precision":1`, want: []string{proportionFraction}},
+		{name: "fraction of precision -1 over whole operands", members: `"numerator":1,"denominator":2,"type":3,"precision":-1`, want: []string{proportionFraction}},
+		{name: "fraction of precision -2 over whole operands", members: `"numerator":1,"denominator":2,"type":3,"precision":-2`, want: []string{precisionRange, proportionFraction}},
+		{name: "fraction of precision 1 over a fractional numerator", members: `"numerator":1.5,"denominator":2,"type":3,"precision":1`, want: []string{proportionFraction}},
+		{name: "fraction of precision 0 over whole operands", members: `"numerator":1,"denominator":2,"type":3,"precision":0`},
 
 		// Valid_denominator: denominator /= 0.0.
 		{name: "ratio over denominator 0", members: `"numerator":1,"denominator":0,"type":0`, want: []string{proportionZero}},
@@ -88,7 +100,7 @@ func TestValidateRM_REQ112_DVProportionKindRules(t *testing.T) {
 		{name: "fraction over denominator 0", members: `"numerator":1,"denominator":0,"type":3`, want: []string{proportionZero}},
 		{name: "no kind over denominator 0", members: `"numerator":1,"denominator":0,"type":7`, want: []string{proportionType, proportionZero}},
 		{name: "no kind leaves the kind rules alone", members: `"numerator":1.5,"denominator":2.5,"type":7`, want: []string{proportionType}},
-		{name: "fraction of precision 0 with a fractional numerator", members: `"numerator":1.5,"denominator":2,"type":3,"precision":0`, want: []string{proportionPrecision, proportionFraction}},
+		{name: "fraction of precision 0 with a fractional numerator breaks Precision_validity alone", members: `"numerator":1.5,"denominator":2,"type":3,"precision":0`, want: []string{proportionPrecision}},
 		{name: "percent of precision 0 with a fractional numerator", members: `"numerator":12.5,"denominator":100,"type":2,"precision":0`, want: []string{proportionPrecision}},
 	}
 	for _, tc := range cases {
@@ -133,7 +145,12 @@ func TestValidateRM_REQ112_DVProportionIssueOrder(t *testing.T) {
 		{
 			name:    "fraction of precision 0 over a fractional numerator and denominator 0",
 			members: `"numerator":1.5,"denominator":0,"type":3,"precision":0`,
-			want:    []string{proportionPrecision, proportionFraction, proportionZero},
+			want:    []string{proportionPrecision, proportionZero},
+		},
+		{
+			name:    "fraction of precision -2 over denominator 0",
+			members: `"numerator":1,"denominator":0,"type":3,"precision":-2`,
+			want:    []string{precisionRange, proportionFraction, proportionZero},
 		},
 		{
 			name:    "no kind of precision 0 over a fractional numerator and denominator 0",
