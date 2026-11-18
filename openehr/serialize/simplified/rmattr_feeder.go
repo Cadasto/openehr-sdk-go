@@ -131,8 +131,7 @@ func rmattrChildGroups(g rmattrGroup, known map[string]bool) (map[string]any, ma
 		// tails merge into one instance, each keeping the key as written.
 		child := bySeg[id][slot]
 		if child == nil {
-			child = newRMAttrGroup(g.prefix(), id, idx, g.sink)
-			child.dups = g.dups
+			child = newRMAttrGroup(g.prefix(), id, idx, g.sink, g.dups)
 			bySeg[id][slot] = child
 		}
 		if held, taken := child.tails[remainder]; taken {

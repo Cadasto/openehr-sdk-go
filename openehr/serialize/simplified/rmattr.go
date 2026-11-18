@@ -121,12 +121,14 @@ func (g rmattrGroup) settleDups() error {
 	return nil
 }
 
-// newRMAttrGroup starts an empty group whose unmatched tails go to sink.
-func newRMAttrGroup(base, family string, index int, sink *unmatchedSink) *rmattrGroup {
+// newRMAttrGroup starts an empty group whose unmatched tails go to sink and
+// whose second spellings go to dups: a new list for a family instance, its
+// parent's for a child group ([rmattrChildGroups]).
+func newRMAttrGroup(base, family string, index int, sink *unmatchedSink, dups *[]tailDup) *rmattrGroup {
 	return &rmattrGroup{
 		base: base, family: family, index: index,
 		tails: make(map[string]any), keys: make(map[string]string), sink: sink,
-		dups: new([]tailDup),
+		dups: dups,
 	}
 }
 
@@ -344,7 +346,7 @@ func writeFlatSeg(b *strings.Builder, s flatSeg) {
 // key no longer in content is skipped, and the first one left that does not
 // parse is refused.
 func rmattrGroups(content map[string]any, keys []contentKey, sink *unmatchedSink) ([]rmattrGroup, error) {
-	byInstance := make(map[string]*rmattrGroup)
+	byInstance := make(map[rmattrInstance]*rmattrGroup)
 	for _, ck := range keys {
 		key := ck.key
 		if _, ok := content[key]; !ok {
@@ -359,10 +361,10 @@ func rmattrGroups(content map[string]any, keys []contentKey, sink *unmatchedSink
 		}
 		val := content[key]
 		delete(content, key)
-		id := base + "\x00" + family + "\x00" + strconv.Itoa(index)
+		id := rmattrInstance{base: base, family: family, index: index}
 		g := byInstance[id]
 		if g == nil {
-			g = newRMAttrGroup(base, family, index, sink)
+			g = newRMAttrGroup(base, family, index, sink, new([]tailDup))
 			byInstance[id] = g
 		}
 		g.put(tail, val, key)
@@ -379,6 +381,13 @@ func rmattrGroups(content map[string]any, keys []contentKey, sink *unmatchedSink
 		)
 	})
 	return groups, nil
+}
+
+// rmattrInstance identifies one family instance: its owner's FLAT path, the
+// family, and its `:N` (-1 when the key carried none).
+type rmattrInstance struct {
+	base, family string
+	index        int
 }
 
 // rmattrDecoded is one family instance that decoded, waiting for its owner.

@@ -11,6 +11,7 @@ import (
 	"cmp"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/json/jsontext"
 	jsonv2 "encoding/json/v2"
 	"fmt"
 	"maps"
@@ -217,7 +218,7 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 		table = capturedKeysDecorated
 	}
 	if captured, known := table[sfxType]; known {
-		m, err := canonicalMap(v)
+		m, err := canonicalObject(v)
 		if err != nil {
 			return "", err
 		}
@@ -266,15 +267,15 @@ func unsetStringType(rmType string) bool {
 // unsetStringValue reports whether m, the canonical form of a value of
 // rmType, is one of [unsetStringType] whose value is the empty string and
 // which carries no other attribute.
-func unsetStringValue(rmType string, m map[string]any) bool {
+func unsetStringValue(rmType string, m canonValue) bool {
 	if !unsetStringType(rmType) {
 		return false
 	}
-	for k, v := range m {
-		switch k {
+	for k, v := range m.members {
+		switch string(k) {
 		case "_type":
 		case "value":
-			if s, _ := v.(string); s != "" {
+			if !v.textIs("") {
 				return false
 			}
 		default:
@@ -341,18 +342,169 @@ func isPartyLeafType(rmType string) bool {
 	return false
 }
 
-// canonicalMap returns v's canonical JSON parsed as a generic object — the
-// input to the captured-form decision.
-func canonicalMap(v any) (map[string]any, error) {
+// canonicalObject returns v's canonical JSON object — the input to the
+// captured-form decision. The checks read its member names, and the few nested
+// members they need, in place through [canonValue], so no generic map is built
+// per leaf: the member set stays the canonical one, and a member the suffix set
+// does not know still forces |raw. A canonical null reads as an empty object,
+// as it decodes into a nil map; any other form that is no object is refused
+// with the error decoding it into an object gives.
+func canonicalObject(v any) (canonValue, error) {
 	b, err := canjson.Marshal(v)
 	if err != nil {
 		return nil, err
+	}
+	if c := canonValue(b); c.isObject() {
+		return c, nil
 	}
 	var m map[string]any
 	if err := jsonv2.Unmarshal(b, &m); err != nil {
 		return nil, err
 	}
-	return m, nil
+	return canonValue("{}"), nil
+}
+
+// canonValue is one JSON value of a canonical form, held as its encoded bytes.
+// A member read from an object is a slice of that object's bytes, and nil
+// stands for an absent member. The readers rely on canonical JSON being
+// compact and well formed, which encoding/json/v2 checks as it writes; on
+// malformed bytes they stop early rather than fail.
+type canonValue []byte
+
+// isObject reports whether v is a JSON object.
+func (v canonValue) isObject() bool { return len(v) > 0 && v[0] == '{' }
+
+// isString reports whether v is a JSON string.
+func (v canonValue) isString() bool { return len(v) > 0 && v[0] == '"' }
+
+// isNil reports whether v is absent or JSON null.
+func (v canonValue) isNil() bool { return len(v) == 0 || string(v) == "null" }
+
+// textIs reports whether v, read as a string, is s. A value that is absent or
+// is no JSON string reads as "".
+func (v canonValue) textIs(s string) bool {
+	if !v.isString() || len(v) < 2 {
+		return s == ""
+	}
+	body := v[1 : len(v)-1]
+	if bytes.IndexByte(body, '\\') < 0 {
+		return string(body) == s
+	}
+	u, err := jsontext.AppendUnquote(nil, v)
+	return err == nil && string(u) == s
+}
+
+// members yields each member of v with its name decoded. It yields nothing
+// when v is no object.
+func (v canonValue) members(yield func(name []byte, value canonValue) bool) {
+	if !v.isObject() {
+		return
+	}
+	for i := jsonSpace(v, 1); i < len(v) && v[i] == '"'; {
+		end := jsonValueEnd(v, i)
+		if end-i < 2 || v[end-1] != '"' {
+			return
+		}
+		name := v[i+1 : end-1]
+		if bytes.IndexByte(name, '\\') >= 0 {
+			name, _ = jsontext.AppendUnquote(nil, v[i:end])
+		}
+		if i = jsonSpace(v, end); i >= len(v) || v[i] != ':' {
+			return
+		}
+		start := jsonSpace(v, i+1)
+		if start >= len(v) {
+			return
+		}
+		end = jsonValueEnd(v, start)
+		if !yield(name, v[start:end]) {
+			return
+		}
+		if i = jsonSpace(v, end); i < len(v) && v[i] == ',' {
+			i = jsonSpace(v, i+1)
+		}
+	}
+}
+
+// member returns the value of v's member called name, or nil when v is no
+// object or has no such member.
+func (v canonValue) member(name string) canonValue {
+	for n, val := range v.members {
+		if string(n) == name {
+			return val
+		}
+	}
+	return nil
+}
+
+// memberCount returns the number of members v has, 0 when v is no object.
+func (v canonValue) memberCount() int {
+	n := 0
+	for range v.members {
+		n++
+	}
+	return n
+}
+
+// jsonSpace returns the index of the first byte at or after i in b that is
+// not JSON whitespace.
+func jsonSpace(b []byte, i int) int {
+	for i < len(b) && (b[i] == ' ' || b[i] == '\t' || b[i] == '\n' || b[i] == '\r') {
+		i++
+	}
+	return i
+}
+
+// jsonValueEnd returns the index just past the JSON value that starts at b[i],
+// or len(b) when the value does not end.
+//
+// A string is skipped quote to quote rather than byte by byte, because a
+// DV_MULTIMEDIA's inline data can run to megabytes and every [canonValue.member]
+// lookup steps over it again: a quote ends the string unless an odd run of
+// backslashes escapes it.
+func jsonValueEnd(b []byte, i int) int {
+	if i >= len(b) {
+		return len(b)
+	}
+	switch b[i] {
+	case '"':
+		for j := i + 1; ; {
+			k := bytes.IndexByte(b[j:], '"')
+			if k < 0 {
+				return len(b)
+			}
+			q := j + k
+			escapes := 0
+			for p := q - 1; p > i && b[p] == '\\'; p-- {
+				escapes++
+			}
+			if escapes%2 == 0 {
+				return q + 1
+			}
+			j = q + 1
+		}
+	case '{', '[':
+		for depth := 0; i < len(b); i++ {
+			switch b[i] {
+			case '"':
+				i = jsonValueEnd(b, i) - 1
+			case '{', '[':
+				depth++
+			case '}', ']':
+				if depth--; depth == 0 {
+					return i + 1
+				}
+			}
+		}
+	default:
+		for ; i < len(b); i++ {
+			switch b[i] {
+			case ',', '}', ']', ' ', '\t', '\n', '\r':
+				return i
+			}
+		}
+	}
+	return len(b)
 }
 
 // codePhraseKeys are the CODE_PHRASE attributes the **nested** |code/|terminology
@@ -411,9 +563,9 @@ var multimediaAlgorithmCodes = []multimediaAlgorithmCode{
 // composite captured keys — DV_CODED_TEXT.defining_code and DV_ORDINAL.symbol —
 // whose nested decorations (preferred_term, a non-local ordinal terminology, …)
 // the top-level check alone would silently drop or rewrite.
-func capturedFully(rmType string, m map[string]any, captured map[string]bool) bool {
-	for k := range m {
-		if k != "_type" && !captured[k] {
+func capturedFully(rmType string, m canonValue, captured map[string]bool) bool {
+	for k := range m.members {
+		if string(k) != "_type" && !captured[string(k)] {
 			return false
 		}
 	}
@@ -422,7 +574,7 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 	// coded elsewhere, or carrying a preferred_term, would be silently rewritten
 	// by that rebuild — it rides |raw instead. Checked here rather than per type
 	// because seven datatypes inherit the attribute from DV_ORDERED.
-	if ns, present := m["normal_status"]; present && !normalStatusCaptured(ns) {
+	if ns := m.member("normal_status"); ns != nil && !normalStatusCaptured(ns) {
 		return false
 	}
 	switch rmType {
@@ -438,8 +590,8 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		// lossless only when there is nothing else to write, so a partly-populated
 		// value — a terminology with no code — must not count as captured, or it
 		// would encode to nothing at all. It rides |raw instead.
-		if cs, _ := m["code_string"].(string); cs == "" {
-			return codePhraseTerminology(m) == "" && m["preferred_term"] == nil &&
+		if m.member("code_string").textIs("") {
+			return codePhraseTerminology(m).textIs("") && m.member("preferred_term").isNil() &&
 				codePhraseCapturedIn(m, codePhraseLeafKeys)
 		}
 		return codePhraseCapturedIn(m, codePhraseLeafKeys)
@@ -449,19 +601,19 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		// the code sets [multimediaAlgorithmCodes] names. A value the rebuild
 		// would re-terminologise, or one carrying a preferred_term the suffix has
 		// no room for, rides |raw whole.
-		mt, ok := m["media_type"].(map[string]any)
-		if !ok || !codePhraseCaptured(mt) {
+		mt := m.member("media_type")
+		if !codePhraseCaptured(mt) {
 			return false
 		}
-		if cs, _ := mt["code_string"].(string); cs == "" {
+		if mt.member("code_string").textIs("") {
 			return false // nothing to write; |raw keeps the rest of the value
 		}
-		if tv := codePhraseTerminology(mt); tv != "" && tv != mediaTypeTerminology {
+		if tv := codePhraseTerminology(mt); !tv.textIs("") && !tv.textIs(mediaTypeTerminology) {
 			return false
 		}
 		for _, a := range multimediaAlgorithmCodes {
-			cp, present := m[a.attr].(map[string]any)
-			if !present {
+			cp := m.member(a.attr)
+			if !cp.isObject() {
 				continue
 			}
 			if !codePhraseCaptured(cp) {
@@ -469,18 +621,18 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 			}
 			// An absent terminology contradicts nothing decode implies, as for
 			// media_type above.
-			if tv := codePhraseTerminology(cp); tv != "" && tv != a.codeSet.ExternalID() {
+			if tv := codePhraseTerminology(cp); !tv.textIs("") && !tv.textIs(a.codeSet.ExternalID()) {
 				return false
 			}
 		}
 		// The bare key is a plain DV_URI; a DV_EHR_URI at `uri` would come back
 		// retyped, so it rides |raw (the substitution rule, one level down).
-		if uri, present := m["uri"].(map[string]any); present {
-			if t, _ := uri["_type"].(string); t != "DV_URI" {
+		if uri := m.member("uri"); uri.isObject() {
+			if !uri.member("_type").textIs("DV_URI") {
 				return false
 			}
-			for k := range uri {
-				if k != "_type" && k != "value" {
+			for k := range uri.members {
+				if string(k) != "_type" && string(k) != "value" {
 					return false
 				}
 			}
@@ -494,31 +646,31 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		// This is load-bearing, not defensive: adding `formatting` to
 		// capturedKeys["DV_CODED_TEXT"] without this made emitText write |other
 		// and silently discard the formatting (caught in PR #86 review).
-		if m["defining_code"] == nil {
-			return m["formatting"] == nil
+		dc := m.member("defining_code")
+		if dc.isNil() {
+			return m.member("formatting").isNil()
 		}
-		return codePhraseCaptured(m["defining_code"])
+		return codePhraseCaptured(dc)
 	case "DV_ORDINAL", "DV_SCALE":
-		sym, ok := m["symbol"].(map[string]any)
-		if !ok {
+		sym := m.member("symbol")
+		if !sym.isObject() {
 			return false
 		}
-		for k := range sym {
-			if k != "_type" && k != "value" && k != "defining_code" {
+		for k := range sym.members {
+			if string(k) != "_type" && string(k) != "value" && string(k) != "defining_code" {
 				return false
 			}
 		}
-		if !codePhraseCaptured(sym["defining_code"]) {
+		dc := sym.member("defining_code")
+		if !codePhraseCaptured(dc) {
 			return false
 		}
 		// Encode writes no |terminology, and decode of a symbol without one
 		// rebuilds it as archetype-local, or in the template's terminology; a
 		// non-local terminology would be silently rewritten, so it rides |raw
 		// instead.
-		if dc, ok := sym["defining_code"].(map[string]any); ok {
-			if tv := codePhraseTerminology(dc); tv != "" && tv != "local" {
-				return false
-			}
+		if tv := codePhraseTerminology(dc); !tv.textIs("") && !tv.textIs("local") {
+			return false
 		}
 	}
 	return true
@@ -533,56 +685,47 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 // `normal statuses`, so `openehr` is the terminology_id decode rebuilds the
 // CODE_PHRASE with. Only the *identifier* is read from the pin here — a bare
 // `|normal_status` decode stays lenient and does not check membership.
-func normalStatusCaptured(v any) bool {
+func normalStatusCaptured(v canonValue) bool {
 	if !codePhraseCaptured(v) {
-		return false
-	}
-	cp, ok := v.(map[string]any)
-	if !ok {
 		return false
 	}
 	// An absent or empty terminology contradicts nothing, so it survives the
 	// implication decode makes.
-	tv := codePhraseTerminology(cp)
-	return tv == "" || tv == terminology.ID
+	tv := codePhraseTerminology(v)
+	return tv.textIs("") || tv.textIs(terminology.ID)
 }
 
-// codePhraseTerminology returns the terminology_id value carried by a canonical
-// CODE_PHRASE object, or "" when it has none — the one attribute the
-// |terminology suffix reduces to a bare string, and the one a rebuild can
-// therefore silently rewrite.
-func codePhraseTerminology(cp map[string]any) string {
-	tid, _ := cp["terminology_id"].(map[string]any)
-	v, _ := tid["value"].(string)
-	return v
+// codePhraseTerminology returns the terminology_id value of a canonical
+// CODE_PHRASE object, nil when it has none; [canonValue.textIs] reads an absent
+// value as "". It is the one attribute the |terminology suffix reduces to a
+// bare string, and the one a rebuild can therefore silently rewrite.
+func codePhraseTerminology(cp canonValue) canonValue {
+	return cp.member("terminology_id").member("value")
 }
 
 // codePhraseCaptured reports whether a canonical CODE_PHRASE object carries
 // only the attributes the nested |code/|terminology suffixes represent.
-func codePhraseCaptured(v any) bool {
+func codePhraseCaptured(v canonValue) bool {
 	return codePhraseCapturedIn(v, codePhraseKeys)
 }
 
 // codePhraseCapturedIn is [codePhraseCaptured] against an explicit key set, so the
 // nested and standalone spellings — which differ by |preferred_term alone — share
 // one implementation.
-func codePhraseCapturedIn(v any, keys map[string]bool) bool {
-	dc, ok := v.(map[string]any)
-	if !ok {
+func codePhraseCapturedIn(v canonValue, keys map[string]bool) bool {
+	if !v.isObject() {
 		return false
 	}
-	for k := range dc {
-		if !keys[k] {
+	for k := range v.members {
+		if !keys[string(k)] {
 			return false
 		}
 	}
 	// TERMINOLOGY_ID reduces to its value string on the wire; anything beyond
 	// that is uncaptured.
-	if tid, ok := dc["terminology_id"].(map[string]any); ok {
-		for k := range tid {
-			if k != "_type" && k != "value" {
-				return false
-			}
+	for k := range v.member("terminology_id").members {
+		if string(k) != "_type" && string(k) != "value" {
+			return false
 		}
 	}
 	return true

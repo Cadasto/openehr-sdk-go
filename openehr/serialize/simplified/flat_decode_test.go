@@ -238,7 +238,8 @@ func TestCtxDefaultsAreGroupMembersWithPinnedRubrics(t *testing.T) {
 			if dc["code_string"] != tc.code {
 				t.Errorf("defaultAttr(%q) code_string = %v, want %q", tc.attr, dc["code_string"], tc.code)
 			}
-			if term := codePhraseTerminology(dc); term != terminology.ID {
+			tid, _ := dc["terminology_id"].(map[string]any)
+			if term, _ := tid["value"].(string); term != terminology.ID {
 				t.Errorf("defaultAttr(%q) terminology = %q, want %q", tc.attr, term, terminology.ID)
 			}
 			if v["value"] != rubric {

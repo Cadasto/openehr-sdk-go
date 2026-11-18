@@ -421,11 +421,11 @@ func heldIntervalAttr(eventPath, flatPath string, ev rm.IntervalEvent[rm.ItemStr
 // one with decorations, is written, so the round trip keeps it.
 func emitHistoryOrigin(out map[string]any, flatPath string, h rm.History[rm.ItemStructure]) error {
 	if earliest, ok := earliestTimeOf(h.Events); ok && h.Origin.Value == earliest {
-		m, err := canonicalMap(h.Origin)
+		m, err := canonicalObject(h.Origin)
 		if err != nil {
 			return err
 		}
-		if len(m) == 2 { // _type and value alone
+		if m.memberCount() == 2 { // _type and value alone
 			return nil
 		}
 	}

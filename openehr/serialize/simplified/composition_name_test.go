@@ -219,18 +219,18 @@ func TestREQ140CompositionNameEncodes(t *testing.T) {
 // judged on its own, so a coded text spelled with a value alone is not plain.
 func TestREQ140PlainTextIsADVTextWithAValueAlone(t *testing.T) {
 	for name, tc := range map[string]struct {
-		m    map[string]any
+		m    string
 		want bool
 	}{
-		"DV_TEXT with a value":          {map[string]any{"_type": "DV_TEXT", "value": "x"}, true},
-		"DV_CODED_TEXT with a value":    {map[string]any{"_type": "DV_CODED_TEXT", "value": "x"}, false},
-		"DV_TEXT with formatting":       {map[string]any{"_type": "DV_TEXT", "value": "x", "formatting": "plain"}, false},
-		"no type":                       {map[string]any{"value": "x"}, false},
-		"DV_TEXT with a mapping beside": {map[string]any{"_type": "DV_TEXT", "value": "x", "mappings": []any{}}, false},
+		"DV_TEXT with a value":          {`{"_type":"DV_TEXT","value":"x"}`, true},
+		"DV_CODED_TEXT with a value":    {`{"_type":"DV_CODED_TEXT","value":"x"}`, false},
+		"DV_TEXT with formatting":       {`{"_type":"DV_TEXT","value":"x","formatting":"plain"}`, false},
+		"no type":                       {`{"value":"x"}`, false},
+		"DV_TEXT with a mapping beside": {`{"_type":"DV_TEXT","value":"x","mappings":[]}`, false},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if got := plainText(tc.m); got != tc.want {
-				t.Errorf("plainText(%v) = %v, want %v", tc.m, got, tc.want)
+			if got := plainText(canonValue(tc.m)); got != tc.want {
+				t.Errorf("plainText(%s) = %v, want %v", tc.m, got, tc.want)
 			}
 		})
 	}

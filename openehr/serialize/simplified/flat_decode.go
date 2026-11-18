@@ -995,7 +995,7 @@ func siphonContext(flat map[string]any, keys []string, rootID string, sink *unma
 	// Most keys are content.
 	ctx, ctxOrigin, content = make(map[string]any), make(map[string]string), make(map[string]any, len(keys))
 	contentKeys = make([]string, 0, len(keys))
-	composer = newRMAttrGroup(rootID, composerSeg, -1, sink)
+	composer = newRMAttrGroup(rootID, composerSeg, -1, sink, new([]tailDup))
 	composer.metadata = "the composer"
 	// Sorted so a body carrying two conflicting real-path spellings reports the
 	// same key first on every run — a map-order-dependent error message is not
@@ -2509,7 +2509,7 @@ func definingCodeOf(v any) map[string]any {
 // parse is refused. Each group carries sink, which takes the keys its grammar
 // does not read.
 func compositeLeafGroups(content map[string]any, keys []contentKey, wt *webtemplate.WebTemplate, sink *unmatchedSink) ([]rmattrGroup, error) {
-	byLeaf := make(map[string]*rmattrGroup)
+	byLeaf := make(map[rmattrInstance]*rmattrGroup)
 	for _, ck := range keys {
 		key := ck.key
 		if _, ok := content[key]; !ok {
@@ -2524,10 +2524,10 @@ func compositeLeafGroups(content map[string]any, keys []contentKey, wt *webtempl
 		}
 		val := content[key]
 		delete(content, key)
-		id := base + "\x00" + family + "\x00" + strconv.Itoa(index)
+		id := rmattrInstance{base: base, family: family, index: index}
 		g := byLeaf[id]
 		if g == nil {
-			g = newRMAttrGroup(base, family, index, sink)
+			g = newRMAttrGroup(base, family, index, sink, new([]tailDup))
 			byLeaf[id] = g
 		}
 		g.put(tail, val, key)
