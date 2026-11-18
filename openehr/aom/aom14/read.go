@@ -206,9 +206,10 @@ const inputBufferMax = 4 << 20
 // These are the four readings the reader refuses in every mode.
 //
 // A document that needs none of these readings is decoded once; one that
-// needs one is decoded a second time, from the bytes the reader keeps of the
-// input, and so is every document when opts pass what the decode reports to a
-// function, which sees each item once.
+// needs one is decoded a second time, and so is every document when opts pass
+// what the decode reports to a function, which sees each item once. The
+// second decode reads the input again from where the read started when r is
+// an [io.Seeker], and from a copy the reader keeps of it otherwise.
 //
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
 // [canxml.Decoder] itself gets neither limit and none of these readings
@@ -217,8 +218,11 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	// lr.N reaches 0 only once r has given a byte past the limit.
 	src := &sourceReader{r: r}
 	lr := &io.LimitedReader{R: src, N: readMaxBytes + 1}
-	// in keeps every byte read from r, for a second reading and decode; it
-	// is made as large as r says it is. Nothing the read returns refers to it.
+	// in holds the input for a second reading and decode; it is made as large
+	// as r says it is. Nothing the read returns refers to it. A reader that
+	// can seek back to where it started is read into in only when a second
+	// reading is needed; any other is copied into in as the first decode
+	// reads it.
 	in := inputBuffers.Get().(*bytes.Buffer)
 	in.Reset()
 	defer func() {
@@ -226,26 +230,34 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 			inputBuffers.Put(in)
 		}
 	}()
-	if l, ok := r.(interface{ Len() int }); ok {
-		in.Grow(min(l.Len(), readMaxBytes) + 1)
+	grow := func() {
+		if l, ok := r.(interface{ Len() int }); ok {
+			in.Grow(min(l.Len(), readMaxBytes) + 1)
+		}
 	}
-	br := bufio.NewReader(io.TeeReader(lr, in))
+	seeker, start, rewinds := rewindable(r)
+	first := io.Reader(lr)
+	if !rewinds {
+		grow()
+		first = io.TeeReader(lr, in)
+	}
+	br := bufio.NewReader(first)
 	settings := decodeopts.Of(opts)
 	// A decode that reports to the caller's function runs once the reader
 	// knows which input it decodes, so that the function sees each item once;
 	// the first decode then reports to none.
-	first := opts
+	firstOpts := opts
 	if settings.Reports {
-		first = nil
+		firstOpts = nil
 		if settings.Strict {
-			first = []canxml.DecoderOption{canxml.WithStrict()}
+			firstOpts = []canxml.DecoderOption{canxml.WithStrict()}
 		}
 	}
 	// The first decode passes its tokens to facts, which decide on a second
 	// reading once it has read the document.
 	var facts tokenFacts
-	first = slices.Concat(first, []canxml.DecoderOption{facts.observeOption()})
-	ot, err := readDocument(br, first)
+	firstOpts = slices.Concat(firstOpts, []canxml.DecoderOption{facts.observeOption()})
+	ot, err := readDocument(br, firstOpts)
 	// An input past the size limit is refused as such, whatever the decode
 	// made of the bytes it read: the limit may have cut it short.
 	if lr.N == 0 {
@@ -265,7 +277,23 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	if !tolerant && !settings.Reports {
 		return readResult(ot, err)
 	}
-	if tolerant && err != nil {
+	switch {
+	case rewinds:
+		// Read the whole input again, from where the read started, under the
+		// same limit.
+		if _, serr := seeker.Seek(start, io.SeekStart); serr != nil {
+			return nil, serr
+		}
+		src = &sourceReader{r: r}
+		lr = &io.LimitedReader{R: src, N: readMaxBytes + 1}
+		grow()
+		if _, cerr := in.ReadFrom(lr); cerr != nil {
+			return nil, cmp.Or(src.err, cerr)
+		}
+		if lr.N == 0 {
+			return nil, errInputTooLarge()
+		}
+	case tolerant && err != nil:
 		// The decode stopped short of the end, which the second reading needs.
 		if _, cerr := io.Copy(io.Discard, br); cerr != nil {
 			return nil, cmp.Or(src.err, cerr)
@@ -294,6 +322,21 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 		return readResult(readDocument(bufio.NewReader(bytes.NewReader(data)), opts))
 	}
 	return readResult(ot, err)
+}
+
+// rewindable reports whether r can seek back to where it is now, and if so
+// returns it as an [io.Seeker] with that offset. A reader whose Seek fails,
+// such as a pipe held in an [os.File], cannot.
+func rewindable(r io.Reader) (io.Seeker, int64, bool) {
+	s, ok := r.(io.Seeker)
+	if !ok {
+		return nil, 0, false
+	}
+	start, err := s.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, 0, false
+	}
+	return s, start, true
 }
 
 // sourceReader reads r and keeps the first error it returns other than
