@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: the AQL entry points of `openehr/validation`** move to the new `openehr/validation/aqlvalidation` as `Validate` and `ValidateWithTypeRelation`, so validating compositions no longer links the AQL parser (REQ-013, REQ-109).
+- **Breaking: the RM floor** reads `DV_PROPORTION.is_integral` as a precision of 0 where one is set, so a fraction with another precision now fails `Fraction_validity`, its `Issue.Value` the precision (REQ-112, REQ-168).
+- **Template validation** reports an omitted or `null` data value part once, as `required` with no `primitive_*` finding beside it, and admits any value under a primitive constraint with no item (REQ-102, REQ-171).
+- **The instance generator** writes each participation's performer as a `PARTY_IDENTIFIED` named `example`, which FLAT and STRUCTURED carry, prefers an ordinal pair that has a code, and writes no fraction the RM floor refuses (REQ-107).
+
 ## [0.50.0] - 2026-11-17
 
 Fiftieth `v0.x` minor: the generator builds each detail level as ITS-REST names it, FLAT and STRUCTURED read the spellings EHRbase and FerroEHR write, the RM floor checks archetype roots per node, and parsed AQL class brackets carry their predicate. **Breaking:** Web Template ids and FLAT and STRUCTURED keys change for sole events and code-fixed names, `MarshalStructured` writes `|value`, and the RM floor and time constraints refuse more.
