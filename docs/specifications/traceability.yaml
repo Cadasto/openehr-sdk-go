@@ -904,7 +904,7 @@ requirements:
     canonical: docs/specifications/auth.md#req-062--jwks-rotation
     status: draft
     implementation: landed
-    packages: [auth/smart, smart/discovery]
+    packages: [auth/smart, smart, smart/discovery]
     probes: [PROBE-006]
     tests:
       - auth/smart/exchange_idtoken_test.go
