@@ -196,77 +196,88 @@ func EnsureSingle(parent any, attrName string, child any) error {
 // attribute on `parent`. Same dispatch / error contract as
 // EnsureSingle.
 func AppendMultiple(parent any, attrName string, child any) error {
+	return AppendMultipleHint(parent, attrName, child, 0)
+}
+
+// AppendMultipleHint is AppendMultiple for a caller that knows how many
+// members it will append to the list: hint. The first member appended to
+// an absent (nil) list makes room for hint members, at least one, so the
+// list does not grow as the others arrive; a list already present, empty
+// or not, grows as append grows it. A list that takes no member,
+// because the caller appends none or each one is refused, stays nil, as
+// AppendMultiple leaves it.
+func AppendMultipleHint(parent any, attrName string, child any, hint int) error {
 	switch p := parent.(type) {
 	case *rm.Composition:
-		return writeCompositionMultiple(p, attrName, child)
+		return writeCompositionMultiple(p, attrName, child, hint)
 	case *rm.EventContext:
-		return writeEventContextMultiple(p, attrName, child)
+		return writeEventContextMultiple(p, attrName, child, hint)
 	case *rm.Section:
-		return writeSectionMultiple(p, attrName, child)
+		return writeSectionMultiple(p, attrName, child, hint)
 	case *rm.Observation:
-		return writeOtherParticipations("*rm.Observation", &p.OtherParticipations, attrName, child)
+		return writeOtherParticipations("*rm.Observation", &p.OtherParticipations, attrName, child, hint)
 	case *rm.Evaluation:
-		return writeOtherParticipations("*rm.Evaluation", &p.OtherParticipations, attrName, child)
+		return writeOtherParticipations("*rm.Evaluation", &p.OtherParticipations, attrName, child, hint)
 	case *rm.Instruction:
-		return writeInstructionMultiple(p, attrName, child)
+		return writeInstructionMultiple(p, attrName, child, hint)
 	case *rm.Action:
-		return writeOtherParticipations("*rm.Action", &p.OtherParticipations, attrName, child)
+		return writeOtherParticipations("*rm.Action", &p.OtherParticipations, attrName, child, hint)
 	case *rm.AdminEntry:
-		return writeOtherParticipations("*rm.AdminEntry", &p.OtherParticipations, attrName, child)
+		return writeOtherParticipations("*rm.AdminEntry", &p.OtherParticipations, attrName, child, hint)
 	case *rm.IsmTransition:
-		return writeIsmTransitionMultiple(p, attrName, child)
+		return writeIsmTransitionMultiple(p, attrName, child, hint)
 	case *rm.History[rm.ItemStructure]:
-		return writeHistoryMultiple(p, attrName, child)
+		return writeHistoryMultiple(p, attrName, child, hint)
 	case *rm.ItemTree:
-		return writeItemTreeMultiple(p, attrName, child)
+		return writeItemTreeMultiple(p, attrName, child, hint)
 	case *rm.ItemList:
-		return writeItemListMultiple(p, attrName, child)
+		return writeItemListMultiple(p, attrName, child, hint)
 	case *rm.ItemTable:
-		return writeItemTableMultiple(p, attrName, child)
+		return writeItemTableMultiple(p, attrName, child, hint)
 	case *rm.Cluster:
-		return writeClusterMultiple(p, attrName, child)
+		return writeClusterMultiple(p, attrName, child, hint)
 	case *rm.Person:
-		return writePartyMultiple(personFields(p), attrName, child)
+		return writePartyMultiple(personFields(p), attrName, child, hint)
 	case *rm.Agent:
-		return writePartyMultiple(agentFields(p), attrName, child)
+		return writePartyMultiple(agentFields(p), attrName, child, hint)
 	case *rm.Group:
-		return writePartyMultiple(groupFields(p), attrName, child)
+		return writePartyMultiple(groupFields(p), attrName, child, hint)
 	case *rm.Organisation:
-		return writePartyMultiple(organisationFields(p), attrName, child)
+		return writePartyMultiple(organisationFields(p), attrName, child, hint)
 	case *rm.Role:
-		return writeRoleMultiple(p, attrName, child)
+		return writeRoleMultiple(p, attrName, child, hint)
 	case *rm.Contact:
-		return writeContactMultiple(p, attrName, child)
+		return writeContactMultiple(p, attrName, child, hint)
 	case *rm.PartyIdentified:
-		return writePartyIdentifiedMultiple(p, "*rm.PartyIdentified", attrName, child)
+		return writePartyIdentifiedMultiple(p, "*rm.PartyIdentified", attrName, child, hint)
 	case *rm.PartyRelated:
-		return writePartyIdentifiedMultiple(&p.PartyIdentified, "*rm.PartyRelated", attrName, child)
+		return writePartyIdentifiedMultiple(&p.PartyIdentified, "*rm.PartyRelated", attrName, child, hint)
 	case *rm.DVText:
-		return writeTextMultiple(p, "*rm.DVText", attrName, child)
+		return writeTextMultiple(p, "*rm.DVText", attrName, child, hint)
 	case *rm.DVCodedText:
-		return writeTextMultiple(&p.DVText, "*rm.DVCodedText", attrName, child)
+		return writeTextMultiple(&p.DVText, "*rm.DVCodedText", attrName, child, hint)
 	case *rm.DVParagraph:
-		return writeDVParagraphMultiple(p, attrName, child)
+		return writeDVParagraphMultiple(p, attrName, child, hint)
 	case *rm.Folder:
-		return writeFolderMultiple(p, attrName, child)
+		return writeFolderMultiple(p, attrName, child, hint)
 	case *rm.DVCount:
-		return writeReferenceRanges("*rm.DVCount", &p.OtherReferenceRanges, attrName, child)
+		return writeReferenceRanges("*rm.DVCount", &p.OtherReferenceRanges, attrName, child, hint)
 	case *rm.DVQuantity:
-		return writeReferenceRanges("*rm.DVQuantity", &p.OtherReferenceRanges, attrName, child)
+		return writeReferenceRanges("*rm.DVQuantity", &p.OtherReferenceRanges, attrName, child, hint)
 	case *rm.DVProportion:
-		return writeReferenceRanges("*rm.DVProportion", &p.OtherReferenceRanges, attrName, child)
+		return writeReferenceRanges("*rm.DVProportion", &p.OtherReferenceRanges, attrName, child, hint)
 	case *rm.DVOrdinal:
-		return writeReferenceRanges("*rm.DVOrdinal", &p.OtherReferenceRanges, attrName, child)
+		return writeReferenceRanges("*rm.DVOrdinal", &p.OtherReferenceRanges, attrName, child, hint)
 	case *rm.DVScale:
-		return writeReferenceRanges("*rm.DVScale", &p.OtherReferenceRanges, attrName, child)
+		return writeReferenceRanges("*rm.DVScale", &p.OtherReferenceRanges, attrName, child, hint)
 	case *rm.DVDate:
-		return writeReferenceRanges("*rm.DVDate", &p.OtherReferenceRanges, attrName, child)
+		return writeReferenceRanges("*rm.DVDate", &p.OtherReferenceRanges, attrName, child, hint)
 	case *rm.DVTime:
-		return writeReferenceRanges("*rm.DVTime", &p.OtherReferenceRanges, attrName, child)
+		return writeReferenceRanges("*rm.DVTime", &p.OtherReferenceRanges, attrName, child, hint)
 	case *rm.DVDateTime:
-		return writeReferenceRanges("*rm.DVDateTime", &p.OtherReferenceRanges, attrName, child)
+		return writeReferenceRanges("*rm.DVDateTime", &p.OtherReferenceRanges, attrName, child, hint)
 	case *rm.DVDuration:
-		return writeReferenceRanges("*rm.DVDuration", &p.OtherReferenceRanges, attrName, child)
+		return writeReferenceRanges("*rm.DVDuration", &p.OtherReferenceRanges, attrName, child, hint)
 	}
 	return fmt.Errorf("%w: parent %T, attr %q", ErrUnknownAttribute, parent, attrName)
 }
@@ -303,6 +314,16 @@ func ensureList[T any](list *[]T) {
 	if *list == nil {
 		*list = []T{}
 	}
+}
+
+// appendHinted appends v to list. Where list is nil it first makes room for
+// hint members, at least one, so a list its caller fills with hint members
+// grows once (AppendMultipleHint).
+func appendHinted[T any](list []T, v T, hint int) []T {
+	if list == nil {
+		list = make([]T, 0, max(hint, 1))
+	}
+	return append(list, v)
 }
 
 // --- COMPOSITION ---------------------------------------------------------
@@ -350,14 +371,14 @@ func writeCompositionSingle(c *rm.Composition, attr string, child any) error {
 	return fmt.Errorf("%w: *rm.Composition has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writeCompositionMultiple(c *rm.Composition, attr string, child any) error {
+func writeCompositionMultiple(c *rm.Composition, attr string, child any, hint int) error {
 	switch attr {
 	case "content":
 		v, ok := child.(rm.ContentItem)
 		if !ok {
 			return mismatch(attr, child, "CONTENT_ITEM")
 		}
-		c.Content = append(c.Content, v)
+		c.Content = appendHinted(c.Content, v, hint)
 		return nil
 	}
 	return fmt.Errorf("%w: *rm.Composition has no multiple attr %q", ErrUnknownAttribute, attr)
@@ -543,20 +564,20 @@ func writeInstructionSingle(i *rm.Instruction, attr string, child any) error {
 	return fmt.Errorf("%w: *rm.Instruction has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writeInstructionMultiple(i *rm.Instruction, attr string, child any) error {
+func writeInstructionMultiple(i *rm.Instruction, attr string, child any, hint int) error {
 	if attr == "activities" {
-		return assignVia(child, func(v rm.Activity) { i.Activities = append(i.Activities, v) }, attr, "ACTIVITY")
+		return assignVia(child, func(v rm.Activity) { i.Activities = appendHinted(i.Activities, v, hint) }, attr, "ACTIVITY")
 	}
-	return writeOtherParticipations("*rm.Instruction", &i.OtherParticipations, attr, child)
+	return writeOtherParticipations("*rm.Instruction", &i.OtherParticipations, attr, child, hint)
 }
 
 // writeOtherParticipations appends to the other_participations every ENTRY
 // class declares, the one multi-valued attribute OBSERVATION, EVALUATION,
 // ACTION and ADMIN_ENTRY hold. class names the Go type for the error
 // detail.
-func writeOtherParticipations(class string, list *[]rm.Participation, attr string, child any) error {
+func writeOtherParticipations(class string, list *[]rm.Participation, attr string, child any, hint int) error {
 	if attr == "other_participations" {
-		return appendParticipation(list, attr, child)
+		return appendParticipation(list, attr, child, hint)
 	}
 	return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, class, attr)
 }
@@ -699,14 +720,14 @@ func writeSectionSingle(s *rm.Section, attr string, child any) error {
 	return fmt.Errorf("%w: *rm.Section has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writeSectionMultiple(s *rm.Section, attr string, child any) error {
+func writeSectionMultiple(s *rm.Section, attr string, child any, hint int) error {
 	switch attr {
 	case "items":
 		v, ok := child.(rm.ContentItem)
 		if !ok {
 			return mismatch(attr, child, "CONTENT_ITEM")
 		}
-		s.Items = append(s.Items, v)
+		s.Items = appendHinted(s.Items, v, hint)
 		return nil
 	}
 	return fmt.Errorf("%w: *rm.Section has no multiple attr %q", ErrUnknownAttribute, attr)
@@ -784,9 +805,9 @@ func writeEventContextSingle(c *rm.EventContext, attr string, child any) error {
 	return fmt.Errorf("%w: *rm.EventContext has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writeEventContextMultiple(c *rm.EventContext, attr string, child any) error {
+func writeEventContextMultiple(c *rm.EventContext, attr string, child any, hint int) error {
 	if attr == "participations" {
-		return appendParticipation(&c.Participations, attr, child)
+		return appendParticipation(&c.Participations, attr, child, hint)
 	}
 	return fmt.Errorf("%w: *rm.EventContext has no multiple attr %q", ErrUnknownAttribute, attr)
 }
@@ -824,14 +845,14 @@ func writeHistorySingle(h *rm.History[rm.ItemStructure], attr string, child any)
 	return fmt.Errorf("%w: *rm.History has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writeHistoryMultiple(h *rm.History[rm.ItemStructure], attr string, child any) error {
+func writeHistoryMultiple(h *rm.History[rm.ItemStructure], attr string, child any, hint int) error {
 	switch attr {
 	case "events":
 		v, ok := child.(rm.Event)
 		if !ok {
 			return mismatch(attr, child, "EVENT")
 		}
-		h.Events = append(h.Events, v)
+		h.Events = appendHinted(h.Events, v, hint)
 		return nil
 	}
 	return fmt.Errorf("%w: *rm.History has no multiple attr %q", ErrUnknownAttribute, attr)
@@ -908,14 +929,14 @@ func writeItemTreeSingle(t *rm.ItemTree, attr string, child any) error {
 	return fmt.Errorf("%w: *rm.ItemTree has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writeItemTreeMultiple(t *rm.ItemTree, attr string, child any) error {
+func writeItemTreeMultiple(t *rm.ItemTree, attr string, child any, hint int) error {
 	switch attr {
 	case "items":
 		v, ok := child.(rm.Item)
 		if !ok {
 			return mismatch(attr, child, "ITEM")
 		}
-		t.Items = append(t.Items, v)
+		t.Items = appendHinted(t.Items, v, hint)
 		return nil
 	}
 	return fmt.Errorf("%w: *rm.ItemTree has no multiple attr %q", ErrUnknownAttribute, attr)
@@ -929,10 +950,10 @@ func writeItemListSingle(l *rm.ItemList, attr string, child any) error {
 	return fmt.Errorf("%w: *rm.ItemList has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writeItemListMultiple(l *rm.ItemList, attr string, child any) error {
+func writeItemListMultiple(l *rm.ItemList, attr string, child any, hint int) error {
 	switch attr {
 	case "items":
-		return assignVia(child, func(v rm.Element) { l.Items = append(l.Items, v) }, attr, "ELEMENT")
+		return assignVia(child, func(v rm.Element) { l.Items = appendHinted(l.Items, v, hint) }, attr, "ELEMENT")
 	}
 	return fmt.Errorf("%w: *rm.ItemList has no multiple attr %q", ErrUnknownAttribute, attr)
 }
@@ -955,10 +976,10 @@ func writeItemTableSingle(t *rm.ItemTable, attr string, child any) error {
 	return fmt.Errorf("%w: *rm.ItemTable has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writeItemTableMultiple(t *rm.ItemTable, attr string, child any) error {
+func writeItemTableMultiple(t *rm.ItemTable, attr string, child any, hint int) error {
 	switch attr {
 	case "rows":
-		return assignVia(child, func(v rm.Cluster) { t.Rows = append(t.Rows, v) }, attr, "CLUSTER")
+		return assignVia(child, func(v rm.Cluster) { t.Rows = appendHinted(t.Rows, v, hint) }, attr, "CLUSTER")
 	}
 	return fmt.Errorf("%w: *rm.ItemTable has no multiple attr %q", ErrUnknownAttribute, attr)
 }
@@ -981,14 +1002,14 @@ func writeClusterSingle(c *rm.Cluster, attr string, child any) error {
 	return fmt.Errorf("%w: *rm.Cluster has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writeClusterMultiple(c *rm.Cluster, attr string, child any) error {
+func writeClusterMultiple(c *rm.Cluster, attr string, child any, hint int) error {
 	switch attr {
 	case "items":
 		v, ok := child.(rm.Item)
 		if !ok {
 			return mismatch(attr, child, "ITEM")
 		}
-		c.Items = append(c.Items, v)
+		c.Items = appendHinted(c.Items, v, hint)
 		return nil
 	}
 	return fmt.Errorf("%w: *rm.Cluster has no multiple attr %q", ErrUnknownAttribute, attr)
@@ -1119,9 +1140,9 @@ func writeTextAttr(t *rm.DVText, class, attr string, child any) error {
 // writeTextMultiple appends a TERM_MAPPING, given as a value or as a
 // pointer, to the mappings DV_TEXT declares, which DV_CODED_TEXT inherits.
 // class names the Go type for the error detail.
-func writeTextMultiple(t *rm.DVText, class, attr string, child any) error {
+func writeTextMultiple(t *rm.DVText, class, attr string, child any, hint int) error {
 	if attr == "mappings" {
-		return assignVia(child, func(v rm.TermMapping) { t.Mappings = append(t.Mappings, v) }, attr, "TERM_MAPPING")
+		return assignVia(child, func(v rm.TermMapping) { t.Mappings = appendHinted(t.Mappings, v, hint) }, attr, "TERM_MAPPING")
 	}
 	return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, class, attr)
 }
@@ -1254,9 +1275,9 @@ func writeIsmTransitionSingle(i *rm.IsmTransition, attr string, child any) error
 
 // writeIsmTransitionMultiple appends a reason, a DV_TEXT or its descendant
 // DV_CODED_TEXT stored as given.
-func writeIsmTransitionMultiple(i *rm.IsmTransition, attr string, child any) error {
+func writeIsmTransitionMultiple(i *rm.IsmTransition, attr string, child any, hint int) error {
 	if attr == "reason" {
-		return assignTextAsGiven(child, func(v rm.DVTextLike) { i.Reason = append(i.Reason, v) }, attr)
+		return assignTextAsGiven(child, func(v rm.DVTextLike) { i.Reason = appendHinted(i.Reason, v, hint) }, attr)
 	}
 	return fmt.Errorf("%w: *rm.IsmTransition has no multiple attr %q", ErrUnknownAttribute, attr)
 }
@@ -1305,22 +1326,22 @@ func writePartySingle(f partyFields, attr string, child any) error {
 	return fmt.Errorf("%w: %s has no single attr %q", ErrUnknownAttribute, f.class, attr)
 }
 
-func writePartyMultiple(f partyFields, attr string, child any) error {
+func writePartyMultiple(f partyFields, attr string, child any, hint int) error {
 	switch attr {
 	case "identities":
-		return assignVia(child, func(v rm.PartyIdentity) { *f.identities = append(*f.identities, v) }, attr, "PARTY_IDENTITY")
+		return assignVia(child, func(v rm.PartyIdentity) { *f.identities = appendHinted(*f.identities, v, hint) }, attr, "PARTY_IDENTITY")
 	case "contacts":
-		return assignVia(child, func(v rm.Contact) { *f.contacts = append(*f.contacts, v) }, attr, "CONTACT")
+		return assignVia(child, func(v rm.Contact) { *f.contacts = appendHinted(*f.contacts, v, hint) }, attr, "CONTACT")
 	case "relationships":
-		return assignVia(child, func(v rm.PartyRelationship) { *f.relationships = append(*f.relationships, v) }, attr, "PARTY_RELATIONSHIP")
+		return assignVia(child, func(v rm.PartyRelationship) { *f.relationships = appendHinted(*f.relationships, v, hint) }, attr, "PARTY_RELATIONSHIP")
 	case "languages":
 		// A DV_TEXT or its descendant DV_CODED_TEXT.
 		if f.languages != nil {
-			return assignDVTextLike(child, func(v rm.DVTextLike) { *f.languages = append(*f.languages, v) }, attr)
+			return assignDVTextLike(child, func(v rm.DVTextLike) { *f.languages = appendHinted(*f.languages, v, hint) }, attr)
 		}
 	case "roles":
 		if f.roles != nil {
-			return assignVia(child, func(v rm.PartyRef) { *f.roles = append(*f.roles, v) }, attr, "PARTY_REF")
+			return assignVia(child, func(v rm.PartyRef) { *f.roles = appendHinted(*f.roles, v, hint) }, attr, "PARTY_REF")
 		}
 	}
 	return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, f.class, attr)
@@ -1339,11 +1360,11 @@ func writeRoleSingle(r *rm.Role, attr string, child any) error {
 	return writePartySingle(roleFields(r), attr, child)
 }
 
-func writeRoleMultiple(r *rm.Role, attr string, child any) error {
+func writeRoleMultiple(r *rm.Role, attr string, child any, hint int) error {
 	if attr == "capabilities" {
-		return assignVia(child, func(v rm.Capability) { r.Capabilities = append(r.Capabilities, v) }, attr, "CAPABILITY")
+		return assignVia(child, func(v rm.Capability) { r.Capabilities = appendHinted(r.Capabilities, v, hint) }, attr, "CAPABILITY")
 	}
-	return writePartyMultiple(roleFields(r), attr, child)
+	return writePartyMultiple(roleFields(r), attr, child, hint)
 }
 
 // writeCapabilitySingle writes a ROLE's capability, so its RM-mandatory
@@ -1406,9 +1427,9 @@ func writePartyIdentifiedSingle(p *rm.PartyIdentified, class, attr string, child
 // writePartyIdentifiedMultiple appends a DV_IDENTIFIER, given as a value or
 // as a pointer, to the identifiers PARTY_IDENTIFIED declares, which
 // PARTY_RELATED inherits. class names the Go type for the error detail.
-func writePartyIdentifiedMultiple(p *rm.PartyIdentified, class, attr string, child any) error {
+func writePartyIdentifiedMultiple(p *rm.PartyIdentified, class, attr string, child any, hint int) error {
 	if attr == "identifiers" {
-		return assignVia(child, func(v rm.DVIdentifier) { p.Identifiers = append(p.Identifiers, v) }, attr, "DV_IDENTIFIER")
+		return assignVia(child, func(v rm.DVIdentifier) { p.Identifiers = appendHinted(p.Identifiers, v, hint) }, attr, "DV_IDENTIFIER")
 	}
 	return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, class, attr)
 }
@@ -1453,10 +1474,10 @@ func writeContactSingle(c *rm.Contact, attr string, child any) error {
 	return fmt.Errorf("%w: *rm.Contact has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writeContactMultiple(c *rm.Contact, attr string, child any) error {
+func writeContactMultiple(c *rm.Contact, attr string, child any, hint int) error {
 	switch attr {
 	case "addresses":
-		return assignVia(child, func(v rm.Address) { c.Addresses = append(c.Addresses, v) }, attr, "ADDRESS")
+		return assignVia(child, func(v rm.Address) { c.Addresses = appendHinted(c.Addresses, v, hint) }, attr, "ADDRESS")
 	}
 	return fmt.Errorf("%w: *rm.Contact has no multiple attr %q", ErrUnknownAttribute, attr)
 }

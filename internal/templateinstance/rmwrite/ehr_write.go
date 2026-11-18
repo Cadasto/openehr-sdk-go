@@ -49,12 +49,12 @@ func writeFolderSingle(f *rm.Folder, attr string, child any) error {
 // writeFolderMultiple appends a sub-folder, given as a value or as a
 // pointer, to a FOLDER's folders, or a reference of any OBJECT_REF class,
 // as given, to its items.
-func writeFolderMultiple(f *rm.Folder, attr string, child any) error {
+func writeFolderMultiple(f *rm.Folder, attr string, child any, hint int) error {
 	switch attr {
 	case "folders":
-		return assignVia(child, func(v rm.Folder) { f.Folders = append(f.Folders, v) }, attr, "FOLDER")
+		return assignVia(child, func(v rm.Folder) { f.Folders = appendHinted(f.Folders, v, hint) }, attr, "FOLDER")
 	case "items":
-		return assignObjectRef(child, func(v rm.ObjectRefLike) { f.Items = append(f.Items, v) }, attr)
+		return assignObjectRef(child, func(v rm.ObjectRefLike) { f.Items = appendHinted(f.Items, v, hint) }, attr)
 	}
 	return fmt.Errorf("%w: *rm.Folder has no multiple attr %q", ErrUnknownAttribute, attr)
 }

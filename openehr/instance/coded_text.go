@@ -3,7 +3,6 @@ package instance
 import (
 	"slices"
 
-	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -74,7 +73,7 @@ func nodeGroup(node *tcimpl.CompiledNode) *terminology.Group {
 	if parent == nil {
 		return nil
 	}
-	class := bmmtype.Class(builtRMType(parent))
+	class := nodeClass(parent)
 	for _, attr := range tcimpl.NodeAttributes(parent) {
 		if slices.Contains(tcimpl.ChildNodes(attr), node) {
 			return attributeGroups[classAttribute{class: class, attr: attr.Name()}]

@@ -8,11 +8,15 @@
 //
 //	EnsureSingle(parent any, attrName string, child any) error
 //	AppendMultiple(parent any, attrName string, child any) error
+//	AppendMultipleHint(parent any, attrName string, child any, hint int) error
 //	EnsureList(parent any, attrName string) error
 //	NewRM(rmTypeName string) (any, error)
 //
-// All four are pure structural setters. Dispatch is a closed type
-// switch on the Go concrete type of `parent`, with no reflection.
+// AppendMultipleHint is AppendMultiple for a caller that knows how many
+// members a list will take: the first member appended to an absent list
+// makes room for hint of them. All five are pure structural setters.
+// Dispatch is a closed type switch on the Go concrete type of `parent`,
+// with no reflection.
 //
 // # Scope
 //

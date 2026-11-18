@@ -32,8 +32,8 @@ func writeParticipationSingle(p *rm.Participation, attr string, child any) error
 // appendParticipation appends a PARTICIPATION, given as a value or as a
 // pointer, to list: an EVENT_CONTEXT's participations or an ENTRY's
 // other_participations.
-func appendParticipation(list *[]rm.Participation, attr string, child any) error {
-	return assignVia(child, func(v rm.Participation) { *list = append(*list, v) }, attr, "PARTICIPATION")
+func appendParticipation(list *[]rm.Participation, attr string, child any, hint int) error {
+	return assignVia(child, func(v rm.Participation) { *list = appendHinted(*list, v, hint) }, attr, "PARTICIPATION")
 }
 
 // writeTermMappingSingle writes a TERM_MAPPING's match, purpose and target.

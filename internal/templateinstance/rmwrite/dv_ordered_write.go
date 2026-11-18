@@ -116,7 +116,7 @@ func writeOrderedSingle[T rm.DVOrdered](class string, status **rm.CodePhrase, no
 // meaning and a DV_INTERVAL<DV_ORDERED> range, so the member is copied
 // into the instantiation the field holds, T. class names the Go type for
 // the error detail.
-func writeReferenceRanges[T rm.DVOrdered](class string, list *[]rm.ReferenceRange[T], attr string, child any) error {
+func writeReferenceRanges[T rm.DVOrdered](class string, list *[]rm.ReferenceRange[T], attr string, child any, hint int) error {
 	if attr != "other_reference_ranges" {
 		return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, class, attr)
 	}
@@ -125,7 +125,7 @@ func writeReferenceRanges[T rm.DVOrdered](class string, list *[]rm.ReferenceRang
 			continue
 		}
 		if meaning, rng, ok := read(child); ok {
-			*list = append(*list, rm.ReferenceRange[T]{Meaning: meaning, Range: rng})
+			*list = appendHinted(*list, rm.ReferenceRange[T]{Meaning: meaning, Range: rng}, hint)
 			return nil
 		}
 	}
