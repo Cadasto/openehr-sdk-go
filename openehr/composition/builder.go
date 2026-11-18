@@ -438,7 +438,7 @@ func findAttributeContaining(parent, target *tcimpl.CompiledNode) *tcimpl.Compil
 // navigateTo follows segs from rmRoot, returning the RM value at the
 // terminal segment. Each step:
 //   - Single attr: rmaccess.Single(parent, attr) → descend.
-//   - Multi attr: rmaccess.Multiple(parent, attr) → first child
+//   - Multi attr: rmaccess.AppendMultiple(buf, parent, attr) → first child
 //     whose archetype_node_id matches the segment's matchID and, when
 //     the segment carries a matchName, whose name value equals it;
 //     else the first child when matchID is empty (covers OPT-silent or
@@ -467,7 +467,10 @@ func descendOne(cur any, s pathSegment) (any, error) {
 		}
 		return v, nil
 	case template.Multiple:
-		items, ok := rmaccess.Multiple(cur, s.attrName)
+		// The items are read into a buffer on the stack, so a list of up
+		// to eight items is read without allocating.
+		var buf [8]any
+		items, ok := rmaccess.AppendMultiple(buf[:0], cur, s.attrName)
 		if !ok {
 			return nil, fmt.Errorf("%w: multi-attribute %q absent on %T", ErrInvalidPath, s.attrName, cur)
 		}
