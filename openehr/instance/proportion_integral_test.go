@@ -43,11 +43,14 @@ func wholeNumber(v rm.Real) bool {
 // template admits 0, under both value fills, a fraction the template
 // requires a precision of with no child included. Where the template
 // admits no precision of 0, a ratio that pins is_integral keeps the
-// precision the template admits, and a fraction with a precision gives way
-// to another type the template admits: the RM floor reads is_integral as a
-// precision of 0 where the precision is set (REQ-112), so no fraction or
-// integer fraction is written at another precision. A ratio with no pin
-// keeps no precision. The RM floor and the template validator pass.
+// precision the template admits. A fraction the walk wrote a precision for
+// keeps its type with no precision where the template does not require
+// one, and gives way to another type the template admits where it does:
+// the RM floor reads is_integral as a precision of 0 where the precision
+// is set (REQ-112), so no fraction or integer fraction is written at
+// another precision. A ratio with no pin keeps no precision. Each value
+// keeps the type the case names. The RM floor and the template validator
+// pass.
 func TestREQ107_IntegralProportionTakesPrecisionZero(t *testing.T) {
 	r, closed := instance.RealRange, instance.Closed
 	// Draws from this numerator range are rarely whole numbers.
@@ -55,6 +58,8 @@ func TestREQ107_IntegralProportionTakesPrecisionZero(t *testing.T) {
 	cases := []struct {
 		name  string
 		attrs []string
+		// kind is the type the value takes.
+		kind rm.Integer
 		// precision is the precision the value takes, or nil for none.
 		precision *rm.Integer
 		// whole says the numerator and the denominator are whole numbers.
@@ -63,47 +68,69 @@ func TestREQ107_IntegralProportionTakesPrecisionZero(t *testing.T) {
 		{
 			name:      "fraction whose template requires a precision with no child",
 			attrs:     []string{fractional, optProportionPart("type", instance.IntList(3)), optSingle("precision")},
+			kind:      3,
 			precision: new(rm.Integer(0)),
 			whole:     true,
 		},
 		{
 			name:      "fraction whose template names no precision",
 			attrs:     []string{fractional, optProportionPart("type", instance.IntList(3))},
+			kind:      3,
 			precision: new(rm.Integer(0)),
 			whole:     true,
 		},
 		{
 			name:      "integer fraction over a precision list of 2 and 0",
 			attrs:     []string{fractional, optProportionPart("type", instance.IntList(4)), optProportionPart("precision", instance.IntList(2, 0))},
+			kind:      4,
 			precision: new(rm.Integer(0)),
 			whole:     true,
 		},
 		{
 			name:      "fraction whose template prohibits the precision",
 			attrs:     []string{fractional, optProportionPart("type", instance.IntList(3)), optProhibitedSingle("precision")},
+			kind:      3,
 			precision: nil,
 			whole:     true,
 		},
 		{
 			name:      "ratio whose template pins is_integral",
 			attrs:     []string{optIntegralPinned(), fractional, optProportionPart("type", instance.IntList(0))},
+			kind:      0,
 			precision: new(rm.Integer(0)),
 			whole:     true,
 		},
 		{
 			name:      "ratio whose template pins is_integral and admits precision 2 alone",
 			attrs:     []string{optIntegralPinned(), fractional, optProportionPart("type", instance.IntList(0)), optProportionPart("precision", instance.IntList(2))},
+			kind:      0,
 			precision: new(rm.Integer(2)),
 			whole:     true,
 		},
 		{
 			name:      "fraction whose template admits precision 2 alone gives way to a ratio",
 			attrs:     []string{fractional, optProportionPart("type", instance.IntList(3, 0)), optProportionPart("precision", instance.IntList(2))},
+			kind:      0,
 			precision: new(rm.Integer(2)),
+		},
+		{
+			name:      "fraction whose optional precision admits 2 alone keeps its type with no precision",
+			attrs:     []string{fractional, optProportionPart("type", instance.IntList(3)), optOptionalSingleOver("precision", optPrimitive("INTEGER", "C_INTEGER", instance.IntList(2)))},
+			kind:      3,
+			precision: nil,
+			whole:     true,
+		},
+		{
+			name:      "integer fraction whose optional precision admits -1 alone keeps its type with no precision",
+			attrs:     []string{fractional, optProportionPart("type", instance.IntList(4)), optOptionalSingleOver("precision", optPrimitive("INTEGER", "C_INTEGER", instance.IntList(-1)))},
+			kind:      4,
+			precision: nil,
+			whole:     true,
 		},
 		{
 			name:      "ratio with no pin",
 			attrs:     []string{fractional, optProportionPart("type", instance.IntList(0))},
+			kind:      0,
 			precision: nil,
 		},
 	}
@@ -111,6 +138,9 @@ func TestREQ107_IntegralProportionTakesPrecisionZero(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, optProportionOver(tc.attrs...), true)
 			eachProportionRun(t, c, func(t *testing.T, what string, out any, p rm.DVProportion) {
+				if p.Type != tc.kind {
+					t.Errorf("%s: DV_PROPORTION %s, want type %d", what, proportionText(p), tc.kind)
+				}
 				switch {
 				case tc.precision == nil && p.Precision != nil:
 					t.Errorf("%s: DV_PROPORTION %s, want no precision", what, proportionText(p))
