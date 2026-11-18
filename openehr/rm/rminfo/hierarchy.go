@@ -92,6 +92,9 @@ type Hierarchy interface {
 	// with known=true is an abstract class nothing concrete extends.
 	// "Concrete" here means "not BMM-abstract"; see [Hierarchy.IsAbstract]
 	// for why that is not the same as "storable".
+	//
+	// The slice may be shared with every other caller, so it must not be
+	// modified.
 	ConcreteDescendants(rmType string) (descendants []string, known bool)
 
 	// DeclaredOn returns the class whose BMM declaration supplied attrName
@@ -228,10 +231,29 @@ func (l *lookup) walkAncestors(rmType string) []string {
 }
 
 func (l *lookup) ConcreteDescendants(rmType string) ([]string, bool) {
-	meta, ok := l.data[rmType]
-	if !ok {
-		return nil, false
-	}
+	descendants, ok := l.descendantIndex()[rmType]
+	return descendants, ok
+}
+
+// descendantIndex returns the shared, memoised ConcreteDescendants answers,
+// one per class in data; an abstract class nothing concrete extends maps to
+// nil. Each list's capacity is its length, so a caller that appends to one
+// gets a new array rather than writing into the shared one. Built on first
+// use, like [lookup.childIndex].
+func (l *lookup) descendantIndex() map[string][]string {
+	l.descendantOnce.Do(func() {
+		l.descendants = make(map[string][]string, len(l.data))
+		for class := range l.data {
+			l.descendants[class] = slices.Clip(l.walkDescendants(class))
+		}
+	})
+	return l.descendants
+}
+
+// walkDescendants computes the ConcreteDescendants answer of rmType, a class
+// in data.
+func (l *lookup) walkDescendants(rmType string) []string {
+	meta := l.data[rmType]
 	children := l.childIndex()
 	seen := map[string]bool{rmType: true}
 	var out []string
@@ -256,7 +278,7 @@ func (l *lookup) ConcreteDescendants(rmType string) ([]string, bool) {
 		queue = append(queue, children[name]...)
 	}
 	slices.Sort(out)
-	return out, true
+	return out
 }
 
 func (l *lookup) DeclaredOn(rmType, attrName string) (string, bool) {
@@ -279,7 +301,7 @@ func (l *lookup) DeclaredOn(rmType, attrName string) (string, bool) {
 
 // childIndex returns the shared, memoised child index. The returned map and
 // its slices are READ-ONLY for callers: they are package state published once
-// under childOnce, and the only caller (ConcreteDescendants) clones before it
+// under childOnce, and the only caller (walkDescendants) clones before it
 // appends.
 //
 // It inverts the Parents edges once, lazily — the generated tables
