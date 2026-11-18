@@ -528,8 +528,13 @@ The parts are:
 
 - the `code_string` of a CODE_PHRASE, a DV_CODED_TEXT's defining code included, whose terminology the constraint still judges;
 - the `units` of a DV_QUANTITY, which leaves the constraint nothing to judge, its ranges being per unit;
+- the `magnitude` of a DV_QUANTITY whose `units` are present, whose units and precision the constraint still judges, its magnitude ranges set aside;
+- the `magnitude` of the DV_COUNT and the `value` of the DV_BOOLEAN the AOM 1.4 short names INTEGER and BOOLEAN bind, which leave the constraint nothing to judge;
 - the `value` of the DV_DATE, DV_TIME, DV_DATE_TIME or DV_DURATION an AOM 1.4 short name binds;
-- and the code string of a DV_ORDINAL's `symbol`, when the validator passes the `value` alone for the constraint to judge.
+- the `symbol` of a DV_ORDINAL, its defining code or that code's `code_string`, when the validator passes the `value` alone for the constraint to judge;
+- and the `value` of a DV_ORDINAL whose `symbol` is present, whose symbol the constraint still judges: it reports nothing where it admits the symbol beside the value of a pair it lists, and judges the whole value where it does not; with the `symbol` absent too, nothing is left to judge.
+
+A number or a boolean is absent only where a decode reports it missing (§ REQ-112 *Value-typed mandatory presence*); in a value built in Go its zero is a value, which the constraint judges.
 
 The constraint **MUST** still judge a CODE_PHRASE's terminology; a DV_ORDINAL's `value`, which the validator passes alone when the RM rules report the symbol's code string; a part the RM rules let be blank, such as a DV_SCALE symbol's `code_string`; and a part the RM does not require, such as an optional String, which it judges as any value.
 At a DV_ORDINAL bound to a `C_DV_ORDINAL` whose symbol's defining code carries a code string, a symbol that does not match its value **MUST** be reported: the validator passes the `value` and that code together as one `constraints.OrdinalSymbol`; a code that names no terminology matches a listed pair under § REQ-103's rule, and the RM rules report the missing terminology.

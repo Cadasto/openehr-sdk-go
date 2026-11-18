@@ -1429,6 +1429,7 @@ requirements:
       - openehr/internal/rmbind/bind_test.go
       - openehr/internal/rmbind/tier_test.go
       - openehr/templatecompile/compile_readings_test.go
+      - openehr/validation/absent_part_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/binding_trial_test.go
@@ -1971,6 +1972,7 @@ requirements:
       - openehr/template/constraints/temporal_parity_test.go
       - openehr/template/constraints/temporal_validate_test.go
       - openehr/templatecompile/compile_test.go
+      - openehr/validation/absent_part_test.go
       - openehr/validation/attribute_not_in_rm_test.go
       - openehr/validation/constraint_ref_walk_test.go
       - openehr/validation/coverage_test.go
@@ -2624,6 +2626,7 @@ requirements:
       - internal/rmaccess/reads_test.go
       - internal/templatecompile/walkfacts_test.go
       - openehr/instance/rm_defaults_yield_test.go
+      - openehr/validation/absent_part_test.go
       - openehr/validation/attribute_not_in_rm_test.go
       - openehr/validation/binding_trial_cost_internal_test.go
       - openehr/validation/binding_trial_test.go
