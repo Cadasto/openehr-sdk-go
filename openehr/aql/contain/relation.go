@@ -48,12 +48,27 @@ type TypeRelation struct {
 	// other foundation classes the pin ships), valued with that spelling.
 	byValue map[string][]string
 	known   map[string]string
+	// number gives each canonical spelling in known a dense number, so a walk
+	// can mark the classes it has seen in a bit set.
+	number map[string]int
 
 	// memo caches the per-start-node reachability closure on first use, one
 	// map per route mode (0: ByReference edges excluded, 1: included). Stored
 	// sets are read-only after LoadOrStore. Not shared across WithOverlay
 	// copies — a copy's overlay set differs, so it starts a memo of its own.
 	memo [2]sync.Map
+
+	// The caches below follow memo's rules: filled on first use, read-only
+	// once stored, and started afresh by each WithOverlay copy. Each is keyed
+	// by graph nodes or BMM-known classes only, never by an unknown name a
+	// caller passed, so it stays bounded by the relation's own class set.
+	//
+	// succ holds each node's successor list per route mode, expanded each
+	// BMM-known class's sorted concrete descendants, and operands the
+	// containable verdict of each BMM-known class.
+	succ     [2]sync.Map
+	expanded sync.Map
+	operands sync.Map
 }
 
 var defaultRel = sync.OnceValue(func() *TypeRelation {
@@ -98,6 +113,7 @@ func (r *TypeRelation) WithOverlay(edges ...Edge) *TypeRelation {
 		al:      r.al,
 		byValue: r.byValue, // shared, read-only
 		known:   r.known,   // shared, read-only
+		number:  r.number,  // shared, read-only
 	}
 	cp.overlays = make([]Edge, len(r.overlays), len(r.overlays)+len(edges))
 	copy(cp.overlays, r.overlays)
@@ -123,6 +139,18 @@ func (r *TypeRelation) Containable(rmType string) Verdict {
 // containable is Containable over an already-resolved name and its known flag,
 // so the pair question resolves each operand once (see CanContain).
 func (r *TypeRelation) containable(c string, isKnown bool) Verdict {
+	if !isKnown {
+		return r.decideContainable(c, false)
+	}
+	if v, ok := r.operands.Load(c); ok {
+		return v.(Verdict)
+	}
+	v, _ := r.operands.LoadOrStore(c, r.decideContainable(c, true))
+	return v.(Verdict)
+}
+
+// decideContainable computes [TypeRelation.containable]'s verdict.
+func (r *TypeRelation) decideContainable(c string, isKnown bool) Verdict {
 	overlayEndpoint := r.namesOverlayEndpoint(c)
 	if !isKnown && !overlayEndpoint {
 		return UnknownClass
@@ -231,23 +259,14 @@ func (r *TypeRelation) Unavoidable(ancestor, via, descendant string) bool {
 		return false
 	}
 
-	starts, targets := r.expand(a), r.expand(d)
-	blocked := make(map[string]bool)
-	for _, c := range r.expand(v) {
-		blocked[c] = true
-	}
-	if intersects(blocked, starts) || intersects(blocked, targets) {
+	starts, targets, blocked := r.expand(a), r.expand(d), r.expand(v)
+	if sharesName(blocked, starts) || sharesName(blocked, targets) {
 		return false
 	}
 	if !r.anyReaches(starts, targets, true) {
 		return false
 	}
-	for _, s := range starts {
-		if intersects(r.reachableAvoiding(s, blocked), targets) {
-			return false // a route round via
-		}
-	}
-	return true
+	return !r.reachesAvoiding(starts, targets, blocked) // a route round via
 }
 
 // --- construction ---------------------------------------------------------
@@ -280,6 +299,10 @@ func build(lk rminfo.Lookup, overlays []Edge) *TypeRelation {
 	r.known = make(map[string]string)
 	for _, c := range lk.KnownRMTypes() {
 		r.known[canon(c)] = c
+	}
+	r.number = make(map[string]int, len(r.known))
+	for _, c := range r.known {
+		r.number[c] = len(r.number)
 	}
 	r.byValue = r.deriveByValue()
 	return r
@@ -417,9 +440,14 @@ func (r *TypeRelation) reachableFrom(start string, allowRef bool) map[string]boo
 	return v.(map[string]bool)
 }
 
-// reachableAvoiding is [TypeRelation.reachableFrom] over the graph with a set
-// of VERTICES removed: a node in blocked is neither reached nor traversed. It
-// is the one query [TypeRelation.Unavoidable] needs and the only reader of it.
+// reachesAvoiding reports whether a node of targets is reachable by at least
+// one edge from a node of starts over the graph with the VERTICES in blocked
+// removed: a blocked node is neither reached nor traversed. It is
+// [TypeRelation.reachableFrom] for every start at once, stopping at the first
+// target reached rather than building the closure, and the one query
+// [TypeRelation.Unavoidable] needs. starts must hold no blocked node; targets
+// and blocked are sorted, as [TypeRelation.expand] returns them.
+//
 // Routes are read at their widest (ByReference edges included) — see that
 // method for why, and TestUnavoidableCountsAByReferenceBypass and the
 // FOLDER/VERSION/COMPOSITION row of TestUnavoidableAcceptanceTable for the
@@ -429,32 +457,83 @@ func (r *TypeRelation) reachableFrom(start string, allowRef bool) map[string]boo
 // It deliberately neither READS nor WRITES the relation's memo. The memo caches
 // the closure of the WHOLE graph per (start, mode); excluding a vertex is a
 // different graph, so reading from it would answer the wrong question and
-// writing to it would corrupt every later verdict. REQ-160 § Reachability
+// writing to it would corrupt every later verdict. The successor lists it
+// reads are those of the whole graph too; the exclusion is applied as the walk
+// steps, never stored. REQ-160 § Reachability
 // semantics has verdicts MAY be memoized, never must, so a fresh walk per call
 // is within contract — and this walk runs per lint operand, not per query row.
-func (r *TypeRelation) reachableAvoiding(start string, blocked map[string]bool) map[string]bool {
-	reached := make(map[string]bool)
-	seen := map[string]bool{start: true}
-	queue := []string{start}
-	for len(queue) > 0 {
-		c := queue[0]
-		queue = queue[1:]
-		for _, nb := range r.successors(c, true) {
-			if blocked[nb] {
+func (r *TypeRelation) reachesAvoiding(starts, targets, blocked []string) bool {
+	seen := newNodeSet(r.number)
+	queue := make([]string, 0, len(starts))
+	for _, s := range starts {
+		if seen.add(s) {
+			queue = append(queue, s)
+		}
+	}
+	for i := 0; i < len(queue); i++ {
+		for _, nb := range r.successors(queue[i], true) {
+			if hasName(blocked, nb) {
 				continue
 			}
-			reached[nb] = true // nb is at depth >= 1, exactly as in reachableFrom
-			if !seen[nb] {
-				seen[nb] = true
+			if hasName(targets, nb) {
+				return true // nb is at depth >= 1, exactly as in reachableFrom
+			}
+			if seen.add(nb) {
 				queue = append(queue, nb)
 			}
 		}
 	}
-	return reached
+	return false
+}
+
+// nodeSet is a set of graph nodes: a bit per numbered class, and a map for a
+// node the numbering does not hold (an overlay endpoint the pin does not know).
+type nodeSet struct {
+	number map[string]int
+	bits   []uint64
+	others map[string]bool
+}
+
+func newNodeSet(number map[string]int) nodeSet {
+	return nodeSet{number: number, bits: make([]uint64, (len(number)+63)/64)}
+}
+
+// add adds n to the set and reports whether it was absent.
+func (s *nodeSet) add(n string) bool {
+	if i, ok := s.number[n]; ok {
+		w, b := i/64, uint64(1)<<(i%64)
+		if s.bits[w]&b != 0 {
+			return false
+		}
+		s.bits[w] |= b
+		return true
+	}
+	if s.others[n] {
+		return false
+	}
+	if s.others == nil {
+		s.others = make(map[string]bool)
+	}
+	s.others[n] = true
+	return true
 }
 
 // successors returns the by-value and overlay successors of a single node.
+// The list is cached per (node, mode) and MUST NOT be mutated.
 func (r *TypeRelation) successors(c string, allowRef bool) []string {
+	idx := 0
+	if allowRef {
+		idx = 1
+	}
+	if v, ok := r.succ[idx].Load(c); ok {
+		return v.([]string)
+	}
+	v, _ := r.succ[idx].LoadOrStore(c, r.findSuccessors(c, allowRef))
+	return v.([]string)
+}
+
+// findSuccessors computes [TypeRelation.successors].
+func (r *TypeRelation) findSuccessors(c string, allowRef bool) []string {
 	out := make([]string, 0, len(r.byValue[c]))
 	out = append(out, r.byValue[c]...)
 	for _, e := range r.overlays {
@@ -468,14 +547,22 @@ func (r *TypeRelation) successors(c string, allowRef bool) []string {
 	return out
 }
 
-// expand returns the concrete descendants of a BMM-known class, or the class
-// itself (exact) for a name the pin does not know — a dialect/consumer endpoint.
+// expand returns the concrete descendants of a BMM-known class, sorted, or the
+// class itself (exact) for a name the pin does not know — a dialect/consumer
+// endpoint. A known class's list is cached and MUST NOT be mutated.
 func (r *TypeRelation) expand(class string) []string {
-	if s, ok := r.known[canon(class)]; ok {
-		ds, _ := r.h.ConcreteDescendants(s)
-		return ds
+	s, ok := r.known[canon(class)]
+	if !ok {
+		return []string{class}
 	}
-	return []string{class}
+	if v, ok := r.expanded.Load(s); ok {
+		return v.([]string)
+	}
+	ds, _ := r.h.ConcreteDescendants(s)
+	ds = slices.Clone(ds)
+	slices.Sort(ds)
+	v, _ := r.expanded.LoadOrStore(s, ds)
+	return v.([]string)
 }
 
 // endpointMatches reports whether node matches an overlay-edge endpoint:
@@ -535,6 +622,23 @@ func canon(s string) string {
 		return s
 	}
 	return string(b)
+}
+
+// hasName reports whether the sorted list names holds name.
+func hasName(names []string, name string) bool {
+	_, found := slices.BinarySearch(names, name)
+	return found
+}
+
+// sharesName reports whether the sorted list a and the list b hold a name in
+// common.
+func sharesName(a, b []string) bool {
+	for _, n := range b {
+		if hasName(a, n) {
+			return true
+		}
+	}
+	return false
 }
 
 func intersects(set map[string]bool, names []string) bool {

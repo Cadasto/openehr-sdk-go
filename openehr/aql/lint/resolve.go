@@ -12,12 +12,12 @@ import (
 // templateIssues runs Layer 3 against a compiled OPT: archetype membership
 // (aql_archetype_not_in_template, Error) and archetype-scoped path resolution
 // (aql_path_not_in_template, Warning).
-func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
+func templateIssues(md queryFacts, c *tcimpl.Compiled) []Issue {
 	var issues []Issue
 
 	// aql_archetype_not_in_template — every literal archetype HRID named in
 	// FROM/CONTAINS MUST be present in the template.
-	for _, hrid := range md.Archetypes {
+	for _, hrid := range documentArchetypes(md.classes) {
 		if len(c.AllByArchetypeID(hrid)) == 0 {
 			issues = append(issues, Issue{
 				Code:     "aql_archetype_not_in_template",
@@ -33,8 +33,8 @@ func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
 	// template, walk the path's structure against that archetype's compiled
 	// subtree. See pathDivergence for the (deliberately conservative)
 	// false-positive policy.
-	for _, p := range md.Paths {
-		ce, ok := md.Aliases[p.Alias]
+	for _, p := range md.paths {
+		ce, ok := md.aliases.lookup(p.Alias)
 		if !ok {
 			continue // unbound — Layer 2
 		}
@@ -56,8 +56,10 @@ func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
 		if len(roots) == 0 {
 			continue // no archetype, or every one absent — already flagged above
 		}
-		norm, err := Normalise(p)
-		if err != nil || len(norm.Segments) == 0 {
+		// The alias bound a class, so it is not empty, and the path's own
+		// segments are what [Normalise] would hand back.
+		segs := p.Segments
+		if len(segs) == 0 {
 			continue // bare alias root — nothing to resolve
 		}
 		// The same archetype may fill several slots (several roots), and a
@@ -75,7 +77,7 @@ func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
 			divergedAll = true
 		)
 		for _, root := range roots {
-			seg, diverged := pathDivergence(root, norm.Segments)
+			seg, diverged := pathDivergence(root, segs)
 			if !diverged {
 				divergedAll = false
 				break
