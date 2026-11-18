@@ -44,7 +44,6 @@ Code in openehr/instance where a default rule lives in two places, and in openeh
 
 ## RM floor: the invariants not yet evaluated (REQ-112, REQ-171)
 The ledger is openehr/validation/invariants.json: each entry whose reason starts "Not yet evaluated" is a mechanical rule the floor could evaluate, and each one taken on adds a catalogue bullet, an evaluator and a PROBE-077 row. Lane: full. Size: L.
-- openehr/validation/rmfloor.go:574 · the DV_PROPORTION is_integral reading the RM floor and the generator share, with the whole-operand fraction default it decides (openehr/instance/template_default.go) · tracked in [issue 474](https://github.com/Cadasto/openehr-sdk-go/issues/474)
 - openehr/validation/invariants.json · 53 entries are out_of_scope with the reason 'Not yet evaluated' (DV_AMOUNT rules, DV_MULTIMEDIA Size_valid, the non-empty rules of ACTOR.roles, ENTRY.other_participations and PARTY.contacts, the change-control coded invariants, VERSION_TREE_ID branch rules and others); each non-empty rule is one rminfo.NonEmptyLists entry (openehr/rm/rminfo/nonempty.go:25), and through REQ-102's list the floor holds non-empty once present (clinical-modeling.md:479) each also changes what template validation reports required · by: sdd-implementer · from: feat/validation-generated-access
 
 ## Tests: a 32-bit build, and a load-dependent race (REQ-120, REQ-073)
