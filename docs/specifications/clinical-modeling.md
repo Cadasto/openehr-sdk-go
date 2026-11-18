@@ -1383,7 +1383,10 @@ The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill`
   It rounds what it draws where a precision applies, and keeps a draw unrounded where the rounded one would leave the constraint:
   - a `DV_QUANTITY`'s `magnitude`: to as many decimals as its precision allows where that is 0 or 1, so to none where the precision admits 0 alone, and to two otherwise.
     Its precision is the upper bound of the precision range of the `C_DV_QUANTITY` entry it is drawn in, or the `precision` the walk wrote where the OPT builds the quantity attribute by attribute.
-    A `C_DV_QUANTITY` entry's `magnitude` is drawn inside the entry's range, away from 0 and from the range's bounds, or from 1 to 100 where the range is open, and so is a `DV_COUNT`'s `magnitude`, as a whole number, where its range is open or bounded on one side or the OPT leaves it unconstrained;
+    A magnitude is drawn inside its range, away from 0 and from the range's bounds, or from 1 to 100 where the range is open or there is none, where it is:
+    - a `C_DV_QUANTITY` entry's `magnitude`;
+    - a `DV_QUANTITY`'s `magnitude` that nothing constrains, with no `C_DV_QUANTITY` and nothing on the `magnitude`, or that a `C_REAL` constrains with no list and a range open or bounded on one side;
+    - a `DV_COUNT`'s `magnitude`, as a whole number, where its range is open or bounded on one side or the OPT leaves it unconstrained;
   - a `DV_PROPORTION`'s `numerator` and `denominator`: to whole numbers where its kind or a `precision` of 0 asks for them (§ Contract *Precedence* 4), and otherwise as a magnitude is, to its `precision` up to two decimals.
 
 `RandomFill` reproducibility is caller-controlled via **`Options.ValueSource`** (a `math/rand/v2.Source`): a fixed source makes leaf values byte-reproducible (§ Contract *Reproducible uids*); `nil`, or a typed-nil source such as a nil `*rand.PCG`, draws from the auto-seeded package global so successive calls differ — mirroring the `UIDSource` determinism seam.

@@ -173,15 +173,17 @@
 // from 0 up gives 10, and no constraint gives 10; a constraint with a list,
 // or one that rejects that value, keeps its own example. A quantity's
 // drawn magnitude is rounded to the template's precision, with no decimals
-// where the precision admits 0 alone and at most two otherwise, and lies
-// inside its range away from 0 and from the range's bounds, or from 1 to
-// 100 where the range is open; a count's drawn magnitude, where its range
-// is open or bounded on one side or the template leaves it unconstrained,
-// is drawn the same way as a whole number, so it is never 0; a
-// proportion's drawn numerator and denominator are rounded the same way;
-// and a duration's drawn value is
-// not zero, a count of one designator its constraint accepts, such as P3Y
-// or PT7H, from 1 to 12 where the constraint has no range and spread across
+// where the precision admits 0 alone and at most two otherwise. Under a
+// quantity constraint, under a real constraint with no list whose range is
+// open or bounded on one side, or where the template leaves it
+// unconstrained, it lies inside its range away from 0 and from the range's
+// bounds, or from 1 to 100 where the range is open or there is none; a
+// count's drawn magnitude, where its range is open or bounded on one side
+// or the template leaves it unconstrained, is drawn the same way as a whole
+// number, so it is never 0; a proportion's drawn numerator and denominator
+// are rounded the same way; and a duration's drawn value is not zero, a
+// count of one designator its constraint accepts, such as P3Y or PT7H,
+// from 1 to 12 where the constraint has no range and spread across
 // the range where it has one, in a designator the range is written in where
 // the constraint accepts it. A duration whose value the template leaves
 // unconstrained is drawn under [RandomFill] too, from 1 to 12 of any
