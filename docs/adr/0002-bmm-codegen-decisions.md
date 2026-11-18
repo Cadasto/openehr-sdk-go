@@ -9,7 +9,7 @@ date: 2026-05-16
 # ADR 0002 — BMM code generator structural decisions
 
 - **Status:** Accepted, 2026-05-16.
-- **Amended by:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (D8), [ADR 0033](0033-missing-members-reported-by-decoders.md) (D9) and [ADR 0034](0034-sdk-authored-root-schemas.md) (D2, D5, D10); D4, D8, D9 and D10 also changed with the generator they describe.
+- **Amended by:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (D8), [ADR 0033](0033-missing-members-reported-by-decoders.md) (D9) and [ADR 0034](0034-sdk-authored-root-schemas.md) (D2, D5, D10); D4, D8, D9 and D10 also changed with the generator they describe; D8's encode half changed on 2026-11-18 (issue 484), at the maintainer's instruction.
 - **Requirements:** REQ-043 (the P_BMM to Go mapping rules the generator applies), since retired into [REQ-041](../specifications/reference-model.md#mapping-rules); [REQ-056](../specifications/wire.md#req-056) (the canonical-XML child order D10 supplies).
 
 ## Context
@@ -56,7 +56,7 @@ Superseding the emission policy `internal/bmmgen/render_jsonmar.go` and `interna
 
 | Property | Was | Is |
 |---|---|---|
-| `_type` on every concrete RM value | hand-rolled prologue in each generated `MarshalJSON` | a generated `MarshalJSONTo` calling `json.MarshalEncode` on an anonymous struct whose first field is `_type` and whose second embeds a method-free alias of the class, except a class that embeds a marshaler-bearing concrete ancestor, whose alias would promote the ancestor's methods and emit the wrong `_type`; those take a flat wire struct that embeds nothing and copies each field, still leading with `_type` |
+| `_type` on every concrete RM value | hand-rolled prologue in each generated `MarshalJSON` | a generated `MarshalJSONTo` that writes `_type` and then each member itself (§ *Encode writes each member itself* below), or, under the options that section names, calls `json.MarshalEncode` on an anonymous struct whose first field is `_type` and whose second embeds a method-free alias of the class, except a class that embeds a marshaler-bearing concrete ancestor, whose alias would promote the ancestor's methods and emit the wrong `_type`; those take a flat wire struct that embeds nothing and copies each field, still leading with `_type` |
 | `_type` on a value held in an interface | `openehr/internal/jsonpoly` (80 lines, 177 call sites) | nothing extra. `MarshalJSONTo` has a **value** receiver, so it is in the method set of both the value and the pointer; v2 dispatches to it however the concrete instance was assigned into the slot. The value receiver is load-bearing under a v1 entry point, not v2: `DefaultOptionsV1` sets `CallMethodsWithLegacySemantics`, which skips a pointer-receiver marshal method on an unaddressable value (an interface or map element), and `contribution`, `transport` and `testkit` stay on v1 by design, whereas a v2 entry alone would call a pointer-receiver method regardless of addressability |
 | Polymorphic dispatch at a substitutable slot | `typereg.DecodeAs[T]` called from each generated `UnmarshalJSON` | one `json.UnmarshalFromFunc` per polymorphic interface, built from `typereg.Default` at init and supplied through `json.WithUnmarshalers`. Every hook passes `dec.Options()` into any nested decode; without it a deeper interface slot silently loses its hook |
 | Member order | struct field order, fixed by emission order | not a contract; [REQ-052](../specifications/wire.md#req-052) recommends `_type` first, and `Hash` sorting is `json.Deterministic(true)` set by the generated marshaler |
@@ -64,7 +64,7 @@ Superseding the emission policy `internal/bmmgen/render_jsonmar.go` and `interna
 | Shape-failure classification (`canjson.ErrInvalidShape`) | `typereg.WrapShapeError` at each generated funnel | one shared runtime helper called by every generated `UnmarshalJSONFrom`, so 110 copies of the classification collapse into one. The sentinel's contract stays [REQ-052](../specifications/wire.md#req-052) § Decode-side shape sentinel, not this ADR's |
 | Nil-receiver refusal (REQ-025) | first statement of each generated `UnmarshalJSON` | first statement of each generated `UnmarshalJSONFrom`, unchanged in force |
 
-The invariant D8 asserts: **no per-type JSON codec logic is generated into `openehr/rm/*_gen.go` or `openehr/aom/aom14/*_gen.go` beyond the two-method delegation above, except for the interval classes.** An interval's codec has to know which of its four boundary flags the wire carried and whether a side is open: encode omits an open side's empty bound ([REQ-052](../specifications/wire.md#req-052)), and decode gives an absent flag its default ([REQ-169](../specifications/wire.md#req-169--interval-boundary-flag-defaults)), neither of which the delegation can see. That logic is generated for every class carrying the four flags, BASE `Interval` included, so the AOM 1.4 constraint intervals get it too, and the generator refuses a flag-carrying class whose shape it does not handle.
+The invariant D8 asserts: **no per-type JSON decode logic is generated into `openehr/rm/*_gen.go` or `openehr/aom/aom14/*_gen.go` beyond the delegation above, except for the interval classes; encode writes each class's members as § *Encode writes each member itself* says.** An interval's codec has to know which of its four boundary flags the wire carried and whether a side is open: encode omits an open side's empty bound ([REQ-052](../specifications/wire.md#req-052)), and decode gives an absent flag its default ([REQ-169](../specifications/wire.md#req-169--interval-boundary-flag-defaults)), neither of which the delegation can see. That logic is generated for every class carrying the four flags, BASE `Interval` included, so the AOM 1.4 constraint intervals get it too, and the generator refuses a flag-carrying class whose shape it does not handle.
 
 **Why pointer and container fields differ.**
 `go doc encoding/json` § Migrating to v2 recommends migrating `omitempty` to `omitzero` for a bool, number, pointer or interface value, and that is right for the pointer fields the generator emits.
@@ -76,6 +76,22 @@ The generator reads the three from `internal/rmlists` by the class that declares
 The cost: canonical XML, and a FLAT or STRUCTURED decode without the template, cannot carry the `[]`, so such a list comes back absent and draws `required` where the template requires it; and every other list an archetype can require by existence keeps `omitempty`, so a present empty one is still left out.
 A mandatory list or map takes `omitzero` so that a present empty one is written and only a nil one left out.
 A mandatory interface or type-parameter field takes `omitempty` instead, because a typed-nil pointer is not zero and encodes as `null`, while every concrete RM value encodes with its `_type` and so is never empty; `any` takes `omitzero`, since an empty string or object it holds is a value.
+
+**Encode writes each member itself.**
+The delegation allocated for every value it wrote: the wrapper holding a copy of the value escapes to the heap, and json/v2 copies each value held by value in an interface slot into a new addressable value before calling its method.
+On the Demonstration composition these were about two thirds of encode allocations.
+Writing the members of three classes directly (CODE_PHRASE, DV_TEXT, ELEMENT) cut its encode from 114 to 82 µs and from 835 to 366 allocations (darwin/arm64), with every corpus document encoded to the same bytes.
+The generated `MarshalJSONTo` therefore writes `{`, `_type` and each member in struct declaration order as tokens on the encoder:
+- a string, a boolean or a pointer to one, as a token;
+- a generated class, by calling its `MarshalJSONTo`;
+- a value in an interface slot, through the `json.MarshalerTo` it implements;
+- a `Hash` map, an `Any` member, `[]byte` and `rm.Character`, through `json.MarshalEncode`, so `json.Deterministic` still sorts `Hash` keys.
+
+The generated code applies each field's omit rule as json/v2 applies its tag (§ *Why pointer and container fields differ*), a typed-nil pointer in an interface slot included.
+It writes directly only when the encoder carries no option that changes how a member is written: a caller's marshalers, `OmitZeroStructFields`, `StringifyNumbers` or v1's legacy `omitempty`.
+Under any of those it takes the wrapper above, so the output is the same bytes under every option set; the encoder's own options, indentation and escaping, apply to the tokens either way.
+A failure names the class whose method failed, as json/v2 does at a method boundary.
+A test encodes every corpus document both ways and compares the bytes.
 
 ### D9 — The generated XML decoders hand what they do not read to an internal runtime
 
