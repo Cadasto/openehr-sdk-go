@@ -3,7 +3,7 @@ package canjson_test
 // direct_encode_test.go: every generated MarshalJSONTo writes its class's
 // members itself, as tokens, unless the encoder carries an option under which
 // json/v2 would write a member otherwise; it then marshals the wrapper struct
-// it always had (ADR 0002 D8, § Encode writes each member itself). The REQ052
+// it always had (ADR 0002 D8, § Encode writes each member itself). The REQ-052
 // wire profile is unchanged by it: these tests encode every value both ways
 // and hold the two to the same bytes, and a failure to the same words.
 //
