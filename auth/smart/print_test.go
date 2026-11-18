@@ -2,6 +2,7 @@ package smart_test
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -128,6 +129,29 @@ func TestSourcePrintsNoCredentials(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestConfigShowsIDTokenTrustedProject checks that a Config printed with fmt,
+// in Go syntax too, or logged with log/slog shows its trusted project, which
+// is not a secret, beside its trusted audiences. REQ-062
+func TestConfigShowsIDTokenTrustedProject(t *testing.T) {
+	t.Parallel()
+	cfg := smart.Config{ClientID: "client-id", IDTokenTrustedAudiences: []string{"api"}, IDTokenTrustedProject: "project-1"}
+	const want = `IDTokenTrustedAudiences: ["api"], IDTokenTrustedProject: "project-1"`
+	for _, verb := range []string{"%v", "%#v"} {
+		if out := fmt.Sprintf(verb, cfg); !strings.Contains(out, want) {
+			t.Errorf("fmt.Sprintf(%q, cfg) = %q, want it to contain %q", verb, out, want)
+		}
+	}
+	var got slog.Value
+	for _, a := range cfg.LogValue().Group() {
+		if a.Key == "IDTokenTrustedProject" {
+			got = a.Value
+		}
+	}
+	if got.Kind() != slog.KindString || got.String() != "project-1" {
+		t.Errorf("LogValue() attribute IDTokenTrustedProject = %v (kind %v), want the string project-1", got, got.Kind())
+	}
 }
 
 // TestREQ026_PrintingSourceDuringRefreshIsRaceFree pins REQ-026 (idiom.md §

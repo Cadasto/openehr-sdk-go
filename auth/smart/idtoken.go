@@ -50,15 +50,36 @@ type IDTokenOption func(*idTokenConfig)
 
 type idTokenConfig struct {
 	trustedAudiences []string
+	// trustedProject is the project WithTrustedProject names; "" means none.
+	trustedProject string
 }
 
 // WithTrustedAudiences names the audiences an ID token's aud claim may list
 // besides the client ID. A token whose aud lists any other audience is
-// rejected, so with no trusted audiences only the client ID is accepted. A
-// later WithTrustedAudiences replaces an earlier one.
+// rejected, so with no trusted audiences only the client ID is accepted,
+// unless [WithTrustedProject] names a project. A later WithTrustedAudiences
+// replaces an earlier one.
 func WithTrustedAudiences(aud ...string) IDTokenOption {
 	trusted := slices.Clone(aud)
 	return func(c *idTokenConfig) { c.trustedAudiences = trusted }
+}
+
+// WithTrustedProject names the project the client belongs to, for an
+// authorization server that lists in an ID token's aud claim the project's
+// ID beside the client ID of every application in that project. That list
+// grows whenever an application registers, so no fixed set given to
+// [WithTrustedAudiences] can hold it.
+//
+// With a project named, a token is rejected unless its aud lists the
+// project ID and it carries an azp claim, which must equal the client ID.
+// Every other audience in aud that is a non-empty string is then accepted,
+// whatever [WithTrustedAudiences] names. An empty projectID names no
+// project, and a later WithTrustedProject replaces an earlier one. A
+// projectID equal to the client ID makes [ValidateIDToken] fail with
+// [auth.ErrInvalidConfig], since the project check would then only check
+// the client ID again.
+func WithTrustedProject(projectID string) IDTokenOption {
+	return func(c *idTokenConfig) { c.trustedProject = projectID }
 }
 
 // ValidateIDToken verifies a JWT ID token against jwks and returns parsed
@@ -76,6 +97,10 @@ func WithTrustedAudiences(aud ...string) IDTokenOption {
 //   - iss must equal issuer exactly;
 //   - aud must contain clientID, and any other audience it lists must be
 //     one named by [WithTrustedAudiences];
+//   - with a project named by [WithTrustedProject], aud must also list the
+//     project ID and the token must carry azp; any other audience aud lists
+//     is then accepted, whatever [WithTrustedAudiences] names;
+//   - an empty or non-string audience is always refused;
 //   - an azp claim, when present, must equal clientID;
 //   - sub must be a non-empty string, naming the user the token is about;
 //   - exp is required, and exp, nbf and iat are checked with a 30-second
@@ -92,14 +117,20 @@ func WithTrustedAudiences(aud ...string) IDTokenOption {
 // names that alg (RFC 8725 §3.1).
 //
 // A token rejected on its own content matches [auth.ErrJWKSValidationFailed].
-// A missing jwks, issuer or clientID matches [auth.ErrInvalidConfig], and a
-// failed JWKS fetch is returned as the fetch error, so an outage never reads
-// as a bad token.
+// A missing jwks, issuer or clientID, or a trusted project equal to clientID,
+// matches [auth.ErrInvalidConfig], and a failed JWKS fetch is returned as the
+// fetch error, so an outage never reads as a bad token.
 func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, clientID, nonce string, now time.Time, allowedAlgs []string, opts ...IDTokenOption) (*IDTokenClaims, error) {
+	var cfg idTokenConfig
+	for _, o := range opts {
+		if o != nil {
+			o(&cfg)
+		}
+	}
 	// The trust anchors are the caller's configuration, so they are checked
 	// before the token: a configuration error must not read as a bad token,
-	// even when the token is empty too (REQ-064).
-	if err := requireIDTokenTrustAnchors(jwks, issuer, clientID); err != nil {
+	// even when the token is empty too (REQ-062, REQ-064).
+	if err := requireIDTokenTrustAnchors(jwks, issuer, clientID, cfg.trustedProject); err != nil {
 		return nil, err
 	}
 	if raw == "" {
@@ -192,13 +223,7 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, client
 	if err := idt.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("%w: claims: %w", auth.ErrJWKSValidationFailed, err)
 	}
-	var cfg idTokenConfig
-	for _, o := range opts {
-		if o != nil {
-			o(&cfg)
-		}
-	}
-	return claimsFromMap(claims, issuer, clientID, nonce, now, cfg.trustedAudiences)
+	return claimsFromMap(claims, issuer, clientID, nonce, now, cfg)
 }
 
 // signatureVerifies reports whether pub verifies raw's signature, whatever its
@@ -210,13 +235,18 @@ func signatureVerifies(ctx context.Context, raw string, pub crypto.PublicKey) bo
 }
 
 // requireIDTokenTrustAnchors enforces OIDC trust binding when validating
-// an id_token (REQ-064): JWKS, issuer, and client_id must all be set.
-func requireIDTokenTrustAnchors(jwks *JWKS, issuer, clientID string) error {
+// an id_token (REQ-064): JWKS, issuer, and client_id must all be set. A
+// trusted project, when one is named, must not be the client ID, or the
+// project check would only check the client ID again (REQ-062).
+func requireIDTokenTrustAnchors(jwks *JWKS, issuer, clientID, trustedProject string) error {
 	if jwks == nil {
 		return fmt.Errorf("%w: JWKS is required to validate id_token", auth.ErrInvalidConfig)
 	}
 	if issuer == "" || clientID == "" {
 		return fmt.Errorf("%w: Issuer and ClientID are required to validate id_token", auth.ErrInvalidConfig)
+	}
+	if trustedProject == clientID {
+		return fmt.Errorf("%w: the trusted project is the client ID", auth.ErrInvalidConfig)
 	}
 	return nil
 }
@@ -299,7 +329,7 @@ func decodeJWTPart(b64 string, dest any) error {
 // ValidateIDToken has verified, as of now, and returns them as
 // IDTokenClaims. now is never zero: ValidateIDToken, the only caller,
 // defaults it to the current time.
-func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now time.Time, trustedAudiences []string) (*IDTokenClaims, error) {
+func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now time.Time, cfg idTokenConfig) (*IDTokenClaims, error) {
 	iss, _ := claimString(claims, "iss")
 	if iss != issuer {
 		return nil, fmt.Errorf("%w: iss mismatch", auth.ErrJWKSValidationFailed)
@@ -308,10 +338,22 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 	if !slices.Contains(aud, clientID) {
 		return nil, fmt.Errorf("%w: aud mismatch", auth.ErrJWKSValidationFailed)
 	}
+	// With a trusted project named, aud must list the project and the token
+	// must carry azp, which the check below holds to the client ID (OIDC Core
+	// 1.0 §3.1.3.7 steps 4 and 5; REQ-062).
+	if cfg.trustedProject != "" {
+		if !slices.Contains(aud, cfg.trustedProject) {
+			return nil, fmt.Errorf("%w: aud does not list the trusted project", auth.ErrJWKSValidationFailed)
+		}
+		if _, ok := claims["azp"]; !ok {
+			return nil, fmt.Errorf("%w: no azp, which a trusted project requires", auth.ErrJWKSValidationFailed)
+		}
+	}
 	// OIDC Core 1.0 §3.1.3.7 step 3: any audience besides the client must be
-	// one the caller trusts. Every raw entry is checked, so an empty or
-	// non-string entry, which aud above leaves out, is refused too (REQ-062).
-	if !audienceEntriesTrusted(claims["aud"], clientID, trustedAudiences) {
+	// one the caller trusts, or any at all under a trusted project. Every raw
+	// entry is checked, so an empty or non-string entry, which aud above
+	// leaves out, is refused too (REQ-062).
+	if !audienceEntriesTrusted(claims["aud"], clientID, cfg) {
 		return nil, fmt.Errorf("%w: aud lists an untrusted or malformed audience", auth.ErrJWKSValidationFailed)
 	}
 	// An azp claim, when present, must name the client (REQ-062).
@@ -380,8 +422,9 @@ func claimString(claims map[string]any, key string) (string, bool) {
 
 // audienceEntriesTrusted reports whether every entry of the raw aud claim v
 // (a string or an array) is a non-empty string that is clientID or one of
-// trusted.
-func audienceEntriesTrusted(v any, clientID string, trusted []string) bool {
+// cfg's trusted audiences. With a trusted project named, any non-empty string
+// is trusted: claimsFromMap has checked the project and azp already.
+func audienceEntriesTrusted(v any, clientID string, cfg idTokenConfig) bool {
 	entries, ok := v.([]any)
 	if !ok {
 		entries = []any{v}
@@ -389,7 +432,10 @@ func audienceEntriesTrusted(v any, clientID string, trusted []string) bool {
 	for _, e := range entries {
 		// A non-string entry reads as "", so it is refused with the empty one.
 		s, _ := e.(string)
-		if s == "" || (s != clientID && !slices.Contains(trusted, s)) {
+		if s == "" {
+			return false
+		}
+		if cfg.trustedProject == "" && s != clientID && !slices.Contains(cfg.trustedAudiences, s) {
 			return false
 		}
 	}

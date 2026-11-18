@@ -150,6 +150,47 @@ func TestTrustedAudiencesReachVerification(t *testing.T) {
 	})
 }
 
+// TestTrustedProjectReachesVerification checks that
+// LaunchContextFromTokenResponse passes the project WithTrustedProject names
+// to the verification: a token whose aud lists the client, the project and
+// another application, with azp naming the client, is refused without it and
+// accepted with it, and a project equal to the client ID fails with
+// auth.ErrInvalidConfig. REQ-062 REQ-064
+func TestTrustedProjectReachesVerification(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv, body := testRSAKey(t)
+	jwks := idTokenJWKS(t, body)
+	tok := signJWT(t, priv, "test-kid", map[string]any{
+		"iss": "https://issuer.example",
+		"sub": "user-1",
+		"aud": []string{"client-id", "project-1", "app-2"},
+		"azp": "client-id",
+		"exp": now.Add(time.Hour).Unix(),
+	})
+	tr := authsmart.TokenResponse{AccessToken: "at", IDToken: tok}
+	base := []smart.ValidateOption{
+		smart.WithJWKS(jwks),
+		smart.WithIssuer("https://issuer.example"),
+		smart.WithClientID("client-id"),
+		smart.WithValidationTime(now),
+	}
+
+	if _, err := smart.LaunchContextFromTokenResponse(t.Context(), tr, base...); !errors.Is(err, auth.ErrJWKSValidationFailed) {
+		t.Fatalf("LaunchContextFromTokenResponse(aud [client-id project-1 app-2], no project) error = %v, want ErrJWKSValidationFailed", err)
+	}
+	lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr, append(base, smart.WithTrustedProject("project-1"))...)
+	if err != nil {
+		t.Fatalf("LaunchContextFromTokenResponse(aud [client-id project-1 app-2], project project-1) error = %v, want nil", err)
+	}
+	if lc.IDToken == nil || lc.IDToken.Subject != "user-1" {
+		t.Fatalf("LaunchContextFromTokenResponse(project project-1) IDToken = %#v, want sub user-1", lc.IDToken)
+	}
+	_, err = smart.LaunchContextFromTokenResponse(t.Context(), tr, append(base, smart.WithTrustedProject("client-id"))...)
+	if !errors.Is(err, auth.ErrInvalidConfig) || errors.Is(err, auth.ErrJWKSValidationFailed) {
+		t.Fatalf("LaunchContextFromTokenResponse(project = client ID) error = %v, want ErrInvalidConfig and not ErrJWKSValidationFailed", err)
+	}
+}
+
 // TestWithTrustedAudiencesKeepsItsOwnCopy checks that changing the caller's
 // slice after building smart.WithTrustedAudiences does not change the trusted
 // set LaunchContextFromTokenResponse passes to the verification. REQ-062

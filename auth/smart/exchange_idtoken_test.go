@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -295,6 +296,99 @@ func TestExchangeIDTokenTrustedAudiences(t *testing.T) { // REQ-064
 	}
 	if tr.IDTokenClaims == nil || !slices.Equal(tr.IDTokenClaims.Audience, []string{"client-id", platform}) {
 		t.Errorf("IDTokenClaims = %+v, want aud [client-id %s]", tr.IDTokenClaims, platform)
+	}
+}
+
+// TestExchangeIDTokenTrustedProject pins REQ-062 and REQ-064: a source that
+// names a trusted project, by WithIDTokenTrustedProject or by
+// Config.IDTokenTrustedProject, accepts at the exchange an ID token whose aud
+// lists the client, the project and other applications, with azp naming the
+// client, and refuses one without the project or without azp as an
+// *auth.ExchangeError matching auth.ErrTokenExchangeFailed and
+// auth.ErrJWKSValidationFailed.
+func TestExchangeIDTokenTrustedProject(t *testing.T) { // REQ-062 REQ-064
+	const project = "project-1"
+	sources := map[string]func(t *testing.T, p *oidcProvider) *smart.Source{
+		"WithIDTokenTrustedProject": func(t *testing.T, p *oidcProvider) *smart.Source {
+			return p.source(t, p.endpoints(), smart.WithIDTokenTrustedProject(project))
+		},
+		"Config.IDTokenTrustedProject": func(t *testing.T, p *oidcProvider) *smart.Source {
+			src, err := smart.FromConfig(smart.Config{
+				HTTPClient:            p.srv.Client(),
+				ClientID:              "client-id",
+				RedirectURI:           "https://app.example/callback",
+				Scopes:                []string{"openid", "launch/patient"},
+				Audience:              testAudience,
+				Auth:                  p.endpoints(),
+				Issuer:                oidcIssuer,
+				IDTokenTrustedProject: project,
+			})
+			if err != nil {
+				t.Fatalf("FromConfig: %v", err)
+			}
+			return src
+		},
+	}
+	cases := []struct {
+		name    string
+		set     map[string]any
+		wantErr bool
+	}{
+		{name: "client, project and another application", set: map[string]any{"aud": []string{"client-id", project, "app-2"}, "azp": "client-id"}},
+		{name: "aud without the project", set: map[string]any{"aud": []string{"client-id", "app-2"}, "azp": "client-id"}, wantErr: true},
+		{name: "no azp", set: map[string]any{"aud": []string{"client-id", project, "app-2"}}, wantErr: true},
+	}
+	for how, build := range sources {
+		for _, tc := range cases {
+			t.Run(how+"/"+tc.name, func(t *testing.T) {
+				p := newOIDCProvider(t)
+				src := build(t, p)
+				req, err := src.BeginAuthorization("")
+				if err != nil {
+					t.Fatalf("BeginAuthorization: %v", err)
+				}
+				c := idClaims(req.Nonce)
+				maps.Copy(c, tc.set)
+				p.setBody(tokenBody(t, "at-1", "rt-1", p.sign(t, c)))
+
+				_, tr, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req)
+				if tc.wantErr {
+					if _, ok := errors.AsType[*auth.ExchangeError](err); !ok ||
+						!errors.Is(err, auth.ErrTokenExchangeFailed) || !errors.Is(err, auth.ErrJWKSValidationFailed) {
+						t.Fatalf("ExchangeAuthorizationCode(%v) error = %v, want an *auth.ExchangeError matching auth.ErrTokenExchangeFailed and auth.ErrJWKSValidationFailed", tc.set, err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("ExchangeAuthorizationCode(%v) error = %v, want success with project %s trusted", tc.set, err, project)
+				}
+				if want := []string{"client-id", project, "app-2"}; tr.IDTokenClaims == nil || !slices.Equal(tr.IDTokenClaims.Audience, want) {
+					t.Errorf("IDTokenClaims = %+v, want aud %q", tr.IDTokenClaims, want)
+				}
+			})
+		}
+	}
+}
+
+// TestFromConfigRefusesTrustedProjectEqualToClient pins REQ-062: a source
+// whose trusted project is its client ID is refused at construction with
+// auth.ErrInvalidConfig, whether the project is set by
+// WithIDTokenTrustedProject or by Config.IDTokenTrustedProject.
+func TestFromConfigRefusesTrustedProjectEqualToClient(t *testing.T) { // REQ-062
+	p := newOIDCProvider(t)
+	_, err := newSource("client-id", p.endpoints(), smart.WithHTTPClient(p.srv.Client()), smart.WithIDTokenTrustedProject("client-id"))
+	if !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Errorf("New(WithIDTokenTrustedProject(client ID)) error = %v, want auth.ErrInvalidConfig", err)
+	}
+	_, err = smart.FromConfig(smart.Config{
+		HTTPClient:            p.srv.Client(),
+		ClientID:              "client-id",
+		Audience:              testAudience,
+		Auth:                  p.endpoints(),
+		IDTokenTrustedProject: "client-id",
+	})
+	if !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Errorf("FromConfig(Config{IDTokenTrustedProject: client ID}) error = %v, want auth.ErrInvalidConfig", err)
 	}
 }
 

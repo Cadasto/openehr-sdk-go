@@ -367,11 +367,18 @@ The code exchange and the refresh verify the ID token they receive with it (§ R
   A missing issuer, client ID or JWKS **MUST** surface as `auth.ErrInvalidConfig`, and a failed JWKS fetch as the fetch error, neither of them matching `auth.ErrJWKSValidationFailed`, so an outage never reads as a bad token.
 - **Verify before claims:** the SDK **MUST** verify the signature before it trusts any claim; the claim checks read only the verified payload.
 - **Claims:** `iss` **MUST** equal the configured issuer exactly, with no URL normalisation (OIDC Core §3.1.3.7), and `aud` **MUST** contain the client ID.
-  When `aud` lists any other audience, the token **MUST** be rejected unless each of them is in the caller's trusted set, empty by default (OIDC Core 1.0 §3.1.3.7 step 3); when the token carries `azp`, it **MUST** equal the client ID.
+  When the token carries `azp`, it **MUST** equal the client ID.
+  When `aud` lists any other audience, the token **MUST** be rejected unless each of them is in the caller's trusted set, empty by default (OIDC Core 1.0 §3.1.3.7 step 3), or the trusted-project rule below accepts it.
   A token without `exp`, or without a non-empty string `sub`, **MUST** be rejected, since OIDC Core 1.0 §2 requires both claims.
   A token **MUST** be rejected when its `exp` lies the clock-skew allowance or more before the validation time, or when its `nbf` or `iat`, if present, lies more than the allowance after it.
   The allowance **SHOULD** be 30 seconds, so a small clock difference between the SDK and the authorization server does not refuse a valid token.
   When the caller supplies a nonce, the `nonce` claim **MUST** equal it.
+- **Trusted project:** some authorization servers list in `aud` a project's ID beside the client ID of every application in that project, a set that grows whenever a client registers, so no fixed trusted set can hold it.
+  The SDK **MUST** let a caller name one such project: `auth/smart.WithTrustedProject` for `ValidateIDToken`, `WithIDTokenTrustedProject` or `Config.IDTokenTrustedProject` for the source, and `smart.WithTrustedProject` for `LaunchContextFromTokenResponse`.
+  With a project named, the SDK **MUST** reject a token unless `aud` lists the project ID and the token carries `azp` (OIDC Core 1.0 §3.1.3.7 steps 4 and 5).
+  It **MUST** then accept every other audience in `aud` that is a non-empty string, whatever the trusted set holds.
+  A project ID equal to the client ID **MUST** surface as `auth.ErrInvalidConfig`, since it would make the project check a second check of the client ID.
+  Without a project named, the trusted set alone decides.
 
 `IDTokenClaims.Nonce` **MUST** hold the token's own `nonce` claim, empty when the token has none, whether or not the caller expected one.
 
@@ -533,10 +540,12 @@ A source without a JWKS **MUST** fail such an exchange with `auth.ErrInvalidConf
 Any ID-token failure at the exchange **MUST** surface as an `*auth.ExchangeError` whose sentinel is `auth.ErrTokenExchangeFailed`, wrapping the cause so its § REQ-062 class (`auth.ErrJWKSValidationFailed`, `auth.ErrInvalidConfig` or the key-set fetch error) stays reachable with `errors.Is`.
 A code exchange whose response carries no `refresh_token` **MUST NOT** keep a refresh token from an earlier session.
 The verified claims **MUST** be returned on `TokenResponse.IDTokenClaims`, and `LaunchContextFromTokenResponse` **MUST** use them without validating again.
-Given an `id_token` without verified claims, it **MUST** validate that token itself as § REQ-062 describes, with the nonce, signing algorithms and trusted audiences its caller passes.
+Given an `id_token` without verified claims, it **MUST** validate that token itself as § REQ-062 describes, with the nonce, signing algorithms, trusted audiences and trusted project its caller passes.
 
 A refresh response that carries an `id_token` **MUST** be validated the same way except for the nonce.
-When the source has verified an earlier ID token and has not been signed out with `Revoke` since (§ REQ-167), the new one **MUST** carry that token's `iss` and `sub` and list the same audiences in `aud`, in any order (OpenID Connect Core 1.0 §12.2; RFC 7519 gives `aud` no order).
+When the source has verified an earlier ID token and has not been signed out with `Revoke` since (§ REQ-167), the new one **MUST** carry that token's `iss` and `sub` (OpenID Connect Core 1.0 §12.2).
+Unless the source names a trusted project (§ REQ-062), the new one **MUST** also list the same audiences in `aud`, in any order (OpenID Connect Core 1.0 §12.2; RFC 7519 gives `aud` no order).
+With a trusted project the set is not compared, since a client that registers between the sign-in and the refresh joins it; the new token meets the trusted-project rule as any other does.
 A failure to verify that ID token **MUST** fail the refresh with an error that matches `auth.ErrRefreshFailed` and the failure's own § REQ-062 class: `auth.ErrJWKSValidationFailed` for a token refused on its own content, otherwise `auth.ErrInvalidConfig` or the key-set fetch error.
 The source **MUST** then keep its previous access and refresh tokens, including when the refresh was forced by `Reauth`.
 Such a failure is transient (§ REQ-063): it reaches `Token` only once the held access token is past its `ExpiresAt`, and reaches `Reauth` and `RefreshIfNeeded` at once.
