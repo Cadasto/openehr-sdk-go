@@ -289,10 +289,9 @@ func (b *Builder) Build() (*rm.Composition, error) {
 			passErrs = append(passErrs, fmt.Errorf("%s: %w", p.path, err))
 		}
 	}
-	// The next Set calls queue into the same array, emptied first so that
-	// it holds none of the values it carried.
-	clear(pending)
-	b.pending = pending[:0]
+	// The drained array is not reused for the next Set calls: a Set made
+	// while this pass ran has already started a new queue, and a shallow copy
+	// of the Builder would share the array with this one.
 	if len(passErrs) > 0 {
 		return b.skeleton, errors.Join(passErrs...)
 	}
