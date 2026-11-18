@@ -552,10 +552,10 @@ func (g *rmaccessGen) render() ([]byte, error) {
 	b.WriteString(strings.Join(forms, ",\n\t\t"))
 	b.WriteString(":\n\t\treturn true\n\t}\n\treturn false\n}\n")
 
-	// single, multiple and hash dispatch.
+	// single, appendMultiple and hash dispatch.
 	writeDispatch(&b, "single", "the single-valued attribute attr of parent: its value, whether it is\n// present, and whether parent's class declares attr as a single-valued\n// attribute at all. With peek set, a primitive leaf comes back as leafMarker{}\n// in place of its value", "peek bool", "any, bool, bool", "nil, false, false",
 		all, func(e armAttrs) bool { return len(e.single) > 0 })
-	writeDispatch(&b, "multiple", "the container attribute attr of parent: its items, boxed only when\n// box is set, its length, whether the list is present, and whether\n// parent's class declares attr as a container at all", "box bool", "[]any, int, bool, bool", "nil, 0, false, false",
+	writeDispatch(&b, "appendMultiple", "the container attribute attr of parent: dst with its items appended,\n// only when box is set, its length, whether the list is present, and\n// whether parent's class declares attr as a container at all. Any other\n// parent hands dst back unchanged", "dst []any, box bool", "[]any, int, bool, bool", "dst, 0, false, false",
 		all, func(e armAttrs) bool { return len(e.multi) > 0 })
 	writeDispatch(&b, "hash", "the Hash attribute attr of parent: the keys of its entries in\n// ascending order, their values, whether the hash is present, and whether\n// parent's class declares attr as a Hash at all", "", "[]string, []any, bool, bool", "nil, nil, false, false",
 		all, func(e armAttrs) bool { return len(e.hash) > 0 })
@@ -590,14 +590,19 @@ func (g *rmaccessGen) render() ([]byte, error) {
 }
 
 // writeDispatch writes the type switch fn that hands parent to the reader of
-// its arm, for every arm that has such a reader; param is the one parameter,
-// if any, the readers take after attr and fn passes on, results are the
-// readers' result types and zero what fn returns for any other parent.
+// its arm, for every arm that has such a reader; param lists the parameters,
+// if any, the readers take after attr and fn passes on, separated by ", ",
+// results are the readers' result types and zero what fn returns for any
+// other parent.
 func writeDispatch(b *bytes.Buffer, fn, doc, param, results, zero string, all []armAttrs, has func(armAttrs) bool) {
 	params, args := "", ""
 	if param != "" {
-		name, _, _ := strings.Cut(param, " ")
-		params, args = ", "+param, ", "+name
+		var names []string
+		for p := range strings.SplitSeq(param, ", ") {
+			name, _, _ := strings.Cut(p, " ")
+			names = append(names, name)
+		}
+		params, args = ", "+param, ", "+strings.Join(names, ", ")
 	}
 	fmt.Fprintf(b, "\n// %s reads %s.\n", fn, doc)
 	fmt.Fprintf(b, "func %s(parent any, attr string%s) (%s) {\n", fn, params, results)
@@ -698,15 +703,17 @@ func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*acce
 }
 
 // writeMultiple writes the reader of arm's containers, each a Go slice
-// ([rmaccessGen.split] refuses any other), whose items are boxed only when the
-// reader is called to box them: those of a list of values as pointers into
-// the backing array (boxPointers), those of a list of interfaces or pointers
-// as they are (boxValues). A list is counted without boxing an item.
+// ([rmaccessGen.split] refuses any other), which appends a list's items to the
+// caller's buffer dst only when it is called to box them: those of a list of
+// values as pointers into the backing array (appendPointers), those of a list
+// of interfaces or pointers as they are (appendValues). A list is counted
+// without boxing an item, and an absent or undeclared one hands dst back
+// unchanged, so the caller's items are never lost.
 func (g *rmaccessGen) writeMultiple(b *bytes.Buffer, arm *accessArm, attrs []*accessAttr) error {
 	q := arm.typ.qualified()
-	fmt.Fprintf(b, "\n// multiple%s reads the containers of %s.\n", arm.typ.suffix(), q)
-	fmt.Fprintf(b, "func multiple%s(x *%s, attr string, box bool) ([]any, int, bool, bool) {\n", arm.typ.suffix(), q)
-	b.WriteString("\tif x == nil {\n\t\treturn nil, 0, false, false\n\t}\n")
+	fmt.Fprintf(b, "\n// appendMultiple%s reads the containers of %s.\n", arm.typ.suffix(), q)
+	fmt.Fprintf(b, "func appendMultiple%s(x *%s, attr string, dst []any, box bool) ([]any, int, bool, bool) {\n", arm.typ.suffix(), q)
+	b.WriteString("\tif x == nil {\n\t\treturn dst, 0, false, false\n\t}\n")
 	b.WriteString("\tswitch attr {\n")
 	for _, a := range attrs {
 		field := "x." + a.field
@@ -714,13 +721,13 @@ func (g *rmaccessGen) writeMultiple(b *bytes.Buffer, arm *accessArm, attrs []*ac
 		if err != nil {
 			return fmt.Errorf("bmmgen: rmaccess: %s.%s: %w", arm.class.BMMName, a.name, err)
 		}
-		box := "boxPointers"
+		appendItems := "appendPointers"
 		if elem == accessInterface || elem == accessPointer {
-			box = "boxValues"
+			appendItems = "appendValues"
 		}
-		fmt.Fprintf(b, "\tcase %q:\n\t\treturn %s(box, %s), len(%s), %s != nil, true\n", a.name, box, field, field, field)
+		fmt.Fprintf(b, "\tcase %q:\n\t\treturn %s(box, dst, %s), len(%s), %s != nil, true\n", a.name, appendItems, field, field, field)
 	}
-	b.WriteString("\t}\n\treturn nil, 0, false, false\n}\n")
+	b.WriteString("\t}\n\treturn dst, 0, false, false\n}\n")
 	return nil
 }
 
