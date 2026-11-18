@@ -136,13 +136,13 @@ Application code (cmd/examples, downstream consumers)
     ├─ (building-block use, no transport) ──→ openehr/rm/  ──→ openehr/serialize/canxml/  (generated XML marshal code)
     ├─ (building-block use, no transport) ──→ openehr/serialize/{canjson,canxml}/  ──→ openehr/rm/typereg/   (neither imports openehr/rm)
     ├─ (building-block use, no transport) ──→ openehr/validation/   ──→ openehr/rm/  openehr/template/
+    ├─ (building-block use, no transport) ──→ openehr/validation/aqlvalidation/  ──→ openehr/validation/  openehr/aql/lint/   (openehr/validation imports no AQL package)
     └─ (building-block use, no transport) ──→ openehr/template/
 
 openehr/{serialize, instance, client/*, validation}, internal/templatecompile ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
 openehr/{rm, rm/typereg, serialize/canjson, aom/aom14} ──→ openehr/internal/refused/   (stdlib-only; carries a refused literal to DecodeError.Value)
 openehr/{rm/typereg, serialize/canjson} ──→ openehr/template/constraints/   (stdlib + internal/iso8601 only; the Redacted type DecodeError.Value holds)
 openehr/client/ehr/composition ──→ openehr/template/webtemplate/   (the Web Template its FLAT and STRUCTURED formats serialise against — REQ-173)
-openehr/validation/aqlvalidation/ ──→ openehr/validation/  openehr/aql/lint/   (AQL lint in the validation model; openehr/validation imports no AQL package)
 
 cadasto/admin     ──→ transport/
 (planned) cadasto/care ──→ openehr/client/*; cadasto/{extra, mpi} ──→ transport/; cadasto/datamap ──→ openehr/templatecompile/ (no transport/ or auth/: REQ-058)
