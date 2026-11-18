@@ -98,7 +98,8 @@ func TestGenerateIntervalOrderKeepsEachSideInItsConstraint(t *testing.T) {
 		wantLower, wantUpper float64
 	}{
 		{
-			// Examples 50 and 10; swapped, 10 and 50 fit both sides.
+			// Examples 50 and 10, each list's first entry; swapped, 10 and
+			// 50 fit both sides.
 			name:      "the swapped pair fits",
 			lowerItem: instance.IntList(50, 10),
 			upperItem: instance.IntList(10, 50),
@@ -107,17 +108,19 @@ func TestGenerateIntervalOrderKeepsEachSideInItsConstraint(t *testing.T) {
 			wantLower: 10, wantUpper: 50,
 		},
 		{
-			// Examples 10 and 0; 0 is outside the lower range, so no swap.
+			// Examples 70 and 50, the middles of the ranges; 50 is outside
+			// the lower range, so no swap.
 			name:      "a lower range above the upper example",
-			lowerItem: instance.IntRange(closed(10), closed(20)),
+			lowerItem: instance.IntRange(closed(60), closed(80)),
 			upperItem: instance.IntRange(closed(0), closed(100)),
-			lowerOK:   between(10, 20),
+			lowerOK:   between(60, 80),
 			upperOK:   between(0, 100),
-			wantLower: 10, wantUpper: 100,
+			wantLower: 60, wantUpper: 100,
 		},
 		{
-			// Examples 70 and 50; 50 is not in the lower list, so no swap,
-			// though 55 fits the upper range.
+			// Examples 70 and 55, the middle of the upper range; swapped, 70
+			// would be outside the upper range, so no swap, though 55 fits
+			// the lower list.
 			name:      "a lower list above the upper example",
 			lowerItem: instance.IntList(70, 55),
 			upperItem: instance.IntRange(closed(50), closed(60)),

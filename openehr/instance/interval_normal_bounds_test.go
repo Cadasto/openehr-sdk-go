@@ -175,9 +175,9 @@ func runNormalBounds[T rm.DVOrdered](t *testing.T, boundRM string, cases []norma
 func TestREQ107_IntervalOrderKeepsEachBoundsNormalRange(t *testing.T) {
 	runNormalBounds(t, "DV_COUNT", []normalBoundsPair{
 		{
-			// The generated lower bound is 5, inside its range, and the upper
-			// bound 0. Swapped, the lower bound would be 0 with the status N
-			// outside its range [5..9].
+			// The generated lower bound is 5, inside its range. Swapped with an
+			// upper bound below 5, as a RandomFill draw can be, the lower bound
+			// would lie outside its range [5..9] with the status N.
 			name:  "lower bound 0..10 in the range [5..9], N, upper 0..10",
 			lower: normalCount(integerFrom(0, 10), "5", "9", "N"), upper: plainCount(integerFrom(0, 10)),
 			lowerRule: true,
@@ -195,9 +195,9 @@ func TestREQ107_IntervalOrderKeepsEachBoundsNormalRange(t *testing.T) {
 			name:  "lower bound 0..10 in the range [5..9], N, upper 0..3, no ordered pair",
 			lower: normalCount(integerFrom(0, 10), "5", "9", "N"), upper: plainCount(integerFrom(0, 3)),
 			lowerRule: true,
-			want: "[DV_COUNT 5 .. DV_COUNT 0] | " +
+			want: "[DV_COUNT 5 .. DV_COUNT 2] | " +
 				"lower DV_COUNT 5; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
-				"upper DV_COUNT 0; normal_status none; normal_range none",
+				"upper DV_COUNT 2; normal_status none; normal_range none",
 			wantRandom: "[DV_COUNT 8 .. DV_COUNT 0] | " +
 				"lower DV_COUNT 8; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
 				"upper DV_COUNT 0; normal_status none; normal_range none",
@@ -219,8 +219,8 @@ func TestREQ107_IntervalOrderKeepsEachBoundsNormalRange(t *testing.T) {
 			name:  "lower bound 5..10, upper 0..10 in the range [0..4], N, no ordered pair",
 			lower: plainCount(integerFrom(5, 10)), upper: normalCount(integerFrom(0, 10), "0", "4", "N"),
 			upperRule: true,
-			want: "[DV_COUNT 5 .. DV_COUNT 0] | " +
-				"lower DV_COUNT 5; normal_status none; normal_range none | " +
+			want: "[DV_COUNT 8 .. DV_COUNT 0] | " +
+				"lower DV_COUNT 8; normal_status none; normal_range none | " +
 				"upper DV_COUNT 0; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 0 .. DV_COUNT 4]",
 			wantRandom: "[DV_COUNT 9 .. DV_COUNT 0] | " +
 				"lower DV_COUNT 9; normal_status none; normal_range none | " +
@@ -278,9 +278,9 @@ func TestREQ107_IntervalOrderKeepsEachBoundsNormalRange(t *testing.T) {
 			name:  "DV_ORDERED lower bound 0..10 in the range [5..9], N, upper 0..3, no ordered pair",
 			lower: normalCount(integerFrom(0, 10), "5", "9", "N"), upper: plainCount(integerFrom(0, 3)),
 			lowerRule: true,
-			want: "[*DV_COUNT 5 .. *DV_COUNT 0] | " +
+			want: "[*DV_COUNT 5 .. *DV_COUNT 2] | " +
 				"lower DV_COUNT 5; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
-				"upper DV_COUNT 0; normal_status none; normal_range none",
+				"upper DV_COUNT 2; normal_status none; normal_range none",
 			wantRandom: "[*DV_COUNT 8 .. *DV_COUNT 0] | " +
 				"lower DV_COUNT 8; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
 				"upper DV_COUNT 0; normal_status none; normal_range none",
@@ -304,9 +304,9 @@ func TestREQ107_IntervalOrderKeepsEachBoundsNormalRange(t *testing.T) {
 			name:  "quantity lower bound 0..10 mm in the range [5..9] mm, N, upper 0..3 mm, no ordered pair",
 			lower: normalQuantity(realFrom(0, 10), "5", "9", "N"), upper: expandedQuantity(realFrom(0, 3)),
 			lowerRule: true,
-			want: "[DV_QUANTITY 5 mm .. DV_QUANTITY 0 mm] | " +
+			want: "[DV_QUANTITY 5 mm .. DV_QUANTITY 1.5 mm] | " +
 				"lower DV_QUANTITY 5 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 9 mm] | " +
-				"upper DV_QUANTITY 0 mm; normal_status none; normal_range none",
+				"upper DV_QUANTITY 1.5 mm; normal_status none; normal_range none",
 			wantRandom: "[DV_QUANTITY 6.76 mm .. DV_QUANTITY 1.01 mm] | " +
 				"lower DV_QUANTITY 6.76 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 9 mm] | " +
 				"upper DV_QUANTITY 1.01 mm; normal_status none; normal_range none",

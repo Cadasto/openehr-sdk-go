@@ -121,7 +121,7 @@ func TestREQ107_ExampleQuantityMagnitudeIsRepresentative(t *testing.T) {
 // builds attribute by attribute, a C_REAL on its magnitude, or no
 // constraint at all: ExampleFill gives its magnitude as it gives one under
 // a C_DV_QUANTITY, rounded to the precision the walk writes, wherever the
-// template puts the precision.
+// template puts the precision. A C_REAL with a list keeps its own example.
 func TestREQ107_ExampleAttributeQuantityMagnitudeIsRepresentative(t *testing.T) {
 	r, closed, open, noEnd := instance.RealRange, instance.Closed, instance.Open, instance.NoEnd
 	units := optSingle("units", optPrimitive("STRING", "C_STRING", "<list>mm</list>"))
@@ -139,6 +139,7 @@ func TestREQ107_ExampleAttributeQuantityMagnitudeIsRepresentative(t *testing.T) 
 		{name: ">=0", opt: quantity(r(closed(0), noEnd)), want: 10},
 		{name: ">30 precision 0", opt: quantity(r(open(30), noEnd), precision0), want: 31},
 		{name: ">30 no precision", opt: quantity(r(open(30), noEnd)), want: 30.01},
+		{name: "list holding 10", opt: quantity(instance.RealList(3, 10)), want: 3},
 		{name: "no magnitude constraint", opt: optElementValue(optNode("DV_QUANTITY", "", units)), want: 10},
 	}
 	for _, tc := range cases {
@@ -155,9 +156,8 @@ func TestREQ107_ExampleAttributeQuantityMagnitudeIsRepresentative(t *testing.T) 
 // TestREQ107_ExampleCountMagnitudeIsRepresentative is the REQ-107
 // Primitive-leaf value fill check on the magnitude ExampleFill gives a
 // DV_COUNT: as a quantity's with a precision of 0, under a C_INTEGER on its
-// magnitude or with no constraint at all. Where that gives no value the
-// C_INTEGER accepts, as a list that holds neither the middle nor 10, its own
-// example stays.
+// magnitude or with no constraint at all. A C_INTEGER with a list keeps its
+// own example, the list entry it gives.
 func TestREQ107_ExampleCountMagnitudeIsRepresentative(t *testing.T) {
 	ir, closed, open, noEnd := instance.IntRange, instance.Closed, instance.Open, instance.NoEnd
 	cases := []struct {
@@ -175,8 +175,7 @@ func TestREQ107_ExampleCountMagnitudeIsRepresentative(t *testing.T) {
 		{name: ">30", opt: countOver(ir(open(30), noEnd)), want: 31},
 		{name: "<=5", opt: countOver(ir(noEnd, closed(5))), want: 5},
 		{name: "<5", opt: countOver(ir(noEnd, open(5))), want: 4},
-		{name: "list holding 10", opt: countOver(instance.IntList(3, 10, 20)), want: 10},
-		{name: "list without 10", opt: countOver(instance.IntList(3, 7)), want: 3},
+		{name: "list holding 10", opt: countOver(instance.IntList(3, 10, 20)), want: 3},
 		{name: "no magnitude constraint", opt: optNode("DV_COUNT", ""), want: 10},
 	}
 	for _, tc := range cases {

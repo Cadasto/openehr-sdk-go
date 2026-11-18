@@ -163,7 +163,7 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 			if !ok {
 				return nil
 			}
-			q.Magnitude = s.quantityMagnitude(constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}, constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true})
+			q.Magnitude = s.quantityMagnitude(openRange, openRange)
 			return q
 		}
 		u, ok := quantityUnitEntry(c, s.quantityUnit)
@@ -391,20 +391,47 @@ func quantityUnitEntry(c constraints.DvQuantity, name string) (constraints.Quant
 	return constraints.QuantityUnit{}, false
 }
 
-// quantityDraws is how many times quantityMagnitude draws before it falls
-// back to the middle of its window.
+// quantityDraws is how many times magnitude draws before it falls back to
+// the middle of its window.
 const quantityDraws = 4
 
 // quantityMagnitude draws a magnitude for a quantity entry whose magnitude
-// range is r and whose precision range is precision. It draws from the
-// range's window (quantityWindow), inset by a tenth of the window's width
-// from each side the range bounds, and rounds the draw to the decimals
-// precision gives (quantityDecimals). A rounded draw that lands on 0, on a
-// bound of the range or outside it is drawn again, up to quantityDraws
-// times, and then the middle of the window, rounded, is tried. Where
-// neither suits, the last draw is kept unrounded, which the window keeps
-// inside the range; sampleValue then checks it against the constraint.
+// range is r and whose precision range is precision, rounded to the
+// decimals precision gives (quantityDecimals), as magnitude draws one.
 func (s sampler) quantityMagnitude(r, precision constraints.NumericRange) float64 {
+	return s.magnitude(r, quantityDecimals(precision))
+}
+
+// count draws a DV_COUNT's magnitude under c, the C_INTEGER on it. A list,
+// or a range bounded on both sides, is drawn from as any C_INTEGER is
+// (sampleValue). A range that is open, or bounded on one side, is drawn
+// from as a quantity's is (magnitude), with no decimals, so the draw lies
+// away from the bound, or from 1 to 100 where the range is open, and is
+// never 0. A draw c rejects gives way to the value ExampleFill gives
+// (countExample).
+func (s sampler) count(c constraints.CInteger) any {
+	if len(c.List) > 0 || bothBounds(c.Range) {
+		return sampleValue(c, s)
+	}
+	if n, ok := wholeMagnitude(s.magnitude(c.Range, 0)); ok && len(c.Validate(n)) == 0 {
+		return n
+	}
+	return countExample(c, c.ExampleValue())
+}
+
+// magnitude draws a magnitude, of a quantity or a count, whose range is r,
+// rounded to decimals. It draws from the range's window (quantityWindow),
+// inset by a tenth of the window's width from each side the range bounds,
+// and rounds the draw. A rounded draw that lands on 0, on a bound of the
+// range or outside it is drawn again, up to quantityDraws times, and then
+// the middle of the window, rounded, is tried. Where neither suits, the
+// last draw is kept unrounded, which the window keeps inside the range;
+// the caller then checks it against the constraint. A range that bounds
+// nothing, the zero value included, is open.
+func (s sampler) magnitude(r constraints.NumericRange, decimals int) float64 {
+	if !r.IsBounded() {
+		r = openRange
+	}
 	lo, hi := quantityWindow(r)
 	inset := float64(hi-lo) / 10
 	if !r.LowerUnbounded {
@@ -413,7 +440,6 @@ func (s sampler) quantityMagnitude(r, precision constraints.NumericRange) float6
 	if !r.UpperUnbounded {
 		hi -= inset
 	}
-	decimals := quantityDecimals(precision)
 	suits := func(v float64) bool {
 		return v != 0 && r.Contains(v) &&
 			(r.LowerUnbounded || v != r.Lower) && (r.UpperUnbounded || v != r.Upper)
@@ -430,6 +456,9 @@ func (s sampler) quantityMagnitude(r, precision constraints.NumericRange) float6
 	}
 	return drawn
 }
+
+// openRange is a numeric range open on both sides.
+var openRange = constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}
 
 // quantityWindow returns the window a quantity magnitude is drawn from:
 // the range itself where it is bounded on both sides, sampleWindow from

@@ -147,20 +147,22 @@ func TestREQ107_IntervalOfExpandedQuantitiesStaysInEachSidesConstraint(t *testin
 			ordered: true,
 		},
 		{
-			// Examples 5 and 0; 0 is outside the lower range, so no swap.
-			name:  "ranges 5..10 and 0..20, lowest with highest",
-			lower: expandedQuantity(realFrom(5, 10)), upper: expandedQuantity(realFrom(0, 20)),
-			want:       "[DV_QUANTITY 5 mm .. DV_QUANTITY 20 mm]",
-			wantRandom: "[DV_QUANTITY 8.38 mm .. DV_QUANTITY 10.17 mm]",
-			ordered:    true,
+			// Examples 17.5 and 10, the middles of the ranges; 10 is outside
+			// the lower range, so no swap.
+			name:  "ranges 15..20 and 0..20, lowest with highest",
+			lower: expandedQuantity(realFrom(15, 20)), upper: expandedQuantity(realFrom(0, 20)),
+			want:    "[DV_QUANTITY 15 mm .. DV_QUANTITY 20 mm]",
+			ordered: true,
 		},
 		{
-			// The lower side has no lowest magnitude, so the upper side's
-			// 0 stands in; the upper side's highest is 10.
+			// Examples 10, which the lower range admits, and 4, the middle
+			// of the upper range; 10 is outside the upper range, so no swap.
+			// The lower side has no lowest magnitude, so the upper bound, 4,
+			// stands in; the upper side's highest is 8.
 			name:  "a lower range with no end, the upper bound stands in",
-			lower: expandedQuantity(realUpTo(20)), upper: expandedQuantity(realFrom(0, 10)),
-			want:       "[DV_QUANTITY 0 mm .. DV_QUANTITY 10 mm]",
-			wantRandom: "[DV_QUANTITY -12.35 mm .. DV_QUANTITY 5.09 mm]",
+			lower: expandedQuantity(realUpTo(20)), upper: expandedQuantity(realFrom(0, 8)),
+			want:       "[DV_QUANTITY 4 mm .. DV_QUANTITY 8 mm]",
+			wantRandom: "[DV_QUANTITY -12.35 mm .. DV_QUANTITY 4.07 mm]",
 			ordered:    true,
 		},
 		{

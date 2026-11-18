@@ -1844,11 +1844,11 @@ func appendListedUnits(dst []string, node *tcimpl.CompiledNode) []string {
 // inUnits returns q in units, and whether its side admits that: whether
 // node, the side's bound node, accepts the result (quantityFits). A
 // C_DV_QUANTITY that lists entries ties a magnitude range to each unit, so
-// there q takes the magnitude ExampleValue gives for the first entry in
-// units; on any other side q keeps its magnitude, which the side's
-// constraint on the magnitude accepted already. A bound that carries a
-// normal_range of its own admits only its own units: its range was settled
-// in them (settleNormalRange). A nil node constrains nothing.
+// there q takes the magnitude ExampleFill gives for the first entry in
+// units (quantityExample); on any other side q keeps its magnitude, which
+// the side's constraint on the magnitude accepted already. A bound that
+// carries a normal_range of its own admits only its own units: its range
+// was settled in them (settleNormalRange). A nil node constrains nothing.
 func inUnits(node *tcimpl.CompiledNode, q rm.DVQuantity, units string) (rm.DVQuantity, bool) {
 	if q.Units == units {
 		return q, true
@@ -1866,7 +1866,7 @@ func inUnits(node *tcimpl.CompiledNode, q rm.DVQuantity, units string) (rm.DVQua
 		if len(entries) == 0 {
 			return q, false
 		}
-		example, ok := constraints.DvQuantity{Units: entries}.ExampleValue().(constraints.QuantityValue)
+		example, ok := quantityExample(constraints.DvQuantity{Units: entries}).(constraints.QuantityValue)
 		if !ok {
 			return q, false
 		}
