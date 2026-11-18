@@ -3,6 +3,9 @@ package webtemplate
 import (
 	"errors"
 	"reflect"
+	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -195,5 +198,55 @@ func TestCheckIDCollisions(t *testing.T) {
 	err := checkIDCollisions(dup)
 	if !errors.Is(err, ErrIDCollision) {
 		t.Fatalf("sibling collision: err = %v, want ErrIDCollision", err)
+	}
+
+	// A walk in document order meets the collision inside the first sibling
+	// before the one between the later siblings.
+	nested := &Node{ID: "root", AQLPath: "/", Children: []*Node{
+		{ID: "a", AQLPath: "/a", Children: []*Node{{ID: "x"}, {ID: "x"}}},
+		{ID: "b"},
+		{ID: "b"},
+	}}
+	want := `"x" under "/a"`
+	if err := checkIDCollisions(nested); !errors.Is(err, ErrIDCollision) || !strings.Contains(err.Error(), want) {
+		t.Errorf("checkIDCollisions(nested) = %v, want ErrIDCollision naming %s", err, want)
+	}
+}
+
+// siblingsWithIDs returns one node per id, in order.
+func siblingsWithIDs(ids ...string) []*Node {
+	nodes := make([]*Node, len(ids))
+	for i, id := range ids {
+		nodes[i] = &Node{ID: id}
+	}
+	return nodes
+}
+
+// TestFirstDuplicateID pins the index of the first sibling whose id an
+// earlier sibling holds, on groups small enough to be compared pairwise and
+// on groups large enough to be searched through a map.
+func TestFirstDuplicateID(t *testing.T) {
+	wide := make([]string, linearSiblingIDs+8)
+	for i := range wide {
+		wide[i] = "n" + strconv.Itoa(i)
+	}
+	wideDup := slices.Clone(wide)
+	wideDup[len(wideDup)-1] = wide[5]
+	cases := []struct {
+		name string
+		ids  []string
+		want int
+	}{
+		{name: "none", ids: nil, want: -1},
+		{name: "one", ids: []string{"a"}, want: -1},
+		{name: "unique", ids: []string{"a", "b", "c"}, want: -1},
+		{name: "repeat", ids: []string{"a", "b", "a", "b"}, want: 2},
+		{name: "wide unique", ids: wide, want: -1},
+		{name: "wide repeat", ids: wideDup, want: len(wideDup) - 1},
+	}
+	for _, tc := range cases {
+		if got := firstDuplicateID(siblingsWithIDs(tc.ids...)); got != tc.want {
+			t.Errorf("firstDuplicateID(%s) = %d, want %d", tc.name, got, tc.want)
+		}
 	}
 }

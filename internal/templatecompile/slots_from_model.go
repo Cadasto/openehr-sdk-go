@@ -16,8 +16,9 @@ import (
 // archetype-id pattern its includes and excludes give that compiles. A pattern
 // that does not compile is left out, and RawIncludeCount counts every include
 // that is not empty, so a consumer can tell a slot whose includes all failed
-// from one that has none.
-func slotRulesFromModel(s *aom14.ArchetypeSlot) constraints.SlotRules {
+// from one that has none. cache holds the patterns compiled so far, and may be
+// nil.
+func slotRulesFromModel(s *aom14.ArchetypeSlot, cache slotAssertionCache) constraints.SlotRules {
 	var raw int
 	for _, a := range s.Includes {
 		if !assertionIsEmpty(a) {
@@ -26,24 +27,49 @@ func slotRulesFromModel(s *aom14.ArchetypeSlot) constraints.SlotRules {
 	}
 	return constraints.SlotRules{
 		RMTypeName:      strings.TrimSpace(s.RMTypeName),
-		Includes:        slotAssertions(s.Includes),
-		Excludes:        slotAssertions(s.Excludes),
+		Includes:        cache.assertions(s.Includes),
+		Excludes:        cache.assertions(s.Excludes),
 		RawIncludeCount: raw,
 	}
 }
 
-// slotAssertions compiles every archetype-id pattern the assertions give, in
+// slotAssertionCache holds, for each archetype-id pattern compiled so far, its
+// assertion, or that it does not compile. A template repeats few patterns
+// across its slots, the catch-all `.*` above all, and an assertion's compiled
+// expressions are immutable, so the slots of one template share them. A nil
+// cache compiles every pattern anew.
+type slotAssertionCache map[string]compiledSlotAssertion
+
+// compiledSlotAssertion is a pattern's assertion; ok is false when the
+// pattern does not compile.
+type compiledSlotAssertion struct {
+	sa constraints.SlotAssertion
+	ok bool
+}
+
+// assertion returns the assertion of pattern, and false when the pattern does
+// not compile.
+func (c slotAssertionCache) assertion(pattern string) (constraints.SlotAssertion, bool) {
+	if r, seen := c[pattern]; seen {
+		return r.sa, r.ok
+	}
+	sa, err := constraints.NewSlotAssertion(pattern)
+	if c != nil {
+		c[pattern] = compiledSlotAssertion{sa: sa, ok: err == nil}
+	}
+	return sa, err == nil
+}
+
+// assertions compiles every archetype-id pattern the assertions give, in
 // order, leaving out one that does not compile, or returns nil when none
 // does.
-func slotAssertions(as []aom14.Assertion) []constraints.SlotAssertion {
+func (c slotAssertionCache) assertions(as []aom14.Assertion) []constraints.SlotAssertion {
 	var out []constraints.SlotAssertion
 	for _, a := range as {
 		for _, pattern := range assertionSlotPatterns(a) {
-			sa, err := constraints.NewSlotAssertion(pattern)
-			if err != nil {
-				continue
+			if sa, ok := c.assertion(pattern); ok {
+				out = append(out, sa)
 			}
-			out = append(out, sa)
 		}
 	}
 	return out
