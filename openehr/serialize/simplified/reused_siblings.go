@@ -57,6 +57,8 @@ type reusedSiblings struct {
 	// attribute, not reused siblings, and none of them is counted as sharing
 	// its path.
 	elements map[*webtemplate.Node]*webtemplate.Node
+	// nodes is how many nodes the Web Template has.
+	nodes int
 }
 
 // siblingGroup is one set of reused siblings that each pin a name.
@@ -163,7 +165,7 @@ func reusedSiblingsOf(wt *webtemplate.WebTemplate) *reusedSiblings {
 	if wt == nil || wt.Tree == nil {
 		return s
 	}
-	var nodes []*webtemplate.Node
+	nodes := make([]*webtemplate.Node, 0, countNodes(wt.Tree))
 	named := false
 	var collect func(n *webtemplate.Node)
 	collect = func(n *webtemplate.Node) {
@@ -190,18 +192,28 @@ func reusedSiblingsOf(wt *webtemplate.WebTemplate) *reusedSiblings {
 			s.paths[n] = s.resolutionPath(n.AQLPath)
 		}
 	}
-	counts := make(map[string]int, len(nodes))
+	s.nodes = len(nodes)
+	seen := make(map[string]bool, len(nodes))
 	for _, n := range nodes {
-		if s.elements[n] == nil {
-			counts[s.nodePath(n)]++
+		if s.elements[n] != nil {
+			continue
 		}
-	}
-	for p, c := range counts {
-		if c > 1 {
+		p := s.nodePath(n)
+		if seen[p] {
 			s.shared[p] = true
 		}
+		seen[p] = true
 	}
 	return s
+}
+
+// countNodes returns how many nodes the tree under n has, n included.
+func countNodes(n *webtemplate.Node) int {
+	c := 1
+	for _, ch := range n.Children {
+		c += countNodes(ch)
+	}
+	return c
 }
 
 // readSiblings finds the sets of reused siblings among nodes that pinned names

@@ -81,8 +81,8 @@ func (i *Integer) UnmarshalJSON(b []byte) error {
 		*i = Integer(n)
 		return nil
 	}
-	var n int32
-	if err := json.Unmarshal(b, &n); err != nil {
+	n, err := unmarshalInt[int32](b, 32)
+	if err != nil {
 		// encoding/json/v2 refuses any literal with a fraction or an
 		// exponent for an int32, 1.0 included, so a refused literal is read
 		// again as a whole number before the refusal stands.
@@ -211,6 +211,23 @@ func isDigits(s string) bool {
 		}
 	}
 	return true
+}
+
+// unmarshalInt reads b as encoding/json/v2 unmarshals it into an N of bitSize
+// bits, with the same value and the same error. A JSON integer, a number with
+// neither fraction nor exponent, that strconv.ParseInt reads in range is
+// parsed here directly; any other input goes through json.Unmarshal for its
+// refusal. The N the slow path decodes into escapes to the heap, which the
+// fast path, returning first, never reaches.
+func unmarshalInt[N int32 | int64](b []byte, bitSize int) (N, error) {
+	if isJSONNumber(b) && !bytes.ContainsAny(b, ".eE") {
+		if v, err := strconv.ParseInt(string(b), 10, bitSize); err == nil {
+			return N(v), nil
+		}
+	}
+	var n N
+	err := json.Unmarshal(b, &n)
+	return n, err
 }
 
 // MarshalJSON emits a JSON number.

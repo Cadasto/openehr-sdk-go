@@ -80,7 +80,7 @@ func TestUnavoidableAcceptanceTable(t *testing.T) {
 		},
 		{
 			"FOLDER", "VERSION", "COMPOSITION", false,
-			"depends on two things: the FOLDER -> COMPOSITION shorthand hop going round the version tier the FOLDER -> VERSIONED_COMPOSITION hop lands on (REQ-160 § Overlay edges), and the exclusion walk counting that reference hop — if this turns true together with TestUnavoidableCountsAByReferenceBypass, reachableAvoiding has been narrowed to the non-reference closure",
+			"depends on two things: the FOLDER -> COMPOSITION shorthand hop going round the version tier the FOLDER -> VERSIONED_COMPOSITION hop lands on (REQ-160 § Overlay edges), and the exclusion walk counting that reference hop — if this turns true together with TestUnavoidableCountsAByReferenceBypass, reachesAvoiding has been narrowed to the non-reference closure",
 		},
 		{
 			"COMPOSITION", "OBSERVATION", "ELEMENT", false,
@@ -179,7 +179,7 @@ func TestUnavoidableOverlayEdgeRetiresAProof(t *testing.T) {
 // The default relation now carries a second witness: the
 // FOLDER/VERSION/COMPOSITION row of TestUnavoidableAcceptanceTable, whose only
 // way round the version tier is the FOLDER -> COMPOSITION reference hop.
-// Narrowing reachableAvoiding to the non-reference closure makes exactly these
+// Narrowing reachesAvoiding to the non-reference closure makes exactly these
 // two answer true. This one keeps the rule pinned on a consumer edge of its
 // own, so it stays a witness whatever happens to the default's overlay data.
 func TestUnavoidableCountsAByReferenceBypass(t *testing.T) {
@@ -191,7 +191,7 @@ func TestUnavoidableCountsAByReferenceBypass(t *testing.T) {
 		t.Fatalf("premise gone: EHR CONTAINS OBSERVATION = %v, want Admissible — the route-existence half must still find a route", got)
 	}
 	if ref.Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {
-		t.Error("the relation still proves the step redundant, though its own ByReference edge routes round the COMPOSITION — the exclusion walk (reachableAvoiding) must count ByReference edges")
+		t.Error("the relation still proves the step redundant, though its own ByReference edge routes round the COMPOSITION — the exclusion walk (reachesAvoiding) must count ByReference edges")
 	}
 }
 
@@ -208,6 +208,22 @@ func TestUnavoidableHonoursAConsumerEdgeEndpoint(t *testing.T) {
 	// The default knows no SITE at all, so it proves nothing about it.
 	if contain.Default().Unavoidable("SITE", "VERSIONED_COMPOSITION", "COMPOSITION") {
 		t.Error("the default relation answered true for a class it does not know")
+	}
+}
+
+// TestUnavoidableFollowsARouteThroughAnUnknownEndpoint — a route round the via
+// may pass a class the pin does not know, here a consumer SITE between the EHR
+// and its observations, and the exclusion walk must step through it.
+func TestUnavoidableFollowsARouteThroughAnUnknownEndpoint(t *testing.T) {
+	if !contain.Default().Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {
+		t.Fatal("premise gone: the default relation no longer proves EHR → COMPOSITION → OBSERVATION unavoidable")
+	}
+	r := contain.Default().WithOverlay(
+		contain.Edge{From: "EHR", To: "SITE"},
+		contain.Edge{From: "SITE", To: "OBSERVATION"},
+	)
+	if r.Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {
+		t.Error("Unavoidable(EHR, COMPOSITION, OBSERVATION) = true; the consumer edges route EHR → SITE → OBSERVATION round the COMPOSITION")
 	}
 }
 

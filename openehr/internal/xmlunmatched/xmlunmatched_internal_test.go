@@ -336,3 +336,86 @@ func TestREQ170_TrackedDecodeConvertsTextThroughOneDecoder(t *testing.T) {
 		t.Errorf("Decode(%q): the tracker keeps its decoder after the failed conversion; want none", bad)
 	}
 }
+
+// keptText is a TextUnmarshaler that keeps the slice UnmarshalText is handed.
+type keptText struct {
+	b []byte
+}
+
+func (k *keptText) UnmarshalText(b []byte) error {
+	k.b = b
+	return nil
+}
+
+// mixedLeaves is a decode target whose children are primitive elements read
+// through DecodeElement: an element named s into a string, any other into a
+// keptText.
+type mixedLeaves struct {
+	strs []string
+	kept []*keptText
+}
+
+func (l *mixedLeaves) UnmarshalXML(dec *xml.Decoder, _ xml.StartElement) error {
+	for {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		switch tk := tok.(type) {
+		case xml.StartElement:
+			if tk.Name.Local == "s" {
+				var s string
+				if err := DecodeElement(dec, &tk, &s); err != nil {
+					return err
+				}
+				l.strs = append(l.strs, s)
+				continue
+			}
+			k := new(keptText)
+			if err := DecodeElement(dec, &tk, k); err != nil {
+				return err
+			}
+			l.kept = append(l.kept, k)
+		case xml.EndElement:
+			return nil
+		}
+	}
+}
+
+// TestREQ170_TrackedDecodeConvertsTextAsEncodingXML pins that a tracked decode
+// reads the text of a string element and of a TextUnmarshaler element as
+// encoding/xml reads it: the string is the text, and UnmarshalText is handed
+// a slice of its own, nil for an element with no text, which reading the next
+// element leaves as it was.
+//
+// Can-fail control: hand UnmarshalText the text the tracker read rather than
+// a copy, and the first of two elements read in a row reads as the second;
+// hand it an empty slice for no text, and it reads as non-nil.
+func TestREQ170_TrackedDecodeConvertsTextAsEncodingXML(t *testing.T) {
+	const doc = "<r><k></k><s>a&amp;b</s><k>12</k><k>34</k><s></s></r>"
+	tr := NewTracker(nil, false)
+	var l mixedLeaves
+	if err := tr.Decode(tr.NewDecoder(strings.NewReader(doc)), &l); err != nil {
+		t.Fatalf("Decode(%q) = %v; want nil", doc, err)
+	}
+	if want := []string{"a&b", ""}; !slices.Equal(l.strs, want) {
+		t.Errorf("Decode(%q) read the strings %q; want %q", doc, l.strs, want)
+	}
+	want := make([]*keptText, 0, 3)
+	for _, elem := range []string{"<k></k>", "<k>12</k>", "<k>34</k>"} {
+		k := new(keptText)
+		if err := xml.Unmarshal([]byte(elem), k); err != nil {
+			t.Fatalf("xml.Unmarshal(%q) = %v; want nil", elem, err)
+		}
+		want = append(want, k)
+	}
+	if len(l.kept) != len(want) {
+		t.Fatalf("Decode(%q) read %d TextUnmarshaler elements; want %d", doc, len(l.kept), len(want))
+	}
+	for i, k := range l.kept {
+		if (k.b == nil) != (want[i].b == nil) || string(k.b) != string(want[i].b) {
+			t.Errorf("Decode(%q): TextUnmarshaler element %d was handed %q (nil %t); want %q (nil %t), as encoding/xml hands it",
+				doc, i+1, k.b, k.b == nil, want[i].b, want[i].b == nil)
+		}
+	}
+}

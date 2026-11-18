@@ -98,23 +98,33 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 // The reference writes `dv_text2`, `dv_text3`: deviations.md records the
 // difference.
 func dedupeSiblingIDs(n *Node) {
-	taken := make(map[string]bool, len(n.Children))
+	if firstDuplicateID(n.Children) >= 0 {
+		renameDuplicateIDs(n.Children)
+	}
 	for _, ch := range n.Children {
+		dedupeSiblingIDs(ch)
+	}
+}
+
+// renameDuplicateIDs gives each sibling whose id an earlier sibling holds the
+// next free `<id>_N`, as [dedupeSiblingIDs] describes.
+func renameDuplicateIDs(siblings []*Node) {
+	taken := make(map[string]bool, len(siblings))
+	for _, ch := range siblings {
 		taken[ch.ID] = true
 	}
-	claimed := make(map[string]bool, len(n.Children))
-	for _, ch := range n.Children {
+	claimed := make(map[string]bool, len(siblings))
+	for _, ch := range siblings {
 		if !claimed[ch.ID] {
 			claimed[ch.ID] = true
-		} else {
-			i := 1
-			for taken[ch.ID+"_"+strconv.Itoa(i)] {
-				i++
-			}
-			ch.ID += "_" + strconv.Itoa(i)
-			taken[ch.ID] = true
+			continue
 		}
-		dedupeSiblingIDs(ch)
+		i := 1
+		for taken[ch.ID+"_"+strconv.Itoa(i)] {
+			i++
+		}
+		ch.ID += "_" + strconv.Itoa(i)
+		taken[ch.ID] = true
 	}
 }
 
@@ -122,18 +132,52 @@ func dedupeSiblingIDs(n *Node) {
 // after [dedupeSiblingIDs]. The next free suffix makes sibling ids unique by
 // construction, so this firing means a builder bug — it stays as a loud
 // guard because an ambiguous FLAT path is far worse than a failed export.
+// The collision reported is the first a walk in document order meets: one
+// inside the subtree of a sibling before the first sibling that repeats an
+// earlier sibling's id, and else that sibling.
 func checkIDCollisions(n *Node) error {
-	seen := map[string]bool{}
-	for _, ch := range n.Children {
-		if seen[ch.ID] {
-			return fmt.Errorf("%w: %q under %q", ErrIDCollision, ch.ID, n.AQLPath)
+	if i := firstDuplicateID(n.Children); i >= 0 {
+		for _, ch := range n.Children[:i] {
+			if err := checkIDCollisions(ch); err != nil {
+				return err
+			}
 		}
-		seen[ch.ID] = true
+		return fmt.Errorf("%w: %q under %q", ErrIDCollision, n.Children[i].ID, n.AQLPath)
+	}
+	for _, ch := range n.Children {
 		if err := checkIDCollisions(ch); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// linearSiblingIDs is the size up to which a sibling group is searched for a
+// repeated id by comparing each id with those before it, rather than through
+// a map.
+const linearSiblingIDs = 32
+
+// firstDuplicateID returns the index of the first of siblings whose id an
+// earlier sibling holds, or -1 when every id is unique.
+func firstDuplicateID(siblings []*Node) int {
+	if len(siblings) <= linearSiblingIDs {
+		for i := 1; i < len(siblings); i++ {
+			for _, prev := range siblings[:i] {
+				if prev.ID == siblings[i].ID {
+					return i
+				}
+			}
+		}
+		return -1
+	}
+	seen := make(map[string]struct{}, len(siblings))
+	for i, ch := range siblings {
+		if _, dup := seen[ch.ID]; dup {
+			return i
+		}
+		seen[ch.ID] = struct{}{}
+	}
+	return -1
 }
 
 // childrenOf walks a kept container's attributes and returns the emitted
@@ -144,20 +188,26 @@ func checkIDCollisions(n *Node) error {
 // supply them.
 func childrenOf(n *templatecompile.CompiledNode, parentPath string, cfg *config) []*Node {
 	out := emitAll(nil, n, parentPath, cfg)
-	seen := map[string]bool{}
+	protos := inContextByRM[n.RMTypeName()]
+	action := n.RMTypeName() == "ACTION"
+	if len(protos) == 0 && !action {
+		return out
+	}
+	seen := make(map[string]bool, len(out))
 	for _, nd := range out {
 		seen[nd.AQLPath] = true
 	}
-	for _, proto := range inContextByRM[n.RMTypeName()] {
-		ic := proto // per-leaf copy; the table entries stay pristine
-		ic.AQLPath = parentPath + "/" + ic.ID
-		if seen[ic.AQLPath] {
+	for _, proto := range protos {
+		path := parentPath + "/" + proto.ID
+		if seen[path] {
 			continue
 		}
+		ic := proto // per-leaf copy; the table entries stay pristine
+		ic.AQLPath = path
 		ic.Inputs = cloneInputs(ic.Inputs) // never alias the table's slices or pointers into returned trees
 		out = append(out, &ic)
 	}
-	if path := parentPath + "/ism_transition"; n.RMTypeName() == "ACTION" && !seen[path] {
+	if action && !seen[parentPath+"/ism_transition"] {
 		out = append(out, ismTransitionIC(parentPath, out))
 	}
 	return out
@@ -522,14 +572,17 @@ func elementNode(el *templatecompile.CompiledNode, elPath string, attr *template
 		return leaf
 	}
 	node := newNode(el, elPath, attr, cfg)
+	valuePath := elPath + "/value" // the children share it
 	if len(alts) == 0 {
-		for _, rmType := range anyValueTypes {
-			node.Children = append(node.Children, valueChild(node, rmType, nil))
+		node.Children = make([]*Node, 0, len(anyValueTypes))
+		for i, rmType := range anyValueTypes {
+			node.Children = append(node.Children, valueChild(node, rmType, anyValueIDs[i], valuePath, nil))
 		}
 		return node
 	}
+	node.Children = make([]*Node, 0, len(alts))
 	for _, v := range alts {
-		node.Children = append(node.Children, valueChild(node, v.RMTypeName(), v))
+		node.Children = append(node.Children, valueChild(node, v.RMTypeName(), choiceID(v.RMTypeName()), valuePath, v))
 	}
 	return node
 }
@@ -566,16 +619,26 @@ var anyValueTypes = []string{
 	"DV_PROPORTION", "DV_DATE_TIME", "DV_TIME", "DV_ORDINAL", "DV_DATE",
 }
 
+// anyValueIDs holds the id of the child of each of anyValueTypes, in the same
+// order ([choiceID]).
+var anyValueIDs = func() []string {
+	ids := make([]string, len(anyValueTypes))
+	for i, rmType := range anyValueTypes {
+		ids[i] = choiceID(rmType)
+	}
+	return ids
+}()
+
 // valueChild returns the child of ELEMENT node el for a value of rmType, at
-// el's aqlPath extended by /value and named as el is, with its id from the
-// type ([choiceID]). v is the value alternative the template constrains, whose
-// occurrences and constraint the child carries, along with el's nodeId; with v
-// nil, for an ELEMENT that constrains no value, the child has no nodeId,
-// occurs 0..1, and carries the inputs of an unconstrained value of rmType, as
-// the reference's are.
-func valueChild(el *Node, rmType string, v *templatecompile.CompiledNode) *Node {
+// path, el's aqlPath extended by /value, named as el is, with id, the id of
+// rmType ([choiceID]). v is the value alternative the template constrains,
+// whose occurrences and constraint the child carries, along with el's nodeId;
+// with v nil, for an ELEMENT that constrains no value, the child has no
+// nodeId, occurs 0..1, and carries the inputs of an unconstrained value of
+// rmType, as the reference's are.
+func valueChild(el *Node, rmType, id, path string, v *templatecompile.CompiledNode) *Node {
 	child := &Node{
-		ID:                    choiceID(rmType),
+		ID:                    id,
 		Name:                  el.Name,
 		LocalizedName:         el.LocalizedName,
 		RMType:                rmType,
@@ -583,7 +646,7 @@ func valueChild(el *Node, rmType string, v *templatecompile.CompiledNode) *Node 
 		Max:                   1,
 		LocalizedNames:        maps.Clone(el.LocalizedNames),
 		LocalizedDescriptions: maps.Clone(el.LocalizedDescriptions),
-		AQLPath:               el.AQLPath + "/value",
+		AQLPath:               path,
 		Inputs:                valueInputs(rmType, v),
 	}
 	if v != nil {

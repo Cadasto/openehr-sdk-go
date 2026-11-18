@@ -138,6 +138,8 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error)
 		required: map[string][]string{},
 		implicit: map[implicitKey]*CompiledAttribute{},
 		paths:    map[string]pathMark{},
+
+		slotAssertions: slotAssertionCache{},
 	}
 	definition, err := objectOf(&opt.Definition, nil)
 	if err != nil {
@@ -234,6 +236,10 @@ type walker struct {
 	// The first-walked instance of any such collision still errors, so a
 	// bug present in both siblings is caught.
 	dupDepth int
+
+	// slotAssertions holds the slot archetype-id patterns this call has
+	// compiled ([slotAssertionCache]).
+	slotAssertions slotAssertionCache
 }
 
 // implicitKey names an implicit attribute: the RM type of its owner, as
@@ -309,7 +315,7 @@ func (w *walker) descend(ob object, cn *CompiledNode, heldAs string, depth int) 
 		cn.slot = &slotInfo{
 			includes: slotPatterns(ob.slot.Includes),
 			excludes: slotPatterns(ob.slot.Excludes),
-			rules:    slotRulesFromModel(ob.slot),
+			rules:    slotRulesFromModel(ob.slot, w.slotAssertions),
 		}
 		return nil
 	}

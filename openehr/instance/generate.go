@@ -126,6 +126,11 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	if opts.ValueFill == RandomFill {
 		g.valueSampler = newSampler(opts.ValueSource)
 	}
+	if opts.Policy != Required {
+		// Large and Medium keep answers for most of the template's nodes, so
+		// the memo is made that size at once rather than grown to it.
+		g.memo = make(map[*tcimpl.CompiledNode]nodeMemo, c.NumNodes()*7/8)
+	}
 
 	root, err := rmwrite.NewRM(rootType)
 	if err != nil {
@@ -186,12 +191,13 @@ type generator struct {
 	enclosingType string
 	elementValue  any
 	openText      *rm.DVText
-	// undescribed holds, per template node, whether it needs content the
-	// template does not describe (needsUndescribed), locatableTypes, per
-	// RM type, whether the value built for it is a LOCATABLE
-	// (buildsLocatable), and held, per template node, the archetypes it
-	// holds (heldArchetypes). All are filled on first use.
-	undescribed    map[*tcimpl.CompiledNode]bool
+	// memo holds, per template node, whether the walk visits each of its
+	// attributes (visits) and whether it needs content the template does
+	// not describe (needsUndescribed), locatableTypes, per RM type, whether
+	// the value built for it is a LOCATABLE (buildsLocatable), and held, per
+	// template node, the archetypes it holds (heldArchetypes). All are
+	// filled on first use.
+	memo           map[*tcimpl.CompiledNode]nodeMemo
 	locatableTypes map[string]bool
 	held           map[*tcimpl.CompiledNode][]string
 }
@@ -263,7 +269,8 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	}
 
 	for _, attr := range tcimpl.NodeAttributes(optNode) {
-		if !g.visits(optNode, attr) {
+		visit, refuse := g.visitAnswer(optNode, attr)
+		if !visit {
 			// A list the template prohibits by prohibiting its every
 			// child, and requires by its existence, is there with no
 			// member.
@@ -280,7 +287,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		// an optional node that holds one is not built of its own, since it
 		// needs content the template does not describe (needsUndescribed),
 		// so the walk gets here only on a node it must build.
-		if noWriter(optNode, attr) {
+		if refuse {
 			return fmt.Errorf("%w: %s.%s at %s (required, but the generator has no writer for it)",
 				ErrConstraintUnsatisfiable, builtRMType(optNode), attr.Name(), optNode.AQLPath())
 		}
@@ -555,15 +562,86 @@ func compositionDefaultOwns(class, attrName string) bool {
 // the OPT prohibits value too, is visited as if the OPT allowed it. An attribute
 // the generator has no writer for (noWriter) is visited only where the
 // template requires it (writerNeeded), for the walk to refuse it. Any other
-// attribute is visited when the policy says so (shouldVisit).
+// attribute is visited when the policy says so (shouldVisit). The answer
+// does not depend on where the walk is, and it is kept per node and
+// attribute for the call: the walk asks it again for every member it builds
+// from a node.
 func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	visit, _ := g.visitAnswer(optNode, attr)
+	return visit
+}
+
+// visitAnswer returns what visits answers for attr of optNode, and refuse,
+// whether the walk visits attr only to refuse it: the generator has no
+// writer for it (noWriter), and the template requires it (writerNeeded).
+// Both are kept per node and attribute for the call.
+func (g *generator) visitAnswer(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) (visit, refuse bool) {
+	// The compile can share an attribute it adds from the BMM among nodes,
+	// so the answer is kept by the attribute's place among optNode's.
+	i := slices.Index(tcimpl.NodeAttributes(optNode), attr)
+	if i < 0 || i >= visitBits {
+		return g.decideVisit(optNode, attr)
+	}
+	bit := uint32(1) << i
+	if m := g.memo[optNode]; m.visitKnown&bit != 0 {
+		return m.visitValue&bit != 0, m.visitRefused&bit != 0
+	}
+	visit, refuse = g.decideVisit(optNode, attr)
+	// Read again: deciding may have kept another answer for optNode.
+	m := g.memo[optNode]
+	m.visitKnown |= bit
+	if visit {
+		m.visitValue |= bit
+	}
+	if refuse {
+		m.visitRefused |= bit
+	}
+	g.keep(optNode, m)
+	return visit, refuse
+}
+
+// visitBits is the number of attributes of a node whose visits answer a
+// nodeMemo keeps: those at the first visitBits places among the node's
+// attributes, which is every attribute of any RM class.
+const visitBits = 32
+
+// nodeMemo keeps what the walk worked out about one template node, which
+// does not depend on where the walk is: bit i of visitKnown is set once
+// visitAnswer has answered for the attribute at place i among the node's
+// attributes, and bit i of visitValue and of visitRefused are its answers;
+// undescribed is what needsUndescribed answered, memoUnknown before it has.
+type nodeMemo struct {
+	visitKnown, visitValue, visitRefused uint32
+	undescribed                          memoBool
+}
+
+// memoBool is a kept answer, or memoUnknown for none yet.
+type memoBool uint8
+
+const (
+	memoUnknown memoBool = iota
+	memoFalse
+	memoTrue
+)
+
+// keep stores m as what the walk worked out about node.
+func (g *generator) keep(node *tcimpl.CompiledNode, m nodeMemo) {
+	if g.memo == nil {
+		g.memo = make(map[*tcimpl.CompiledNode]nodeMemo)
+	}
+	g.memo[node] = m
+}
+
+// decideVisit is visitAnswer without the answers kept.
+func (g *generator) decideVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) (visit, refuse bool) {
 	if walkSkips(optNode, attr) {
-		return false
+		return false, false
 	}
 	if noWriter(optNode, attr) {
-		return writerNeeded(optNode, attr)
+		needed := writerNeeded(optNode, attr)
+		return needed, needed
 	}
-	return g.shouldVisit(optNode, attr)
+	return g.shouldVisit(optNode, attr), false
 }
 
 // walkSkips reports whether the walk leaves attr of optNode alone under
@@ -975,11 +1053,8 @@ func intervalBoundType(node *tcimpl.CompiledNode, declared string) string {
 	if side := holdingAttribute(node); side != "lower" && side != "upper" {
 		return ""
 	}
-	_, params, ok := bmmtype.Split(builtRMType(parent))
-	if !ok || len(params) != 1 {
-		return ""
-	}
-	if c := params[0]; c != declared && descendsFrom(c, declared) {
+	_, c, ok := bmmtype.Param(builtRMType(parent))
+	if ok && c != declared && descendsFrom(c, declared) {
 		return c
 	}
 	return ""
@@ -1276,12 +1351,12 @@ func intervalBoundFits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttrib
 		return nil
 	}
 	interval := builtRMType(optNode)
-	_, params, ok := bmmtype.Split(interval)
-	if !ok || len(params) != 1 || descendsFrom(built, params[0]) {
+	_, param, ok := bmmtype.Param(interval)
+	if !ok || descendsFrom(built, param) {
 		return nil
 	}
 	return fmt.Errorf("%w: %s.%s at %s: a %s bound in an interval over %s",
-		ErrConstraintUnsatisfiable, interval, attr.Name(), optNode.AQLPath(), built, params[0])
+		ErrConstraintUnsatisfiable, interval, attr.Name(), optNode.AQLPath(), built, param)
 }
 
 // rmDeclaresList reports whether the pinned RM declares attrName a list on
@@ -2160,8 +2235,10 @@ func (g *generator) fillCodeDefault(opt *tcimpl.CompiledNode, parent any, attr s
 	}
 	// Best-effort: rmwrite addresses each of these attributes on every
 	// class codeDefaultFor names, and a value the walk builds is checked by
-	// the validator afterwards.
-	_ = rmwrite.EnsureSingle(parent, attr, &d.code)
+	// the validator afterwards. The code is copied out of d so that only a
+	// write moves it to the heap, not every call.
+	code := d.code
+	_ = rmwrite.EnsureSingle(parent, attr, &code)
 	return true
 }
 
@@ -2421,6 +2498,11 @@ func (g *generator) planMembers(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 			if room := upperBound - total; upperBound >= 0 && (room <= 0 || k >= asked && room <= reserved) {
 				break
 			}
+			if plan.own == nil {
+				// Room for two members of each child left, Large's most
+				// for a child that asks for none, so the list seldom grows.
+				plan.own = make([]*tcimpl.CompiledNode, 0, 2*(len(children)-i))
+			}
 			plan.own = append(plan.own, child)
 			total++
 			if k < asked {
@@ -2599,7 +2681,7 @@ func valuesElement(child *tcimpl.CompiledNode) bool {
 		return false
 	}
 	value := parent.Attribute("value")
-	return value != nil && slices.Contains(value.Children(), child)
+	return value != nil && slices.Contains(tcimpl.ChildNodes(value), child)
 }
 
 // stampSlotFill overrides the archetype_node_id and archetype_details
@@ -3440,7 +3522,8 @@ func proportionOperand(node *tcimpl.CompiledNode, current float64, whole, nonZer
 			(!whole || math.Trunc(v) == v) && (!nonZero || v != 0) &&
 			componentFits(node, v)
 	}
-	candidates := []float64{current, math.Round(current), math.Floor(current), math.Ceil(current)}
+	var buf [16]float64
+	candidates := append(buf[:0], current, math.Round(current), math.Floor(current), math.Ceil(current))
 	if c, ok := primitiveOf(node).(constraints.CReal); ok {
 		candidates = append(candidates, c.List...)
 	}
@@ -3590,7 +3673,7 @@ func bmmRequired(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) b
 	if class == "" || class == bmmtype.Class(strings.TrimSpace(optNode.RMTypeName())) {
 		return false
 	}
-	return slices.Contains(rminfo.Default.RequiredAttributes(class), attr.Name())
+	return slices.Contains(requiredAttributes(class), attr.Name())
 }
 
 // holdsRequiredChild reports whether a child asks the list attr for a

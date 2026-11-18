@@ -304,6 +304,11 @@ func cutFields(s, sep string) ([3]string, int, bool) {
 	return fields, n, true
 }
 
+// errEmptyZone is what [ParseZone] returns for the empty designator. It is one
+// shared value because a value that names no zone is ordinary input: callers
+// such as [UTCMagnitude] ask for the zone of every local time they compare.
+var errEmptyZone = errors.New("empty timezone")
+
 // ParseZone parses a timezone designator (Z, ±hh, ±hhmm or ±hh:mm) and
 // returns its offset in seconds east of UTC. The hour is at most 14 east and
 // 12 west (TIME_DEFINITIONS Max_timezone_hour / Min_timezone_hour).
@@ -312,7 +317,7 @@ func ParseZone(tz string) (int, error) {
 		return 0, nil
 	}
 	if tz == "" {
-		return 0, errors.New("empty timezone")
+		return 0, errEmptyZone
 	}
 	sign, maxHour := 1, 14
 	switch tz[0] {

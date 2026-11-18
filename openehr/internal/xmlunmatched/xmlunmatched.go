@@ -222,6 +222,9 @@ type Tracker struct {
 	// textDec converts the text of each primitive element ([Tracker.convert]);
 	// nil until the first, and after a conversion that failed.
 	textDec *textDecoder
+	// textBuf is the buffer [Tracker.elementText] reads the text of the next
+	// primitive element into; nil until the first.
+	textBuf []byte
 	// maxDepth is the deepest an element may nest below the root of the value,
 	// the root at depth 1, set by [Tracker.LimitDepth]; 0 sets no limit.
 	maxDepth int
@@ -759,7 +762,9 @@ func (t *Tracker) decodeOptional(dec *xml.Decoder, start *xml.StartElement, v an
 // end, and returns its text. An attribute and a child element are unmatched,
 // and the text around a child element is kept, as encoding/xml keeps it. An
 // element nested deeper than encoding/xml's own depth limit is refused before
-// anything of it is read.
+// anything of it is read. The text is valid until the next call: it is read
+// into a buffer t keeps for the next element while the buffer is small
+// ([maxKeptText]).
 func (t *Tracker) elementText(dec *xml.Decoder, start *xml.StartElement) ([]byte, error) {
 	// The element is the innermost open one, at the depth encoding/xml counts
 	// for it: the tracker follows every element from the start of the input.
@@ -769,7 +774,7 @@ func (t *Tracker) elementText(dec *xml.Decoder, start *xml.StartElement) ([]byte
 	if err := t.attrs(start.Attr, nil); err != nil {
 		return nil, err
 	}
-	var text []byte
+	text := t.textBuf[:0]
 	for {
 		tok, err := dec.Token()
 		if err != nil {
@@ -786,10 +791,19 @@ func (t *Tracker) elementText(dec *xml.Decoder, start *xml.StartElement) ([]byte
 				return nil, err
 			}
 		case xml.EndElement:
+			if cap(text) <= maxKeptText {
+				t.textBuf = text[:0]
+			}
 			return text, nil
 		}
 	}
 }
+
+// maxKeptText is the largest buffer, in bytes, a tracker keeps between the
+// primitive elements it reads ([Tracker.elementText]): enough for the text of
+// a usual primitive, so a long decode does not allocate one per element, and
+// small enough that a long text, such as base64 data, is let go.
+const maxKeptText = 1024
 
 // convert decodes text, the whole text of a primitive element named name,
 // into v through encoding/xml, so that the conversion is the one an untracked
@@ -798,7 +812,24 @@ func (t *Tracker) elementText(dec *xml.Decoder, start *xml.StartElement) ([]byte
 // makes one at its first primitive element and hands the same one the tokens
 // of each later element. It drops the decoder after a conversion that failed,
 // which could leave it partway through the element.
+//
+// Two values need no decoder, as encoding/xml reads them from those tokens
+// alone: a string, which is the text unchanged, and a pointer to a
+// TextUnmarshaler that is no xml.Unmarshaler, whose UnmarshalText method is
+// handed a copy of the text, nil when the text is empty.
 func (t *Tracker) convert(name xml.Name, text []byte, v any) error {
+	switch tv := v.(type) {
+	case *string:
+		if tv != nil {
+			*tv = string(text)
+			return nil
+		}
+	case xml.Unmarshaler:
+	case encoding.TextUnmarshaler:
+		if isPointer(tv) && !isNilPointer(tv) {
+			return tv.UnmarshalText(append([]byte(nil), text...))
+		}
+	}
 	if t.textDec == nil {
 		t.textDec = new(textDecoder)
 		t.textDec.dec = xml.NewTokenDecoder(t.textDec)
@@ -890,7 +921,13 @@ func (r *trackingReader) Token() (xml.Token, error) {
 			n := len(r.t.open)
 			r.t.open[n-1].nilled = r.t.open[n-2].nilled || isNilled(tk.Attr)
 		}
-		tk.Attr = r.scope.open(tk.Attr)
+		attrs := r.scope.open(tk.Attr)
+		if len(attrs) == len(tk.Attr) {
+			// No namespace declaration was dropped: tok is the token to
+			// return, already boxed.
+			return tok, err
+		}
+		tk.Attr = attrs
 		return tk, err
 	case xml.EndElement:
 		r.t.pop()

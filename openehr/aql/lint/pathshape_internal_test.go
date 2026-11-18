@@ -39,7 +39,7 @@ func walkOne(t *testing.T, q string) pathShape {
 	if len(doc.Paths) != 1 {
 		t.Fatalf("Parse(%q) reported %d identified paths, want 1", q, len(doc.Paths))
 	}
-	return newSegmentWalker(rminfo.Default, Extract(doc).Aliases).walk(doc.Paths[0])
+	return newSegmentWalker(rminfo.Default, newBindings(doc.Classes)).walk(&doc.Paths[0])
 }
 
 // TestSegmentWalkTypesEverySegmentItCan is the baseline the stop rows are read
@@ -221,7 +221,7 @@ func TestWalkStopNames(t *testing.T) {
 // still be that universe, name for name.
 func TestSegmentWalkerSharesTheDefaultClassSet(t *testing.T) {
 	names := rminfo.Default.KnownRMTypes()
-	w := newSegmentWalker(rminfo.Default, nil)
+	w := newSegmentWalker(rminfo.Default, bindings{})
 	if len(w.known) != len(names) {
 		t.Errorf("the walker over rminfo.Default knows %d classes, want the pin's %d", len(w.known), len(names))
 	}
@@ -230,9 +230,9 @@ func TestSegmentWalkerSharesTheDefaultClassSet(t *testing.T) {
 			t.Errorf("the walker over rminfo.Default does not know %q, which KnownRMTypes lists", n)
 		}
 	}
-	allocs := testing.AllocsPerRun(100, func() { _ = newSegmentWalker(rminfo.Default, nil) })
+	allocs := testing.AllocsPerRun(100, func() { _ = newSegmentWalker(rminfo.Default, bindings{}) })
 	if allocs > 1 {
-		t.Errorf("newSegmentWalker(rminfo.Default, nil) allocates %v times, want at most 1 (the walker itself)", allocs)
+		t.Errorf("newSegmentWalker(rminfo.Default, bindings{}) allocates %v times, want at most 1 (the walker itself)", allocs)
 	}
 }
 
@@ -264,7 +264,7 @@ func TestSegmentWalkerOverAnotherLookupUsesItsOwnClassSet(t *testing.T) {
 		if len(doc.Paths) != 1 {
 			t.Fatalf("Parse(%q) reported %d identified paths, want 1", q, len(doc.Paths))
 		}
-		return newSegmentWalker(look, Extract(doc).Aliases).walk(doc.Paths[0])
+		return newSegmentWalker(look, newBindings(doc.Classes)).walk(&doc.Paths[0])
 	}
 	const synthQ = "SELECT s/items/value FROM SYNTH s"
 	if sh := walk(synthetic, synthQ); sh.Root != "SYNTH" || sh.Stop != stopNone || len(sh.Typed) != 2 {

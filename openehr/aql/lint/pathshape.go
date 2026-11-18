@@ -151,7 +151,7 @@ func (s pathShape) offendingFrom(from int) (segmentShape, bool) {
 // with [newSegmentWalker]; one walker serves a whole lint pass.
 type segmentWalker struct {
 	look    rminfo.Lookup
-	classes map[string]parse.ClassExpr
+	classes bindings
 	// known is the pin's class universe as a set. The membership test is what
 	// separates "the pin cannot type this" from "the pin says no", which
 	// [rminfo.Lookup.AttributeRMType] alone cannot: asking it about a generic
@@ -160,23 +160,33 @@ type segmentWalker struct {
 	//
 	// It is read-only: every walker over rminfo.Default shares one set.
 	known map[string]bool
+	// typed is the backing store each walk's [pathShape.Typed] is cut from,
+	// so that one allocation can serve every path of a pass.
+	typed []segmentShape
 }
 
 // newSegmentWalker builds a walker over look's class universe, with classes as
-// the alias→class-expression binding ([Metadata.Aliases]).
+// the alias→class-expression binding (the binding [Metadata.Aliases] holds).
 //
 // A walker over [rminfo.Default], which is every walker a lint pass builds,
 // reads the shared set [defaultUniverse] holds instead of building its own.
 // Any other Lookup may define a different universe, so it gets a set of its
 // own.
-func newSegmentWalker(look rminfo.Lookup, classes map[string]parse.ClassExpr) *segmentWalker {
+func newSegmentWalker(look rminfo.Lookup, classes bindings) *segmentWalker {
+	w := new(segmentWalker)
+	w.init(look, classes)
+	return w
+}
+
+// init sets w up as [newSegmentWalker] does, for a walker the caller holds.
+func (w *segmentWalker) init(look rminfo.Lookup, classes bindings) {
 	var known map[string]bool
 	if u := defaultUniverse(); look == u.look {
 		known = u.known
 	} else {
 		known = knownClasses(look)
 	}
-	return &segmentWalker{look: look, classes: classes, known: known}
+	*w = segmentWalker{look: look, classes: classes, known: known}
 }
 
 // defaultUniverse is [rminfo.Default]'s class universe as a set, built on the
@@ -209,8 +219,8 @@ func knownClasses(look rminfo.Lookup) map[string]bool {
 // legal path is worse than a missed one, because the consumer running this in
 // CI cannot tell them apart — the same policy [pathDivergence] applies at
 // Layer 3.
-func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
-	ce := w.classes[p.Alias]
+func (w *segmentWalker) walk(p *parse.IdentifiedPath) pathShape {
+	ce, _ := w.classes.lookup(p.Alias)
 	if ce.ParamArchetype {
 		return pathShape{Stop: stopParamArchetype}
 	}
@@ -228,19 +238,20 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 		return pathShape{Stop: stopUnknownAliasClass}
 	}
 	sh := pathShape{Root: root, StopAt: len(p.Segments)}
+	start := len(w.typed)
 	current := root
 	for i, seg := range p.Segments {
 		rmType, declared := w.look.AttributeRMType(current, seg.Name)
 		if !declared {
 			sh.Stop, sh.StopAt = stopUndeclaredAttribute, i
-			return sh
+			break
 		}
 		// The second return is the SAME "does the pin declare it" question
 		// [rminfo.Lookup.AttributeRMType] just answered yes to, so it carries
 		// nothing new here; and were a Lookup ever to disagree with itself, a
 		// false reads as single-valued, which is the silent direction.
 		container, _ := w.look.IsContainer(current, seg.Name)
-		sh.Typed = append(sh.Typed, segmentShape{
+		w.typed = append(w.typed, segmentShape{
 			Index:  i,
 			Name:   seg.Name,
 			Parent: current,
@@ -256,9 +267,14 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 		}
 		if !w.known[rmType] {
 			sh.Stop, sh.StopAt = stopTypeOutsideUniverse, i+1
-			return sh
+			break
 		}
 		current = rmType
+	}
+	if len(w.typed) > start {
+		// Cut from the walker's store and capped at its own length, so no
+		// later walk can write into it.
+		sh.Typed = w.typed[start:len(w.typed):len(w.typed)]
 	}
 	return sh
 }
@@ -289,15 +305,15 @@ func (w *segmentWalker) walk(p parse.IdentifiedPath) pathShape {
 //
 // The group is ungated — every code in it is Warning, so none can flip
 // [Result.OK] (REQ-161 § Always on, never gated).
-func pathShapeIssues(doc *parse.Document, md Metadata, q *aql.Query, rel *contain.TypeRelation) []Issue {
+func pathShapeIssues(doc *parse.Document, md queryFacts, q *aql.Query, rel *contain.TypeRelation) []Issue {
 	walked := walkPaths(md)
-	var issues []Issue
-	issues = append(issues, repeatingSegmentIssues(walked)...)
-	issues = append(issues, pagingIssues(doc, q)...)
-	issues = append(issues, selectAliasIssues(doc)...)
-	issues = append(issues, fanoutPathGrainIssues(walked)...)
-	issues = append(issues, redundantStepIssues(doc, md, rel)...)
-	return issues
+	return joinIssues(
+		repeatingSegmentIssues(walked),
+		pagingIssues(doc, q),
+		selectAliasIssues(doc),
+		fanoutPathGrainIssues(walked),
+		redundantStepIssues(doc, md, rel),
+	)
 }
 
 // walkedPath is one identified path beside the walk's verdict on it. The two
@@ -305,8 +321,9 @@ func pathShapeIssues(doc *parse.Document, md Metadata, q *aql.Query, rel *contai
 // that no check can pair a path with another path's verdict, and so that adding
 // a third reader of the walk needs no new index discipline.
 type walkedPath struct {
-	// Path is the identified path as the document recorded it.
-	Path parse.IdentifiedPath
+	// Path is the identified path as the document recorded it, in the
+	// document's own path list.
+	Path *parse.IdentifiedPath
 	// Shape is the conservative walk's verdict on Path.
 	Shape pathShape
 }
@@ -321,13 +338,20 @@ type walkedPath struct {
 // RESULT is what makes that true by construction: the two checks cannot drift
 // into answering two walks that merely look alike, and a path is typed once
 // however many checks ask about it.
-func walkPaths(md Metadata) []walkedPath {
-	if len(md.Paths) == 0 {
+func walkPaths(md queryFacts) []walkedPath {
+	if len(md.paths) == 0 {
 		return nil
 	}
-	w := newSegmentWalker(rminfo.Default, md.Aliases)
-	walked := make([]walkedPath, len(md.Paths))
-	for i, p := range md.Paths {
+	var w segmentWalker
+	w.init(rminfo.Default, md.aliases)
+	segs := 0
+	for _, p := range md.paths {
+		segs += len(p.Segments)
+	}
+	w.typed = make([]segmentShape, 0, segs)
+	walked := make([]walkedPath, len(md.paths))
+	for i := range md.paths {
+		p := &md.paths[i]
 		walked[i] = walkedPath{Path: p, Shape: w.walk(p)}
 	}
 	return walked
@@ -345,7 +369,7 @@ func walkPaths(md Metadata) []walkedPath {
 func repeatingSegmentIssues(walked []walkedPath) []Issue {
 	var issues []Issue
 	for _, wp := range walked {
-		p := wp.Path
+		p := *wp.Path
 		for _, seg := range wp.Shape.offending() {
 			issues = append(issues, Issue{
 				Code: "aql_path_repeating_unpredicated",
@@ -454,12 +478,18 @@ func selectAliasIssues(doc *parse.Document) []Issue {
 	if q == nil {
 		return nil
 	}
-	var issues []Issue
-	for i, item := range q.Select.Items {
-		if _, star := item.Expr.(parse.StarExpr); star {
-			continue
+	n := 0
+	for _, item := range q.Select.Items {
+		if needsSelectAlias(item) {
+			n++
 		}
-		if item.Alias != "" {
+	}
+	if n == 0 {
+		return nil
+	}
+	issues := make([]Issue, 0, n)
+	for i, item := range q.Select.Items {
+		if !needsSelectAlias(item) {
 			continue
 		}
 		path, span := selectItemSite(item)
@@ -480,6 +510,15 @@ func selectAliasIssues(doc *parse.Document) []Issue {
 		})
 	}
 	return issues
+}
+
+// needsSelectAlias reports whether item draws aql_select_no_alias: it is not
+// a `*` and wrote no alias.
+func needsSelectAlias(item parse.SelectItem) bool {
+	if _, star := item.Expr.(parse.StarExpr); star {
+		return false
+	}
+	return item.Alias == ""
 }
 
 // selectItemSite is where a projected item is, for a diagnostic: its path
@@ -594,13 +633,13 @@ func fanoutPathGrainIssues(walked []walkedPath) []Issue {
 				Code: "aql_fanout_path_grain",
 				// The path the Span covers, so a reader correlating the two
 				// reads one location twice rather than two.
-				Path: displayPath(later),
+				Path: displayPath(*later),
 				Detail: fmt.Sprintf(
 					"projected paths %q and %q are rooted on alias %q and descend into "+
 						"different unpredicated repeating scopes after their common prefix "+
 						"(%s.%s and %s.%s); row multiplicity for this shape is engine-defined "+
 						"(SPECQUERY-9) — verify the result shape against the target CDR",
-					displayPath(earlier), displayPath(later), later.Alias,
+					displayPath(*earlier), displayPath(*later), later.Alias,
 					first.Parent, first.Name, second.Parent, second.Name,
 				),
 				Severity: Warning,
@@ -621,7 +660,7 @@ func fanoutPathGrainIssues(walked []walkedPath) []Issue {
 // half of a product).
 //
 // NAMES only; see [fanoutPathGrainIssues] for why a predicate is not read here.
-func commonPrefixLen(a, b parse.IdentifiedPath) int {
+func commonPrefixLen(a, b *parse.IdentifiedPath) int {
 	n := min(len(a.Segments), len(b.Segments))
 	for i := range n {
 		if a.Segments[i].Name != b.Segments[i].Name {
@@ -684,7 +723,7 @@ func commonPrefixLen(a, b parse.IdentifiedPath) int {
 // An ANONYMOUS operand (no alias at all) is INCLUDED, not skipped, exactly as
 // it is for aql_versioned_object_unreferenced: with no alias no path can
 // reference it, so "roots no identified path" holds unconditionally.
-func redundantStepIssues(doc *parse.Document, md Metadata, rel *contain.TypeRelation) []Issue {
+func redundantStepIssues(doc *parse.Document, md queryFacts, rel *contain.TypeRelation) []Issue {
 	q := doc.Query()
 	if q == nil {
 		return nil
@@ -697,12 +736,18 @@ func redundantStepIssues(doc *parse.Document, md Metadata, rel *contain.TypeRela
 	if from.Contains == nil || from.Root.RMType == "" {
 		return nil
 	}
-	chain, _ := containsChain([]parse.ClassExpr{from.Root}, *from.Contains)
+	n := 1 + chainLen(*from.Contains)
+	if n < 3 {
+		return nil // a root and a leaf, with no step between them
+	}
+	seed := make([]parse.ClassExpr, 1, n)
+	seed[0] = from.Root
+	chain, _ := containsChain(seed, *from.Contains)
 	if len(chain) < 3 {
 		return nil // a root and a leaf, with no step between them
 	}
-	referenced := make(map[string]bool, len(md.Paths))
-	for _, p := range md.Paths {
+	referenced := make(map[string]bool, len(md.paths))
+	for _, p := range md.paths {
 		referenced[p.Alias] = true
 	}
 
@@ -793,6 +838,23 @@ func containsChain(chain []parse.ClassExpr, n parse.Containment) ([]parse.ClassE
 		}
 	}
 	return chain, true
+}
+
+// chainLen is an upper bound on how many class expressions [containsChain]
+// appends for n, so the chain can be allocated once.
+func chainLen(n parse.Containment) int {
+	if n.Negated || isJunction(n) || n.Class.RMType == "" {
+		return 0
+	}
+	l := 1
+	for _, ch := range n.Children {
+		k := chainLen(ch)
+		l += k
+		if k == 0 {
+			break // containsChain stops at this child
+		}
+	}
+	return l
 }
 
 // segmentSpan is the span the idx-th segment's ATTRIBUTE NAME occupies in the

@@ -70,6 +70,57 @@ func TestNestedSlotFailuresMatchTheBufferedDecode(t *testing.T) {
 	}
 }
 
+// untypedName finds every `name` whose object opens without a `_type`, a
+// narrow slot the decode fills with its fallback class, DV_TEXT. The largest
+// fixture writes most of its names so.
+var untypedName = regexp.MustCompile(`"name"\s*:\s*\{\s*"value"`)
+
+// REQ-052 § the decode error contract, for a narrow slot with no `_type`: one
+// nested in a slot the decode read whole is decoded where it stands, as its
+// fallback class, and both its success and its failure are what reading it
+// whole gives. The oracle is the buffered decode under a caller's hook set, as
+// in TestNestedSlotFailuresMatchTheBufferedDecode. The document as it is must
+// decode to the same composition; each mutation breaks one untyped name, with
+// a member of the wrong JSON kind or a duplicate member, at every depth.
+func TestUntypedSlotFailuresMatchTheBufferedDecode(t *testing.T) {
+	t.Parallel()
+	doc, err := os.ReadFile(fixtures.CompositionJSON(benchFixture))
+	if err != nil {
+		t.Fatalf("read fixture %s: %v", benchFixture, err)
+	}
+	var inPlace, buffered rm.Composition
+	gotErr := jsonv2.Unmarshal(doc, &inPlace)
+	wantErr := jsonv2.Unmarshal(doc, &buffered, jsonv2.WithUnmarshalers(callerHooks))
+	if got, want := outcome(&inPlace, gotErr), outcome(&buffered, wantErr); got != want {
+		t.Fatalf("fixture %s as it is: in-place decode\n%s\nwant, as read whole\n%s", benchFixture, got, want)
+	}
+	sites := untypedName.FindAllIndex(doc, -1)
+	if len(sites) < 100 {
+		t.Fatalf("fixture %s holds %d names without a _type, want at least 100 to reach nested slots", benchFixture, len(sites))
+	}
+	mutations := []struct{ name, insert string }{
+		{name: "list member of the wrong kind", insert: `"mappings":5,`},
+		{name: "string member of the wrong kind", insert: `"formatting":{},`},
+		{name: "duplicate member", insert: `"value":"x",`},
+	}
+	// Every fifth site keeps the test quick and still reaches each depth.
+	for i := 0; i < len(sites); i += 5 {
+		at := bytes.IndexByte(doc[sites[i][0]:], '{') + sites[i][0] + 1
+		for _, mu := range mutations {
+			mutant := bytes.Join([][]byte{doc[:at], []byte(mu.insert), doc[at:]}, nil)
+			var inPlace, buffered rm.Composition
+			gotErr := jsonv2.Unmarshal(mutant, &inPlace)
+			wantErr := jsonv2.Unmarshal(mutant, &buffered, jsonv2.WithUnmarshalers(callerHooks))
+			if gotErr == nil {
+				t.Errorf("site %d (%s at offset %d): in-place decode succeeded, want the mutation refused", i, mu.name, at)
+			}
+			if got, want := outcome(&inPlace, gotErr), outcome(&buffered, wantErr); got != want {
+				t.Errorf("site %d (%s at offset %d): in-place decode\n%s\nwant, as read whole\n%s", i, mu.name, at, got, want)
+			}
+		}
+	}
+}
+
 // outcome writes what a decode gave: the document it decoded, re-encoded, or
 // the failure with every link of its chain and the positions each records.
 func outcome(c *rm.Composition, err error) string {

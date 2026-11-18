@@ -143,7 +143,7 @@ func TestREQ111_SlotRulesAndPredicateFromModel(t *testing.T) {
 		},
 		Excludes: []aom14.Assertion{matchesAssertion(`archetype_id/value matches {/.*/}`, "")},
 	}
-	rules := slotRulesFromModel(slot)
+	rules := slotRulesFromModel(slot, nil)
 	if rules.RMTypeName != "CLUSTER" {
 		t.Errorf("slotRulesFromModel RMTypeName = %q; want %q", rules.RMTypeName, "CLUSTER")
 	}
@@ -168,7 +168,39 @@ func TestREQ111_SlotRulesAndPredicateFromModel(t *testing.T) {
 	if got := slotPathPredicateFromModel(&aom14.ArchetypeSlot{Includes: []aom14.Assertion{{}}}); got != "" {
 		t.Errorf("slotPathPredicateFromModel(an include with no pattern) = %q; want empty", got)
 	}
-	if got := slotRulesFromModel(&aom14.ArchetypeSlot{RMTypeName: "CLUSTER"}); got.Includes != nil || got.Excludes != nil || got.RawIncludeCount != 0 {
+	if got := slotRulesFromModel(&aom14.ArchetypeSlot{RMTypeName: "CLUSTER"}, nil); got.Includes != nil || got.Excludes != nil || got.RawIncludeCount != 0 {
 		t.Errorf("slotRulesFromModel(no assertion) = %+v; want no rules", got)
+	}
+}
+
+// TestSlotRulesShareCompiledPatterns pins that slots read through one cache
+// get the rules a slot read without one gets, a pattern that does not compile
+// left out the second time too, and that a pattern two slots give is compiled
+// once and shared.
+func TestSlotRulesShareCompiledPatterns(t *testing.T) {
+	slot := &aom14.ArchetypeSlot{
+		RMTypeName: "CLUSTER",
+		Includes: []aom14.Assertion{
+			matchesAssertion(`archetype_id/value matches {/openEHR-EHR-CLUSTER\.(a|b\.v1/}`, ""),
+			matchesAssertion(`archetype_id/value matches {/openEHR-EHR-CLUSTER\.device\.v1/}`, ""),
+		},
+		Excludes: []aom14.Assertion{matchesAssertion(`archetype_id/value matches {/.*/}`, "")},
+	}
+	want := slotRulesFromModel(slot, nil)
+	cache := slotAssertionCache{}
+	first := slotRulesFromModel(slot, cache)
+	second := slotRulesFromModel(slot, cache)
+	for i, got := range []constraints.SlotRules{first, second} {
+		if !slices.Equal(slotAssertionPatterns(got.Includes), slotAssertionPatterns(want.Includes)) ||
+			!slices.Equal(slotAssertionPatterns(got.Excludes), slotAssertionPatterns(want.Excludes)) ||
+			got.RMTypeName != want.RMTypeName || got.RawIncludeCount != want.RawIncludeCount {
+			t.Errorf("slotRulesFromModel through a cache, read %d = %+v; want %+v, as without one", i+1, got, want)
+		}
+	}
+	if len(cache) != 3 {
+		t.Errorf("cache holds %d patterns after two reads of one slot; want 3, each pattern once, the one that does not compile included", len(cache))
+	}
+	if !first.Includes[0].MatchesArchetypeID("openEHR-EHR-CLUSTER.device.v1") || !second.Includes[0].MatchesArchetypeID("openEHR-EHR-CLUSTER.device.v1") {
+		t.Errorf("an include read through the cache does not match the archetype id its pattern names")
 	}
 }

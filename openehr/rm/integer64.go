@@ -82,8 +82,8 @@ func (i *Integer64) UnmarshalJSON(b []byte) error {
 		*i = Integer64(n)
 		return nil
 	}
-	var n int64
-	if err := json.Unmarshal(b, &n); err != nil {
+	n, err := unmarshalInt[int64](b, 64)
+	if err != nil {
 		// encoding/json/v2 refuses any literal with a fraction or an
 		// exponent for an int64, 1.0 included, so a refused literal is read
 		// again as a whole number before the refusal stands.

@@ -90,23 +90,133 @@ func Extract(doc *parse.Document) Metadata {
 	if doc == nil || !doc.Parsed() {
 		return Metadata{Aliases: map[string]parse.ClassExpr{}}
 	}
-	md := Metadata{Aliases: make(map[string]parse.ClassExpr, len(doc.Classes))}
-	seen := make(map[string]bool)
+	md := Metadata{
+		Archetypes: documentArchetypes(doc.Classes),
+		Aliases:    make(map[string]parse.ClassExpr, len(doc.Classes)),
+	}
 	for _, ce := range doc.Classes {
 		if ce.Alias != "" {
 			md.Aliases[ce.Alias] = ce
-		}
-		for _, hrid := range classArchetypes(ce) {
-			if !seen[hrid] {
-				seen[hrid] = true
-				md.Archetypes = append(md.Archetypes, hrid)
-			}
 		}
 	}
 	md.SelectAliases = slices.Clone(doc.SelectAliases)
 	md.Paths = slices.Clone(doc.Paths)
 	md.Params = slices.Clone(doc.Params)
 	return md
+}
+
+// queryFacts is what [Lint] reads of a parsed document: the facts [Metadata]
+// carries, read in place. The slices are the document's own, which no check
+// writes to, and the alias binding is looked up in the document's class list
+// rather than copied into a map.
+type queryFacts struct {
+	classes       []parse.ClassExpr
+	aliases       bindings
+	selectAliases nameSet
+	paths         []parse.IdentifiedPath
+	params        []string
+}
+
+// factsOf returns doc's facts. doc is non-nil and parsed.
+func factsOf(doc *parse.Document) queryFacts {
+	return queryFacts{
+		classes:       doc.Classes,
+		aliases:       newBindings(doc.Classes),
+		selectAliases: newNameSet(doc.SelectAliases),
+		paths:         doc.Paths,
+		params:        doc.Params,
+	}
+}
+
+// documentArchetypes returns the distinct literal archetype HRIDs classes
+// name, in document order ([Metadata.Archetypes]).
+func documentArchetypes(classes []parse.ClassExpr) []string {
+	var hrids []string
+	seen := make(map[string]bool)
+	for _, ce := range classes {
+		for _, hrid := range classArchetypes(ce) {
+			if !seen[hrid] {
+				seen[hrid] = true
+				hrids = append(hrids, hrid)
+			}
+		}
+	}
+	return hrids
+}
+
+// bindingIndexMin is the list length from which [bindings] and [nameSet]
+// index the names in a map instead of scanning the list.
+const bindingIndexMin = 16
+
+// nameSet answers whether a name is in a list, scanning a short list and
+// indexing a long one, as [bindings] does.
+type nameSet struct {
+	names []string
+	index map[string]struct{} // nil below bindingIndexMin names
+}
+
+// newNameSet returns the set of names.
+func newNameSet(names []string) nameSet {
+	s := nameSet{names: names}
+	if len(names) >= bindingIndexMin {
+		s.index = make(map[string]struct{}, len(names))
+		for _, n := range names {
+			s.index[n] = struct{}{}
+		}
+	}
+	return s
+}
+
+// has reports whether name is in the set.
+func (s nameSet) has(name string) bool {
+	if s.index != nil {
+		_, ok := s.index[name]
+		return ok
+	}
+	return slices.Contains(s.names, name)
+}
+
+// bindings maps each bound alias to its class expression, as
+// [Metadata.Aliases] does: when two class expressions carry one alias, the
+// later one in document order binds it, and an anonymous class expression
+// binds nothing.
+type bindings struct {
+	classes []parse.ClassExpr
+	index   map[string]int // nil below bindingIndexMin classes
+}
+
+// newBindings returns the bindings classes declare.
+func newBindings(classes []parse.ClassExpr) bindings {
+	b := bindings{classes: classes}
+	if len(classes) >= bindingIndexMin {
+		b.index = make(map[string]int, len(classes))
+		for i, ce := range classes {
+			if ce.Alias != "" {
+				b.index[ce.Alias] = i
+			}
+		}
+	}
+	return b
+}
+
+// lookup returns the class expression alias binds, and whether it binds one.
+func (b bindings) lookup(alias string) (parse.ClassExpr, bool) {
+	if alias == "" {
+		return parse.ClassExpr{}, false
+	}
+	if b.index != nil {
+		i, ok := b.index[alias]
+		if !ok {
+			return parse.ClassExpr{}, false
+		}
+		return b.classes[i], true
+	}
+	for _, ce := range slices.Backward(b.classes) {
+		if ce.Alias == alias {
+			return ce, true
+		}
+	}
+	return parse.ClassExpr{}, false
 }
 
 // classArchetypes returns the distinct literal archetype HRIDs ce names, in
@@ -125,6 +235,14 @@ func classArchetypes(ce parse.ClassExpr) []string {
 	if ce.Archetype != "" && !ce.ParamArchetype {
 		return []string{ce.Archetype}
 	}
+	return junctionArchetypes(ce.ParsedPredicate)
+}
+
+// junctionArchetypes is [classArchetypes] for a bracket that leaves
+// Archetype empty: the distinct HRIDs among p's archetype operands. Kept apart
+// so that classArchetypes stays small enough to inline, and its one-HRID slice
+// can live on the caller's stack.
+func junctionArchetypes(p aql.SegmentPredicate) []string {
 	var hrids []string
 	var visit func(p aql.SegmentPredicate)
 	visit = func(p aql.SegmentPredicate) {
@@ -138,6 +256,6 @@ func classArchetypes(ce parse.ClassExpr) []string {
 			visit(p.Right)
 		}
 	}
-	visit(ce.ParsedPredicate)
+	visit(p)
 	return hrids
 }

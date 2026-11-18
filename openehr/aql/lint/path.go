@@ -46,18 +46,19 @@ type Path struct {
 // text stays on the AST ([aql.IdentifiedPath.Raw]) for round-trip; a
 // diagnostic names the path, it does not re-emit it.
 func displayPath(p parse.IdentifiedPath) string {
-	norm, err := Normalise(p)
-	if err != nil {
+	if p.Alias == "" {
 		return p.Raw // no alias: nothing structural to render, and Raw is all there is
 	}
+	rootPred := aql.StripPredicateTrivia(p.Predicate)
 	var sb strings.Builder
+	sb.Grow(len(p.Alias) + len(rootPred) + 2 + suffixLenBound(p.Segments))
 	sb.WriteString(p.Alias)
-	if pred := aql.StripPredicateTrivia(p.Predicate); pred != "" {
+	if rootPred != "" {
 		sb.WriteByte('[')
-		sb.WriteString(pred)
+		sb.WriteString(rootPred)
 		sb.WriteByte(']')
 	}
-	sb.WriteString(norm.Suffix)
+	writeSuffix(&sb, p.Segments)
 	return sb.String()
 }
 
@@ -69,7 +70,14 @@ func Normalise(p parse.IdentifiedPath) (Path, error) {
 		return Path{}, ErrEmptyPath
 	}
 	var sb strings.Builder
-	for _, seg := range p.Segments {
+	sb.Grow(suffixLenBound(p.Segments))
+	writeSuffix(&sb, p.Segments)
+	return Path{Alias: p.Alias, Segments: slices.Clone(p.Segments), Suffix: sb.String()}, nil
+}
+
+// writeSuffix writes the canonical alias-free form of segs ([Path.Suffix]).
+func writeSuffix(sb *strings.Builder, segs []parse.PathSegment) {
+	for _, seg := range segs {
 		sb.WriteByte('/')
 		sb.WriteString(seg.Name)
 		// Trivia-stripped: see [Path.Suffix]. The verbatim text stays on
@@ -80,5 +88,17 @@ func Normalise(p parse.IdentifiedPath) (Path, error) {
 			sb.WriteByte(']')
 		}
 	}
-	return Path{Alias: p.Alias, Segments: slices.Clone(p.Segments), Suffix: sb.String()}, nil
+}
+
+// suffixLenBound is an upper bound on the length [writeSuffix] writes for
+// segs: stripping trivia never lengthens a predicate.
+func suffixLenBound(segs []parse.PathSegment) int {
+	n := 0
+	for _, seg := range segs {
+		n += 1 + len(seg.Name)
+		if seg.Predicate != "" {
+			n += len(seg.Predicate) + 2
+		}
+	}
+	return n
 }

@@ -2,6 +2,7 @@ package terminology
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -194,5 +195,35 @@ func TestRegistryAccessorsUseTheTables(t *testing.T) {
 	}
 	if got := len(slices.Collect(CodeSets())); got != 1 {
 		t.Errorf("CodeSets yields %d, want 1", got)
+	}
+}
+
+// TestCodeSetHasFoldsEveryPinnedCode asks each code set for every one of its
+// codes in upper case, lower case and as pinned: a case-ignoring set has all
+// three, whatever the code's length, and an openEHR-issued one only the
+// spelling it pins. A folded lookup allocates nothing.
+func TestCodeSetHasFoldsEveryPinnedCode(t *testing.T) {
+	longest := ""
+	for s := range CodeSets() {
+		for code := range s.All() {
+			if len(code) > len(longest) {
+				longest = code
+			}
+			for _, spelling := range []string{code, strings.ToUpper(code), strings.ToLower(code)} {
+				want := s.ignoreCase || spelling == code
+				if got := s.Has(spelling); got != want {
+					t.Errorf("%s.Has(%q) = %v, want %v", s.ID(), spelling, got, want)
+				}
+			}
+		}
+	}
+	if len(longest) > foldBufLen {
+		t.Errorf("longest pinned code %q has %d bytes, more than foldBufLen = %d", longest, len(longest), foldBufLen)
+	}
+	if long := strings.Repeat("A", foldBufLen+1); Countries.Has(long) {
+		t.Errorf("Countries.Has(%q) = true, want false", long)
+	}
+	if n := testing.AllocsPerRun(100, func() { _ = Countries.Has("NL") }); n != 0 {
+		t.Errorf(`Countries.Has("NL") allocates %v times, want 0`, n)
 	}
 }

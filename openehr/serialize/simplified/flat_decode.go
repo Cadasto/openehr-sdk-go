@@ -125,7 +125,7 @@ func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeC
 	if err != nil {
 		return nil, err
 	}
-	b, err := json.Marshal(compJSON)
+	b, err := marshalSized(compJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -149,8 +149,11 @@ func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeC
 // node path ([templateIndex]). Every key it does not read goes to sink, and the
 // decode carries on without it. A refusal names each key as the body wrote it.
 func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *templateIndex, sink *unmatchedSink) (_ map[string]any, err error) {
+	// The passes below read the keys in sorted order: they are sorted once, and
+	// again only when a pass renames one.
+	sorted := slices.Sorted(maps.Keys(flat))
 	// A key that is no path in the FLAT grammar is refused before any is read.
-	if err := checkFlatKeys(flat); err != nil {
+	if err := checkFlatKeys(sorted); err != nil {
 		return nil, err
 	}
 	root := wt.Tree
@@ -161,12 +164,18 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// A key ending in a bare `|` spells the key without it; both at once are two
 	// spellings of one field (REQ-170), judged once the decode knows whether it
 	// reads that field.
-	flat, fold := foldEmptySuffix(flat)
+	flat, fold := foldEmptySuffix(flat, sorted)
+	if fold.spellings != nil {
+		sorted = slices.Sorted(maps.Keys(flat))
+	}
 	// A duplicate sibling's earlier spelling, `x2` for `x_1`, is read as the Web
 	// Template's id, and a key spelled both ways is two spellings of one field
 	// too (REQ-053, REQ-170). Every later stage reads the Web Template's id, and
 	// a refusal it makes goes back to the body's spelling on the way out.
 	flat, siblings := foldSiblingSpellings(flat, wt, fold.spellings)
+	if siblings.written != nil {
+		sorted = slices.Sorted(maps.Keys(flat))
+	}
 	defer func() { err = siblings.respell(err) }()
 	if sink != nil {
 		sink.spellings = siblings.spellings
@@ -174,7 +183,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// Separate composition-level context from clinical content; context is
 	// rebuilt from RM attributes, not from a Web Template leaf path. The
 	// composer's real-path keys come out as one party group.
-	ctx, ctxOrigin, composer, content, err := siphonContext(flat, root.ID, sink)
+	ctx, ctxOrigin, composer, content, contentKeys, err := siphonContext(flat, sorted, root.ID, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +191,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	sib := reusedSiblingsOf(wt)
 	// The three passes below walk content in sorted order and share one parse of
 	// each key; each skips the keys an earlier one took out of content.
-	parsed := parseContentKeys(content)
+	parsed := parseSortedKeys(contentKeys)
 	// The reference's in-context keys for RM attributes the Web Template this
 	// SDK builds does not model name RM data decode would drop: refused in every
 	// mode, before anything could set them aside as unmatched or the
@@ -978,14 +987,18 @@ func MetadataWitnessSpellings() []string {
 // fields once they are parsed. Two spellings of one composer key, with and
 // without the `:0` of the root or the composer segment, are one key: they must
 // agree, and a null one is absent ([putComposerKey]).
-func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx map[string]any, ctxOrigin map[string]string, composer *rmattrGroup, content map[string]any, err error) {
-	ctx, ctxOrigin, content = make(map[string]any), make(map[string]string), make(map[string]any)
+//
+// keys are flat's keys, sorted, and contentKeys are content's.
+func siphonContext(flat map[string]any, keys []string, rootID string, sink *unmatchedSink) (ctx map[string]any, ctxOrigin map[string]string, composer *rmattrGroup, content map[string]any, contentKeys []string, err error) {
+	// Most keys are content.
+	ctx, ctxOrigin, content = make(map[string]any), make(map[string]string), make(map[string]any, len(keys))
+	contentKeys = make([]string, 0, len(keys))
 	composer = newRMAttrGroup(rootID, composerSeg, -1, sink)
 	composer.metadata = "the composer"
 	// Sorted so a body carrying two conflicting real-path spellings reports the
 	// same key first on every run — a map-order-dependent error message is not
 	// reproducible for whoever has to fix the payload.
-	for _, key := range slices.Sorted(maps.Keys(flat)) {
+	for _, key := range keys {
 		val := flat[key]
 		if strings.HasPrefix(key, "ctx/") {
 			if key != ctxSettingBare && key != ctxSettingTerminology && !ctxFields[key] {
@@ -1006,7 +1019,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				// (REQ-053): it is read as the pair it names, and compared
 				// with any other spelling of that pair.
 				if err := putBareSetting(ctx, ctxOrigin, key, val); err != nil {
-					return nil, nil, nil, nil, err
+					return nil, nil, nil, nil, nil, err
 				}
 				continue
 			}
@@ -1016,12 +1029,12 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				// terminology is a typed error, not a silent rewrite (REQ-053),
 				// exactly as the real-path witness below.
 				if err := checkTerminologyWitness(key, val, terminology.ID); err != nil {
-					return nil, nil, nil, nil, err
+					return nil, nil, nil, nil, nil, err
 				}
 				continue
 			}
 			if err := putCtx(ctx, ctxOrigin, key, val, key); err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, err
 			}
 			continue
 		}
@@ -1029,18 +1042,19 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// is judged from the left like any other: an index past :0 on it is
 		// past its bound (REQ-170).
 		if seg, alone := rootSegmentAlone(key, rootID); alone && seg.idx > 0 {
-			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(seg))
+			return nil, nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(seg))
 		}
 		rel, rootSeg, isRooted := cutRoot(key, rootID)
 		if !isRooted {
 			content[key] = val
+			contentKeys = append(contentKeys, key)
 			continue
 		}
 		// The template root is the one COMPOSITION: `<root>:0/` is `<root>/`
 		// (REQ-053), and any other index is past its bound, refused whatever
 		// follows it (REQ-170).
 		if rootSeg.idx > 0 {
-			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(rootSeg))
+			return nil, nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(rootSeg))
 		}
 		// The tables below are keyed on the unindexed spelling. An indexed
 		// metadata path is read exactly as that spelling, and only `:0` is an
@@ -1050,14 +1064,14 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		raw := rel
 		rel, overIndexed := metadataRel(rel)
 		if overIndexed && isMetadataSpelling(rel) {
-			return nil, nil, nil, nil, fmt.Errorf("%w: %q (a composition metadata path runs through single-valued attributes, so :0 is the only index it takes)",
+			return nil, nil, nil, nil, nil, fmt.Errorf("%w: %q (a composition metadata path runs through single-valued attributes, so :0 is the only index it takes)",
 				ErrUnknownPath, key)
 		}
 		// Any other key that runs through a metadata segment past :0 is past
 		// that segment's bound whatever follows it, whether or not the Web
 		// Template carries a node for the segment (REQ-170).
 		if overIndexed {
-			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
+			return nil, nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
 		}
 		// |value spells the bare value of a datatype that has one, so at a
 		// real path whose bare key is an alias, the start time's, it is that
@@ -1075,7 +1089,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				continue
 			}
 			if err := checkTerminologyWitness(key, val, want); err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, err
 			}
 			continue
 		}
@@ -1088,7 +1102,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				continue
 			}
 			if err := putCtx(ctx, ctxOrigin, ctxKey, val, key); err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, nil, nil, nil, err
 			}
 			continue
 		}
@@ -1113,11 +1127,11 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 			}
 			if rel == settingBase {
 				if err := putBareSetting(ctx, ctxOrigin, key, val); err != nil {
-					return nil, nil, nil, nil, err
+					return nil, nil, nil, nil, nil, err
 				}
 				continue
 			}
-			return nil, nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
+			return nil, nil, nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
 				ErrUnsupportedDatatype, key, metadataOwnedBaseCtx[base])
 		}
 		// The composer's real path carries the whole composer in the party
@@ -1131,8 +1145,9 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 			continue
 		}
 		content[key] = val
+		contentKeys = append(contentKeys, key)
 	}
-	return ctx, ctxOrigin, composer, content, nil
+	return ctx, ctxOrigin, composer, content, contentKeys, nil
 }
 
 // checkTerminologyWitness reads a terminology witness of a coded metadata
@@ -1462,7 +1477,7 @@ func completeRequired(node map[string]any, ci ctxInfo) {
 		if class == "HISTORY" {
 			ci = historyTimes(node, ci)
 		}
-		for _, attr := range rminfo.Default.RequiredAttributes(class) {
+		for _, attr := range requiredAttributes(class) {
 			if _, has := node[attr]; has {
 				continue
 			}
@@ -1752,7 +1767,9 @@ type aqlSeg struct {
 // name/value='x']) are still not split — no supported Web Template emits them
 // (mirror rmpath.parsePredicate if that changes).
 func parseAQL(p string) []aqlSeg {
-	return slices.Collect(aqlSegments(p))
+	// Every segment starts at a slash; a slash inside a name starts none, so
+	// this may be more than the segments.
+	return slices.AppendSeq(make([]aqlSeg, 0, strings.Count(p, "/")), aqlSegments(p))
 }
 
 // aqlSegments yields the segments [parseAQL] returns, one at a time, for a
@@ -2011,24 +2028,28 @@ type ismNodes struct {
 // included.
 func ismTransitionNodes(wt *webtemplate.WebTemplate, sib *reusedSiblings) (nodes ismNodes, found bool) {
 	nodes = ismNodes{archetyped: make(map[string]ismNode), merged: make(map[string]mergedIsmNode)}
-	var walk func(n *webtemplate.Node, flat string)
-	walk = func(n *webtemplate.Node, flat string) {
+	// flat holds the FLAT path of the node being walked; a string is made of it
+	// only for an ISM_TRANSITION node.
+	var walk func(n *webtemplate.Node, flat []byte) []byte
+	walk = func(n *webtemplate.Node, flat []byte) []byte {
+		base := len(flat)
 		for _, ch := range n.Children {
-			chFlat := flat + "/" + ch.ID
+			flat = append(append(flat[:base], '/'), ch.ID...)
 			if nodeRMType(ch) == "ISM_TRANSITION" {
 				found = true
 				switch step := childByID(ch, careflowStepLeaf); {
 				case ch.NodeID != "":
-					nodes.archetyped[sib.nodePath(ch)] = ismNode{id: ch.NodeID, name: ch.Name, flat: chFlat}
+					nodes.archetyped[sib.nodePath(ch)] = ismNode{id: ch.NodeID, name: ch.Name, flat: string(flat)}
 				case step != nil:
-					nodes.merged[sib.nodePath(ch)] = mergedIsmNode{steps: codeInputList(step), flat: chFlat}
+					nodes.merged[sib.nodePath(ch)] = mergedIsmNode{steps: codeInputList(step), flat: string(flat)}
 				}
 			}
-			walk(ch, chFlat)
+			flat = walk(ch, flat)
 		}
+		return flat[:base]
 	}
 	if wt.Tree != nil {
-		walk(wt.Tree, wt.Tree.ID)
+		walk(wt.Tree, append(make([]byte, 0, 256), wt.Tree.ID...))
 	}
 	return nodes, found
 }
@@ -2071,6 +2092,17 @@ func settleIsmTransitions(compJSON map[string]any, wt *webtemplate.WebTemplate, 
 	return settleIsmTransitionsUnder(compJSON, nodes)
 }
 
+// holdsNested reports whether a member of obj is an object or a list.
+func holdsNested(obj map[string]any) bool {
+	for _, v := range obj {
+		switch v.(type) {
+		case map[string]any, []any:
+			return true
+		}
+	}
+	return false
+}
+
 // ismNodeKey is the member [walkAQL] records on an ISM_TRANSITION it places,
 // holding the resolution path of the Web Template node it places it under.
 // It is no RM member: [settleIsmTransitions] removes it.
@@ -2079,12 +2111,29 @@ const ismNodeKey = "_ism_transition_node"
 // settleIsmTransitionsUnder walks obj in sorted attribute order, so a body with
 // two bad transitions names the same one on every run.
 func settleIsmTransitionsUnder(obj map[string]any, nodes ismNodes) error {
-	for _, attr := range slices.Sorted(maps.Keys(obj)) {
-		switch v := obj[attr].(type) {
+	_, err := settleIsmTransitionsIn(obj, nodes, nil)
+	return err
+}
+
+// settleIsmTransitionsIn is [settleIsmTransitionsUnder] with one buffer for the
+// sorted attributes of every object on the way down: each object's sit after
+// its parent's, and are dropped once it is walked. It returns the buffer,
+// which may have grown, cut back to what it was passed.
+func settleIsmTransitionsIn(obj map[string]any, nodes ismNodes, attrs []string) ([]string, error) {
+	if !holdsNested(obj) {
+		return attrs, nil // no member a transition could be or sit under
+	}
+	base := len(attrs)
+	attrs = slices.AppendSeq(attrs, maps.Keys(obj))
+	end := len(attrs)
+	slices.Sort(attrs[base:end])
+	var err error
+	for i := base; i < end; i++ {
+		switch v := obj[attrs[i]].(type) {
 		case map[string]any:
 			if v["_type"] != "ISM_TRANSITION" {
-				if err := settleIsmTransitionsUnder(v, nodes); err != nil {
-					return err
+				if attrs, err = settleIsmTransitionsIn(v, nodes, attrs[:end]); err != nil {
+					return attrs[:base], err
 				}
 				continue
 			}
@@ -2093,24 +2142,24 @@ func settleIsmTransitionsUnder(obj map[string]any, nodes ismNodes) error {
 			impliedOpenehrTerminology(v)
 			if n, ok := nodes.archetyped[at]; ok {
 				if err := settleIsmTransition(v, n); err != nil {
-					return err
+					return attrs[:base], err
 				}
 			} else if m, ok := nodes.merged[at]; ok {
 				if err := settleMergedIsmTransition(v, m); err != nil {
-					return err
+					return attrs[:base], err
 				}
 			}
 		case []any:
 			for _, e := range v {
 				if m, ok := e.(map[string]any); ok {
-					if err := settleIsmTransitionsUnder(m, nodes); err != nil {
-						return err
+					if attrs, err = settleIsmTransitionsIn(m, nodes, attrs[:end]); err != nil {
+						return attrs[:base], err
 					}
 				}
 			}
 		}
 	}
-	return nil
+	return attrs[:base], nil
 }
 
 // impliedOpenehrTerminology gives a rebuilt ISM_TRANSITION's current state and
@@ -3702,7 +3751,7 @@ func isEmptyStructure(c *templatecompile.CompiledNode) bool {
 // keeps a list non-empty once present ask for a member, but the floor keeps
 // no list of an ITEM_STRUCTURE so ([rminfo.NonEmptyLists]).
 func holdsNoMember(c *templatecompile.CompiledNode) bool {
-	for _, attr := range rminfo.Default.RequiredAttributes(bmmtype.Class(c.RMTypeName())) {
+	for _, attr := range requiredAttributes(bmmtype.Class(c.RMTypeName())) {
 		if !carriedByEmptyStructure(attr) {
 			return false
 		}
@@ -3849,7 +3898,34 @@ func completeActionArchetypeIDs(compJSON map[string]any, tmpl *templateIndex) {
 // validator reads it, from the value's class.
 func rmRequires(node map[string]any, attr string) bool {
 	t, _ := node["_type"].(string)
-	return slices.Contains(rminfo.Default.RequiredAttributes(bmmtype.Class(t)), attr)
+	return slices.Contains(requiredAttributes(bmmtype.Class(t)), attr)
+}
+
+// requiredByClass holds what [rminfo.Default] answers RequiredAttributes with
+// for each class it knows, built on first use: the pinned RM does not change,
+// and it answers a fresh list on every call. A class it does not know is not
+// held, so the map stays within the pin's classes. requiredFrom is the Lookup
+// the answers come from; a Default replaced since is asked directly.
+var (
+	requiredByClass sync.Map // class → []string, read-only
+	requiredFrom    = rminfo.Default
+)
+
+// requiredAttributes is rminfo.Default.RequiredAttributes(class), for a caller
+// that only reads the list.
+func requiredAttributes(class string) []string {
+	if rminfo.Default != requiredFrom {
+		return rminfo.Default.RequiredAttributes(class)
+	}
+	if v, ok := requiredByClass.Load(class); ok {
+		return v.([]string)
+	}
+	attrs := requiredFrom.RequiredAttributes(class)
+	if attrs == nil {
+		return nil
+	}
+	v, _ := requiredByClass.LoadOrStore(class, attrs)
+	return v.([]string)
 }
 
 // checkNoPhantoms walks the rebuilt tree and rejects any container element that
@@ -4021,7 +4097,9 @@ func appendMemberName[V any](path []byte, m map[string]any, known map[string]V) 
 // collapsed leaf at `…/items[at0004]/value` stands for at `…/items[at0004]`:
 // that ELEMENT takes its leaf's place.
 func templateRanks(wt *webtemplate.WebTemplate, sib *reusedSiblings) map[string]int {
-	rank := make(map[string]int)
+	// Each node adds its own path; the prefixes it adds are mostly the paths
+	// of nodes above it, and the rest stand for folded nodes.
+	rank := make(map[string]int, sib.nodes+sib.nodes/2)
 	next := 0
 	var walk func(n *webtemplate.Node)
 	walk = func(n *webtemplate.Node) {
@@ -4980,11 +5058,12 @@ type emptySuffixFold struct {
 // unmatched keys (REQ-170). Either way the sink reports every spelling as
 // written. A spelling that holds null is absent (REQ-053), so beside the
 // other spelling it is no disagreement: the value is the other one's. The map
-// returned is flat itself when nothing was folded.
-func foldEmptySuffix(flat map[string]any) (map[string]any, emptySuffixFold) {
+// returned is flat itself when nothing was folded, and fold.spellings is then
+// nil. keys are flat's keys, sorted.
+func foldEmptySuffix(flat map[string]any, keys []string) (map[string]any, emptySuffixFold) {
 	var out map[string]any
 	var fold emptySuffixFold
-	for _, key := range slices.Sorted(maps.Keys(flat)) {
+	for _, key := range keys {
 		bare, piped := strings.CutSuffix(key, "|")
 		if !piped {
 			continue
@@ -5045,12 +5124,13 @@ func splitSuffix(key string) (base, suffix string) {
 	return base, suffix
 }
 
-// checkFlatKeys refuses the first key of flat, in sorted order, that is not a
-// well-formed FLAT key ([flatKeyMalformation]), with [ErrUnknownPath], naming
-// the key and none of its value (REQ-170). Such a key is no path at all, so
-// it is refused in every mode rather than set aside as unmatched content.
-func checkFlatKeys(flat map[string]any) error {
-	for _, key := range slices.Sorted(maps.Keys(flat)) {
+// checkFlatKeys refuses the first of keys, a FLAT map's keys in sorted order,
+// that is not a well-formed FLAT key ([flatKeyMalformation]), with
+// [ErrUnknownPath], naming the key and none of its value (REQ-170). Such a key
+// is no path at all, so it is refused in every mode rather than set aside as
+// unmatched content.
+func checkFlatKeys(keys []string) error {
+	for _, key := range keys {
 		if why := flatKeyMalformation(key); why != "" {
 			return fmt.Errorf("%w: %q is not a well-formed FLAT key: %s", ErrUnknownPath, key, why)
 		}
@@ -5106,8 +5186,19 @@ type parsedKey struct {
 // segment before it is read by [parseFlatSeg]. A segment whose index is not
 // spelled canonically is refused, naming the index and the path.
 func parseFlatKey(key string) (parsedKey, error) {
+	return parseFlatKeyInto(key, make([]flatSeg, 0, flatSegCount(key)))
+}
+
+// flatSegCount is how many path segments [parseFlatKey] reads in key.
+func flatSegCount(key string) int {
+	key, _ = splitSuffix(key)
+	return strings.Count(key, "/") + 1
+}
+
+// parseFlatKeyInto is [parseFlatKey] with the segments appended to segs, which
+// has room for [flatSegCount] of them.
+func parseFlatKeyInto(key string, segs []flatSeg) (parsedKey, error) {
 	key, suffix := splitSuffix(key)
-	segs := make([]flatSeg, 0, strings.Count(key, "/")+1)
 	for p := range strings.SplitSeq(key, "/") {
 		seg, ok := parseFlatSeg(p)
 		if !ok {
@@ -5180,10 +5271,23 @@ type contentKey struct {
 // passes that walk content before the leaf loop. A key that does not parse
 // keeps its error, and each pass decides what that means for it.
 func parseContentKeys(content map[string]any) []contentKey {
-	keys := slices.Sorted(maps.Keys(content))
+	return parseSortedKeys(slices.Sorted(maps.Keys(content)))
+}
+
+// parseSortedKeys is [parseContentKeys] over content's keys, already sorted.
+func parseSortedKeys(keys []string) []contentKey {
 	out := make([]contentKey, len(keys))
+	// The keys' segments share one backing array, each key's capped at its
+	// own count.
+	n := 0
+	for _, key := range keys {
+		n += flatSegCount(key)
+	}
+	segs := make([]flatSeg, 0, n)
 	for i, key := range keys {
-		pk, err := parseFlatKey(key)
+		at, c := len(segs), flatSegCount(key)
+		pk, err := parseFlatKeyInto(key, segs[at:at:at+c])
+		segs = segs[:at+c]
 		out[i] = contentKey{key: key, pk: pk, err: err}
 	}
 	return out

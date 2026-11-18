@@ -80,8 +80,11 @@ func resolve(root rm.Locatable, path string) ([]any, error) {
 		return nil, nil
 	}
 	current := []any{root}
+	// Each step fills the list the step before last filled, which nothing
+	// reads any more.
+	var spare []any
 	for _, seg := range segs {
-		next := make([]any, 0, len(current))
+		next := spare[:0]
 		for _, obj := range current {
 			for _, child := range childrenAt(obj, seg.attr) {
 				if matchesPredicate(child, seg) {
@@ -89,10 +92,13 @@ func resolve(root rm.Locatable, path string) ([]any, error) {
 				}
 			}
 		}
-		current = next
+		current, spare = next, current
 		if len(current) == 0 {
 			break
 		}
+	}
+	if current == nil {
+		current = []any{} // empty, as every miss has always been, never nil
 	}
 	return current, nil
 }
@@ -118,7 +124,8 @@ func parsePath(path string) ([]segment, error) {
 		return nil, nil
 	}
 	var (
-		segs  []segment
+		// A slash inside a predicate is no step, so this may be one too many.
+		segs  = make([]segment, 0, strings.Count(path, "/")+1)
 		depth int
 		start int
 	)

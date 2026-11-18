@@ -36,6 +36,84 @@ type Model struct {
 	absence rminfo.AbsenceReporter
 	roots   sync.Map // reflect.Type → rootOf, see [Model.RootOf]
 	lists   sync.Map // class name → []string, see [Model.required]
+	// index holds what the lookup answers about each class it lists, read
+	// once on first use; see [Model.classes].
+	indexOnce sync.Once
+	index     map[string]*classInfo
+}
+
+// classInfo is what the lookup answers about one class: whether it is
+// abstract, and each attribute as [Model.Attribute] reads it.
+type classInfo struct {
+	name     string
+	abstract bool
+	attrs    map[string]*attrInfo
+}
+
+// attrInfo is one attribute of a class: its name, and what
+// [Model.Attribute] reads about it in a slot that binds nothing.
+type attrInfo struct {
+	name string
+	attr Attribute
+}
+
+// bind returns the attribute as [Model.Attribute] reads it in a slot that
+// binds the class's type parameter to bound.
+func (a *attrInfo) bind(bound string) Attribute {
+	attr := a.attr
+	if attr.Kind == KindParameter && bound != "" {
+		attr.Type, attr.Kind, attr.Payload = bound, KindClass, false
+	}
+	return attr
+}
+
+// member returns the attribute of c that name names, or nil when c is nil or
+// has none, with the name as a string: the attribute's own, so naming it
+// costs nothing, or else a copy.
+func (c *classInfo) member(name []byte) (string, *attrInfo) {
+	if c != nil {
+		if a := c.attrs[string(name)]; a != nil {
+			return a.name, a
+		}
+	}
+	return string(name), nil
+}
+
+// classes returns, keyed by name, every class the lookup lists
+// ([rminfo.Lookup.KnownRMTypes]) and knows as a class, each with the
+// attributes it lists for the class when it is an [rminfo.AttributeLister].
+// It is read from the lookup once and never changes after. A class or
+// attribute it does not hold is asked of the lookup itself, so it changes no
+// answer, only what an answer costs.
+func (m *Model) classes() map[string]*classInfo {
+	m.indexOnce.Do(func() {
+		lister, _ := m.lookup.(rminfo.AttributeLister)
+		names := m.lookup.KnownRMTypes()
+		index := make(map[string]*classInfo, len(names))
+		for _, name := range names {
+			abstract, known := m.hier.IsAbstract(name)
+			if !known {
+				continue
+			}
+			c := &classInfo{name: name, abstract: abstract}
+			if lister != nil {
+				attrs := lister.AttributeNames(name)
+				// infos never grows past its capacity, so the pointers
+				// into it stay valid.
+				infos := make([]attrInfo, 0, len(attrs))
+				c.attrs = make(map[string]*attrInfo, len(attrs))
+				for _, attr := range attrs {
+					if a, ok := m.attribute(name, attr, ""); ok {
+						infos = append(infos, attrInfo{name: attr, attr: a})
+						c.attrs[attr] = &infos[len(infos)-1]
+					}
+				}
+			}
+			index[name] = c
+		}
+		m.index = index
+	})
+	return m.index
 }
 
 // intervalFlags are the four boundary flags BASE Interval declares. The RM
@@ -231,6 +309,16 @@ func (m *Model) Resolve(typ string, hasType bool, declared string) (string, erro
 // DV_QUANTITY.normal_range, binds its bounds to that class. A Hash attribute
 // whose values are RM objects reports the values' class as its Type.
 func (m *Model) Attribute(rmType, name, bound string) (Attribute, bool) {
+	if c := m.classes()[rmType]; c != nil {
+		if a := c.attrs[name]; a != nil {
+			return a.bind(bound), true
+		}
+	}
+	return m.attribute(rmType, name, bound)
+}
+
+// attribute is [Model.Attribute] read from the lookup.
+func (m *Model) attribute(rmType, name, bound string) (Attribute, bool) {
 	typ, ok := m.lookup.AttributeRMType(rmType, name)
 	if !ok {
 		return Attribute{}, false

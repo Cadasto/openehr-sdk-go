@@ -3,6 +3,7 @@ package instance
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
@@ -50,19 +51,21 @@ func newRMIfKnown(declared string) (any, bool) {
 // declared is not a recognised generic form; v is nil when it is one
 // but names no instantiation built here.
 func newGenericRM(declared string) (v any, generic bool) {
-	base, params, ok := bmmtype.Split(declared)
-	if !ok || len(params) == 0 {
-		return nil, false
+	base, param, one := bmmtype.Param(declared)
+	if !one {
+		// DV_INTERVAL takes one parameter; any other count is no known
+		// instantiation, like an unknown parameter. Only a name with a
+		// comma can have more than one.
+		if !strings.Contains(declared, ",") {
+			return nil, false
+		}
+		base, params, ok := bmmtype.Split(declared)
+		return nil, ok && len(params) > 1 && base == "DV_INTERVAL"
 	}
 	if base != "DV_INTERVAL" {
 		return nil, false
 	}
-	// DV_INTERVAL takes one parameter; any other count is no known
-	// instantiation, like an unknown parameter.
-	if len(params) != 1 {
-		return nil, true
-	}
-	build, ok := intervalOver[params[0]]
+	build, ok := intervalOver[param]
 	if !ok {
 		return nil, true
 	}
@@ -93,22 +96,30 @@ var intervalOver = map[string]func() any{
 // type, an interval over an abstract class that is no DV_ORDERED, such as
 // DATA_VALUE, included: the RM admits no such parameter.
 func abstractIntervalParameter(declared string) (param string, ok bool) {
-	if !strings.HasPrefix(declared, "DV_INTERVAL") {
+	rest, interval := strings.CutPrefix(declared, "DV_INTERVAL")
+	if !interval {
 		return "", false
 	}
-	base, params, split := bmmtype.Split(declared)
-	if !split || base != "DV_INTERVAL" || len(params) != 1 {
+	// An interval over a class intervalOver builds, written without white
+	// space as templates write it, is told without parsing the name.
+	if len(rest) > 2 && rest[0] == '<' && rest[len(rest)-1] == '>' {
+		if _, builds := intervalOver[rest[1:len(rest)-1]]; builds {
+			return "", false
+		}
+	}
+	base, param, one := bmmtype.Param(declared)
+	if !one || base != "DV_INTERVAL" {
 		return "", false
 	}
-	if _, builds := intervalOver[params[0]]; builds {
+	if _, builds := intervalOver[param]; builds {
 		return "", false
 	}
 	h, isHierarchy := rminfo.Default.(rminfo.Hierarchy)
 	if !isHierarchy {
 		return "", false
 	}
-	abstract, known := h.IsAbstract(params[0])
-	return params[0], known && abstract && descendsFrom(params[0], "DV_ORDERED")
+	abstract, known := h.IsAbstract(param)
+	return param, known && abstract && descendsFrom(param, "DV_ORDERED")
 }
 
 // concreteIntervalParameter returns the concrete descendant of param, an
@@ -134,8 +145,26 @@ func concreteIntervalParameter(param string) string {
 // order, of rmType when the pinned BMM knows it as an abstract data-value
 // class that concreteFor's table does not name, such as DV_QUANTIFIED,
 // DV_ORDERED or DV_TEMPORAL, and "" otherwise. Other abstract classes keep
-// failing as unknown RM types, as before.
-func firstConcreteDataValue(rmType string) string {
+// failing as unknown RM types, as before. It reads the answer from a table
+// built once, since concreteFor asks it for nearly every node.
+func firstConcreteDataValue(rmType string) string { return firstConcreteDataValues()[rmType] }
+
+// firstConcreteDataValues holds firstConcreteDataValueOf for each class
+// rminfo.Default knows that has one. The pinned RM does not change, so it
+// is built on first use and only read after, by any number of goroutines.
+var firstConcreteDataValues = sync.OnceValue(func() map[string]string {
+	table := make(map[string]string)
+	for _, class := range rminfo.Default.KnownRMTypes() {
+		if d := firstConcreteDataValueOf(class); d != "" {
+			table[class] = d
+		}
+	}
+	return table
+})
+
+// firstConcreteDataValueOf is firstConcreteDataValue read from the pinned
+// BMM's class hierarchy.
+func firstConcreteDataValueOf(rmType string) string {
 	h, ok := rminfo.Default.(rminfo.Hierarchy)
 	if !ok {
 		return ""

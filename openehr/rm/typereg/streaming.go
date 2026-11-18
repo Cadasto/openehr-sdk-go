@@ -415,7 +415,7 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 	case out == nil:
 		return nilArgument("DecodePolymorphic", "out", reflect.TypeFor[T]().Name())
 	}
-	if handled, err := decodeSlotInPlace(dec, out); handled {
+	if handled, err := decodeSlotInPlace(dec, out, fallback); handled {
 		return err
 	}
 	raw, err := dec.ReadValue()
@@ -525,7 +525,9 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 // buffered decode would: dec carries the SDK's hooks under their buffered
 // identity ([hookSet]), so the slot sits in a value an enclosing slot read
 // whole; dec reports errors with v2 semantics; and the slot is an object whose
-// leading `_type` [leadingType] reads and [Default] knows. The enclosing read
+// leading `_type` [leadingType] reads and [Default] knows, or, where the slot
+// has a fallback, an object with no `_type` member at all ([lacksTypeMember]),
+// which the buffered decode's peek reads as absent. The enclosing read
 // tokenised every byte of that value under these options and checked its depth
 // from the document's root (REQ-108), so a second read of this slot could find
 // neither malformed input nor a depth refusal. It would only cost time, once
@@ -535,7 +537,7 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 // caller then reads the slot whole. A failure keeps the positions a decoder of
 // the slot's own would give it ([rebaseSlotError]), inside the [DecodeError]
 // that names the slot's `_type`, as the buffered decode's does.
-func decodeSlotInPlace[T any](dec *jsontext.Decoder, out *T) (handled bool, err error) {
+func decodeSlotInPlace[T any](dec *jsontext.Decoder, out *T, fallback func() any) (handled bool, err error) {
 	opts := dec.Options()
 	set := unmarshalerAgg.Load()
 	if hooks, _ := json.GetOption(opts, json.WithUnmarshalers); set == nil || hooks != set.buffered {
@@ -553,15 +555,20 @@ func decodeSlotInPlace[T any](dec *jsontext.Decoder, out *T) (handled bool, err 
 	if lead < len(ahead) && (ahead[lead] == ':' || ahead[lead] == ',') {
 		lead = skipWhitespace(ahead, lead+1)
 	}
+	var v any
 	name, ok := leadingType(ahead[lead:], opts)
-	if !ok || name == "" {
+	switch {
+	case ok && name != "":
+		ctor, known := Default.Lookup(name)
+		if !known {
+			return false, nil
+		}
+		v = ctor()
+	case !ok && fallback != nil && plainTypeMember(opts) && lacksTypeMember(ahead[lead:]):
+		v = fallback()
+	default:
 		return false, nil
 	}
-	ctor, ok := Default.Lookup(name)
-	if !ok {
-		return false, nil
-	}
-	v := ctor()
 	depth, start := dec.StackDepth(), dec.InputOffset()+int64(lead)
 	if err := json.UnmarshalDecode(dec, v); err != nil {
 		slot := slotPrefix(dec.StackPointer(), depth)
@@ -783,15 +790,11 @@ func peekType(raw jsontext.Value, opts ...json.Options) (string, error) {
 // through the peek.
 //
 // raw must be a complete JSON value the decoder has already accepted; the scan
-// relies on that and checks syntax only as far as the _type value.
+// relies on that and checks syntax only as far as the _type value. A name
+// [Default] registers comes back as the registry's own string, so the slots of
+// known types copy nothing.
 func leadingType(raw jsontext.Value, opts json.Options) (name string, ok bool) {
-	if dup, _ := json.GetOption(opts, jsontext.AllowDuplicateNames); dup {
-		return "", false
-	}
-	if fold, _ := json.GetOption(opts, json.MatchCaseInsensitiveNames); fold {
-		return "", false
-	}
-	if hooks, _ := json.GetOption(opts, json.WithUnmarshalers); !unmarshalerAgg.Load().sdkHooks(hooks) {
+	if !plainTypeMember(opts) {
 		return "", false
 	}
 	i := skipWhitespace(raw, 0)
@@ -815,12 +818,75 @@ func leadingType(raw jsontext.Value, opts json.Options) (name string, ok bool) {
 	for j := start; j < len(raw); j++ {
 		switch c := raw[j]; {
 		case c == '"':
+			if name, ok := Default.registeredName(raw[start:j]); ok {
+				return name, true
+			}
 			return string(raw[start:j]), true
 		case c == '\\' || c >= 0x80:
 			return "", false
 		}
 	}
 	return "", false
+}
+
+// plainTypeMember reports whether, under opts, a decode reads `_type` from the
+// one member whose name is spelled exactly so and runs no caller code on it:
+// duplicate names are refused, names match case-sensitively, and the hook set
+// is the SDK aggregate under either identity. [leadingType] and
+// [lacksTypeMember] read raw bytes in place of that decode only then.
+func plainTypeMember(opts json.Options) bool {
+	if dup, _ := json.GetOption(opts, jsontext.AllowDuplicateNames); dup {
+		return false
+	}
+	if fold, _ := json.GetOption(opts, json.MatchCaseInsensitiveNames); fold {
+		return false
+	}
+	hooks, _ := json.GetOption(opts, json.WithUnmarshalers)
+	return unmarshalerAgg.Load().sdkHooks(hooks)
+}
+
+// lacksTypeMember reports whether raw is an object none of whose members is
+// named `_type`, so that [peekType] would read the discriminator as absent
+// under options [plainTypeMember] accepts. A member name holding a backslash
+// escape could decode to `_type`, so it makes the answer false, as anything
+// but an object does. raw opens with a JSON value the decoder has already
+// accepted, whose syntax the scan does not check again; it stops at the end of
+// that object, and answers false where raw ends before the object does.
+func lacksTypeMember(raw []byte) bool {
+	i := skipWhitespace(raw, 0)
+	if i >= len(raw) || raw[i] != '{' {
+		return false
+	}
+	depth, atName := 0, false
+	for ; i < len(raw); i++ {
+		switch raw[i] {
+		case '{', '[':
+			depth++
+			atName = raw[i] == '{' && depth == 1
+		case '}', ']':
+			depth--
+			if depth == 0 {
+				return true
+			}
+		case ',':
+			atName = depth == 1
+		case '"':
+			start, escaped := i+1, false
+			for i++; i < len(raw) && raw[i] != '"'; i++ {
+				if raw[i] == '\\' {
+					escaped = true
+					i++
+				}
+			}
+			if atName {
+				if escaped || string(raw[start:min(i, len(raw))]) == "_type" {
+					return false
+				}
+				atName = false
+			}
+		}
+	}
+	return false
 }
 
 // skipWhitespace returns the index of the first byte of b at or after i that is

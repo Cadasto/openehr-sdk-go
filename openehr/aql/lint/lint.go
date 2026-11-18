@@ -245,18 +245,19 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	if opts == nil {
 		opts = &Options{}
 	}
-	md := Extract(doc)
-	issues := []Issue{}
+	md := factsOf(doc)
+	// One slot per check group, in the order Result.Issues lists them.
+	var groups [5][]Issue
 
 	// opts.Query reaches the shape group too: the TOP check needs the request
 	// envelope to see the second row-limit channel (REQ-109). A nil Query
 	// leaves that channel invisible, exactly as it gates the parameter checks.
-	issues = append(issues, shapeIssues(doc, md, opts.Query)...)
+	groups[0] = shapeIssues(doc, md, opts.Query)
 	// The Layer-2 semantic group (REQ-161) is unconditional: unlike Compiled
 	// and Query, the relation always has a usable default, so a nil
 	// Options.Relation selects the pinned RM rather than switching the group
 	// off.
-	issues = append(issues, semanticIssues(doc, opts.Relation)...)
+	groups[1] = semanticIssues(doc, opts.Relation)
 	// The Layer-2 path-shape group (REQ-161) is ungated too, and for a
 	// stronger reason: it has no input to gate on. Every fact it reads is in
 	// the query text, the pinned BMM, or a relation that defaults when absent,
@@ -268,14 +269,39 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	// being unable to fire, not the group being gated. opts.Relation reaches it
 	// for aql_contains_redundant_step alone, and nil there selects the default
 	// relation exactly as it does for the semantic group above.
-	issues = append(issues, pathShapeIssues(doc, md, opts.Query, opts.Relation)...)
+	groups[2] = pathShapeIssues(doc, md, opts.Query, opts.Relation)
 	if opts.Query != nil {
-		issues = append(issues, paramIssues(md, opts.Query)...)
+		groups[3] = paramIssues(md, opts.Query)
 	}
 	if opts.Compiled != nil {
-		issues = append(issues, templateIssues(md, opts.Compiled)...)
+		groups[4] = templateIssues(md, opts.Compiled)
 	}
-	return Result{Issues: issues}
+	return Result{Issues: joinIssues(groups[:]...)}
+}
+
+// joinIssues concatenates groups in order. A single non-empty group is
+// returned as it is, and more are copied into one list allocated once. The
+// result is never nil.
+func joinIssues(groups ...[]Issue) []Issue {
+	n, nonEmpty, only := 0, 0, 0
+	for i, g := range groups {
+		if len(g) > 0 {
+			n += len(g)
+			nonEmpty++
+			only = i
+		}
+	}
+	switch nonEmpty {
+	case 0:
+		return []Issue{}
+	case 1:
+		return groups[only]
+	}
+	out := make([]Issue, 0, n)
+	for _, g := range groups {
+		out = append(out, g...)
+	}
+	return out
 }
 
 // shapeIssues runs the Layer-2 shape checks: alias binding,
@@ -284,7 +310,7 @@ func Lint(doc *parse.Document, opts *Options) Result {
 // grammar requires both), so no aql_select / aql_from issue can arise here.
 // q is the request envelope from [Options.Query] (nil when the caller supplied
 // none); only the TOP group reads it, and only for its row limit.
-func shapeIssues(doc *parse.Document, md Metadata, q *aql.Query) []Issue {
+func shapeIssues(doc *parse.Document, md queryFacts, q *aql.Query) []Issue {
 	var issues []Issue
 
 	// aql_unknown_alias — every identified path's root alias MUST bind to a
@@ -292,15 +318,11 @@ func shapeIssues(doc *parse.Document, md Metadata, q *aql.Query) []Issue {
 	// there is resolved against the SELECT `AS` aliases before the issue is
 	// raised. FROM/CONTAINS is consulted first, so a SELECT alias reusing a
 	// bound alias never shadows the class binding.
-	selectAliases := make(map[string]bool, len(md.SelectAliases))
-	for _, a := range md.SelectAliases {
-		selectAliases[a] = true
-	}
 	for _, p := range doc.Paths {
-		if _, ok := md.Aliases[p.Alias]; ok {
+		if _, ok := md.aliases.lookup(p.Alias); ok {
 			continue
 		}
-		if namesSelectAlias(p, selectAliases) {
+		if namesSelectAlias(p, md.selectAliases) {
 			continue
 		}
 		issues = append(issues, Issue{
@@ -335,8 +357,7 @@ func shapeIssues(doc *parse.Document, md Metadata, q *aql.Query) []Issue {
 		})
 	}
 
-	issues = append(issues, topIssues(doc, q)...)
-	return issues
+	return joinIssues(issues, topIssues(doc, q))
 }
 
 // topIssues reports the deprecated `SELECT TOP` modifier and the two row-bound
@@ -402,11 +423,11 @@ func topIssues(doc *parse.Document, q *aql.Query) []Issue {
 // labels a projected column, not a path root, so `ORDER BY score/magnitude`
 // (or a predicated key) stays aql_unknown_alias. The fallback is scoped to
 // ORDER BY — a SELECT alias is not a SELECT or WHERE operand root.
-func namesSelectAlias(p parse.IdentifiedPath, selectAliases map[string]bool) bool {
+func namesSelectAlias(p parse.IdentifiedPath, selectAliases nameSet) bool {
 	if p.Clause != parse.ClauseOrderBy || len(p.Segments) > 0 || p.Predicate != "" {
 		return false
 	}
-	return selectAliases[p.Alias]
+	return selectAliases.has(p.Alias)
 }
 
 // hasIdentifiableScope reports whether FROM / CONTAINS names a literal
@@ -422,11 +443,11 @@ func hasIdentifiableScope(doc *parse.Document) bool {
 
 // paramIssues runs the Layer-2 parameter-binding checks against a Query's
 // Parameters map.
-func paramIssues(md Metadata, q *aql.Query) []Issue {
+func paramIssues(md queryFacts, q *aql.Query) []Issue {
 	var issues []Issue
 
 	// aql_unbound_param — every $name referenced MUST have a Parameters key.
-	for _, name := range md.Params {
+	for _, name := range md.params {
 		if _, ok := q.Parameters[name]; !ok {
 			issues = append(issues, Issue{
 				Code:     "aql_unbound_param",
@@ -437,8 +458,8 @@ func paramIssues(md Metadata, q *aql.Query) []Issue {
 	}
 
 	// aql_unused_param — a bound parameter not referenced is advisory.
-	referenced := make(map[string]bool, len(md.Params))
-	for _, name := range md.Params {
+	referenced := make(map[string]bool, len(md.params))
+	for _, name := range md.params {
 		referenced[name] = true
 	}
 	// Sort keys: map iteration order is random, but Result.Issues is

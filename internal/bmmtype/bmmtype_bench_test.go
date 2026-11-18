@@ -57,3 +57,14 @@ func BenchmarkSubstitute(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkParam(b *testing.B) {
+	for _, bc := range benchNames {
+		b.Run(bc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				bmmtype.Param(bc.typ)
+			}
+		})
+	}
+}

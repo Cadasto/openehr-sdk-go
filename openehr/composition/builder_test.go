@@ -382,6 +382,44 @@ func TestBuilder_Build_Idempotent(t *testing.T) {
 	}
 }
 
+// TestBuilder_CopyAfterBuildQueuesApart confirms a shallow copy of a Builder
+// taken after a Build queues its Set calls apart from the original: the
+// original's Build writes the value the original was given, not the copy's.
+func TestBuilder_CopyAfterBuildQueuesApart(t *testing.T) {
+	c := compileFixture(t, "vital_signs")
+	b, err := composition.NewBuilder(t.Context(), c,
+		composition.WithTerritory("NL"),
+		composition.WithComposer(testComposer()),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	if err := b.SetQuantity(systolicPath, 110, "mm[Hg]"); err != nil {
+		t.Fatalf("SetQuantity 110: %v", err)
+	}
+	if _, err := b.Build(); err != nil {
+		t.Fatalf("first Build: %v", err)
+	}
+	cp := *b
+	if err := b.SetQuantity(systolicPath, 120, "mm[Hg]"); err != nil {
+		t.Fatalf("original SetQuantity 120: %v", err)
+	}
+	if err := cp.SetQuantity(systolicPath, 130, "mm[Hg]"); err != nil {
+		t.Fatalf("copy SetQuantity 130: %v", err)
+	}
+	comp, err := b.Build()
+	if err != nil {
+		t.Fatalf("original Build: %v", err)
+	}
+	sys, _ := findSystolicDiastolic(comp)
+	if sys == nil {
+		t.Fatal("systolic DV_QUANTITY not found in built composition")
+	}
+	if float64(sys.Magnitude) != 120 {
+		t.Errorf("original Build wrote systolic %v, want its own 120", sys.Magnitude)
+	}
+}
+
 // TestBuilder_TemplateID asserts Builder.TemplateID matches the
 // compiled template's id.
 //

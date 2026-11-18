@@ -342,8 +342,8 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 		*r = Real(f)
 		return nil
 	}
-	var f float64
-	if err := json.Unmarshal(b, &f); err != nil {
+	f, err := unmarshalFloat(b)
+	if err != nil {
 		return fmt.Errorf("rm.Real: %w", err)
 	}
 	if lossy(string(b), f) {
@@ -351,6 +351,69 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 	}
 	*r = Real(f)
 	return nil
+}
+
+// unmarshalFloat reads b as encoding/json/v2 unmarshals it into a float64,
+// with the same value and the same error. A JSON number that strconv.ParseFloat
+// reads without error, which is the number json/v2 then stores, is parsed
+// here directly; any other input goes through json.Unmarshal for its refusal.
+// The float the slow path decodes into escapes to the heap, which the fast
+// path, returning first, never reaches.
+func unmarshalFloat(b []byte) (float64, error) {
+	if isJSONNumber(b) {
+		if f, err := strconv.ParseFloat(string(b), 64); err == nil {
+			return f, nil
+		}
+	}
+	var f float64
+	err := json.Unmarshal(b, &f)
+	return f, err
+}
+
+// isJSONNumber reports whether b is exactly one number as RFC 8259 § 6 spells
+// it: an optional minus, an integer part with no leading zero, an optional
+// fraction and an optional exponent, with nothing around it.
+func isJSONNumber(b []byte) bool {
+	i := 0
+	if i < len(b) && b[i] == '-' {
+		i++
+	}
+	switch {
+	case i < len(b) && b[i] == '0':
+		i++
+	case i < len(b) && b[i] >= '1' && b[i] <= '9':
+		i = skipDigits(b, i)
+	default:
+		return false
+	}
+	if i < len(b) && b[i] == '.' {
+		j := skipDigits(b, i+1)
+		if j == i+1 {
+			return false
+		}
+		i = j
+	}
+	if i < len(b) && (b[i] == 'e' || b[i] == 'E') {
+		i++
+		if i < len(b) && (b[i] == '+' || b[i] == '-') {
+			i++
+		}
+		j := skipDigits(b, i)
+		if j == i {
+			return false
+		}
+		i = j
+	}
+	return i == len(b)
+}
+
+// skipDigits returns the index of the first byte of b at or after i that is
+// not an ASCII decimal digit, or len(b).
+func skipDigits(b []byte, i int) int {
+	for i < len(b) && b[i] >= '0' && b[i] <= '9' {
+		i++
+	}
+	return i
 }
 
 // UnmarshalText implements [encoding.TextUnmarshaler] so that canonical XML
