@@ -7,7 +7,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -16,7 +15,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
-	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	templateprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
 )
 
@@ -217,7 +215,8 @@ func TestREQ111_ResolveReachesLaterAlternative(t *testing.T) {
 }
 
 // TestREQ111_ResolveFollowsResolutionRulesOverCorpus holds Resolve to the
-// rules of § REQ-111 Path lookup on every corpus template: for every node,
+// rules of § REQ-111 Path lookup on every operational template PROBE-111
+// covers, the corpus's and the generic ones the SDK ships: for every node,
 // the path built from the node ids and archetype ids above it resolves, in
 // the default and the strict mode, to the node resolveByRules reaches on the
 // compiled tree's attributes and children, or both refuse it alike. The
@@ -229,11 +228,10 @@ func TestREQ111_ResolveFollowsResolutionRulesOverCorpus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Probe111OperationalTemplates: %v", err)
 	}
-	root := fixtures.CorpusRoot()
 	var checked, elsewhere, ambiguous int
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
-			c, err := templatecompile.Compile(mustReadModelFile(t, filepath.Join(root, filepath.FromSlash(name))))
+			c, err := templatecompile.Compile(mustReadModelFile(t, templateprobes.Probe111TemplatePath(name)))
 			if err != nil {
 				t.Skipf("does not compile: %v", err)
 			}

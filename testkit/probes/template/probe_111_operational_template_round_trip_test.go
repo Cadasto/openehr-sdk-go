@@ -27,20 +27,16 @@ const probe111CorpusFloor = 84
 // covers, the corpus's and the generic ones, sorted.
 func probe111Templates(t *testing.T) []string {
 	t.Helper()
-	corpus, err := probes.Probe111OperationalTemplates()
+	names, err := probes.Probe111OperationalTemplates()
 	if err != nil {
 		t.Fatalf("Probe111OperationalTemplates: %v", err)
 	}
-	generic, err := probes.Probe111GenericTemplates()
-	if err != nil {
-		t.Fatalf("Probe111GenericTemplates: %v", err)
-	}
-	names := slices.Concat(corpus, generic)
-	slices.Sort(names)
 	return names
 }
 
-func readCorpusTemplate(t *testing.T, name string) []byte {
+// readTemplate reads the operational template name, as
+// Probe111OperationalTemplates gives it.
+func readTemplate(t *testing.T, name string) []byte {
 	t.Helper()
 	body, err := os.ReadFile(probes.Probe111TemplatePath(name))
 	if err != nil {
@@ -62,7 +58,7 @@ func TestProbe111OperationalTemplateRoundTrip(t *testing.T) {
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			r, err := probes.Probe111OperationalTemplateRoundTrip(readCorpusTemplate(t, name))
+			r, err := probes.Probe111OperationalTemplateRoundTrip(readTemplate(t, name))
 			if err != nil {
 				t.Fatalf("Probe111OperationalTemplateRoundTrip(%s): framework error %v", name, err)
 			}
@@ -96,17 +92,21 @@ func TestProbe111OperationalTemplatesReachTheCrossFormatSets(t *testing.T) {
 	}
 }
 
-// PROBE-111 (REQ-176, REQ-178): the probe covers the two generic templates
-// the SDK ships, read from their package, the one copy of each, under names
-// no corpus template takes.
+// PROBE-111 (REQ-176, REQ-178): the one list of the templates the probe
+// covers holds the two generic templates the SDK ships, each once, read from
+// their package, the one copy of each. No corpus template takes a generic/
+// name: Probe111TemplatePath resolves such a name to the generic templates'
+// folder, so a corpus file named that way would never be read.
 func TestProbe111CoversTheGenericTemplates(t *testing.T) {
-	generic, err := probes.Probe111GenericTemplates()
-	if err != nil {
-		t.Fatalf("Probe111GenericTemplates: %v", err)
+	var generic []string
+	for _, name := range probe111Templates(t) {
+		if strings.HasPrefix(name, "generic/") {
+			generic = append(generic, name)
+		}
 	}
 	want := []string{"generic/generic_ehr_status.v1.opt", "generic/generic_folder.v1.opt"}
 	if !slices.Equal(generic, want) {
-		t.Errorf("Probe111GenericTemplates() = %q, want %q", generic, want)
+		t.Errorf("Probe111OperationalTemplates() lists %q under generic/, want %q: the generic templates, each once, and no corpus template", generic, want)
 	}
 	for _, name := range generic {
 		path := probes.Probe111TemplatePath(name)
@@ -115,15 +115,6 @@ func TestProbe111CoversTheGenericTemplates(t *testing.T) {
 		}
 		if _, err := os.Stat(path); err != nil {
 			t.Errorf("Probe111TemplatePath(%q): %v", name, err)
-		}
-	}
-	corpus, err := probes.Probe111OperationalTemplates()
-	if err != nil {
-		t.Fatalf("Probe111OperationalTemplates: %v", err)
-	}
-	for _, name := range corpus {
-		if strings.HasPrefix(name, "generic/") {
-			t.Errorf("the corpus holds %s, whose name Probe111TemplatePath resolves to the generic templates' folder", name)
 		}
 	}
 }
@@ -183,7 +174,7 @@ func TestProbe111WriteSchemaDocuments(t *testing.T) {
 		if slices.Contains(held, name) {
 			continue
 		}
-		out, err := probes.Probe111ReEncode(readCorpusTemplate(t, name))
+		out, err := probes.Probe111ReEncode(readTemplate(t, name))
 		if err != nil {
 			t.Errorf("Probe111ReEncode(%s): %v", name, err)
 			continue

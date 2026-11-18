@@ -6,9 +6,9 @@ package aom14_test
 // element limit, during the decode through canxml.WithMaxDepth, and inside
 // content a reading leaves out, each with an error wrapping
 // canxml.ErrLimitExceeded. REQ-176 (clinical-modeling.md § REQ-176): it reads
-// every corpus operational template into the model as canxml.Unmarshal does,
-// a byte-order-marked one among them, and does not match the root element by
-// name.
+// every operational template PROBE-111 covers, the corpus's and the generic
+// ones, into the model as canxml.Unmarshal does, a byte-order-marked one among
+// them, and does not match the root element by name.
 
 import (
 	"bytes"
@@ -18,7 +18,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"testing/iotest"
@@ -27,7 +26,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
-	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	templateprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
 )
 
@@ -85,8 +83,9 @@ func nested(depth int) string {
 }
 
 // TestREQ176_ReadOperationalTemplateReadsTheCorpus pins that the reader reads
-// every corpus operational template into the value canxml.Unmarshal decodes
-// it into, the byte-order-marked ones among them.
+// every operational template PROBE-111 covers, the corpus's and the generic
+// ones the SDK ships, into the value canxml.Unmarshal decodes it into, the
+// byte-order-marked ones among them.
 func TestREQ176_ReadOperationalTemplateReadsTheCorpus(t *testing.T) {
 	t.Parallel()
 	names, err := templateprobes.Probe111OperationalTemplates()
@@ -94,11 +93,11 @@ func TestREQ176_ReadOperationalTemplateReadsTheCorpus(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(names) == 0 {
-		t.Fatal("the corpus holds no operational template")
+		t.Fatal("PROBE-111 covers no operational template")
 	}
 	bom := 0
 	for _, name := range names {
-		data, err := os.ReadFile(filepath.Join(fixtures.CorpusRoot(), filepath.FromSlash(name)))
+		data, err := os.ReadFile(templateprobes.Probe111TemplatePath(name))
 		if err != nil {
 			t.Fatal(err)
 		}

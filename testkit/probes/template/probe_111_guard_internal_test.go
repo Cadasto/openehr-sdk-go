@@ -3,12 +3,10 @@ package templateprobes
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 	"regexp"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
-	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // probe111WithheldMember is the operational template member the can-fail
@@ -17,8 +15,8 @@ import (
 const probe111WithheldMember = "referenceSetUri"
 
 // TestProbe111GuardCatchesAWithheldMember is the can-fail control for
-// PROBE-111's round-trip leg (REQ-176 § Round trip). On every corpus
-// operational template that carries C_CODE_REFERENCE.referenceSetUri, the leg
+// PROBE-111's round-trip leg (REQ-176 § Round trip). On every operational
+// template PROBE-111 covers that carries C_CODE_REFERENCE.referenceSetUri, the leg
 // runs with a decoder that withholds that member, and it must fail, naming
 // the member, through the check that sees it:
 //
@@ -81,7 +79,7 @@ func TestProbe111GuardCatchesAWithheldMember(t *testing.T) {
 	}
 	carriers := 0
 	for _, name := range names {
-		body, err := os.ReadFile(filepath.Join(fixtures.CorpusRoot(), filepath.FromSlash(name)))
+		body, err := os.ReadFile(Probe111TemplatePath(name))
 		if err != nil {
 			t.Fatalf("read %s: %v", name, err)
 		}
@@ -106,6 +104,6 @@ func TestProbe111GuardCatchesAWithheldMember(t *testing.T) {
 		}
 	}
 	if carriers == 0 {
-		t.Fatalf("no corpus operational template carries %s: the control proves nothing", probe111WithheldMember)
+		t.Fatalf("no operational template PROBE-111 covers carries %s: the control proves nothing", probe111WithheldMember)
 	}
 }
