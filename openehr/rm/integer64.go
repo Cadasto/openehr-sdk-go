@@ -2,6 +2,7 @@ package rm
 
 import (
 	"bytes"
+	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -82,8 +83,8 @@ func (i *Integer64) UnmarshalJSON(b []byte) error {
 		*i = Integer64(n)
 		return nil
 	}
-	var n int64
-	if err := json.Unmarshal(b, &n); err != nil {
+	n, err := unmarshalInt[int64](b, 64)
+	if err != nil {
 		// encoding/json/v2 refuses any literal with a fraction or an
 		// exponent for an int64, 1.0 included, so a refused literal is read
 		// again as a whole number before the refusal stands.
@@ -109,4 +110,12 @@ func (i *Integer64) UnmarshalJSON(b []byte) error {
 // MarshalJSON emits a JSON number.
 func (i Integer64) MarshalJSON() ([]byte, error) {
 	return json.Marshal(int64(i))
+}
+
+// MarshalJSONTo writes the JSON number [Integer64.MarshalJSON] returns
+// straight to enc, without building it in a slice of its own; encoding/json
+// prefers this method to MarshalJSON.
+func (i Integer64) MarshalJSONTo(enc *jsontext.Encoder) error {
+	var buf [24]byte
+	return enc.WriteValue(strconv.AppendInt(buf[:0], int64(i), 10))
 }

@@ -111,6 +111,25 @@ func TestLeadingType(t *testing.T) {
 	}
 }
 
+// TestLeadingTypeOfARegisteredNameDoesNotAllocate pins the cost of the slot
+// dispatch: a leading `_type` that names a registered class comes
+// back as the registry's own string, with no copy of the slot's bytes, while
+// an unknown name, read for its error, is copied.
+func TestLeadingTypeOfARegisteredNameDoesNotAllocate(t *testing.T) {
+	sdk := sdkSlotOptions()
+	known := jsontext.Value(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}`)
+	unknown := jsontext.Value(`{"_type":"NO_SUCH_TYPE"}`)
+	if name, ok := leadingType(known, sdk); name != "DV_QUANTITY" || !ok {
+		t.Fatalf("leadingType(%s) = %q, %v; want DV_QUANTITY, true", known, name, ok)
+	}
+	if got := testing.AllocsPerRun(100, func() { _, _ = leadingType(known, sdk) }); got != 0 {
+		t.Errorf("leadingType(%s) allocates %v times per call; want 0", known, got)
+	}
+	if name, ok := leadingType(unknown, sdk); name != "NO_SUCH_TYPE" || !ok {
+		t.Errorf("leadingType(%s) = %q, %v; want NO_SUCH_TYPE, true", unknown, name, ok)
+	}
+}
+
 // TestLeadingTypeGuardsAgreeWithPeekType pins that each guard in leadingType is
 // load-bearing. In each row the full decode does not read the leading member's
 // raw bytes as _type: with duplicate names allowed a later _type wins, with

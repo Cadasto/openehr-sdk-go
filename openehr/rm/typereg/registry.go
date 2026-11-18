@@ -94,7 +94,15 @@ var (
 // during package init.
 type Registry struct {
 	mu    sync.RWMutex
-	ctors map[string]func() any
+	ctors map[string]registration
+}
+
+// registration is one registered type: its constructor, and the name it was
+// registered under, which [Registry.registeredName] hands back in place of a
+// copy of the bytes it was asked about.
+type registration struct {
+	name string
+	ctor func() any
 }
 
 // Default is the process-wide registry. The rm package's init()
@@ -104,7 +112,7 @@ var Default = NewRegistry()
 // NewRegistry returns an empty registry. Useful for tests that want
 // an isolated registry; production code uses [Default].
 func NewRegistry() *Registry {
-	return &Registry{ctors: make(map[string]func() any)}
+	return &Registry{ctors: make(map[string]registration)}
 }
 
 // Register associates an openEHR _type string with a constructor.
@@ -122,7 +130,7 @@ func (r *Registry) Register(typeName string, ctor func() any) {
 	if _, exists := r.ctors[typeName]; exists {
 		panic(fmt.Sprintf("typereg.Register: duplicate registration for %q", typeName))
 	}
-	r.ctors[typeName] = ctor
+	r.ctors[typeName] = registration{name: typeName, ctor: ctor}
 }
 
 // Lookup returns the constructor for typeName and a boolean
@@ -130,8 +138,18 @@ func (r *Registry) Register(typeName string, ctor func() any) {
 func (r *Registry) Lookup(typeName string) (func() any, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	c, ok := r.ctors[typeName]
-	return c, ok
+	reg, ok := r.ctors[typeName]
+	return reg.ctor, ok
+}
+
+// registeredName returns the name a type was registered under when name
+// spells it, without copying name to a string of its own; ok is false when no
+// type of that name is registered.
+func (r *Registry) registeredName(name []byte) (string, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	reg, ok := r.ctors[string(name)]
+	return reg.name, ok
 }
 
 // Names returns a sorted snapshot of every registered type name, which

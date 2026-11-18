@@ -3,6 +3,7 @@ package rm
 import (
 	"bytes"
 	"encoding"
+	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -342,8 +343,8 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 		*r = Real(f)
 		return nil
 	}
-	var f float64
-	if err := json.Unmarshal(b, &f); err != nil {
+	f, err := unmarshalFloat(b)
+	if err != nil {
 		return fmt.Errorf("rm.Real: %w", err)
 	}
 	if lossy(string(b), f) {
@@ -351,6 +352,69 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 	}
 	*r = Real(f)
 	return nil
+}
+
+// unmarshalFloat reads b as encoding/json/v2 unmarshals it into a float64,
+// with the same value and the same error. A JSON number that strconv.ParseFloat
+// reads without error, which is the number json/v2 then stores, is parsed
+// here directly; any other input goes through json.Unmarshal for its refusal.
+// The float the slow path decodes into escapes to the heap, which the fast
+// path, returning first, never reaches.
+func unmarshalFloat(b []byte) (float64, error) {
+	if isJSONNumber(b) {
+		if f, err := strconv.ParseFloat(string(b), 64); err == nil {
+			return f, nil
+		}
+	}
+	var f float64
+	err := json.Unmarshal(b, &f)
+	return f, err
+}
+
+// isJSONNumber reports whether b is exactly one number as RFC 8259 § 6 spells
+// it: an optional minus, an integer part with no leading zero, an optional
+// fraction and an optional exponent, with nothing around it.
+func isJSONNumber(b []byte) bool {
+	i := 0
+	if i < len(b) && b[i] == '-' {
+		i++
+	}
+	switch {
+	case i < len(b) && b[i] == '0':
+		i++
+	case i < len(b) && b[i] >= '1' && b[i] <= '9':
+		i = skipDigits(b, i)
+	default:
+		return false
+	}
+	if i < len(b) && b[i] == '.' {
+		j := skipDigits(b, i+1)
+		if j == i+1 {
+			return false
+		}
+		i = j
+	}
+	if i < len(b) && (b[i] == 'e' || b[i] == 'E') {
+		i++
+		if i < len(b) && (b[i] == '+' || b[i] == '-') {
+			i++
+		}
+		j := skipDigits(b, i)
+		if j == i {
+			return false
+		}
+		i = j
+	}
+	return i == len(b)
+}
+
+// skipDigits returns the index of the first byte of b at or after i that is
+// not an ASCII decimal digit, or len(b).
+func skipDigits(b []byte, i int) int {
+	for i < len(b) && b[i] >= '0' && b[i] <= '9' {
+		i++
+	}
+	return i
 }
 
 // UnmarshalText implements [encoding.TextUnmarshaler] so that canonical XML
@@ -413,8 +477,8 @@ func (r *Real) UnmarshalText(text []byte) error {
 // NaN, the xs:double spellings, and a finite value as the shortest decimal
 // that reads back as the same float64, as encoding/xml writes a float64.
 //
-// encoding/json prefers [Real.MarshalJSON] over this method, so canonical
-// JSON is unchanged by its presence.
+// encoding/json prefers [Real.MarshalJSONTo] and [Real.MarshalJSON] over this
+// method, so canonical JSON is unchanged by its presence.
 func (r Real) MarshalText() ([]byte, error) {
 	f := float64(r)
 	switch {
@@ -431,4 +495,39 @@ func (r Real) MarshalText() ([]byte, error) {
 // MarshalJSON emits a JSON number.
 func (r Real) MarshalJSON() ([]byte, error) {
 	return json.Marshal(float64(r))
+}
+
+// MarshalJSONTo writes the JSON number [Real.MarshalJSON] returns straight to
+// enc, without building it in a slice of its own; encoding/json prefers this
+// method to MarshalJSON. A NaN or an infinity, which JSON cannot spell, makes
+// it return errors.ErrUnsupported without writing: encoding/json then calls
+// MarshalJSON, which refuses the value exactly as it would without this
+// method.
+func (r Real) MarshalJSONTo(enc *jsontext.Encoder) error {
+	f := float64(r)
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return errors.ErrUnsupported
+	}
+	var buf [32]byte
+	return enc.WriteValue(appendJSONFloat(buf[:0], f))
+}
+
+// appendJSONFloat appends f to dst in the form encoding/json/v2 marshals a
+// finite float64 in: the shortest decimal that reads back as f, written
+// without an exponent from 1e-6 up to but excluding 1e21 and with one
+// outside that range, its exponent stripped of a leading zero (1e-7, not
+// 1e-07). It mirrors the internal jsonwire.AppendFloat at 64 bits;
+// TestNumericMarshalJSONToWritesMarshalJSONBytes holds the two to the same
+// bytes.
+func appendJSONFloat(dst []byte, f float64) []byte {
+	format := byte('f')
+	if abs := math.Abs(f); abs != 0 && (abs < 1e-6 || abs >= 1e21) {
+		format = 'e'
+	}
+	dst = strconv.AppendFloat(dst, f, format, -1, 64)
+	if n := len(dst); format == 'e' && n >= 4 && dst[n-4] == 'e' && dst[n-3] == '-' && dst[n-2] == '0' {
+		dst[n-2] = dst[n-1]
+		dst = dst[:n-1]
+	}
+	return dst
 }
