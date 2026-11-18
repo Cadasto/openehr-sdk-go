@@ -387,3 +387,26 @@ func TestValidator_REQ102_REQ171_AbsentPartsWhereTheWalkStops(t *testing.T) {
 		})
 	}
 }
+
+// REQ-102, REQ-171 — judging a quantity whose magnitude is absent leaves the
+// compiled template as it was: the units and the precision are judged by a
+// copy of the constraint with its magnitude ranges set aside, so a later
+// call with the same compiled template still holds a magnitude to its range.
+// A Validator holds no state between calls, and a compiled template serves
+// every call that shares it.
+func TestValidate_REQ102_REQ171_AbsentMagnitudeLeavesTheTemplateAsItWas(t *testing.T) {
+	t.Parallel()
+	c := mustCompileInline(t, elementValueOPT(quantityChild))
+	outOfRange := valueElement(&rm.DVQuantity{Magnitude: 500, Units: "cm"})
+	want := []pinnedIssue{templateFinding("out_of_range", "/value")}
+	if got := pinnedIssues(validation.Validate(outOfRange, c).Issues); !slices.Equal(got, want) {
+		t.Fatalf("precondition: Validate(magnitude 500 cm) issues = %+v, want %+v", got, want)
+	}
+	absent := validation.ValidateJSON([]byte(elementJSON(`{"_type": "DV_QUANTITY", "units": "cm"}`)), new(rm.Element), c)
+	if got, wantAbsent := pinnedIssues(absent.Issues), []pinnedIssue{rmRequired("/value/magnitude")}; !slices.Equal(got, wantAbsent) {
+		t.Fatalf("precondition: ValidateJSON(magnitude left out) issues = %+v, want %+v", got, wantAbsent)
+	}
+	if got := pinnedIssues(validation.Validate(outOfRange, c).Issues); !slices.Equal(got, want) {
+		t.Errorf("Validate(magnitude 500 cm) after a quantity with no magnitude, same compiled template, issues = %+v, want %+v: the call changed the template's magnitude range", got, want)
+	}
+}
