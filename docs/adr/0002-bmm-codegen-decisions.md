@@ -79,8 +79,8 @@ A mandatory interface or type-parameter field takes `omitempty` instead, because
 
 **Encode writes each member itself.**
 The delegation allocated for every value it wrote: the wrapper holding a copy of the value escapes to the heap, and json/v2 copies each value held by value in an interface slot into a new addressable value before calling its method.
-On the Demonstration composition these were about two thirds of encode allocations.
-Writing the members of three classes directly (CODE_PHRASE, DV_TEXT, ELEMENT) cut its encode from 114 to 82 µs and from 835 to 366 allocations (darwin/arm64), with every corpus document encoded to the same bytes.
+On the Demonstration composition these were about two thirds of encode allocations, measured while `rm.Real`, `rm.Integer` and `rm.Integer64` still carried a `MarshalJSONTo`, which they do not keep (below).
+On that base, writing the members of three classes directly (CODE_PHRASE, DV_TEXT, ELEMENT) cut its encode from 114 to 82 µs and from 835 to 366 allocations (darwin/arm64), with every corpus document encoded to the same bytes.
 The generated `MarshalJSONTo` therefore writes `{`, `_type` and each member in struct declaration order as tokens on the encoder:
 - a string, a boolean or a pointer to one, as a token;
 - `rm.Real`, `rm.Integer` and `rm.Integer64` in `openehr/rm`, through unexported writers that write the bytes their `MarshalJSON` writes, so the three types keep no `MarshalJSONTo` of their own;
@@ -99,8 +99,8 @@ The encoder's own options, indentation and escaping, apply to the tokens either 
 A failure names the class whose method failed, as json/v2 does at a method boundary.
 Tests encode every corpus document and every registered class both ways and compare the bytes, under each option the gate checks.
 
-Generated for every class, it cut the Demonstration composition's encode from 123 to 60 µs and from 835 to 6 allocations (darwin/arm64).
-The cost is code: the generated JSON encoders grew from 4,883 to 19,572 lines, and a program that encodes canonical JSON from 8.46 to 9.63 MB (+13.9%; +12.0% stripped).
+Generated for every class, it cut the Demonstration composition's encode from 147 to 58 µs and from 1,012 to 6 allocations (darwin/arm64); 177 of those allocations were the numbers' `MarshalJSON` calls, which the unexported writers replace.
+The cost is code: the generated JSON encoders grew from 4,883 to 19,572 lines, and a program that encodes canonical JSON from 8.44 to 9.63 MB (+14.1%; +12.4% stripped).
 
 ### D9 — The generated XML decoders hand what they do not read to an internal runtime
 
