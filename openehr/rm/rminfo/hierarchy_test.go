@@ -438,12 +438,12 @@ func TestDeclaredOnAgreesWithTheFlattenedTables(t *testing.T) {
 
 // TestHierarchyReturnsCopiesNotPackageState — REQ-048. A caller that sorts or
 // truncates a returned slice must not corrupt the next caller's answer.
+// ConcreteDescendants is the exception: TestSharedListsAreBuiltOnce holds it.
 func TestHierarchyReturnsCopiesNotPackageState(t *testing.T) {
 	h := hier(t)
 	mutators := map[string]func() []string{
-		"Parents":             func() []string { p, _ := h.Parents("TERMINOLOGY_SERVICE"); return p },
-		"Ancestors":           func() []string { a, _ := h.Ancestors("OBSERVATION"); return a },
-		"ConcreteDescendants": func() []string { d, _ := h.ConcreteDescendants("ENTRY"); return d },
+		"Parents":   func() []string { p, _ := h.Parents("TERMINOLOGY_SERVICE"); return p },
+		"Ancestors": func() []string { a, _ := h.Ancestors("OBSERVATION"); return a },
 	}
 	for name, get := range mutators {
 		first := get()
@@ -811,4 +811,53 @@ func rminfoDefaultDataCopy(t *testing.T) map[string]rminfo.ClassMeta {
 		}
 	}
 	return out
+}
+
+// TestSharedListsAreBuiltOnce — REQ-048. RequiredAttributes and
+// ConcreteDescendants answer from lists built once per lookup, so a repeated
+// call allocates nothing and hands back the same list, for the pinned lookup
+// and for one New builds. Each list's capacity is its length, so a caller that
+// appends gets a new array and the next answer is unchanged.
+func TestSharedListsAreBuiltOnce(t *testing.T) {
+	synthetic := rminfo.New(map[string]rminfo.ClassMeta{
+		"ROOT": {Abstract: true, Attributes: map[string]rminfo.AttrMeta{"a": {Required: true}, "b": {}}, AttrOrder: []string{"a", "b"}},
+		"LEAF": {Parents: []string{"ROOT"}, Attributes: map[string]rminfo.AttrMeta{"a": {Required: true}, "c": {Required: true}}, AttrOrder: []string{"a", "c"}},
+	})
+	for name, l := range map[string]rminfo.Lookup{"Default": rminfo.Default, "New": synthetic} {
+		h, ok := l.(rminfo.Hierarchy)
+		if !ok {
+			t.Fatalf("%s does not implement Hierarchy", name)
+		}
+		required, descendant, abstract := "ELEMENT", "ENTRY", "ENTRY"
+		if name == "New" {
+			required, descendant, abstract = "LEAF", "ROOT", "ROOT"
+		}
+		lists := map[string]func() []string{
+			"RequiredAttributes":  func() []string { return l.RequiredAttributes(required) },
+			"ConcreteDescendants": func() []string { d, _ := h.ConcreteDescendants(descendant); return d },
+		}
+		for method, get := range lists {
+			first := get()
+			if len(first) == 0 {
+				t.Fatalf("%s %s: fixture returned an empty list", name, method)
+			}
+			if cap(first) != len(first) {
+				t.Errorf("%s %s: cap %d != len %d, so a caller's append would write into the shared list", name, method, cap(first), len(first))
+			}
+			want := slices.Clone(first)
+			_ = append(first, "APPENDED")
+			if again := get(); &again[0] != &first[0] || !slices.Equal(again, want) {
+				t.Errorf("%s %s: second answer %v is not the first list %v", name, method, again, want)
+			}
+			if n := testing.AllocsPerRun(100, func() { _ = get() }); n != 0 {
+				t.Errorf("%s %s allocates %v times per call, want 0", name, method, n)
+			}
+		}
+		if d, known := h.ConcreteDescendants(abstract + "_UNKNOWN"); known || d != nil {
+			t.Errorf("%s ConcreteDescendants(unknown) = %v, %t, want nil, false", name, d, known)
+		}
+		if r := l.RequiredAttributes(required + "_UNKNOWN"); r != nil {
+			t.Errorf("%s RequiredAttributes(unknown) = %v, want nil", name, r)
+		}
+	}
 }
