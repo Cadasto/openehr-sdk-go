@@ -26,15 +26,13 @@ import (
 
 // scalarLeaf reports whether optNode is an AOM 1.4 primitive short-name leaf
 // on a BMM scalar channel (DV_COUNT.magnitude under INTEGER, DV_DURATION.value
-// under DURATION) whose short name rmValue, a Go primitive, matches, and
-// returns its primitive constraint. Such a node is checked by its constraint
-// alone: it has no RM type to match and no attributes to walk.
-func scalarLeaf(optNode *tcimpl.CompiledNode, rmValue any) (constraints.PrimitiveConstraint, bool) {
-	pc := optNode.PrimitiveConstraint()
-	if pc == nil || !tcimpl.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
-		return nil, false
-	}
-	return pc, rmbind.PrimitiveValueMatchesShortName(optNode.RMTypeName(), rmValue)
+// under DURATION) whose short name rmValue, a Go primitive, matches. Such a
+// node is checked by its primitive constraint alone, and by nothing where it
+// carries none, a C_PRIMITIVE_OBJECT with no item allowing any value of its
+// type: it has no RM type to match and no attributes to walk.
+func scalarLeaf(optNode *tcimpl.CompiledNode, rmValue any) bool {
+	return tcimpl.IsAOMPrimitiveShortName(optNode.RMTypeName()) &&
+		rmbind.PrimitiveValueMatchesShortName(optNode.RMTypeName(), rmValue)
 }
 
 // isConstraintRef reports whether pc is a CONSTRAINT_REF: a value set bound

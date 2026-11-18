@@ -523,6 +523,7 @@ Items that are not a LOCATABLE bind by RM type (§ *Items that are not a LOCATAB
 #### Primitive constraints
 
 REQ-103 `PrimitiveConstraint.Validate` runs at every primitive leaf the OPT declares; bound to the RM value found by the structural walk.
+A `C_PRIMITIVE_OBJECT` with no `item`, which the compile step reads as no constraint ([§ REQ-111](#req-111--public-compiled-template-bridge) *What the compile step tolerates*), checks nothing at its leaf: it admits any value of the type its AOM 1.4 short name names, as AOM 1.4's `any_allowed` reads an `item` that is Void.
 A part of a value that the RM rules report as absent or empty is theirs to report, not the constraint's, as [§ REQ-171 *One finding per defect*](#one-finding-per-defect) says.
 The parts are:
 

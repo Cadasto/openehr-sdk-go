@@ -582,7 +582,7 @@ func (e *engine) checkIdentityAndType(n engineNode) (scalar bool) {
 	if iss, ok := identityIssue(n.bound, n.value, n.path); ok {
 		e.found.emit(iss)
 	}
-	if _, scalar = scalarLeaf(n.bound, n.value); scalar {
+	if scalar = scalarLeaf(n.bound, n.value); scalar {
 		return true
 	}
 	if iss, ok := rmTypeIssue(n.bound, n.value, n.path); ok {
@@ -597,7 +597,9 @@ func (e *engine) checkIdentityAndType(n engineNode) (scalar bool) {
 // template constrains nothing below the node. A slot leaf carries no
 // structure below it, and a leaf with a primitive constraint checks the
 // value by that constraint ([engine.judgeLeaf]); below either, the node's
-// attributes are walked with the RM rules alone. Where a part of the value
+// attributes are walked with the RM rules alone. A scalar leaf with no
+// primitive constraint, a C_PRIMITIVE_OBJECT with no item, allows any value
+// of its type and checks nothing. Where a part of the value
 // the constraint reads is absent, checkLeaf also returns the judgement the
 // walk holds until it has visited the node's attributes, and nil otherwise.
 // A CONSTRAINT_REF names a value set outside the SDK and checks nothing
@@ -611,6 +613,9 @@ func (e *engine) checkLeaf(n engineNode, scalar bool, class string) (*tcimpl.Com
 	}
 	pc := n.bound.PrimitiveConstraint()
 	if pc == nil {
+		if scalar {
+			return nil, nil
+		}
 		return n.bound, nil
 	}
 	held := e.judgeLeaf(n, class, pc)
