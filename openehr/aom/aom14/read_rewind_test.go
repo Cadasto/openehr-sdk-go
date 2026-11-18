@@ -84,3 +84,52 @@ func TestReadOperationalTemplateRewindsOrCopies(t *testing.T) {
 		}
 	}
 }
+
+// BenchmarkReadOperationalTemplate reads every corpus template from a
+// *bytes.Reader and from an *os.File, which the reader reads again only when
+// it needs a second reading, and from a reader it copies as it reads.
+func BenchmarkReadOperationalTemplate(b *testing.B) {
+	refs, err := fixtures.ListAllOPTs()
+	if err != nil {
+		b.Fatal(err)
+	}
+	docs := make([][]byte, len(refs))
+	files := make([]*os.File, len(refs))
+	for i, ref := range refs {
+		if docs[i], err = os.ReadFile(ref.Path); err != nil {
+			b.Fatal(err)
+		}
+		f, err := os.Open(ref.Path)
+		if err != nil {
+			b.Fatal(err)
+		}
+		// The file is only read, so its Close has nothing to report.
+		b.Cleanup(func() { _ = f.Close() })
+		files[i] = f
+	}
+	readers := []struct {
+		name string
+		open func(b *testing.B, i int) io.Reader
+	}{
+		{name: "bytes.Reader", open: func(_ *testing.B, i int) io.Reader { return bytes.NewReader(docs[i]) }},
+		{name: "os.File", open: func(b *testing.B, i int) io.Reader {
+			if _, err := files[i].Seek(0, io.SeekStart); err != nil {
+				b.Fatal(err)
+			}
+			return files[i]
+		}},
+		{name: "copying", open: func(_ *testing.B, i int) io.Reader { return noSeek{bytes.NewReader(docs[i])} }},
+	}
+	for _, r := range readers {
+		b.Run(r.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				for i := range docs {
+					if _, err := aom14.ReadOperationalTemplate(r.open(b, i)); err != nil {
+						b.Fatalf("%s: %v", refs[i].Name, err)
+					}
+				}
+			}
+		})
+	}
+}
