@@ -1,6 +1,6 @@
 ---
 kind: plan
-harvested_through: 2026-11-17T11:17:06Z
+harvested_through: 2026-11-18T10:39:52Z
 ---
 # Backlog
 
@@ -33,20 +33,18 @@ Code in openehr/aql/parse and openehr/aql/lint where a class junction with an op
 Code in openehr/instance and internal/templatecompile where a value the generator writes, or the template id it carries, can meet an RM rule, an OPT constraint or a CDR's reading it now leaves to chance; one needs a decision before the code: the template id reading. Lane: maintenance; full where a sentence changes. Size: S each.
 - internal/templatecompile/compile.go:99 · the template id is kept as the OPT writes it, trimmed only at the ends, while ITS-XML types it as a token whose whitespace collapses; EHRbase 2.37.1 stores the corpus id `IDCR -  Adverse Reaction List.v1` with one space and refuses every generated composition as naming no template, FerroEHR 5.6.0 keeps both spaces (with the collapsed id: EHRbase 204, FerroEHR 422), and BASE leaves TEMPLATE_ID's lexical form "to be determined"; decide the reading, then collapse runs of whitespace here so the generator, FLAT and validation carry one id · from: CDR cross-check 2026-11-06
 
-## One copy of each rule: defaults, the archetype-id test, and the template defaults no consumer writes (REQ-107, REQ-111, REQ-103, REQ-112)
-Code in openehr/instance where a default rule lives in two places, and in openehr/validation and openehr/serialize/simplified where the RM floor and FLAT decode each wrap the archetype-id test, so a change to one copy leaves the other behind; and the template's default values, which reach the compiled node in internal/templatecompile but which the Web Template does not write. Lane: maintenance; full where a consumer starts writing the defaults. Size: S–M.
+## One copy of each rule: the code defaults and the archetype-id test (REQ-107, REQ-112)
+Code in openehr/instance where a default rule lives in two places, and in openehr/validation and openehr/serialize/simplified where the RM floor and FLAT decode each wrap the archetype-id test, so a change to one copy leaves the other behind. Lane: maintenance. Size: S each.
 - openehr/instance/generate.go:2138 · fillCodeDefault / codeDefaultFor / heldCodes remain a second, build-time default path for language, encoding and charset beside codedRules (coded_settle.go:61); they share only languageCode() and utf8Code(), not the table, so the two could be one · by: sdd-implementer · from: feat/generator-writer-gaps
-- internal/templatecompile/node.go:232 · The template's default values now reach CompiledNode.DefaultValue, and the example generator, and through its skeleton the composition builder, now write them, but the Web Template inputs' defaultValue does not · by: task7-worker · from: feat/compile-step-operational-template-model
 - openehr/validation/rmfloor.go:397 · isArchetypeID and the FLAT decoder's test at openehr/serialize/simplified/archetype_details.go:92 each wrap rm.ParseArchetypeID behind their own shortcut; one rm helper would keep the floor's set of roots and the nodes FLAT decode gives details from drifting apart · from: #470
 
 ## RM floor: the invariants not yet evaluated (REQ-112, REQ-171)
 The ledger is openehr/validation/invariants.json: each entry whose reason starts "Not yet evaluated" is a mechanical rule the floor could evaluate, and each one taken on adds a catalogue bullet, an evaluator and a PROBE-077 row. Lane: full. Size: L.
 - openehr/validation/invariants.json · 53 entries are out_of_scope with the reason 'Not yet evaluated' (DV_AMOUNT rules, DV_MULTIMEDIA Size_valid, the non-empty rules of ACTOR.roles, ENTRY.other_participations and PARTY.contacts, the change-control coded invariants, VERSION_TREE_ID branch rules and others); each non-empty rule is one rminfo.NonEmptyLists entry (openehr/rm/rminfo/nonempty.go:25), and through REQ-102's list the floor holds non-empty once present (clinical-modeling.md:479) each also changes what template validation reports required · by: sdd-implementer · from: feat/validation-generated-access
 
-## Tests: a 32-bit build, and a load-dependent race (REQ-120, REQ-073)
-Tests that cannot run or do not hold under load: an openehr/rm test package that builds for GOARCH=386, and a SMART discovery cancellation test whose timing does not depend on load. Lane: maintenance. Size: S each.
+## Tests: a 32-bit build (REQ-120)
+A test package that cannot build for a 32-bit target: openehr/rm, under GOARCH=386. Lane: maintenance. Size: S.
 - openehr/rm/temporal_funcs_test.go:392 · With GOARCH=386 the rm test package does not build (`newYear2026` overflows int in t.Errorf), so no test can pin 32-bit behaviour such as a version tree part past a 32-bit int · from: #410
-- smart/discovery/issuer_test.go:445 · TestResolveCrossCheckHonoursContext failed once in a full-tree make test-race (Docker, 9f7cdec): Resolve returned fetch_failed 'openid-configuration: jsontext: unexpected EOF' on an empty body instead of wrapping context.Canceled; it passed 30 of 30 isolated race runs on main and on the branch, so the handler's cancel-then-wait timing is load-dependent · from: #411
 
 ## Performance: allocations in the generated RM access and the RM-floor walk, and the FLAT decode's per-call template ranks and key sorts (REQ-171, REQ-053)
 A generator change in internal/bmmgen on its own branch, measured with BenchmarkValidateComposition and the composition Set+Build benchmark, with the RM-floor walk's allocation bound tightened to what it allocates; and a per-Web-Template cache in openehr/serialize/simplified, measured with BenchmarkUnmarshalFlat. Lane: maintenance. Size: M.
