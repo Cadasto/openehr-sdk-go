@@ -2,6 +2,7 @@ package bmmgen
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -70,6 +71,34 @@ func embedLineOffsets(chunk, embed string) []int {
 	return offsets
 }
 
+// splitMarshalChunk splits a class's rendered canonical-JSON marshal chunk
+// into its wrapper, the wire declarations and marshalJSONWrapped, and its
+// direct writer, MarshalJSONTo and writeJSONMembers, which follow the
+// wrapper and open with the doc comment of MarshalJSONTo.
+func splitMarshalChunk(chunk string) (wrapped, direct string, ok bool) {
+	at := strings.Index(chunk, "\n// MarshalJSONTo ")
+	if at < 0 {
+		return "", "", false
+	}
+	return chunk[:at+1], chunk[at+1:], true
+}
+
+// directLeadsWithType reports whether the rendered direct writer of the class
+// named bmmName writes `_type` first: the first statement of writeJSONMembers,
+// which MarshalJSONTo calls once it has written the opening brace, writes the
+// `_type` member with the class's name.
+func directLeadsWithType(direct, bmmName string) bool {
+	_, body, ok := strings.Cut(direct, ") writeJSONMembers(enc *jsontext.Encoder")
+	if !ok {
+		return false
+	}
+	_, body, ok = strings.Cut(body, ") error {\n")
+	if !ok {
+		return false
+	}
+	return strings.HasPrefix(body, fmt.Sprintf("\tif err := writeJSONString(enc, \"_type\", %q); err != nil {\n", bmmName))
+}
+
 // TestRenderMarshalLeadsWithType pins the REQ-052 SHOULD that `_type` is the
 // leading member. `_type` is never a declared BMM property, so a class's fields
 // are always "reordered" relative to it; the generator INJECTS it first in the
@@ -87,6 +116,12 @@ func embedLineOffsets(chunk, embed string) []int {
 // Moving the `_type` field after the alias in renderMarshalAlias or
 // renderMarshalIntervalDerived, after another field in renderMarshalFlat, or
 // changing how the alias is embedded turns the census red.
+//
+// The direct writer, which every MarshalJSONTo takes unless an encoder option
+// sends it to the wrapper, is held by [directLeadsWithType] the same way: it
+// reads as not leading when `_type` follows another member, names another
+// class or is missing, so moving the `_type` write in renderDirectEncode
+// turns the census red too.
 func TestRenderMarshalLeadsWithType(t *testing.T) {
 	// Prove the witness discriminates on every shape. Each broken rendering
 	// must read as NOT leading with `_type`; without them, the census could be
@@ -168,6 +203,24 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 			t.Fatalf("marshalLeadsWithType(%s) = %v, want %v: the witness does not discriminate, so the census below proves nothing", tc.name, got, tc.want)
 		}
 	}
+	const membersSig = "func (x *X) writeJSONMembers(enc *jsontext.Encoder, nameSlot uint8) error {\n"
+	const writeType = "\tif err := writeJSONString(enc, \"_type\", \"X\"); err != nil {\n\t\treturn err\n\t}\n"
+	const writeValue = "\tif err := writeJSONString(enc, \"value\", x.Value); err != nil {\n\t\treturn err\n\t}\n"
+	for _, tc := range []struct {
+		name   string
+		direct string
+		want   bool
+	}{
+		{name: "_type written first", direct: membersSig + writeType + writeValue, want: true},
+		{name: "_type written after a member", direct: membersSig + writeValue + writeType, want: false},
+		{name: "_type names another class", direct: membersSig + strings.Replace(writeType, `"X"`, `"Y"`, 1) + writeValue, want: false},
+		{name: "no _type written", direct: membersSig + writeValue, want: false},
+		{name: "no writeJSONMembers", direct: writeType + writeValue, want: false},
+	} {
+		if got := directLeadsWithType(tc.direct, "X"); got != tc.want {
+			t.Fatalf("directLeadsWithType(%s) = %v, want %v: the witness does not discriminate, so the census below proves nothing", tc.name, got, tc.want)
+		}
+	}
 
 	plan, err := BuildPlan(context.Background(), TargetRM.RootID, testResolver())
 	if err != nil {
@@ -196,8 +249,15 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 			default:
 				t.Fatalf("%s takes wire shape %d, which the census has no witness for", pc.BMMName, shape)
 			}
-			if !marshalLeadsWithType(chunk, aliasEmbed) {
-				t.Errorf("%s marshaller does not lead with `_type`: the discriminator must be the first member (REQ-052)", pc.BMMName)
+			wrapped, direct, ok := splitMarshalChunk(chunk)
+			if !ok {
+				t.Fatalf("%s: no MarshalJSONTo doc comment ends the wrapper in the chunk:\n%s", pc.BMMName, chunk)
+			}
+			if !marshalLeadsWithType(wrapped, aliasEmbed) {
+				t.Errorf("%s wrapper does not lead with `_type`: the discriminator must be the first member (REQ-052)", pc.BMMName)
+			}
+			if !directLeadsWithType(direct, pc.BMMName) {
+				t.Errorf("%s direct writer does not lead with `_type`: the discriminator must be the first member (REQ-052)", pc.BMMName)
 			}
 			checked++
 		}
@@ -208,12 +268,12 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 }
 
 // TestRenderIntervalEncodersCopyTheReceiverOnce pins how the interval
-// encoders reach BASE Interval's members: every value they encode is a wrapper
-// that embeds the base's method-free alias by value, and no encoder takes the
-// address of its receiver. Taking it moves the value receiver to the heap, an
-// allocation per encoded value beside the wrapper's own. BASE Interval writes
-// no `_type`, so the census above does not reach its encoder; this test checks
-// it beside the three classes that embed it.
+// encoders reach BASE Interval's members: every value the wrapper encodes is a
+// struct that embeds the base's method-free alias by value, and MarshalJSONTo
+// never takes the address of its value receiver. Taking it moves the receiver
+// to the heap, an allocation per encoded value. BASE Interval writes no
+// `_type`, so the census above does not reach its encoder; this test checks it
+// beside the three classes that embed it.
 func TestRenderIntervalEncodersCopyTheReceiverOnce(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
@@ -242,18 +302,25 @@ func TestRenderIntervalEncodersCopyTheReceiverOnce(t *testing.T) {
 			if err != nil {
 				t.Fatalf("renderMarshalJSON(%s): %v", class, err)
 			}
-			_, body, ok := strings.Cut(chunk, ") MarshalJSONTo(enc *jsontext.Encoder) error {\n")
+			recv := jsonmarReceiverName(pc.GoName)
+			addr := regexp.MustCompile(`&` + regexp.QuoteMeta(recv) + `\b`)
+			_, direct, ok := strings.Cut(chunk, ") MarshalJSONTo(enc *jsontext.Encoder) error {\n")
 			if !ok {
 				t.Fatalf("no MarshalJSONTo in the %s chunk:\n%s", class, chunk)
 			}
-			recv := jsonmarReceiverName(pc.GoName)
-			if addr := regexp.MustCompile(`&` + regexp.QuoteMeta(recv) + `\b`); addr.MatchString(body) {
-				t.Errorf("%s MarshalJSONTo takes the address of its receiver %q, which moves it to the heap:\n%s", class, recv, body)
+			direct, _, _ = strings.Cut(direct, "\n}\n")
+			if addr.MatchString(direct) {
+				t.Errorf("%s MarshalJSONTo takes the address of its receiver %q, which moves it to the heap:\n%s", class, recv, direct)
 			}
+			_, body, ok := strings.Cut(chunk, ") marshalJSONWrapped(enc *jsontext.Encoder) error {\n")
+			if !ok {
+				t.Fatalf("no marshalJSONWrapped in the %s chunk:\n%s", class, chunk)
+			}
+			body, _, _ = strings.Cut(body, "\n}\n")
 			calls := strings.Count(body, "json.MarshalEncode(")
 			embeds := len(embedLineOffsets(body, aliasTypeName(base.GoName)))
 			if calls == 0 || embeds != calls {
-				t.Errorf("%s MarshalJSONTo makes %d json.MarshalEncode calls and embeds %s by value %d times, want one by-value embed per call:\n%s", class, calls, aliasTypeName(base.GoName), embeds, body)
+				t.Errorf("%s marshalJSONWrapped makes %d json.MarshalEncode calls and embeds %s by value %d times, want one by-value embed per call:\n%s", class, calls, aliasTypeName(base.GoName), embeds, body)
 			}
 		})
 	}

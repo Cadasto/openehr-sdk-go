@@ -18,20 +18,20 @@ import (
 // ancestor, so nothing is promoted.
 type rawInterval[T any] Interval[T]
 
-// MarshalJSONTo emits canonical openEHR JSON for Interval, which is abstract and
-// so carries no `_type`. Field order follows the struct declaration,
-// and json.Deterministic sorts any Hash keys. A nil list or map field is
-// left out by its omit option. The FormatNil* options write any other nil
-// slice or map, such as one held in an any field, as `null`.
-// The receiver is a value so an Interval held by value in a struct field
-// takes this encoder.
+// marshalJSONWrapped is the wrapper encode of Interval, which is abstract and so
+// carries no `_type`: it marshals an anonymous struct embedding the
+// method-free alias, so json/v2 writes every member under the encoder's
+// options. Field order follows the struct declaration, and
+// json.Deterministic sorts any Hash keys. A nil list or map field is left
+// out by its omit option. The FormatNil* options write any other nil slice
+// or map, such as one held in an any field, as `null`.
 //
 // An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
 // emits no `lower` or `upper` member. The wrapper then declares a zero-size
 // field of that name at its own level, shallower than the bound embedded
 // through the alias, so it wins; it is always omitted, and the other
 // members keep their order.
-func (i Interval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (i *Interval[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(i.LowerUnbounded, i.Lower)
 	omitUpper := omitIntervalBound(i.UpperUnbounded, i.Upper)
 	switch {
@@ -40,25 +40,101 @@ func (i Interval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 			rawInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
 			Upper struct{} `json:"upper,omitzero"`
-		}{rawInterval: rawInterval[T](i)}, typereg.MarshalOptions(enc))
+		}{rawInterval: rawInterval[T](*i)}, typereg.MarshalOptions(enc))
 	case omitLower:
 		return json.MarshalEncode(enc, &struct {
 			rawInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
-		}{rawInterval: rawInterval[T](i)}, typereg.MarshalOptions(enc))
+		}{rawInterval: rawInterval[T](*i)}, typereg.MarshalOptions(enc))
 	case omitUpper:
 		return json.MarshalEncode(enc, &struct {
 			rawInterval[T]
 			Upper struct{} `json:"upper,omitzero"`
-		}{rawInterval: rawInterval[T](i)}, typereg.MarshalOptions(enc))
+		}{rawInterval: rawInterval[T](*i)}, typereg.MarshalOptions(enc))
 	}
 	return json.MarshalEncode(enc, &struct {
 		rawInterval[T]
-	}{rawInterval: rawInterval[T](i)}, typereg.MarshalOptions(enc))
+	}{rawInterval: rawInterval[T](*i)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Interval, which is abstract
+// and so carries no `_type`: an object holding each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
+// writes no `lower` or `upper` member.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so an Interval held by value in a struct field
+// takes this encoder.
+func (i Interval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return i.marshalJSONWrapped(enc)
+	}
+	omitLower := omitIntervalBound(i.LowerUnbounded, i.Lower)
+	omitUpper := omitIntervalBound(i.UpperUnbounded, i.Upper)
+	lowerValue := any(i.Lower)
+	lowerSlot := jsonParam(lowerValue)
+	upperValue := any(i.Upper)
+	upperSlot := jsonParam(upperValue)
+	if (lowerSlot|upperSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Interval[T]](enc, mark, i.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Interval[T]](enc, false, err)
+	}
+	if err := i.writeJSONMembers(enc, lowerSlot, lowerValue, upperSlot, upperValue, omitLower, omitUpper); err != nil {
+		return typereg.EncodeFailure[Interval[T]](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Interval after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (i *Interval[T]) writeJSONMembers(enc *jsontext.Encoder, lowerSlot uint8, lowerValue any, upperSlot uint8, upperValue any, omitLower bool, omitUpper bool) error {
+	if !omitLower && lowerSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "lower"); err != nil {
+			return err
+		}
+		if err := writeJSONParam(enc, lowerValue, lowerSlot); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONBool(enc, "lower_included", i.LowerIncluded); err != nil {
+		return err
+	}
+	if err := writeJSONBool(enc, "lower_unbounded", i.LowerUnbounded); err != nil {
+		return err
+	}
+	if !omitUpper && upperSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "upper"); err != nil {
+			return err
+		}
+		if err := writeJSONParam(enc, upperValue, upperSlot); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONBool(enc, "upper_included", i.UpperIncluded); err != nil {
+		return err
+	}
+	if err := writeJSONBool(enc, "upper_unbounded", i.UpperUnbounded); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // jsonWirePointInterval is the wire struct the decoder of PointInterval reads
-// through. The encoder does not use it: MarshalJSONTo builds a wrapper
+// through. The encoder does not use it: marshalJSONWrapped builds a wrapper
 // of its own. PointInterval embeds BASE Interval, so a method-free alias of
 // the class would promote the base's MarshalJSONTo. The wire struct embeds the
 // method-free alias of the base instead, and carries the class's own members
@@ -72,22 +148,20 @@ type jsonWirePointInterval[T any] struct {
 	UpperUnbounded bool `json:"upper_unbounded"`
 }
 
-// MarshalJSONTo emits canonical openEHR JSON for PointInterval with `_type`
-// (value "Point_interval") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
+// marshalJSONWrapped is the wrapper encode of PointInterval: it marshals an
+// anonymous struct whose leading field is `_type` (value "Point_interval"), so json/v2
+// writes every member under the encoder's options. Field order follows
+// the struct declaration, and json.Deterministic sorts any Hash keys. A
+// nil list or map field is left out by its omit option. The FormatNil*
 // options write any other nil slice or map, such as one held in an any
 // field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
 //
 // An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
 // emits no `lower` or `upper` member. The wrapper then declares a zero-size
 // field of that name at its own level, shallower than the bound embedded
 // through the alias, so it wins; it is always omitted, and the other
 // members keep their order.
-func (p PointInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (p *PointInterval[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
 	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
 	switch {
@@ -133,8 +207,88 @@ func (p PointInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}{Type: "Point_interval", rawInterval: rawInterval[T](p.Interval), LowerIncluded: p.LowerIncluded, LowerUnbounded: p.LowerUnbounded, UpperIncluded: p.UpperIncluded, UpperUnbounded: p.UpperUnbounded}, typereg.MarshalOptions(enc))
 }
 
+// MarshalJSONTo writes canonical openEHR JSON for PointInterval: an object whose
+// leading member is `_type` (value "Point_interval"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
+// writes no `lower` or `upper` member.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (p PointInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return p.marshalJSONWrapped(enc)
+	}
+	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
+	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
+	lowerValue := any(p.Lower)
+	lowerSlot := jsonParam(lowerValue)
+	upperValue := any(p.Upper)
+	upperSlot := jsonParam(upperValue)
+	if (lowerSlot|upperSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[PointInterval[T]](enc, mark, p.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[PointInterval[T]](enc, false, err)
+	}
+	if err := p.writeJSONMembers(enc, lowerSlot, lowerValue, upperSlot, upperValue, omitLower, omitUpper); err != nil {
+		return typereg.EncodeFailure[PointInterval[T]](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of PointInterval after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (p *PointInterval[T]) writeJSONMembers(enc *jsontext.Encoder, lowerSlot uint8, lowerValue any, upperSlot uint8, upperValue any, omitLower bool, omitUpper bool) error {
+	if err := writeJSONString(enc, "_type", "Point_interval"); err != nil {
+		return err
+	}
+	if !omitLower && lowerSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "lower"); err != nil {
+			return err
+		}
+		if err := writeJSONParam(enc, lowerValue, lowerSlot); err != nil {
+			return err
+		}
+	}
+	if !omitUpper && upperSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "upper"); err != nil {
+			return err
+		}
+		if err := writeJSONParam(enc, upperValue, upperSlot); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONBool(enc, "lower_included", p.LowerIncluded); err != nil {
+		return err
+	}
+	if err := writeJSONBool(enc, "lower_unbounded", p.LowerUnbounded); err != nil {
+		return err
+	}
+	if err := writeJSONBool(enc, "upper_included", p.UpperIncluded); err != nil {
+		return err
+	}
+	if err := writeJSONBool(enc, "upper_unbounded", p.UpperUnbounded); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
+}
+
 // jsonWireProperInterval is the wire struct the decoder of ProperInterval reads
-// through. The encoder does not use it: MarshalJSONTo builds a wrapper
+// through. The encoder does not use it: marshalJSONWrapped builds a wrapper
 // of its own. ProperInterval embeds BASE Interval, so a method-free alias of
 // the class would promote the base's MarshalJSONTo. The wire struct embeds the
 // method-free alias of the base instead, and carries the class's own members
@@ -144,22 +298,20 @@ type jsonWireProperInterval[T any] struct {
 	*rawInterval[T]
 }
 
-// MarshalJSONTo emits canonical openEHR JSON for ProperInterval with `_type`
-// (value "Proper_interval") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
+// marshalJSONWrapped is the wrapper encode of ProperInterval: it marshals an
+// anonymous struct whose leading field is `_type` (value "Proper_interval"), so json/v2
+// writes every member under the encoder's options. Field order follows
+// the struct declaration, and json.Deterministic sorts any Hash keys. A
+// nil list or map field is left out by its omit option. The FormatNil*
 // options write any other nil slice or map, such as one held in an any
 // field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
 //
 // An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
 // emits no `lower` or `upper` member. The wrapper then declares a zero-size
 // field of that name at its own level, shallower than the bound embedded
 // through the alias, so it wins; it is always omitted, and the other
 // members keep their order.
-func (p ProperInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (p *ProperInterval[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
 	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
 	switch {
@@ -187,4 +339,84 @@ func (p ProperInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 		Type string `json:"_type"`
 		rawInterval[T]
 	}{Type: "Proper_interval", rawInterval: rawInterval[T](p.Interval)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for ProperInterval: an object whose
+// leading member is `_type` (value "Proper_interval"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound is empty
+// writes no `lower` or `upper` member.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (p ProperInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return p.marshalJSONWrapped(enc)
+	}
+	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
+	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
+	lowerValue := any(p.Lower)
+	lowerSlot := jsonParam(lowerValue)
+	upperValue := any(p.Upper)
+	upperSlot := jsonParam(upperValue)
+	if (lowerSlot|upperSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[ProperInterval[T]](enc, mark, p.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[ProperInterval[T]](enc, false, err)
+	}
+	if err := p.writeJSONMembers(enc, lowerSlot, lowerValue, upperSlot, upperValue, omitLower, omitUpper); err != nil {
+		return typereg.EncodeFailure[ProperInterval[T]](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of ProperInterval after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (p *ProperInterval[T]) writeJSONMembers(enc *jsontext.Encoder, lowerSlot uint8, lowerValue any, upperSlot uint8, upperValue any, omitLower bool, omitUpper bool) error {
+	if err := writeJSONString(enc, "_type", "Proper_interval"); err != nil {
+		return err
+	}
+	if !omitLower && lowerSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "lower"); err != nil {
+			return err
+		}
+		if err := writeJSONParam(enc, lowerValue, lowerSlot); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONBool(enc, "lower_included", p.LowerIncluded); err != nil {
+		return err
+	}
+	if err := writeJSONBool(enc, "lower_unbounded", p.LowerUnbounded); err != nil {
+		return err
+	}
+	if !omitUpper && upperSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "upper"); err != nil {
+			return err
+		}
+		if err := writeJSONParam(enc, upperValue, upperSlot); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONBool(enc, "upper_included", p.UpperIncluded); err != nil {
+		return err
+	}
+	if err := writeJSONBool(enc, "upper_unbounded", p.UpperUnbounded); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }

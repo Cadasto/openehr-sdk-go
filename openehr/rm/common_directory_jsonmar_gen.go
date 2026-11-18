@@ -18,20 +18,156 @@ import (
 // ancestor, so nothing is promoted.
 type rawFolder Folder
 
-// MarshalJSONTo emits canonical openEHR JSON for Folder with `_type`
-// (value "FOLDER") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (f Folder) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of Folder: it marshals an
+// anonymous struct whose leading field is `_type` (value "FOLDER") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (f *Folder) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawFolder
-	}{"FOLDER", rawFolder(f)}, typereg.MarshalOptions(enc))
+	}{"FOLDER", rawFolder(*f)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Folder: an object whose
+// leading member is `_type` (value "FOLDER"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (f Folder) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return f.marshalJSONWrapped(enc)
+	}
+	detailsSlot := jsonSlot(f.Details)
+	nameSlot := jsonSlot(f.Name)
+	uidSlot := jsonSlot(f.UID)
+	if (detailsSlot|nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Folder](enc, mark, f.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Folder](enc, false, err)
+	}
+	if err := f.writeJSONMembers(enc, detailsSlot, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[Folder](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Folder after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (f *Folder) writeJSONMembers(enc *jsontext.Encoder, detailsSlot uint8, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "FOLDER"); err != nil {
+		return err
+	}
+	if f.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := f.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", f.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if detailsSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "details"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, f.Details, detailsSlot); err != nil {
+			return err
+		}
+	}
+	if f.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := f.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if len(f.Folders) > 0 {
+		if err := writeJSONName(enc, "folders"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range f.Folders {
+			if err := f.Folders[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(f.Items) > 0 {
+		if err := writeJSONName(enc, "items"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range f.Items {
+			if err := writeJSONSlot(enc, f.Items[_k], jsonSlot(f.Items[_k])); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(f.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range f.Links {
+			if err := f.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, f.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, f.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // jsonWireVersionedFolder is the flat canonical-JSON wire struct for VersionedFolder. VersionedFolder embeds
@@ -48,14 +184,79 @@ type jsonWireVersionedFolder struct {
 	TimeCreated DVDateTime `json:"time_created"`
 }
 
-// MarshalJSONTo emits canonical openEHR JSON for VersionedFolder with `_type`
-// (value "VERSIONED_FOLDER") as the leading member. The receiver is a
-// value so a by-value instance in a polymorphic slot keeps its `_type`.
-func (v VersionedFolder) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of VersionedFolder: it copies each field
+// into the flat wire struct, `_type` (value "VERSIONED_FOLDER") leading, and marshals
+// it, so json/v2 writes every member under the encoder's options.
+func (v *VersionedFolder) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &jsonWireVersionedFolder{
 		Class:       "VERSIONED_FOLDER",
 		UID:         v.UID,
 		OwnerID:     v.OwnerID,
 		TimeCreated: v.TimeCreated,
 	}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for VersionedFolder: an object whose
+// leading member is `_type` (value "VERSIONED_FOLDER"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (v VersionedFolder) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return v.marshalJSONWrapped(enc)
+	}
+	ownerIdSlot := jsonSlot(v.OwnerID)
+	if ownerIdSlot&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[VersionedFolder](enc, mark, v.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[VersionedFolder](enc, false, err)
+	}
+	if err := v.writeJSONMembers(enc, ownerIdSlot); err != nil {
+		return typereg.EncodeFailure[VersionedFolder](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of VersionedFolder after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (v *VersionedFolder) writeJSONMembers(enc *jsontext.Encoder, ownerIdSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "VERSIONED_FOLDER"); err != nil {
+		return err
+	}
+	if err := writeJSONName(enc, "uid"); err != nil {
+		return err
+	}
+	if err := v.UID.MarshalJSONTo(enc); err != nil {
+		return err
+	}
+	if ownerIdSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "owner_id"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, v.OwnerID, ownerIdSlot); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONName(enc, "time_created"); err != nil {
+		return err
+	}
+	if err := v.TimeCreated.MarshalJSONTo(enc); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }

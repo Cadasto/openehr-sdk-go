@@ -18,20 +18,72 @@ import (
 // ancestor, so nothing is promoted.
 type rawCBoolean CBoolean
 
-// MarshalJSONTo emits canonical openEHR JSON for CBoolean with `_type`
-// (value "C_BOOLEAN") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (c CBoolean) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of CBoolean: it marshals an
+// anonymous struct whose leading field is `_type` (value "C_BOOLEAN") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (c *CBoolean) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawCBoolean
-	}{"C_BOOLEAN", rawCBoolean(c)}, typereg.MarshalOptions(enc))
+	}{"C_BOOLEAN", rawCBoolean(*c)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for CBoolean: an object whose
+// leading member is `_type` (value "C_BOOLEAN"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (c CBoolean) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return c.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[CBoolean](enc, false, err)
+	}
+	if err := c.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[CBoolean](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of CBoolean after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (c *CBoolean) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "C_BOOLEAN"); err != nil {
+		return err
+	}
+	if c.AssumedValue != nil {
+		if err := writeJSONName(enc, "assumed_value"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.Bool(*c.AssumedValue)); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONBool(enc, "false_valid", c.FalseValid); err != nil {
+		return err
+	}
+	if err := writeJSONBool(enc, "true_valid", c.TrueValid); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawCDate is the method-free canonical-JSON alias for CDate. The alias
@@ -40,20 +92,90 @@ func (c CBoolean) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawCDate CDate
 
-// MarshalJSONTo emits canonical openEHR JSON for CDate with `_type`
-// (value "C_DATE") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (c CDate) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of CDate: it marshals an
+// anonymous struct whose leading field is `_type` (value "C_DATE") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (c *CDate) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawCDate
-	}{"C_DATE", rawCDate(c)}, typereg.MarshalOptions(enc))
+	}{"C_DATE", rawCDate(*c)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for CDate: an object whose
+// leading member is `_type` (value "C_DATE"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (c CDate) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return c.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[CDate](enc, false, err)
+	}
+	if err := c.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[CDate](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of CDate after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (c *CDate) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "C_DATE"); err != nil {
+		return err
+	}
+	if c.AssumedValue != nil {
+		if err := writeJSONName(enc, "assumed_value"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*c.AssumedValue)); err != nil {
+			return err
+		}
+	}
+	if c.Pattern != nil {
+		if err := writeJSONName(enc, "pattern"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*c.Pattern)); err != nil {
+			return err
+		}
+	}
+	if c.Range != nil {
+		if err := writeJSONName(enc, "range"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.Range, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	if c.TimezoneValidity != nil {
+		if err := writeJSONName(enc, "timezone_validity"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.TimezoneValidity, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawCDateTime is the method-free canonical-JSON alias for CDateTime. The alias
@@ -62,20 +184,90 @@ func (c CDate) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawCDateTime CDateTime
 
-// MarshalJSONTo emits canonical openEHR JSON for CDateTime with `_type`
-// (value "C_DATE_TIME") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (c CDateTime) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of CDateTime: it marshals an
+// anonymous struct whose leading field is `_type` (value "C_DATE_TIME") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (c *CDateTime) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawCDateTime
-	}{"C_DATE_TIME", rawCDateTime(c)}, typereg.MarshalOptions(enc))
+	}{"C_DATE_TIME", rawCDateTime(*c)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for CDateTime: an object whose
+// leading member is `_type` (value "C_DATE_TIME"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (c CDateTime) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return c.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[CDateTime](enc, false, err)
+	}
+	if err := c.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[CDateTime](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of CDateTime after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (c *CDateTime) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "C_DATE_TIME"); err != nil {
+		return err
+	}
+	if c.AssumedValue != nil {
+		if err := writeJSONName(enc, "assumed_value"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*c.AssumedValue)); err != nil {
+			return err
+		}
+	}
+	if c.Pattern != nil {
+		if err := writeJSONName(enc, "pattern"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*c.Pattern)); err != nil {
+			return err
+		}
+	}
+	if c.Range != nil {
+		if err := writeJSONName(enc, "range"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.Range, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	if c.TimezoneValidity != nil {
+		if err := writeJSONName(enc, "timezone_validity"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.TimezoneValidity, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawCDuration is the method-free canonical-JSON alias for CDuration. The alias
@@ -84,20 +276,82 @@ func (c CDateTime) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawCDuration CDuration
 
-// MarshalJSONTo emits canonical openEHR JSON for CDuration with `_type`
-// (value "C_DURATION") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (c CDuration) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of CDuration: it marshals an
+// anonymous struct whose leading field is `_type` (value "C_DURATION") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (c *CDuration) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawCDuration
-	}{"C_DURATION", rawCDuration(c)}, typereg.MarshalOptions(enc))
+	}{"C_DURATION", rawCDuration(*c)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for CDuration: an object whose
+// leading member is `_type` (value "C_DURATION"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (c CDuration) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return c.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[CDuration](enc, false, err)
+	}
+	if err := c.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[CDuration](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of CDuration after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (c *CDuration) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "C_DURATION"); err != nil {
+		return err
+	}
+	if c.AssumedValue != nil {
+		if err := writeJSONName(enc, "assumed_value"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*c.AssumedValue)); err != nil {
+			return err
+		}
+	}
+	if c.Pattern != nil {
+		if err := writeJSONName(enc, "pattern"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*c.Pattern)); err != nil {
+			return err
+		}
+	}
+	if c.Range != nil {
+		if err := writeJSONName(enc, "range"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.Range, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawCInteger is the method-free canonical-JSON alias for CInteger. The alias
@@ -106,20 +360,83 @@ func (c CDuration) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawCInteger CInteger
 
-// MarshalJSONTo emits canonical openEHR JSON for CInteger with `_type`
-// (value "C_INTEGER") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (c CInteger) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of CInteger: it marshals an
+// anonymous struct whose leading field is `_type` (value "C_INTEGER") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (c *CInteger) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawCInteger
-	}{"C_INTEGER", rawCInteger(c)}, typereg.MarshalOptions(enc))
+	}{"C_INTEGER", rawCInteger(*c)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for CInteger: an object whose
+// leading member is `_type` (value "C_INTEGER"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (c CInteger) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return c.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[CInteger](enc, false, err)
+	}
+	if err := c.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[CInteger](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of CInteger after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (c *CInteger) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "C_INTEGER"); err != nil {
+		return err
+	}
+	if c.AssumedValue != nil {
+		if err := writeJSONName(enc, "assumed_value"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.AssumedValue, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	if len(c.List) > 0 {
+		if err := writeJSONName(enc, "list"); err != nil {
+			return err
+		}
+		_v := c.List
+		if err := json.MarshalEncode(enc, &_v, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	if c.Range != nil {
+		if err := writeJSONName(enc, "range"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.Range, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawCReal is the method-free canonical-JSON alias for CReal. The alias
@@ -128,20 +445,83 @@ func (c CInteger) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawCReal CReal
 
-// MarshalJSONTo emits canonical openEHR JSON for CReal with `_type`
-// (value "C_REAL") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (c CReal) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of CReal: it marshals an
+// anonymous struct whose leading field is `_type` (value "C_REAL") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (c *CReal) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawCReal
-	}{"C_REAL", rawCReal(c)}, typereg.MarshalOptions(enc))
+	}{"C_REAL", rawCReal(*c)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for CReal: an object whose
+// leading member is `_type` (value "C_REAL"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (c CReal) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return c.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[CReal](enc, false, err)
+	}
+	if err := c.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[CReal](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of CReal after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (c *CReal) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "C_REAL"); err != nil {
+		return err
+	}
+	if c.AssumedValue != nil {
+		if err := writeJSONName(enc, "assumed_value"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.AssumedValue, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	if len(c.List) > 0 {
+		if err := writeJSONName(enc, "list"); err != nil {
+			return err
+		}
+		_v := c.List
+		if err := json.MarshalEncode(enc, &_v, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	if c.Range != nil {
+		if err := writeJSONName(enc, "range"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.Range, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawCString is the method-free canonical-JSON alias for CString. The alias
@@ -150,20 +530,98 @@ func (c CReal) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawCString CString
 
-// MarshalJSONTo emits canonical openEHR JSON for CString with `_type`
-// (value "C_STRING") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (c CString) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of CString: it marshals an
+// anonymous struct whose leading field is `_type` (value "C_STRING") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (c *CString) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawCString
-	}{"C_STRING", rawCString(c)}, typereg.MarshalOptions(enc))
+	}{"C_STRING", rawCString(*c)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for CString: an object whose
+// leading member is `_type` (value "C_STRING"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (c CString) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return c.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[CString](enc, false, err)
+	}
+	if err := c.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[CString](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of CString after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (c *CString) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "C_STRING"); err != nil {
+		return err
+	}
+	if c.AssumedValue != nil {
+		if err := writeJSONName(enc, "assumed_value"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*c.AssumedValue)); err != nil {
+			return err
+		}
+	}
+	if len(c.List) > 0 {
+		if err := writeJSONName(enc, "list"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range c.List {
+			if err := enc.WriteToken(jsontext.String(c.List[_k])); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if c.ListOpen != nil {
+		if err := writeJSONName(enc, "list_open"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.Bool(*c.ListOpen)); err != nil {
+			return err
+		}
+	}
+	if c.Pattern != nil {
+		if err := writeJSONName(enc, "pattern"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*c.Pattern)); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawCTime is the method-free canonical-JSON alias for CTime. The alias
@@ -172,18 +630,88 @@ func (c CString) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawCTime CTime
 
-// MarshalJSONTo emits canonical openEHR JSON for CTime with `_type`
-// (value "C_TIME") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (c CTime) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of CTime: it marshals an
+// anonymous struct whose leading field is `_type` (value "C_TIME") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (c *CTime) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawCTime
-	}{"C_TIME", rawCTime(c)}, typereg.MarshalOptions(enc))
+	}{"C_TIME", rawCTime(*c)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for CTime: an object whose
+// leading member is `_type` (value "C_TIME"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (c CTime) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return c.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[CTime](enc, false, err)
+	}
+	if err := c.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[CTime](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of CTime after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (c *CTime) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "C_TIME"); err != nil {
+		return err
+	}
+	if c.AssumedValue != nil {
+		if err := writeJSONName(enc, "assumed_value"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*c.AssumedValue)); err != nil {
+			return err
+		}
+	}
+	if c.Pattern != nil {
+		if err := writeJSONName(enc, "pattern"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*c.Pattern)); err != nil {
+			return err
+		}
+	}
+	if c.Range != nil {
+		if err := writeJSONName(enc, "range"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.Range, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	if c.TimezoneValidity != nil {
+		if err := writeJSONName(enc, "timezone_validity"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, c.TimezoneValidity, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }

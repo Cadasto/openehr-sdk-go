@@ -18,20 +18,58 @@ import (
 // ancestor, so nothing is promoted.
 type rawISO8601Timezone ISO8601Timezone
 
-// MarshalJSONTo emits canonical openEHR JSON for ISO8601Timezone with `_type`
-// (value "Iso8601_timezone") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (i ISO8601Timezone) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of ISO8601Timezone: it marshals an
+// anonymous struct whose leading field is `_type` (value "Iso8601_timezone") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (i *ISO8601Timezone) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawISO8601Timezone
-	}{"Iso8601_timezone", rawISO8601Timezone(i)}, typereg.MarshalOptions(enc))
+	}{"Iso8601_timezone", rawISO8601Timezone(*i)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for ISO8601Timezone: an object whose
+// leading member is `_type` (value "Iso8601_timezone"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (i ISO8601Timezone) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return i.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[ISO8601Timezone](enc, false, err)
+	}
+	if err := i.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[ISO8601Timezone](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of ISO8601Timezone after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (i *ISO8601Timezone) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "Iso8601_timezone"); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawTimeDefinitions is the method-free canonical-JSON alias for TimeDefinitions. The alias
@@ -40,18 +78,56 @@ func (i ISO8601Timezone) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawTimeDefinitions TimeDefinitions
 
-// MarshalJSONTo emits canonical openEHR JSON for TimeDefinitions with `_type`
-// (value "Time_Definitions") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (t TimeDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of TimeDefinitions: it marshals an
+// anonymous struct whose leading field is `_type` (value "Time_Definitions") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (t *TimeDefinitions) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawTimeDefinitions
-	}{"Time_Definitions", rawTimeDefinitions(t)}, typereg.MarshalOptions(enc))
+	}{"Time_Definitions", rawTimeDefinitions(*t)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for TimeDefinitions: an object whose
+// leading member is `_type` (value "Time_Definitions"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (t TimeDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return t.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[TimeDefinitions](enc, false, err)
+	}
+	if err := t.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[TimeDefinitions](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of TimeDefinitions after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (t *TimeDefinitions) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "Time_Definitions"); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }

@@ -18,18 +18,97 @@ import (
 // ancestor, so nothing is promoted.
 type rawItemTag ItemTag
 
-// MarshalJSONTo emits canonical openEHR JSON for ItemTag with `_type`
-// (value "ITEM_TAG") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (i ItemTag) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of ItemTag: it marshals an
+// anonymous struct whose leading field is `_type` (value "ITEM_TAG") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (i *ItemTag) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawItemTag
-	}{"ITEM_TAG", rawItemTag(i)}, typereg.MarshalOptions(enc))
+	}{"ITEM_TAG", rawItemTag(*i)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for ItemTag: an object whose
+// leading member is `_type` (value "ITEM_TAG"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (i ItemTag) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return i.marshalJSONWrapped(enc)
+	}
+	ownerIdSlot := jsonSlot(i.OwnerID)
+	targetSlot := jsonSlot(i.Target)
+	if (ownerIdSlot|targetSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[ItemTag](enc, mark, i.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[ItemTag](enc, false, err)
+	}
+	if err := i.writeJSONMembers(enc, ownerIdSlot, targetSlot); err != nil {
+		return typereg.EncodeFailure[ItemTag](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of ItemTag after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (i *ItemTag) writeJSONMembers(enc *jsontext.Encoder, ownerIdSlot uint8, targetSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "ITEM_TAG"); err != nil {
+		return err
+	}
+	if err := writeJSONString(enc, "key", i.Key); err != nil {
+		return err
+	}
+	if ownerIdSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "owner_id"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, i.OwnerID, ownerIdSlot); err != nil {
+			return err
+		}
+	}
+	if targetSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "target"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, i.Target, targetSlot); err != nil {
+			return err
+		}
+	}
+	if i.TargetPath != nil {
+		if err := writeJSONName(enc, "target_path"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*i.TargetPath)); err != nil {
+			return err
+		}
+	}
+	if i.Value != nil {
+		if err := writeJSONName(enc, "value"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*i.Value)); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }

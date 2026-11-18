@@ -18,20 +18,124 @@ import (
 // ancestor, so nothing is promoted.
 type rawAddress Address
 
-// MarshalJSONTo emits canonical openEHR JSON for Address with `_type`
-// (value "ADDRESS") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (a Address) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of Address: it marshals an
+// anonymous struct whose leading field is `_type` (value "ADDRESS") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (a *Address) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawAddress
-	}{"ADDRESS", rawAddress(a)}, typereg.MarshalOptions(enc))
+	}{"ADDRESS", rawAddress(*a)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Address: an object whose
+// leading member is `_type` (value "ADDRESS"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (a Address) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return a.marshalJSONWrapped(enc)
+	}
+	detailsSlot := jsonSlot(a.Details)
+	nameSlot := jsonSlot(a.Name)
+	uidSlot := jsonSlot(a.UID)
+	if (detailsSlot|nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Address](enc, mark, a.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Address](enc, false, err)
+	}
+	if err := a.writeJSONMembers(enc, detailsSlot, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[Address](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Address after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (a *Address) writeJSONMembers(enc *jsontext.Encoder, detailsSlot uint8, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "ADDRESS"); err != nil {
+		return err
+	}
+	if a.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := a.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", a.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if detailsSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "details"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, a.Details, detailsSlot); err != nil {
+			return err
+		}
+	}
+	if a.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := a.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if len(a.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range a.Links {
+			if err := a.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, a.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, a.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawAgent is the method-free canonical-JSON alias for Agent. The alias
@@ -40,20 +144,204 @@ func (a Address) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawAgent Agent
 
-// MarshalJSONTo emits canonical openEHR JSON for Agent with `_type`
-// (value "AGENT") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (a Agent) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of Agent: it marshals an
+// anonymous struct whose leading field is `_type` (value "AGENT") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (a *Agent) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawAgent
-	}{"AGENT", rawAgent(a)}, typereg.MarshalOptions(enc))
+	}{"AGENT", rawAgent(*a)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Agent: an object whose
+// leading member is `_type` (value "AGENT"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (a Agent) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return a.marshalJSONWrapped(enc)
+	}
+	detailsSlot := jsonSlot(a.Details)
+	nameSlot := jsonSlot(a.Name)
+	uidSlot := jsonSlot(a.UID)
+	if (detailsSlot|nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Agent](enc, mark, a.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Agent](enc, false, err)
+	}
+	if err := a.writeJSONMembers(enc, detailsSlot, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[Agent](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Agent after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (a *Agent) writeJSONMembers(enc *jsontext.Encoder, detailsSlot uint8, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "AGENT"); err != nil {
+		return err
+	}
+	if a.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := a.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", a.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if len(a.Contacts) > 0 {
+		if err := writeJSONName(enc, "contacts"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range a.Contacts {
+			if err := a.Contacts[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if detailsSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "details"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, a.Details, detailsSlot); err != nil {
+			return err
+		}
+	}
+	if a.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := a.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if a.Identities != nil {
+		if err := writeJSONName(enc, "identities"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range a.Identities {
+			if err := a.Identities[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(a.Languages) > 0 {
+		if err := writeJSONName(enc, "languages"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range a.Languages {
+			if err := writeJSONSlot(enc, a.Languages[_k], jsonSlot(a.Languages[_k])); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(a.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range a.Links {
+			if err := a.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, a.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if len(a.Relationships) > 0 {
+		if err := writeJSONName(enc, "relationships"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range a.Relationships {
+			if err := a.Relationships[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(a.Roles) > 0 {
+		if err := writeJSONName(enc, "roles"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range a.Roles {
+			if err := a.Roles[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, a.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawCapability is the method-free canonical-JSON alias for Capability. The alias
@@ -62,20 +350,132 @@ func (a Agent) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawCapability Capability
 
-// MarshalJSONTo emits canonical openEHR JSON for Capability with `_type`
-// (value "CAPABILITY") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (c Capability) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of Capability: it marshals an
+// anonymous struct whose leading field is `_type` (value "CAPABILITY") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (c *Capability) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawCapability
-	}{"CAPABILITY", rawCapability(c)}, typereg.MarshalOptions(enc))
+	}{"CAPABILITY", rawCapability(*c)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Capability: an object whose
+// leading member is `_type` (value "CAPABILITY"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (c Capability) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return c.marshalJSONWrapped(enc)
+	}
+	credentialsSlot := jsonSlot(c.Credentials)
+	nameSlot := jsonSlot(c.Name)
+	uidSlot := jsonSlot(c.UID)
+	if (credentialsSlot|nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Capability](enc, mark, c.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Capability](enc, false, err)
+	}
+	if err := c.writeJSONMembers(enc, credentialsSlot, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[Capability](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Capability after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (c *Capability) writeJSONMembers(enc *jsontext.Encoder, credentialsSlot uint8, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "CAPABILITY"); err != nil {
+		return err
+	}
+	if c.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := c.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", c.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if credentialsSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "credentials"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, c.Credentials, credentialsSlot); err != nil {
+			return err
+		}
+	}
+	if c.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := c.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if len(c.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range c.Links {
+			if err := c.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, c.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if c.TimeValidity != nil {
+		if err := writeJSONName(enc, "time_validity"); err != nil {
+			return err
+		}
+		if err := c.TimeValidity.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, c.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawContact is the method-free canonical-JSON alias for Contact. The alias
@@ -84,20 +484,139 @@ func (c Capability) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawContact Contact
 
-// MarshalJSONTo emits canonical openEHR JSON for Contact with `_type`
-// (value "CONTACT") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (c Contact) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of Contact: it marshals an
+// anonymous struct whose leading field is `_type` (value "CONTACT") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (c *Contact) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawContact
-	}{"CONTACT", rawContact(c)}, typereg.MarshalOptions(enc))
+	}{"CONTACT", rawContact(*c)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Contact: an object whose
+// leading member is `_type` (value "CONTACT"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (c Contact) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return c.marshalJSONWrapped(enc)
+	}
+	nameSlot := jsonSlot(c.Name)
+	uidSlot := jsonSlot(c.UID)
+	if (nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Contact](enc, mark, c.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Contact](enc, false, err)
+	}
+	if err := c.writeJSONMembers(enc, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[Contact](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Contact after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (c *Contact) writeJSONMembers(enc *jsontext.Encoder, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "CONTACT"); err != nil {
+		return err
+	}
+	if c.Addresses != nil {
+		if err := writeJSONName(enc, "addresses"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range c.Addresses {
+			if err := c.Addresses[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if c.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := c.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", c.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if c.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := c.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if len(c.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range c.Links {
+			if err := c.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, c.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if c.TimeValidity != nil {
+		if err := writeJSONName(enc, "time_validity"); err != nil {
+			return err
+		}
+		if err := c.TimeValidity.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, c.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawGroup is the method-free canonical-JSON alias for Group. The alias
@@ -106,20 +625,204 @@ func (c Contact) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawGroup Group
 
-// MarshalJSONTo emits canonical openEHR JSON for Group with `_type`
-// (value "GROUP") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (g Group) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of Group: it marshals an
+// anonymous struct whose leading field is `_type` (value "GROUP") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (g *Group) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawGroup
-	}{"GROUP", rawGroup(g)}, typereg.MarshalOptions(enc))
+	}{"GROUP", rawGroup(*g)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Group: an object whose
+// leading member is `_type` (value "GROUP"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (g Group) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return g.marshalJSONWrapped(enc)
+	}
+	detailsSlot := jsonSlot(g.Details)
+	nameSlot := jsonSlot(g.Name)
+	uidSlot := jsonSlot(g.UID)
+	if (detailsSlot|nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Group](enc, mark, g.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Group](enc, false, err)
+	}
+	if err := g.writeJSONMembers(enc, detailsSlot, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[Group](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Group after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (g *Group) writeJSONMembers(enc *jsontext.Encoder, detailsSlot uint8, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "GROUP"); err != nil {
+		return err
+	}
+	if g.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := g.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", g.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if len(g.Contacts) > 0 {
+		if err := writeJSONName(enc, "contacts"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range g.Contacts {
+			if err := g.Contacts[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if detailsSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "details"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, g.Details, detailsSlot); err != nil {
+			return err
+		}
+	}
+	if g.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := g.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if g.Identities != nil {
+		if err := writeJSONName(enc, "identities"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range g.Identities {
+			if err := g.Identities[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(g.Languages) > 0 {
+		if err := writeJSONName(enc, "languages"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range g.Languages {
+			if err := writeJSONSlot(enc, g.Languages[_k], jsonSlot(g.Languages[_k])); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(g.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range g.Links {
+			if err := g.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, g.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if len(g.Relationships) > 0 {
+		if err := writeJSONName(enc, "relationships"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range g.Relationships {
+			if err := g.Relationships[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(g.Roles) > 0 {
+		if err := writeJSONName(enc, "roles"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range g.Roles {
+			if err := g.Roles[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, g.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawOrganisation is the method-free canonical-JSON alias for Organisation. The alias
@@ -128,20 +831,204 @@ func (g Group) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawOrganisation Organisation
 
-// MarshalJSONTo emits canonical openEHR JSON for Organisation with `_type`
-// (value "ORGANISATION") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (o Organisation) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of Organisation: it marshals an
+// anonymous struct whose leading field is `_type` (value "ORGANISATION") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (o *Organisation) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawOrganisation
-	}{"ORGANISATION", rawOrganisation(o)}, typereg.MarshalOptions(enc))
+	}{"ORGANISATION", rawOrganisation(*o)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Organisation: an object whose
+// leading member is `_type` (value "ORGANISATION"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (o Organisation) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return o.marshalJSONWrapped(enc)
+	}
+	detailsSlot := jsonSlot(o.Details)
+	nameSlot := jsonSlot(o.Name)
+	uidSlot := jsonSlot(o.UID)
+	if (detailsSlot|nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Organisation](enc, mark, o.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Organisation](enc, false, err)
+	}
+	if err := o.writeJSONMembers(enc, detailsSlot, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[Organisation](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Organisation after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (o *Organisation) writeJSONMembers(enc *jsontext.Encoder, detailsSlot uint8, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "ORGANISATION"); err != nil {
+		return err
+	}
+	if o.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := o.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", o.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if len(o.Contacts) > 0 {
+		if err := writeJSONName(enc, "contacts"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range o.Contacts {
+			if err := o.Contacts[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if detailsSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "details"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, o.Details, detailsSlot); err != nil {
+			return err
+		}
+	}
+	if o.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := o.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if o.Identities != nil {
+		if err := writeJSONName(enc, "identities"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range o.Identities {
+			if err := o.Identities[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(o.Languages) > 0 {
+		if err := writeJSONName(enc, "languages"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range o.Languages {
+			if err := writeJSONSlot(enc, o.Languages[_k], jsonSlot(o.Languages[_k])); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(o.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range o.Links {
+			if err := o.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, o.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if len(o.Relationships) > 0 {
+		if err := writeJSONName(enc, "relationships"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range o.Relationships {
+			if err := o.Relationships[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(o.Roles) > 0 {
+		if err := writeJSONName(enc, "roles"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range o.Roles {
+			if err := o.Roles[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, o.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawPartyIdentity is the method-free canonical-JSON alias for PartyIdentity. The alias
@@ -150,20 +1037,124 @@ func (o Organisation) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawPartyIdentity PartyIdentity
 
-// MarshalJSONTo emits canonical openEHR JSON for PartyIdentity with `_type`
-// (value "PARTY_IDENTITY") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (p PartyIdentity) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of PartyIdentity: it marshals an
+// anonymous struct whose leading field is `_type` (value "PARTY_IDENTITY") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (p *PartyIdentity) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawPartyIdentity
-	}{"PARTY_IDENTITY", rawPartyIdentity(p)}, typereg.MarshalOptions(enc))
+	}{"PARTY_IDENTITY", rawPartyIdentity(*p)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for PartyIdentity: an object whose
+// leading member is `_type` (value "PARTY_IDENTITY"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (p PartyIdentity) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return p.marshalJSONWrapped(enc)
+	}
+	detailsSlot := jsonSlot(p.Details)
+	nameSlot := jsonSlot(p.Name)
+	uidSlot := jsonSlot(p.UID)
+	if (detailsSlot|nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[PartyIdentity](enc, mark, p.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[PartyIdentity](enc, false, err)
+	}
+	if err := p.writeJSONMembers(enc, detailsSlot, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[PartyIdentity](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of PartyIdentity after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (p *PartyIdentity) writeJSONMembers(enc *jsontext.Encoder, detailsSlot uint8, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "PARTY_IDENTITY"); err != nil {
+		return err
+	}
+	if p.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := p.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", p.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if detailsSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "details"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, p.Details, detailsSlot); err != nil {
+			return err
+		}
+	}
+	if p.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := p.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if len(p.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range p.Links {
+			if err := p.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, p.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, p.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawPartyRelationship is the method-free canonical-JSON alias for PartyRelationship. The alias
@@ -172,20 +1163,144 @@ func (p PartyIdentity) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawPartyRelationship PartyRelationship
 
-// MarshalJSONTo emits canonical openEHR JSON for PartyRelationship with `_type`
-// (value "PARTY_RELATIONSHIP") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (p PartyRelationship) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of PartyRelationship: it marshals an
+// anonymous struct whose leading field is `_type` (value "PARTY_RELATIONSHIP") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (p *PartyRelationship) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawPartyRelationship
-	}{"PARTY_RELATIONSHIP", rawPartyRelationship(p)}, typereg.MarshalOptions(enc))
+	}{"PARTY_RELATIONSHIP", rawPartyRelationship(*p)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for PartyRelationship: an object whose
+// leading member is `_type` (value "PARTY_RELATIONSHIP"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (p PartyRelationship) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return p.marshalJSONWrapped(enc)
+	}
+	detailsSlot := jsonSlot(p.Details)
+	nameSlot := jsonSlot(p.Name)
+	uidSlot := jsonSlot(p.UID)
+	if (detailsSlot|nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[PartyRelationship](enc, mark, p.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[PartyRelationship](enc, false, err)
+	}
+	if err := p.writeJSONMembers(enc, detailsSlot, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[PartyRelationship](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of PartyRelationship after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (p *PartyRelationship) writeJSONMembers(enc *jsontext.Encoder, detailsSlot uint8, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "PARTY_RELATIONSHIP"); err != nil {
+		return err
+	}
+	if p.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := p.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", p.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if detailsSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "details"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, p.Details, detailsSlot); err != nil {
+			return err
+		}
+	}
+	if p.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := p.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if len(p.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range p.Links {
+			if err := p.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, p.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONName(enc, "source"); err != nil {
+		return err
+	}
+	if err := p.Source.MarshalJSONTo(enc); err != nil {
+		return err
+	}
+	if err := writeJSONName(enc, "target"); err != nil {
+		return err
+	}
+	if err := p.Target.MarshalJSONTo(enc); err != nil {
+		return err
+	}
+	if p.TimeValidity != nil {
+		if err := writeJSONName(enc, "time_validity"); err != nil {
+			return err
+		}
+		if err := p.TimeValidity.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, p.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawPerson is the method-free canonical-JSON alias for Person. The alias
@@ -194,20 +1309,204 @@ func (p PartyRelationship) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawPerson Person
 
-// MarshalJSONTo emits canonical openEHR JSON for Person with `_type`
-// (value "PERSON") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (p Person) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of Person: it marshals an
+// anonymous struct whose leading field is `_type` (value "PERSON") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (p *Person) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawPerson
-	}{"PERSON", rawPerson(p)}, typereg.MarshalOptions(enc))
+	}{"PERSON", rawPerson(*p)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Person: an object whose
+// leading member is `_type` (value "PERSON"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (p Person) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return p.marshalJSONWrapped(enc)
+	}
+	detailsSlot := jsonSlot(p.Details)
+	nameSlot := jsonSlot(p.Name)
+	uidSlot := jsonSlot(p.UID)
+	if (detailsSlot|nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Person](enc, mark, p.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Person](enc, false, err)
+	}
+	if err := p.writeJSONMembers(enc, detailsSlot, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[Person](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Person after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (p *Person) writeJSONMembers(enc *jsontext.Encoder, detailsSlot uint8, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "PERSON"); err != nil {
+		return err
+	}
+	if p.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := p.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", p.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if len(p.Contacts) > 0 {
+		if err := writeJSONName(enc, "contacts"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range p.Contacts {
+			if err := p.Contacts[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if detailsSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "details"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, p.Details, detailsSlot); err != nil {
+			return err
+		}
+	}
+	if p.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := p.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if p.Identities != nil {
+		if err := writeJSONName(enc, "identities"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range p.Identities {
+			if err := p.Identities[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(p.Languages) > 0 {
+		if err := writeJSONName(enc, "languages"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range p.Languages {
+			if err := writeJSONSlot(enc, p.Languages[_k], jsonSlot(p.Languages[_k])); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(p.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range p.Links {
+			if err := p.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, p.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if len(p.Relationships) > 0 {
+		if err := writeJSONName(enc, "relationships"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range p.Relationships {
+			if err := p.Relationships[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(p.Roles) > 0 {
+		if err := writeJSONName(enc, "roles"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range p.Roles {
+			if err := p.Roles[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, p.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawRole is the method-free canonical-JSON alias for Role. The alias
@@ -216,20 +1515,202 @@ func (p Person) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawRole Role
 
-// MarshalJSONTo emits canonical openEHR JSON for Role with `_type`
-// (value "ROLE") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (r Role) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of Role: it marshals an
+// anonymous struct whose leading field is `_type` (value "ROLE") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (r *Role) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawRole
-	}{"ROLE", rawRole(r)}, typereg.MarshalOptions(enc))
+	}{"ROLE", rawRole(*r)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Role: an object whose
+// leading member is `_type` (value "ROLE"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (r Role) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return r.marshalJSONWrapped(enc)
+	}
+	detailsSlot := jsonSlot(r.Details)
+	nameSlot := jsonSlot(r.Name)
+	uidSlot := jsonSlot(r.UID)
+	if (detailsSlot|nameSlot|uidSlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Role](enc, mark, r.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Role](enc, false, err)
+	}
+	if err := r.writeJSONMembers(enc, detailsSlot, nameSlot, uidSlot); err != nil {
+		return typereg.EncodeFailure[Role](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Role after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (r *Role) writeJSONMembers(enc *jsontext.Encoder, detailsSlot uint8, nameSlot uint8, uidSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "ROLE"); err != nil {
+		return err
+	}
+	if r.ArchetypeDetails != nil {
+		if err := writeJSONName(enc, "archetype_details"); err != nil {
+			return err
+		}
+		if err := r.ArchetypeDetails.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "archetype_node_id", r.ArchetypeNodeID); err != nil {
+		return err
+	}
+	if len(r.Capabilities) > 0 {
+		if err := writeJSONName(enc, "capabilities"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range r.Capabilities {
+			if err := r.Capabilities[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(r.Contacts) > 0 {
+		if err := writeJSONName(enc, "contacts"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range r.Contacts {
+			if err := r.Contacts[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if detailsSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "details"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, r.Details, detailsSlot); err != nil {
+			return err
+		}
+	}
+	if r.FeederAudit != nil {
+		if err := writeJSONName(enc, "feeder_audit"); err != nil {
+			return err
+		}
+		if err := r.FeederAudit.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if r.Identities != nil {
+		if err := writeJSONName(enc, "identities"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range r.Identities {
+			if err := r.Identities[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if len(r.Links) > 0 {
+		if err := writeJSONName(enc, "links"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range r.Links {
+			if err := r.Links[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if nameSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "name"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, r.Name, nameSlot); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONName(enc, "performer"); err != nil {
+		return err
+	}
+	if err := r.Performer.MarshalJSONTo(enc); err != nil {
+		return err
+	}
+	if len(r.Relationships) > 0 {
+		if err := writeJSONName(enc, "relationships"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range r.Relationships {
+			if err := r.Relationships[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if r.TimeValidity != nil {
+		if err := writeJSONName(enc, "time_validity"); err != nil {
+			return err
+		}
+		if err := r.TimeValidity.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if uidSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, r.UID, uidSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // jsonWireVersionedParty is the flat canonical-JSON wire struct for VersionedParty. VersionedParty embeds
@@ -246,14 +1727,79 @@ type jsonWireVersionedParty struct {
 	TimeCreated DVDateTime `json:"time_created"`
 }
 
-// MarshalJSONTo emits canonical openEHR JSON for VersionedParty with `_type`
-// (value "VERSIONED_PARTY") as the leading member. The receiver is a
-// value so a by-value instance in a polymorphic slot keeps its `_type`.
-func (v VersionedParty) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of VersionedParty: it copies each field
+// into the flat wire struct, `_type` (value "VERSIONED_PARTY") leading, and marshals
+// it, so json/v2 writes every member under the encoder's options.
+func (v *VersionedParty) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &jsonWireVersionedParty{
 		Class:       "VERSIONED_PARTY",
 		UID:         v.UID,
 		OwnerID:     v.OwnerID,
 		TimeCreated: v.TimeCreated,
 	}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for VersionedParty: an object whose
+// leading member is `_type` (value "VERSIONED_PARTY"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (v VersionedParty) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return v.marshalJSONWrapped(enc)
+	}
+	ownerIdSlot := jsonSlot(v.OwnerID)
+	if ownerIdSlot&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[VersionedParty](enc, mark, v.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[VersionedParty](enc, false, err)
+	}
+	if err := v.writeJSONMembers(enc, ownerIdSlot); err != nil {
+		return typereg.EncodeFailure[VersionedParty](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of VersionedParty after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (v *VersionedParty) writeJSONMembers(enc *jsontext.Encoder, ownerIdSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "VERSIONED_PARTY"); err != nil {
+		return err
+	}
+	if err := writeJSONName(enc, "uid"); err != nil {
+		return err
+	}
+	if err := v.UID.MarshalJSONTo(enc); err != nil {
+		return err
+	}
+	if ownerIdSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "owner_id"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, v.OwnerID, ownerIdSlot); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONName(enc, "time_created"); err != nil {
+		return err
+	}
+	if err := v.TimeCreated.MarshalJSONTo(enc); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
