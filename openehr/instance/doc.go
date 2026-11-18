@@ -94,9 +94,10 @@
 //     participation; an entry's provider, a PARTY_SELF, and one other
 //     participation; and an activity's timing, an ISO 8601 recurring
 //     interval in the formalism ISO8601. Each participation has a
-//     PARTY_SELF performer, the mode openehr 193|not specified| and the
-//     function text unknown. An attribute the template names is built as
-//     the template says, or left out where the template prohibits it. Not
+//     performer that is a PARTY_IDENTIFIED named example, the mode openehr
+//     193|not specified| and the function text unknown. An attribute the
+//     template names is built as the template says, or left out where the
+//     template prohibits it. Not
 //     written are an entry's workflow_id and guideline_id, a locatable's
 //     links, and a history's duration and period. Large is the SDK's
 //     complete level: every root it returns meets the template and the RM,
@@ -202,7 +203,12 @@
 // one side alone staying on that side. Where nothing is left, Generate returns an error wrapping
 // [ErrConstraintUnsatisfiable]. Where the template gives an RM attribute
 // no value, the generator writes an RM-valid default, unless the
-// template's own constraint on that attribute rejects it. A coded
+// template's own constraint on that attribute rejects it. A party the
+// template gives only as the abstract PARTY_PROXY, or does not name, is a
+// PARTY_SELF, as an entry's subject is, except the composer, which is
+// Options.Composer, and a participation's performer, a PARTY_IDENTIFIED
+// named example unless the template gives it a name, identifiers or an
+// external reference. A coded
 // attribute the RM keeps within a group or a code set of the openEHR
 // terminology, such as a participation's mode, a text's language or a
 // multimedia value's media type, keeps a code the walk wrote that the set

@@ -120,6 +120,29 @@ func checkSelfPerformer(t *testing.T, p rm.Participation) {
 	}
 }
 
+// checkExamplePerformer fails t unless p's performer is a PARTY_IDENTIFIED
+// named example, the performer the generator builds where the OPT leaves it
+// silent or gives it as the abstract PARTY_PROXY.
+func checkExamplePerformer(t *testing.T, p rm.Participation) {
+	t.Helper()
+	party, ok := p.Performer.(*rm.PartyIdentified)
+	if !ok {
+		t.Errorf("PARTICIPATION.performer is %T, want *rm.PartyIdentified", p.Performer)
+		return
+	}
+	if party.Name == nil || *party.Name != "example" {
+		t.Errorf("PARTICIPATION.performer name = %s, want %q", optionalText(party.Name), "example")
+	}
+}
+
+// optionalText is the quoted text s points to, or <none> for a nil s.
+func optionalText(s *string) string {
+	if s == nil {
+		return "<none>"
+	}
+	return fmt.Sprintf("%q", *s)
+}
+
 // checkCodedAs fails t unless got carries code, with the text text.
 func checkCodedAs(t *testing.T, what string, got rm.DVCodedText, code rm.CodePhrase, text string) {
 	t.Helper()
@@ -201,8 +224,11 @@ func openehrCode(code string) rm.CodePhrase {
 // OPT gives no value: a function the walk writes as a DV_CODED_TEXT takes
 // openehr 253|unknown| of the participation function group, and one it
 // writes as a DV_TEXT stays a DV_TEXT; a mode takes openehr 193|not
-// specified|; an omitted performer is a PARTY_SELF, and one the OPT names
-// keeps what the OPT gives it; a time the OPT names is written. Where the
+// specified|; a performer the OPT omits, gives as the abstract PARTY_PROXY
+// or leaves untyped is a PARTY_IDENTIFIED, named example unless the OPT
+// gives it an external_ref, and one the OPT names as a concrete class is
+// that class and keeps what the OPT gives it; a time the OPT names is
+// written. Where the
 // OPT codes the function or the mode in local, the code the walk wrote
 // stays and breaks that RM rule (Precedence 1). A participations list the
 // OPT requires and gives no child gets one PARTICIPATION built from the BMM.
@@ -231,7 +257,7 @@ func TestREQ107_ParticipationsAreWritten(t *testing.T) {
 					t.Fatal("PARTICIPATION.mode absent, want openehr 193")
 				}
 				checkCodedAs(t, "PARTICIPATION.mode", *p.Mode, notSpecified, "not specified")
-				checkSelfPerformer(t, p)
+				checkExamplePerformer(t, p)
 				if p.Time == nil || p.Time.Lower.Value != defaultsNow.Format(time.RFC3339) || !p.Time.UpperUnbounded {
 					t.Errorf("PARTICIPATION.time = %+v, want a lower bound at Options.Now and no upper bound", p.Time)
 				}
@@ -246,7 +272,7 @@ func TestREQ107_ParticipationsAreWritten(t *testing.T) {
 				if p.Mode != nil {
 					t.Errorf("PARTICIPATION.mode = %+v, want none: the OPT does not name it", p.Mode)
 				}
-				checkSelfPerformer(t, p)
+				checkExamplePerformer(t, p)
 			},
 		},
 		{
@@ -295,6 +321,38 @@ func TestREQ107_ParticipationsAreWritten(t *testing.T) {
 			opt: contextParticipationsOPT(optSingle("function", optNode("DV_TEXT", "")),
 				optSingle("performer", optNode("PARTY_PROXY", ""))),
 			list:  contextParticipations,
+			check: checkExamplePerformer,
+		},
+		{
+			name: "context: performer an untyped node",
+			opt: contextParticipationsOPT(optSingle("function", optNode("DV_TEXT", "")),
+				optSingle("performer", optUntyped(""))),
+			list:  contextParticipations,
+			check: checkExamplePerformer,
+		},
+		{
+			name: "context: performer the abstract PARTY_PROXY with an external_ref",
+			opt: contextParticipationsOPT(optSingle("function", optNode("DV_TEXT", "")),
+				optSingle("performer", optNode("PARTY_PROXY", "", optSingle("external_ref", optNode("PARTY_REF", ""))))),
+			list: contextParticipations,
+			check: func(t *testing.T, p rm.Participation) {
+				party, ok := p.Performer.(*rm.PartyIdentified)
+				if !ok {
+					t.Fatalf("PARTICIPATION.performer is %T, want *rm.PartyIdentified", p.Performer)
+				}
+				if party.ExternalRef == nil {
+					t.Error("PARTICIPATION.performer external_ref absent, want the one the OPT names")
+				}
+				if party.Name != nil {
+					t.Errorf("PARTICIPATION.performer name = %q, want none: the external_ref meets Basic_validity", *party.Name)
+				}
+			},
+		},
+		{
+			name: "context: performer a PARTY_SELF the OPT names",
+			opt: contextParticipationsOPT(optSingle("function", optNode("DV_TEXT", "")),
+				optSingle("performer", optNode("PARTY_SELF", ""))),
+			list:  contextParticipations,
 			check: checkSelfPerformer,
 		},
 		{
@@ -303,7 +361,7 @@ func TestREQ107_ParticipationsAreWritten(t *testing.T) {
 			list: contextParticipations,
 			check: func(t *testing.T, p rm.Participation) {
 				checkPlainFunction(t, p, walkText)
-				checkSelfPerformer(t, p)
+				checkExamplePerformer(t, p)
 			},
 		},
 		{
@@ -316,7 +374,7 @@ func TestREQ107_ParticipationsAreWritten(t *testing.T) {
 					t.Fatal("PARTICIPATION.mode absent, want openehr 193")
 				}
 				checkCodedAs(t, "PARTICIPATION.mode", *p.Mode, notSpecified, "not specified")
-				checkSelfPerformer(t, p)
+				checkExamplePerformer(t, p)
 			},
 		},
 	}
@@ -330,6 +388,34 @@ func TestREQ107_ParticipationsAreWritten(t *testing.T) {
 			checkValidBut(t, out, c, tc.expect...)
 		})
 	}
+}
+
+// TestREQ107_OnlyAPerformerIsBuiltAsANamedParty is the REQ-107 check that
+// the performer default reaches no other party: an OBSERVATION whose OPT
+// gives both its subject and the performer of one of its other
+// participations as the abstract PARTY_PROXY gets a PARTY_SELF subject and
+// a performer that is a PARTY_IDENTIFIED named example, under every policy,
+// both value fills and both compile modes, and passes both validators.
+func TestREQ107_OnlyAPerformerIsBuiltAsANamedParty(t *testing.T) {
+	opt := optTemplate("OBSERVATION",
+		optSingle("subject", optNode("PARTY_PROXY", "")),
+		optMultiple("other_participations", optParticipation(
+			optSingle("function", optNode("DV_TEXT", "")),
+			optSingle("performer", optNode("PARTY_PROXY", "")))))
+	runEveryWay(t, "subject and performer the abstract PARTY_PROXY", opt, func(t *testing.T, _ instance.Options, out any, c *templatecompile.Compiled) {
+		obs, ok := out.(*rm.Observation)
+		if !ok {
+			t.Fatalf("generated root is %T, want *rm.Observation", out)
+		}
+		if _, ok := obs.Subject.(*rm.PartySelf); !ok {
+			t.Errorf("OBSERVATION.subject is %T, want *rm.PartySelf", obs.Subject)
+		}
+		if len(obs.OtherParticipations) != 1 {
+			t.Fatalf("%d other participations generated, want 1", len(obs.OtherParticipations))
+		}
+		checkExamplePerformer(t, obs.OtherParticipations[0])
+		checkValidBut(t, out, c)
+	})
 }
 
 // optTermMapping is a TERM_MAPPING with attrs.

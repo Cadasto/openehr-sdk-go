@@ -35,7 +35,8 @@ func nowText(opts instance.Options) string {
 // writes where the template names none: a function that is a plain DV_TEXT
 // holding the rubric of the RM default openehr 253, unknown, which the FLAT
 // format carries, a mode coded openehr 193 not specified with its rubric,
-// and a PARTY_SELF performer (REQ-107 RM defaults).
+// and a performer that is a PARTY_IDENTIFIED named example (REQ-107 RM
+// defaults).
 func checkExampleParticipation(t *testing.T, where string, p rm.Participation) {
 	t.Helper()
 	function, ok := p.Function.(*rm.DVText)
@@ -51,8 +52,10 @@ func checkExampleParticipation(t *testing.T, where string, p rm.Participation) {
 		t.Errorf("%s mode = %s|%s|%s, want %s|193|%s", where, p.Mode.DefiningCode.TerminologyID.Value,
 			p.Mode.DefiningCode.CodeString, p.Mode.Value, terminology.ID, rubric)
 	}
-	if _, ok := p.Performer.(*rm.PartySelf); !ok {
-		t.Errorf("%s performer is %T, want *rm.PartySelf", where, p.Performer)
+	if performer, ok := p.Performer.(*rm.PartyIdentified); !ok {
+		t.Errorf("%s performer is %T, want *rm.PartyIdentified", where, p.Performer)
+	} else if performer.Name == nil || *performer.Name != "example" {
+		t.Errorf("%s performer name = %s, want %q", where, optionalText(performer.Name), "example")
 	}
 }
 

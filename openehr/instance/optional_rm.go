@@ -34,11 +34,13 @@ const (
 //   - a COMPOSITION's feeder_audit, whose originating_system_audit has the
 //     system_id exampleSystemID and the clock as its time;
 //   - an EVENT_CONTEXT's end_time, from the clock, its health_care_facility,
-//     a PARTY_IDENTIFIED named example, and one participations member;
+//     a PARTY_IDENTIFIED named example (exampleParty), and one
+//     participations member;
 //   - an ENTRY's provider, a PARTY_SELF, and one other_participations member;
 //   - an ACTIVITY's timing, an ISO 8601 recurring interval.
 //
-// Each participation is the one exampleParticipation builds. An attribute
+// Each participation is the one exampleParticipation builds, whose
+// performer is a PARTY_IDENTIFIED named example too. An attribute
 // opt names is the walk's, which visits it under Large where the template
 // allows it and leaves it out where the template prohibits it, so nothing
 // here writes over what the template constrains. An attribute that already
@@ -60,9 +62,7 @@ func (g *generator) writeOptionalRMAttributes(opt *tcimpl.CompiledNode, rmValue 
 			v.EndTime = &rm.DVDateTime{Value: g.dateTimeDefault()}
 		}
 		if unnamed(opt, "health_care_facility") && (v.HealthCareFacility == nil || rm.IsTypedNil(v.HealthCareFacility)) {
-			facility := &rm.PartyIdentified{}
-			fillPartyName(&facility.Name, 0, nil)
-			v.HealthCareFacility = facility
+			v.HealthCareFacility = exampleParty()
 		}
 		if unnamed(opt, "participations") && len(v.Participations) == 0 {
 			v.Participations = []rm.Participation{g.exampleParticipation()}
@@ -100,22 +100,33 @@ func (g *generator) writeEntryParties(opt *tcimpl.CompiledNode, provider *rm.Par
 }
 
 // exampleParticipation is the PARTICIPATION Large writes where the template
-// names none: a PARTY_SELF performer, the RM default of an abstract
-// PARTY_PROXY; a mode coded with its RM default, openehr 193|not
-// specified|, with its rubric (settleCoded), so Mode_valid holds; and a
-// function written as a DV_TEXT, the type the BMM gives it, whose text is
-// the rubric of the function's RM default, openehr 253|unknown|. The
-// function is not coded because the FLAT format carries a participation's
-// function as plain text only, so a coded one would make the root one
-// FLAT cannot carry; Function_valid binds a coded function alone.
+// names none: a performer that is a PARTY_IDENTIFIED named example
+// (exampleParty), the type the walk builds for a performer the template
+// gives as the abstract PARTY_PROXY (concreteAt); a mode coded with its RM
+// default, openehr 193|not specified|, with its rubric (settleCoded), so
+// Mode_valid holds; and a function written as a DV_TEXT, the type the BMM
+// gives it, whose text is the rubric of the function's RM default, openehr
+// 253|unknown|. The function is not coded because the FLAT format carries a
+// participation's function as plain text only, so a coded one would make
+// the root one FLAT cannot carry; Function_valid binds a coded function
+// alone.
 func (g *generator) exampleParticipation() rm.Participation {
 	function, _ := terminology.ParticipationFunction.Rubric(participationFunctionDefault)
 	p := rm.Participation{
 		Function:  &rm.DVText{Value: function},
 		Mode:      &rm.DVCodedText{},
-		Performer: &rm.PartySelf{},
+		Performer: exampleParty(),
 	}
 	g.settleCoded(nil, &p)
+	return p
+}
+
+// exampleParty is the PARTY_IDENTIFIED Large writes as an EVENT_CONTEXT's
+// health_care_facility and as the performer of a participation it adds: one
+// named example (fillPartyName), so RM Basic_validity holds.
+func exampleParty() *rm.PartyIdentified {
+	p := &rm.PartyIdentified{}
+	fillPartyName(&p.Name, 0, nil)
 	return p
 }
 

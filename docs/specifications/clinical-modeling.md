@@ -1034,7 +1034,8 @@ When both of these hold, the generator **SHOULD** write the default given here, 
 
 A `COMPOSITION`'s `context` is written under every policy, `Required` included, as its item says:
 
-- an abstract `PARTY_PROXY` other than a `COMPOSITION`'s `composer`, such as an ENTRY's `subject` or a `PARTICIPATION`'s `performer`: a `PARTY_SELF`, never an empty `PARTY_IDENTIFIED`, which would break `Basic_validity`;
+- an abstract `PARTY_PROXY` other than a `COMPOSITION`'s `composer` and a `PARTICIPATION`'s `performer`, such as an ENTRY's `subject`: a `PARTY_SELF`, never an empty `PARTY_IDENTIFIED`, which would break `Basic_validity`;
+- a `PARTICIPATION`'s `performer` that is an abstract `PARTY_PROXY`: a `PARTY_IDENTIFIED`, whose `name` § [Precedence](#precedence) 2 writes as `example`, since FLAT and STRUCTURED write a `PARTY_SELF` performer as no party key ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes)), and the Simplified Formats specification shows a performer only by its `PARTY_IDENTIFIED` keys;
 - an abstract `OBJECT_ID` or `UID_BASED_ID`, such as the `id` of a `PARTY_REF`, an `OBJECT_REF` or a `LOCATABLE_REF`: a `HIER_OBJECT_ID` whose `value` *Identity* gives;
 - an ENTRY's `language`: `Options.Language` in `ISO_639-1`; its `encoding`: `UTF-8` in `IANA_character-sets`; so that `Language_valid` and `Encoding_valid` hold (§ [REQ-112](#req-112--template-less-reference-model-validation-floor) *Coded invariants*);
 - a `DV_TEXT`'s or `DV_CODED_TEXT`'s `language`, and a `DV_ENCAPSULATED`'s: `Options.Language` in `ISO_639-1`; a `DV_TEXT`'s or `DV_CODED_TEXT`'s `encoding`, and a `DV_ENCAPSULATED`'s `charset`: `UTF-8` in `IANA_character-sets`; so that their `Language_valid`, `Encoding_valid` and `Charset_valid` hold;
@@ -1074,7 +1075,12 @@ Under `Large`, `Generate` **MUST** write the optional RM attributes below where 
 - an ENTRY's `provider`, a `PARTY_SELF`, and one member of its `other_participations`;
 - an `ACTIVITY`'s `timing`: a `DV_PARSABLE` whose `formalism` is `ISO8601` and whose `value` is an ISO 8601 recurring interval, `R/`, the date-time *Clock* gives and `/P1D`, the form the RM prefers for it (RM `ACTIVITY.timing`: "the preferred syntax is ISO8601 'R' format").
 
-Each participation has a `PARTY_SELF` performer, the `mode` `openehr` `193|not specified|` with its rubric, and a `function` that is a plain `DV_TEXT` whose `value` is `unknown`, the rubric of its RM default `253`, since FLAT's `|function` key carries only a plain `DV_TEXT` ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes)) and `Function_valid` binds only a coded `function`.
+Each participation has:
+
+- a `performer` that is a `PARTY_IDENTIFIED` whose `name` is `example`;
+- the `mode` `openehr` `193|not specified|` with its rubric;
+- a `function` that is a plain `DV_TEXT` whose `value` is `unknown`, the rubric of its RM default `253`, since FLAT's `|function` key carries only a plain `DV_TEXT` ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes)) and `Function_valid` binds only a coded `function`.
+
 An attribute the OPT node names is the visit's: `Large` builds it under the OPT's constraints where the OPT allows it, a `feeder_audit` excepted (*Known gap: attributes the generator cannot write*), and leaves it out where the OPT prohibits it.
 Beyond those *Leaf values*, *RM defaults* and § [Precedence](#precedence) 4 write under every policy, `Large` writes no other optional RM attribute the OPT does not name, such as an ENTRY's `workflow_id` or `guideline_id`, a LOCATABLE's `links`, or a `HISTORY`'s `duration` or `period`.
 The skeleton the composition builder seeds a `Builder` with under `Large` holds none of them ([§ REQ-101](#req-101--generic-opt-driven-composition-builder)).
@@ -1231,6 +1237,8 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
      The value § Contract *Leaf values* gives stays where it has that scheme.
      Otherwise the generator writes the first value with that scheme the OPT lists, or, where the OPT lists none or leaves its list open, one its pattern admits, and else `ehr://example` where the OPT admits it.
      An empty value, which only a pattern that admits nothing else gives, is not narrowed: it gets the placeholder (§ [Exceptions and known gaps](#exceptions-and-known-gaps)).
+   - `Code_string_valid` ([§ REQ-112](#req-112--template-less-reference-model-validation-floor)) narrows the pairs a `C_DV_ORDINAL` lists, on a single value or on an interval's bound, to those whose `symbol` has a code, where it lists one.
+     A list whose every pair has an empty `code_string` is not narrowed: the pair written gets the placeholder (§ [Exceptions and known gaps](#exceptions-and-known-gaps)).
 
    A `C_INTEGER`, a `C_DV_ORDINAL` value or a `precision` range that reaches past the 32-bit range of an RM `Integer` is refused when the template is read: its text does not decode as an `Integer` ([wire.md § REQ-056](wire.md#req-056)), whose range [wire.md § Floating-point precision](wire.md#floating-point-precision) gives.
    So the generator meets none.
@@ -1291,7 +1299,9 @@ A root `Generate` returns can break § Contract's output rule in these cases, an
 - **An RM invariant that relates the object to another**, such as PARTY `Relationships_validity` or PARTY_RELATIONSHIP `Source_valid` and `Target_valid`, which a single generated object cannot meet, is not kept.
 - **A placeholder code on an attribute an RM rule ties to a code set or terminology group** for which § Contract gives no default, such as a `normal_status`, or a DV_MULTIMEDIA `compression_algorithm` or `integrity_check_algorithm`, can break that rule.
 - **An attribute the OPT prohibits that an RM rule needs, a list the BMM requires a member in whose cardinality upper bound is 0, or an attribute the OPT requires that an RM rule needs absent** (§ [Precedence](#precedence) 2), such as `CLUSTER.items` or a PARTY's `identities` at cardinality `0..0`, or a `normal_range` on a bound of a REFERENCE_RANGE's `range`, breaks the OPT's prohibition, bound or requirement.
-- **A `DV_EHR_URI`'s `value`, or the text and code of a `DV_ORDINAL`'s or `DV_SCALE`'s `symbol`, whose OPT pattern admits only the empty string**, such as `x{0}`, gets the placeholder *Placeholders* gives, since the RM needs it present (§ [Precedence](#precedence) 2), and breaks the OPT's pattern.
+- **A value the RM needs present that the OPT admits only empty** gets the placeholder *Placeholders* gives (§ [Precedence](#precedence) 2):
+  - a `DV_EHR_URI`'s `value`, or the text and code of a `DV_ORDINAL`'s or `DV_SCALE`'s `symbol`, whose OPT pattern admits only the empty string, such as `x{0}`, breaks the OPT's pattern;
+  - the code of a `DV_ORDINAL`'s `symbol` whose `C_DV_ORDINAL` lists every pair with an empty `code_string` is the placeholder code in the terminology of the pair written, and breaks the OPT's list.
 - **An earlier sibling with room that carries a later, required one's identity, where neither pins a name** (§ Contract *What a visit writes*): the validator binds an item to the first of them that has room and under whose constraints it validates ([§ REQ-102](#req-102--composition-validation) *Structural — binding items*).
   So the earlier sibling takes the member built for the later one wherever that member validates under it.
   Under `Medium` an optional earlier sibling gets no member of its own and takes the later one's.
@@ -1396,7 +1406,7 @@ It keeps the RM rules where:
 - the settles § [Precedence](#precedence) 3 and 4 run on the walk's own value (a percentage `accuracy`, a DV_PROPORTION's kind, a DV_PERIODIC_TIME_SPECIFICATION's formalism, a coded attribute's group or code set, and `Normal_range_and_status_consistency`) leave it as it is, but for the `precision` 0 they give a DV_PROPORTION that has none, which no RM rule asks for.
 
 A default that does not validate, or breaks such a rule, leaves the value the `ValueFill` gives.
-Compile captures an OPT `<assumed_value>` into the constraint's `Default` field, but the generator does not read it.
+Compile captures an OPT `<assumed_value>` into the `Default` field of a `C_BOOLEAN`, `C_INTEGER`, `C_REAL` or `C_STRING` constraint, the only constraints that have one, but the generator does not read it.
 
 The generator is **sound** (every root it returns meets § Contract's output rule, apart from § [Exceptions and known gaps](#exceptions-and-known-gaps)), not **complete** (it does not enumerate every valid instance — different policies may produce different but equally valid trees).
 Sound × validator-aligned ⇒ PROBE-027 cross-checks the contract.
