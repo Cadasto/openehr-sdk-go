@@ -790,6 +790,33 @@ func elideRegion(b *strings.Builder, region string, lead, tail int) {
 // holding predicate text: the class position, a predicate assembled by hand,
 // or a form the parser leaves unstructured.
 func StripPredicateTrivia(text string) string {
+	if triviaFree(text) {
+		return text
+	}
+	return stripPredicateTrivia(text)
+}
+
+// triviaFree reports whether text holds no byte that can start trivia: a
+// whitespace byte, `--`, or the first byte of a [bomRun] form. The walk in
+// [stripPredicateTrivia] copies such a text unchanged, so the caller can skip
+// it and the string it would build.
+func triviaFree(text string) bool {
+	for i := 0; i < len(text); i++ {
+		switch text[i] {
+		case ' ', '\t', '\r', '\n', 0x00, 0xEE, 0xEF:
+			return false
+		case '-':
+			if i+1 < len(text) && text[i+1] == '-' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// stripPredicateTrivia is the lexer-state walk [StripPredicateTrivia] runs on
+// a text that may hold trivia.
+func stripPredicateTrivia(text string) string {
 	var b strings.Builder
 	pending := false // an interior trivia run collapses to one space
 	content := func(s string) {
