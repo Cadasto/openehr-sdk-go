@@ -1688,6 +1688,7 @@ requirements:
       - openehr/instance/normal_range_test.go
       - openehr/instance/null_flavour_default_test.go
       - openehr/instance/ordered_value_test.go
+      - openehr/instance/ordinal_empty_code_test.go
       - openehr/instance/ordinal_integer_test.go
       - openehr/instance/participation_mapping_test.go
       - openehr/instance/party_attribute_test.go
