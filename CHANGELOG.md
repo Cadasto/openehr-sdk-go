@@ -8,12 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **ID-token verification in `auth/smart` and `smart`** can trust a named project, accepting every audience of a token whose `aud` lists that project and whose `azp` is the client ID (REQ-062, REQ-064).
+
 ### Changed
 
 - **Breaking: the AQL entry points of `openehr/validation`** move to the new `openehr/validation/aqlvalidation` as `Validate` and `ValidateWithTypeRelation`, so validating compositions no longer links the AQL parser (REQ-013, REQ-109).
 - **Breaking: the RM floor** reads `DV_PROPORTION.is_integral` as a precision of 0 where one is set, so a fraction with another precision now fails `Fraction_validity`, its `Issue.Value` the precision (REQ-112, REQ-168).
+- **Breaking: `rminfo.RequiredAttributes` and `ConcreteDescendants`** return one list per class, shared by every call, which a caller must not modify (REQ-048).
 - **Template validation** reports an omitted or `null` data value part once, as `required` with no `primitive_*` finding beside it, and admits any value under a primitive constraint with no item (REQ-102, REQ-171).
-- **The instance generator** writes each participation's performer as a `PARTY_IDENTIFIED` named `example`, which FLAT and STRUCTURED carry, prefers an ordinal pair that has a code, and writes no fraction the RM floor refuses (REQ-107).
+- **The instance generator** gives quantity and count magnitudes a representative value, writes each performer as a `PARTY_IDENTIFIED` named `example`, prefers an ordinal pair with a code and writes no fraction the RM floor refuses (REQ-107).
+- **Canonical JSON encode** of RM and AOM 1.4 values writes the same bytes faster, from generated code that writes each member, and a binary that encodes it grows by about 14% (REQ-052).
 
 ## [0.50.0] - 2026-11-17
 
