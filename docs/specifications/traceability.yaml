@@ -1459,6 +1459,7 @@ requirements:
       - openehr/validation/pointer_primitive_test.go
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/primitive_input_test.go
+      - openehr/validation/primitive_no_item_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/quantity_property_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
@@ -1758,6 +1759,7 @@ requirements:
       - openehr/validation/issuepath_test.go
       - openehr/validation/optional_list_counts_test.go
       - openehr/validation/optional_string_test.go
+      - openehr/validation/primitive_no_item_test.go
       - openehr/validation/quantity_property_test.go
       - openehr/validation/subtype_conformance_corpus_test.go
       - openehr/validation/subtype_conformance_test.go
@@ -1920,6 +1922,7 @@ requirements:
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/open_name_list_test.go
+      - openehr/validation/primitive_no_item_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_chained_test.go
       - testkit/probes/template/probe_022_opt_path_resolution.go
@@ -2655,6 +2658,7 @@ requirements:
       - openehr/validation/noncomposition_test.go
       - openehr/validation/optional_list_counts_test.go
       - openehr/validation/primitive_empty_part_test.go
+      - openehr/validation/primitive_no_item_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/registry_roots_test.go
       - openehr/validation/rm_class_names_internal_test.go
