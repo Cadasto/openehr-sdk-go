@@ -428,7 +428,7 @@ The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templateco
   type Severity int
   const (
       Error   Severity = iota
-      Warning              // advisory; does not flip Result.OK ([ValidateAQL] emits these)
+      Warning              // advisory; does not flip Result.OK (aqlvalidation.Validate emits these)
   )
   ```
 
@@ -715,7 +715,7 @@ Global guard codes (`nil_composition`, `nil_template`) return `nil` from `Issue.
 
 ### Out of scope (this REQ)
 
-- **AQL lint** (`ValidateAQL`) — a separate entry point under REQ-109; it does not change the composition-validation surface.
+- **AQL lint** (`aqlvalidation.Validate`) — a separate entry point under REQ-109; it does not change the composition-validation surface.
 - **Decoding wire bytes** — `ValidateComposition` takes a decoded value; the decode-aware entries `ValidateJSON` and `ValidateXML` are [§ REQ-112](#value-typed-mandatory-presence)'s.
 - **External terminology lookup** — value-set membership against SNOMED CT / LOINC / external services.
   REQ-103 closed-code-list checking is the ceiling.
@@ -2203,7 +2203,7 @@ The floor does **not** evaluate:
 ## REQ-168 — Value-free validation diagnostics
 
 A diagnostic **MUST NOT** carry a submitted value (§ Submitted values and structure) outside a field its type names value-bearing (§ Field classes).
-The rule binds [§ REQ-103](#req-103--primitive-constraint-introspection)'s `Violation`, the `Issue` that [§ REQ-102](#req-102--composition-validation) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) return, and the AQL diagnostics: the `lint.Issue` of [§ REQ-109](aql.md#req-109--aql-static-lint), which the `Issue` that `ValidateAQL` returns carries over, and the drop record of [§ REQ-113](aql.md#value-free-structured-drop-records).
+The rule binds [§ REQ-103](#req-103--primitive-constraint-introspection)'s `Violation`, the `Issue` that [§ REQ-102](#req-102--composition-validation) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) return, and the AQL diagnostics: the `lint.Issue` of [§ REQ-109](aql.md#req-109--aql-static-lint), which the `Issue` that `aqlvalidation.Validate` returns carries over, and the drop record of [§ REQ-113](aql.md#value-free-structured-drop-records).
 Diagnostics travel to places a caller does not choose for clinical data: an HTTP error body, a log line, a monitoring event.
 The values they describe are clinical data (a date of birth, a measured magnitude, a free-text name), and an AQL literal can be one, so a message that quotes one carries it to each of those places, in callers that never meant to send it.
 A consumer whose refusal reasons may name structure but never a value would otherwise discard the diagnostics wholesale, and its clients would get a generic refusal where the SDK knew what was wrong and where.
@@ -2244,7 +2244,7 @@ The classes of the validators' fields:
 |---|---|---|
 | `constraints.Violation` | `Code`, `Detail` | `Value` |
 | `validation.Issue` from the REQ-102 entry points and the REQ-112 floor entries | `Path`, `Code`, `Layer`, `Rule`, `Detail`, `Severity` | `Value` |
-| `validation.Issue` from `ValidateAQL` and `ValidateAQLWithTypeRelation` | `Code`, `Layer`, `Rule`, `Severity`, which carry no source text ([§ REQ-109 § Value-free lint diagnostics](aql.md#value-free-lint-diagnostics)) | `Detail` and `Path`, as § REQ-109 classifies them |
+| `validation.Issue` from `aqlvalidation.Validate` and `aqlvalidation.ValidateWithTypeRelation` | `Code`, `Layer`, `Rule`, `Severity`, which carry no source text ([§ REQ-109 § Value-free lint diagnostics](aql.md#value-free-lint-diagnostics)) | `Detail` and `Path`, as § REQ-109 classifies them |
 
 The `lint.Issue` fields are classed in [§ REQ-109 § Value-free lint diagnostics](aql.md#value-free-lint-diagnostics), and the drop record's in [§ REQ-113 § Value-free structured drop records](aql.md#value-free-structured-drop-records).
 
@@ -2285,7 +2285,7 @@ On a `Violation`, `Value` **MUST** hold the part of the input that the failing c
 | `DvQuantity`, precision range | the input's `Precision` |
 | `DvQuantity`, units not enumerated | the input's `Units` |
 
-On an `Issue` from the instance validators, `Value` **MUST** hold what this table names, and be empty on every other `Issue` (an absence, a count, a type or identity mismatch, a guard) and on every `Issue` from `ValidateAQL` or `ValidateAQLWithTypeRelation`:
+On an `Issue` from the instance validators, `Value` **MUST** hold what this table names, and be empty on every other `Issue` (an absence, a count, a type or identity mismatch, a guard) and on every `Issue` from `aqlvalidation.Validate` or `aqlvalidation.ValidateWithTypeRelation`:
 
 | Issue | `Value` |
 |---|---|
@@ -2306,11 +2306,11 @@ On an `Issue` from the instance validators, `Value` **MUST** hold what this tabl
   `Code`, and on an instance validator's `Issue` also `Path` and `Severity`, are value-free (§ Field classes).
   Their vocabularies, `Result.OK` and the set of findings are the ones [§ REQ-102](#req-102--composition-validation), [§ REQ-103](#req-103--primitive-constraint-introspection) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) define.
   A caller dispatches on `Code`, not on `Detail` text ([§ REQ-103 § Violation taxonomy](#violation-taxonomy), [§ REQ-102 § Issue codes](#issue-codes)).
-- The issues of `ValidateAQL` follow [§ REQ-109 § Value-free lint diagnostics](aql.md#value-free-lint-diagnostics).
+- The issues of `aqlvalidation.Validate` follow [§ REQ-109 § Value-free lint diagnostics](aql.md#value-free-lint-diagnostics).
 
 **Acceptance.** For each row of § What `Value` holds, a test plants a marker value that no constraint text contains and checks that `Value.Reveal()` returns what the row names and that no value-free field carries the marker.
 A `Violation`, an `Issue` and a `Result` holding a marker are rendered with `%v`, `%+v`, `%#v`, `%s`, `%d` and `%p`, directly and through an unexported field, encoded with `encoding/json` v1 and v2 and `encoding/gob`, and logged through the text and JSON handlers of `log/slog`, and the marker appears in none of that output.
-The empty-`Value` cases (`CodeWrongType`, an unparseable pattern, an absence, an issue from `ValidateAQL`) each have a named test, and `ValidateComposition` over a composition with a marker at a constrained primitive leaf reports the marker in that issue's `Value` and in no other field.
+The empty-`Value` cases (`CodeWrongType`, an unparseable pattern, an absence, an issue from `aqlvalidation.Validate`) each have a named test, and `ValidateComposition` over a composition with a marker at a constrained primitive leaf reports the marker in that issue's `Value` and in no other field.
 
 ### Out of scope
 
@@ -2437,7 +2437,7 @@ type Issue struct {
 
 type Layer uint8
 const (
-    LayerNone     Layer = iota // a guard, a walk condition, or an issue from ValidateAQL
+    LayerNone     Layer = iota // a guard, a walk condition, or an issue from aqlvalidation.Validate
     LayerTemplate              // a template clause
     LayerRM                    // an RM rule or an RM-mandatory presence
 )
@@ -2447,7 +2447,7 @@ func (l Layer) String() string // "", "template", "rm"; any other value "layer(N
 Every issue the instance validators report **MUST** name its `Layer` and carry a non-empty `Rule`, except the issues that judge the call or the walk rather than the instance: the guards (`nil_root`, `nil_template`, `nil_composition`, the nil wrappers' codes, `rm_type_unknown`, and `invalid_shape` on undecodable input) and the walk conditions (`max_depth`, `max_nodes`, `cyclic_value`) carry no layer and an empty `Rule`.
 An issue a template clause produces is on the template layer; one an RM rule or an RM-mandatory presence produces is on the RM layer.
 An attribute the template walk finds absent is on the template layer when the template requires it by its existence, a list included ([§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member*), and on the RM layer when only the RM marks it mandatory.
-An issue from `ValidateAQL` or `ValidateAQLWithTypeRelation` is not an instance finding and carries neither.
+An issue from `aqlvalidation.Validate` or `aqlvalidation.ValidateWithTypeRelation` is not an instance finding and carries neither.
 
 `Rule` names the clause the issue evaluates:
 
@@ -2530,7 +2530,7 @@ Nor does it list a `C_CODE_REFERENCE` that lists codes or names no reference set
 `Complete` **MUST** report true exactly when `Stopped` and `External` are both empty: no limit stopped the walk, and every constraint it reached could be checked locally.
 `Complete` says nothing of `NotInRM`: no instance can carry such an attribute, so its constraint is a defect of the template, not a part of the instance the result failed to check.
 Nor does it say anything of `Unevaluated`, which lists RM rules the SDK does not evaluate on any instance, so it is reported beside `Complete` rather than folded into it.
-The zero `Coverage`, which a guard and `ValidateAQL` return, is complete.
+The zero `Coverage`, which a guard and `aqlvalidation.Validate` return, is complete.
 A coverage path is written by § REQ-102 *Issue paths* and is value-free.
 
 ### Out of scope

@@ -18,6 +18,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/aqlvalidation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
@@ -168,7 +169,7 @@ func TestExternalValidateEHRStatus(t *testing.T) {
 }
 
 // TestExternalInstanceAndAQL proves the other two REQ-111 consumers —
-// instance.Generate and validation.ValidateAQL — are
+// instance.Generate and aqlvalidation.Validate — are
 // reachable on the public-only call path with an externally-compiled OPT,
 // so every entry point REQ-111 names is covered, not just the builder and
 // the composition validator.
@@ -193,11 +194,11 @@ func TestExternalInstanceAndAQL(t *testing.T) {
 		t.Fatalf("instance.AsComposition: %v", err)
 	}
 
-	// validation.ValidateAQL runs the template-aware lint against the public
+	// aqlvalidation.Validate runs the template-aware lint against the public
 	// *Compiled. A query naming an archetype absent from the template must
 	// surface aql_archetype_not_in_template — proving the externally-compiled
 	// template actually drives the check.
-	res := validation.ValidateAQL(
+	res := aqlvalidation.Validate(
 		aql.Query{Q: "SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1]"},
 		c,
 	)
@@ -209,6 +210,6 @@ func TestExternalInstanceAndAQL(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("ValidateAQL did not flag the absent archetype against the compiled template; got %+v", res.Issues)
+		t.Fatalf("aqlvalidation.Validate did not flag the absent archetype against the compiled template; got %+v", res.Issues)
 	}
 }

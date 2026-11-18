@@ -43,7 +43,8 @@
 // openehr/aql/parse (syntax → generated-type-free AST) and openehr/aql/lint
 // (syntax, shape and template checks, plus RM-semantic containment and
 // portability checks over openehr/aql/contain's containment relation);
-// validation.ValidateAQL bridges lint into the shared validation Issue model.
+// openehr/validation/aqlvalidation bridges lint into the shared validation
+// Issue model.
 // Programs that only need to construct AQL (no execution) can import
 // openehr/aql alone.
 //

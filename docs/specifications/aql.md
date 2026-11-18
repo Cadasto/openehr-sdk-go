@@ -726,7 +726,7 @@ Recording a decline never widens the profile: admitting an engine extension is a
 - Empty / whitespace-only input **MUST** yield code `aql_empty` (before parse).
 - Input that does not parse as `selectQuery` per the profile **MUST** yield code `aql_syntax`.
 - The `aql_syntax` `Detail` **SHOULD** carry the parser's `line:column` when the parser reports a position, and **SHOULD NOT** invent one when it does not, because a reader takes a printed coordinate for a real one: a `parse.SyntaxError` whose `Pos` is zero prints no `0:0` from `Error()`, and its `Detail` carries no `L:C:` prefix.
-- `parse.Parse` returns a `*parse.SyntaxError` wrapping the building-block sentinel `aql.ErrSyntax`; the `validation.ValidateAQL` bridge maps `aql_syntax` / `aql_empty` to `validation.ErrAQLSyntax` via `validation.Issue.Err`.
+- `parse.Parse` returns a `*parse.SyntaxError` wrapping the building-block sentinel `aql.ErrSyntax`; the `aqlvalidation.Validate` bridge maps `aql_syntax` / `aql_empty` to `validation.ErrAQLSyntax` via `validation.Issue.Err`.
 
 ### Layer 2 — Shape (AST walk, no CDR)
 
@@ -779,8 +779,9 @@ A path through a non-mandatory RM attribute the OPT did not constrain can still 
   `lint.Result.OK()` is true when no **Error**-severity issue is present (Warnings do not make a result not-OK).
 - `lint.LintString(q, *Options)` is the raw-AQL entry; `lint.Lint(doc, *Options)` lints an already-parsed `*parse.Document`.
   `Options{Compiled, Query, Relation}` is nilable, but the three fields do not gate alike: nil `Compiled` drops Layer 3 and nil `Query` drops the parameter-binding checks, whereas a nil `Relation` switches nothing off, so the REQ-161 semantic group always runs ([§ REQ-161 § Relation supply](#relation-supply)).
-- `validation.ValidateAQL(q aql.Query, c *templatecompile.Compiled) validation.Result` is the seam: it parses `q.Q`, runs the layers, and maps `lint.Issue` → `validation.Issue` (code and severity carried verbatim) so callers already using `ValidateComposition` get one uniform `Result`.
-- `validation.ValidateAQLWithTypeRelation(q, c, rel *contain.TypeRelation) validation.Result` is the same seam with the containment relation supplied by the caller, and `ValidateAQL(q, c)` is its nil call.
+- `aqlvalidation.Validate(q aql.Query, c *templatecompile.Compiled) validation.Result` is the seam: it parses `q.Q`, runs the layers, and maps `lint.Issue` → `validation.Issue` (code and severity carried verbatim) so callers already using `ValidateComposition` get one uniform `Result`.
+  It lives in `openehr/validation/aqlvalidation`, apart from the instance validators, so that importing `openehr/validation` links no AQL parser ([module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence)).
+- `aqlvalidation.ValidateWithTypeRelation(q, c, rel *contain.TypeRelation) validation.Result` is the same seam with the containment relation supplied by the caller, and `Validate(q, c)` is its nil call.
   [§ REQ-161 § Relation supply](#relation-supply) states the obligation to offer it and the bound on what a supplied relation changes.
 - A published lint code **MUST NOT** be re-pointed at another rule: consumers filter and gate on `Code`, so a code keeps its meaning for as long as it exists.
 
@@ -1149,7 +1150,7 @@ Every entry point that runs the semantic group **MUST** offer this supply, or th
 
 - the read side through `lint.Options`;
 - the write side through `(*aql.Builder).VerifyContainment` (§ Builder adapter);
-- and the validation seam through `validation.ValidateAQLWithTypeRelation` (REQ-109 § Issue model and entry points), whose no-relation form `ValidateAQL(q, c)` **MUST** be exactly the nil call.
+- and the validation seam through `aqlvalidation.ValidateWithTypeRelation` (REQ-109 § Issue model and entry points), whose no-relation form `aqlvalidation.Validate(q, c)` **MUST** be exactly the nil call.
 
 A relation is supplied, never gated: nil **MUST** select the REQ-160 default at every one of them, and never switches a group off.
 

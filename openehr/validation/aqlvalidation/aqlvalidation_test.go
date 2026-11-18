@@ -1,23 +1,31 @@
-package validation_test
+package aqlvalidation_test
 
 import (
 	"errors"
+	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/aqlvalidation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
+// compileVitalSigns reads and compiles the vendored vital_signs template.
 func compileVitalSigns(t *testing.T) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := readOPTFile(fixtures.TemplateOptForName("vital_signs"))
+	raw, err := os.ReadFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
-		t.Fatalf("readOPTFile: %v", err)
+		t.Fatalf("read vital_signs OPT: %v", err)
+	}
+	opt, err := fixtures.ReadOperationalTemplate(raw)
+	if err != nil {
+		t.Fatalf("ReadOperationalTemplate: %v", err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
@@ -26,10 +34,15 @@ func compileVitalSigns(t *testing.T) *templatecompile.Compiled {
 	return c
 }
 
-// ValidateAQL surfaces a syntax failure as code "aql_syntax", which Issue.Err
+// containsCode reports whether an issue in issues carries code.
+func containsCode(issues []validation.Issue, code string) bool {
+	return slices.ContainsFunc(issues, func(i validation.Issue) bool { return i.Code == code })
+}
+
+// Validate surfaces a syntax failure as code "aql_syntax", which Issue.Err
 // maps to the ErrAQLSyntax sentinel (REQ-109 → REQ-102 bridge).
-func TestValidateAQL_Syntax(t *testing.T) {
-	r := validation.ValidateAQL(aql.NewQuery("SELECT FROM EHR e"), nil)
+func TestValidate_Syntax(t *testing.T) {
+	r := aqlvalidation.Validate(aql.NewQuery("SELECT FROM EHR e"), nil)
 	if r.OK {
 		t.Fatal("expected not-OK for a syntax error")
 	}
@@ -44,8 +57,8 @@ func TestValidateAQL_Syntax(t *testing.T) {
 	}
 }
 
-func TestValidateAQL_Empty(t *testing.T) {
-	r := validation.ValidateAQL(aql.NewQuery("   "), nil)
+func TestValidate_Empty(t *testing.T) {
+	r := aqlvalidation.Validate(aql.NewQuery("   "), nil)
 	if r.OK {
 		t.Fatal("expected not-OK for an empty query")
 	}
@@ -62,33 +75,53 @@ func TestValidateAQL_Empty(t *testing.T) {
 
 // A query naming an archetype absent from the compiled template fails with
 // aql_archetype_not_in_template (Layer 3).
-func TestValidateAQL_ArchetypeNotInTemplate(t *testing.T) {
+func TestValidate_ArchetypeNotInTemplate(t *testing.T) {
 	c := compileVitalSigns(t)
 	q := aql.NewQuery("SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1]")
-	r := validation.ValidateAQL(q, c)
+	r := aqlvalidation.Validate(q, c)
 	if !containsCode(r.Issues, "aql_archetype_not_in_template") {
 		t.Fatalf("want aql_archetype_not_in_template; issues = %+v", r.Issues)
 	}
 }
 
 // A well-formed query against an archetype present in the template is clean.
-func TestValidateAQL_Clean(t *testing.T) {
+func TestValidate_Clean(t *testing.T) {
 	c := compileVitalSigns(t)
 	q := aql.NewQuery(
 		"SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude " +
 			"FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
 	)
-	r := validation.ValidateAQL(q, c)
+	r := aqlvalidation.Validate(q, c)
 	if !r.OK {
 		t.Fatalf("expected clean result, got %+v", r.Issues)
 	}
 }
 
+// A query the lint finds nothing in still returns a non-nil, empty Issues
+// list, as validation.Result documents, and the zero Coverage: the Result is
+// built in this package, not by the validation package's own constructor.
+func TestValidate_NoIssuesIsEmptyNotNil(t *testing.T) {
+	c := compileVitalSigns(t)
+	q := aql.NewQuery(
+		"SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude AS magnitude " +
+			"FROM EHR e CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] " +
+			"WHERE e/ehr_id/value = $ehr_id",
+	)
+	q.Parameters = map[string]any{"ehr_id": "7d44b88c-6b1f-4a43-9d3f-0d1c8a4d7f21"}
+	r := aqlvalidation.Validate(q, c)
+	if !r.OK || r.Issues == nil || len(r.Issues) != 0 {
+		t.Fatalf("Validate(%q) = OK %v, Issues %#v; want OK true and a non-nil empty Issues", q.Q, r.OK, r.Issues)
+	}
+	if cov := r.Coverage; cov.Stopped != nil || cov.External != nil || cov.NotInRM != nil || cov.Unevaluated != nil {
+		t.Errorf("Validate(%q).Coverage = %+v, want the zero Coverage", q.Q, r.Coverage)
+	}
+}
+
 // A warning-only lint result (no Error-severity issue) bridges to Result.OK
 // == true: aql_from_archetype is advisory and must not flip the gate.
-func TestValidateAQL_WarningOnlyIsOK(t *testing.T) {
+func TestValidate_WarningOnlyIsOK(t *testing.T) {
 	c := compileVitalSigns(t)
-	r := validation.ValidateAQL(aql.NewQuery("SELECT c FROM COMPOSITION c"), c)
+	r := aqlvalidation.Validate(aql.NewQuery("SELECT c FROM COMPOSITION c"), c)
 	if !r.OK {
 		t.Fatalf("warning-only result must be OK, got %+v", r.Issues)
 	}
@@ -102,29 +135,29 @@ func TestValidateAQL_WarningOnlyIsOK(t *testing.T) {
 
 // Parameter binding bridges through: an unbound $param is an Error-severity
 // issue carried into the validation Result.
-func TestValidateAQL_UnboundParam(t *testing.T) {
+func TestValidate_UnboundParam(t *testing.T) {
 	c := compileVitalSigns(t)
 	q := aql.NewQuery(
 		"SELECT o FROM EHR e CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] " +
 			"WHERE e/ehr_id/value = $ehr_id",
 	)
-	r := validation.ValidateAQL(q, c)
+	r := aqlvalidation.Validate(q, c)
 	if !containsCode(r.Issues, "aql_unbound_param") {
 		t.Fatalf("want aql_unbound_param; issues = %+v", r.Issues)
 	}
 }
 
-// ValidateAQL delegates to ValidateAQLWithTypeRelation with a nil relation,
+// Validate delegates to ValidateWithTypeRelation with a nil relation,
 // and a nil relation SELECTS the REQ-160 default rather than switching the
 // containment group off (REQ-161 § Relation supply). The two entry points must
 // therefore be indistinguishable, or the escape hatch has changed the default
 // behaviour of every existing caller.
-func TestValidateAQLWithTypeRelation_NilIsValidateAQL(t *testing.T) {
+func TestValidateWithTypeRelation_NilIsValidate(t *testing.T) {
 	// Asserted directly, not only through the equality below: comparing the two
 	// entry points cannot fail while one delegates to the other, so the content
 	// of this test is that nil still JUDGES containment.
 	const impossible = "SELECT c FROM OBSERVATION o CONTAINS COMPOSITION c"
-	if r := validation.ValidateAQLWithTypeRelation(aql.NewQuery(impossible), nil, nil); !containsCode(r.Issues, "aql_impossible_containment") {
+	if r := aqlvalidation.ValidateWithTypeRelation(aql.NewQuery(impossible), nil, nil); !containsCode(r.Issues, "aql_impossible_containment") {
 		t.Fatalf("a nil relation must select the REQ-160 default, not switch the group off; issues = %+v", r.Issues)
 	}
 
@@ -133,10 +166,10 @@ func TestValidateAQLWithTypeRelation_NilIsValidateAQL(t *testing.T) {
 		"SELECT c FROM COMPOSITION c", // warning only
 		"SELECT FROM EHR e",           // Layer-1 failure
 	} {
-		base := validation.ValidateAQL(aql.NewQuery(q), nil)
-		with := validation.ValidateAQLWithTypeRelation(aql.NewQuery(q), nil, nil)
+		base := aqlvalidation.Validate(aql.NewQuery(q), nil)
+		with := aqlvalidation.ValidateWithTypeRelation(aql.NewQuery(q), nil, nil)
 		if base.OK != with.OK || len(base.Issues) != len(with.Issues) {
-			t.Fatalf("%q: ValidateAQL = %+v, WithTypeRelation(nil) = %+v", q, base, with)
+			t.Fatalf("%q: Validate = %+v, ValidateWithTypeRelation(nil) = %+v", q, base, with)
 		}
 		for i := range base.Issues {
 			if base.Issues[i] != with.Issues[i] {
@@ -151,18 +184,18 @@ func TestValidateAQLWithTypeRelation_NilIsValidateAQL(t *testing.T) {
 // (REQ-161 § Relation supply). The EHR IM versions no parties, so
 // `EHR CONTAINS VERSIONED_PARTY` is Never by default — the case REQ-160
 // § Extensibility names.
-func TestValidateAQLWithTypeRelation_OverlayRetiresContainmentError(t *testing.T) {
+func TestValidateWithTypeRelation_OverlayRetiresContainmentError(t *testing.T) {
 	q := aql.NewQuery("SELECT p FROM EHR e CONTAINS VERSIONED_PARTY vp[uid/value=$vp] CONTAINS PERSON p")
 	q.Parameters = map[string]any{"vp": "8849182c-82ad-4088-a07f-48ead4180515::local.ehrbase.org::1"}
 
 	// Premise: the default relation must actually raise the Error, or this
 	// test would pass for the wrong reason.
-	if base := validation.ValidateAQL(q, nil); !containsCode(base.Issues, "aql_impossible_containment") {
+	if base := aqlvalidation.Validate(q, nil); !containsCode(base.Issues, "aql_impossible_containment") {
 		t.Fatalf("premise broken: default relation raises no aql_impossible_containment; issues = %+v", base.Issues)
 	}
 
 	rel := contain.Default().WithOverlay(contain.Edge{From: "EHR", To: "VERSIONED_PARTY"})
-	got := validation.ValidateAQLWithTypeRelation(q, nil, rel)
+	got := aqlvalidation.ValidateWithTypeRelation(q, nil, rel)
 	if containsCode(got.Issues, "aql_impossible_containment") {
 		t.Fatalf("overlay did not retire the containment Error; issues = %+v", got.Issues)
 	}
@@ -171,12 +204,13 @@ func TestValidateAQLWithTypeRelation_OverlayRetiresContainmentError(t *testing.T
 	}
 }
 
-// A relation governs the containment codes and nothing else: it cannot retire
-// a Layer-1 syntax failure, a Layer-2 shape or parameter finding, or a Layer-3
-// template finding. An overlay wide enough to admit every pair is the strongest
-// form of the question — if anything outside the containment group survives it,
-// the seam is passing the relation somewhere it does not belong.
-func TestValidateAQLWithTypeRelation_DoesNotReachOtherLayers(t *testing.T) {
+// A relation governs the containment codes and aql_contains_redundant_step,
+// and nothing else: it cannot retire a Layer-1 syntax failure, a Layer-2 shape
+// or parameter finding, or a Layer-3 template finding. An overlay wide enough to
+// admit every pair is the strongest form of the question: if a finding outside
+// those codes does not survive it, the seam is passing the relation somewhere it
+// does not belong.
+func TestValidateWithTypeRelation_DoesNotReachOtherLayers(t *testing.T) {
 	wide := contain.Default().WithOverlay(
 		contain.Edge{From: "EHR", To: "VERSIONED_PARTY"},
 		contain.Edge{From: "OBSERVATION", To: "COMPOSITION"},
@@ -201,7 +235,7 @@ func TestValidateAQLWithTypeRelation_DoesNotReachOtherLayers(t *testing.T) {
 			c, "aql_archetype_not_in_template",
 		},
 	} {
-		got := validation.ValidateAQLWithTypeRelation(aql.NewQuery(tc.query), tc.compiled, wide)
+		got := aqlvalidation.ValidateWithTypeRelation(aql.NewQuery(tc.query), tc.compiled, wide)
 		if !containsCode(got.Issues, tc.want) {
 			t.Errorf("%s: want %s to survive a wide overlay; issues = %+v", tc.name, tc.want, got.Issues)
 		}
@@ -211,7 +245,7 @@ func TestValidateAQLWithTypeRelation_DoesNotReachOtherLayers(t *testing.T) {
 // The three REQ-161 portability advisories consult no relation, so an overlay
 // cannot retire them either — they ask a class question of the pinned RM, or
 // read the query's own shape.
-func TestValidateAQLWithTypeRelation_DoesNotReachPortabilityCodes(t *testing.T) {
+func TestValidateWithTypeRelation_DoesNotReachPortabilityCodes(t *testing.T) {
 	wide := contain.Default().WithOverlay(contain.Edge{From: "EHR", To: "VERSIONED_PARTY"})
 
 	for _, tc := range []struct{ name, query, want string }{
@@ -223,7 +257,7 @@ func TestValidateAQLWithTypeRelation_DoesNotReachPortabilityCodes(t *testing.T) 
 			"aql_fanout_row_grain",
 		},
 	} {
-		got := validation.ValidateAQLWithTypeRelation(aql.NewQuery(tc.query), nil, wide)
+		got := aqlvalidation.ValidateWithTypeRelation(aql.NewQuery(tc.query), nil, wide)
 		if !containsCode(got.Issues, tc.want) {
 			t.Errorf("%s: want %s to survive a wide overlay; issues = %+v", tc.name, tc.want, got.Issues)
 		}
@@ -231,7 +265,7 @@ func TestValidateAQLWithTypeRelation_DoesNotReachPortabilityCodes(t *testing.T) 
 }
 
 // The REQ-109 TOP codes are live at the validation seam, not only in the lint
-// building block: ValidateAQL passes the caller's aql.Query into
+// building block: Validate passes the caller's aql.Query into
 // lint.LintString unconditionally, so the envelope's row limit is visible to
 // the pass on the path most consumers actually gate CI on. This is the
 // positive case — a `SELECT TOP n` beside an envelope Fetch is the pairing the
@@ -239,11 +273,11 @@ func TestValidateAQLWithTypeRelation_DoesNotReachPortabilityCodes(t *testing.T) 
 // with AQL-top"), so it bridges as an Error-severity Issue and flips
 // Result.OK.
 // REQ-109 · PROBE-028
-func TestValidateAQL_TopWithEnvelopeFetch(t *testing.T) {
+func TestValidate_TopWithEnvelopeFetch(t *testing.T) {
 	q := aql.NewQuery("SELECT TOP 5 e/ehr_id/value FROM EHR e")
 	q.Fetch = 20
 
-	r := validation.ValidateAQL(q, nil)
+	r := aqlvalidation.Validate(q, nil)
 	if r.OK {
 		t.Errorf("Result.OK = true, want false (TOP beside the envelope row limit is an Error); issues = %+v", r.Issues)
 	}
@@ -279,7 +313,7 @@ func TestValidateAQL_TopWithEnvelopeFetch(t *testing.T) {
 // `offset`, which the SDK deliberately leaves undiagnosed on the read side.
 // Only the aql_deprecated_top Warning survives, so the Result stays OK.
 // REQ-109 · PROBE-028
-func TestValidateAQL_TopWithoutEnvelopeFetch(t *testing.T) {
+func TestValidate_TopWithoutEnvelopeFetch(t *testing.T) {
 	const in = "SELECT TOP 5 e/ehr_id/value FROM EHR e"
 
 	zeroFetch := aql.NewQuery(in)
@@ -294,7 +328,7 @@ func TestValidateAQL_TopWithoutEnvelopeFetch(t *testing.T) {
 		{"Offset only", offsetOnly},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r := validation.ValidateAQL(tc.query, nil)
+			r := aqlvalidation.Validate(tc.query, nil)
 			if containsCode(r.Issues, "aql_top_with_fetch") {
 				t.Errorf("aql_top_with_fetch fired with no envelope row limit; issues = %+v", r.Issues)
 			}

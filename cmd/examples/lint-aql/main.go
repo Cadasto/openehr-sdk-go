@@ -24,6 +24,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/aqlvalidation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -85,7 +86,7 @@ func run() error {
 
 // loadTemplate reads the OPT file into the operational template model and
 // compiles it. The compiled form is what every template-aware SDK entry point
-// takes, ValidateAQL included.
+// takes, aqlvalidation.Validate included.
 //
 // By default ReadOperationalTemplate reads a node type it does not know as a
 // leaf without its subtree, so every archetype and path in that subtree lints
@@ -113,7 +114,7 @@ func loadTemplate(optPath string) (*templatecompile.Compiled, error) {
 // carry warnings; returning early on OK would hide them.
 func report(label string, query aql.Query, compiled *templatecompile.Compiled) {
 	fmt.Printf("== %s ==\n%s\n", label, query.Q)
-	result := validation.ValidateAQL(query, compiled)
+	result := aqlvalidation.Validate(query, compiled)
 
 	var errorCount, warningCount int
 	for _, issue := range result.Issues {

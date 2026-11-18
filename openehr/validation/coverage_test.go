@@ -5,8 +5,8 @@ package validation_test
 // one per limit; External lists, in walk order, the path of each leaf the
 // template binds to a CONSTRAINT_REF, or to a C_CODE_REFERENCE that names a
 // reference set and lists no code; Complete is true exactly when both are
-// empty. The zero Coverage, which a guard and ValidateAQL return, is
-// complete.
+// empty. The zero Coverage, which a guard and aqlvalidation.Validate return,
+// is complete.
 
 import (
 	"os"
@@ -20,6 +20,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/aqlvalidation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -329,8 +330,9 @@ func TestValidator_REQ171_CorpusCoverage(t *testing.T) {
 	}
 }
 
-// REQ-171 § Coverage — a guard, ValidateAQL and ValidateAQLWithTypeRelation
-// return the zero Coverage, which is complete.
+// REQ-171 § Coverage — a guard, aqlvalidation.Validate and
+// aqlvalidation.ValidateWithTypeRelation return the zero Coverage, which is
+// complete.
 func TestREQ171_GuardsAndAQLReturnTheZeroCoverage(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "vital_signs")
@@ -345,9 +347,9 @@ func TestREQ171_GuardsAndAQLReturnTheZeroCoverage(t *testing.T) {
 		{name: "ValidateRM(root outside the RM set)", r: validation.ValidateRM(struct{}{})},
 		{name: "ValidateRMFolder(nil)", r: validation.ValidateRMFolder(nil)},
 		{name: "ValidateRMEHRStatusBytes(array)", r: validation.ValidateRMEHRStatusBytes([]byte(`[]`))},
-		{name: "ValidateAQL", r: validation.ValidateAQL(aql.NewQuery("SELECT * FROM EHR e CONTAINS COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]"), c)},
-		{name: "ValidateAQL(syntax error)", r: validation.ValidateAQL(aql.NewQuery("SELEC x"), c)},
-		{name: "ValidateAQLWithTypeRelation", r: validation.ValidateAQLWithTypeRelation(aql.NewQuery("SELEC x"), c, contain.Default())},
+		{name: "aqlvalidation.Validate", r: aqlvalidation.Validate(aql.NewQuery("SELECT * FROM EHR e CONTAINS COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]"), c)},
+		{name: "aqlvalidation.Validate(syntax error)", r: aqlvalidation.Validate(aql.NewQuery("SELEC x"), c)},
+		{name: "aqlvalidation.ValidateWithTypeRelation", r: aqlvalidation.ValidateWithTypeRelation(aql.NewQuery("SELEC x"), c, contain.Default())},
 	}
 	for _, tc := range tests {
 		if len(tc.r.Issues) == 0 {

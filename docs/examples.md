@@ -31,7 +31,7 @@ The Packages column lists the SDK packages each program imports, by short name (
 | [generate-example](#generate-example) | No | `aom14`, `templatecompile`, `instance`, `canjson`, `rm` | OPT → generated RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql`, `aql/contain` | Struct + verb builders → byte-identical AQL; nested CONTAINS + in-text paging; opt-in RM containment check |
 | [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured tree, print each clause, emit canonical text back |
-| [lint-aql](#lint-aql) | No | `aql`, `aom14`, `templatecompile`, `validation` | AQL lint through `ValidateAQL`: syntax, shape, RM, template |
+| [lint-aql](#lint-aql) | No | `aql`, `aom14`, `templatecompile`, `validation`, `aqlvalidation` | AQL lint through `aqlvalidation.Validate`: syntax, shape, RM, template |
 | [compile-build-validate](#compile-build-validate) | No | `aom14`, `templatecompile`, `composition`, `validation`, `canjson`, `rm` | Compile → build → round-trip → validate, public imports only |
 | [template-explore](#template-explore) | No | `aom14`, `template`, `templatecompile` | Walk a compiled OPT: structure tree + leaf paths |
 | [webtemplate-export](#webtemplate-export) | No | `aom14`, `templatecompile`, `template/webtemplate` | Compiled OPT → Web Template JSON |
@@ -447,14 +447,14 @@ The type tags in parentheses (`(param)`, `(string)`, `(func)`, `(path)`) are add
 
 **Purpose:** Check AQL queries for problems before they reach a server. The linter parses the text against the grammar the SDK accepts, then runs its checks in layers: syntax; shape (alias binding, parameter binding); FROM / CONTAINS against the openEHR Reference Model (RM) built into the SDK, which needs no template; path-shape and paging advisories over the query text, likewise template-free; and, when given a compiled OPT, the archetypes and paths against that template.
 
-The program calls `validation.ValidateAQL`; the underlying building block is `openehr/aql/lint` (`LintString` / `Lint`), which has no transport or auth. A lint-clean query is **not** proven spec-conformant, nor guaranteed to execute. The CDR remains the authority on paths.
+The program calls `aqlvalidation.Validate`; the underlying building block is `openehr/aql/lint` (`LintString` / `Lint`), which has no transport or auth. A lint-clean query is **not** proven spec-conformant, nor guaranteed to execute. The CDR remains the authority on paths.
 
 ```bash
 go run ./cmd/examples/lint-aql
 go run ./cmd/examples/lint-aql path/to/template.opt
 ```
 
-**Packages:** `openehr/aql`, `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/validation` (`openehr/aql/parse` and `openehr/aql/lint` run underneath `ValidateAQL`)
+**Packages:** `openehr/aql`, `openehr/aom/aom14`, `openehr/templatecompile`, `openehr/validation`, `openehr/validation/aqlvalidation` (`openehr/aql/parse` and `openehr/aql/lint` run underneath `aqlvalidation.Validate`)
 
 **Sample output:**
 
@@ -490,7 +490,7 @@ result   : OK — no errors, 3 advisories
 
 Four queries: a clean one; a broken one, where an archetype missing from the template and an unbound `$threshold` are errors while an unpredicated `events` step and a missing alias are advisories; a well-formed query that can never match, because under the RM an OBSERVATION never contains a COMPOSITION; and one that is OK yet not issue-free, because a FOLDER reaches a COMPOSITION only through a reference. `Result.OK` is false only when an error-severity issue is present, so an OK result can still carry warnings.
 
-**What to copy into your app:** for CI or pre-flight checks call `lint.LintString(q, nil)` (syntax, shape and RM checks, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or call `validation.ValidateAQL`) to add the archetype and path checks. Read that OPT with `aom14.ReadOperationalTemplate` and compile it, as the program does: by default the reader reads a node type it does not know as a leaf without its subtree, so the lint reports the archetypes and paths under such a node as not in the template; a lint that must not do so passes `canxml.WithStrict()` to the reader and `templatecompile.WithStrict()` to `Compile`, which refuse such readings. Dispatch on `Issue.Code` and treat only `Error`-severity issues as hard failures. Still read `Result.Issues`, not only `Result.OK`: OK means *no errors*, not *no issues*. Most of the portability codes and all of the path-shape codes are advisory (the last block above).
+**What to copy into your app:** for CI or pre-flight checks call `lint.LintString(q, nil)` (syntax, shape and RM checks, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or call `aqlvalidation.Validate`) to add the archetype and path checks. Read that OPT with `aom14.ReadOperationalTemplate` and compile it, as the program does: by default the reader reads a node type it does not know as a leaf without its subtree, so the lint reports the archetypes and paths under such a node as not in the template; a lint that must not do so passes `canxml.WithStrict()` to the reader and `templatecompile.WithStrict()` to `Compile`, which refuse such readings. Dispatch on `Issue.Code` and treat only `Error`-severity issues as hard failures. Still read `Result.Issues`, not only `Result.OK`: OK means *no errors*, not *no issues*. Most of the portability codes and all of the path-shape codes are advisory (the last block above).
 
 ---
 

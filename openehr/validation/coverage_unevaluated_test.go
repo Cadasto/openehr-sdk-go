@@ -4,7 +4,7 @@ package validation_test
 // sorted and once each, the invariants of the classes the walk visited, those
 // their ancestors declare included, that the invariant inventory does not
 // classify as evaluated. Complete says nothing of it, and the zero Coverage,
-// which a guard and ValidateAQL return, lists none.
+// which a guard and aqlvalidation.Validate return, lists none.
 
 import (
 	"slices"
@@ -16,6 +16,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/aqlvalidation"
 )
 
 // sortedOnce reports whether keys is sorted with no key twice.
@@ -199,8 +200,9 @@ func TestCoverage_REQ171_UnevaluatedListsTheClassesTheWalkVisited(t *testing.T) 
 	}
 }
 
-// REQ-171 § Coverage — a guard, ValidateAQL and ValidateAQLWithTypeRelation
-// list no unevaluated invariant: they visit no value.
+// REQ-171 § Coverage — a guard, aqlvalidation.Validate and
+// aqlvalidation.ValidateWithTypeRelation list no unevaluated invariant: they
+// visit no value.
 func TestCoverage_REQ171_GuardsAndAQLListNoUnevaluated(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "vital_signs")
@@ -215,8 +217,8 @@ func TestCoverage_REQ171_GuardsAndAQLListNoUnevaluated(t *testing.T) {
 		{name: "ValidateRM(root outside the RM set)", r: validation.ValidateRM(struct{}{})},
 		{name: "ValidateRMEHRStatus(nil)", r: validation.ValidateRMEHRStatus(nil)},
 		{name: "ValidateRMEHRStatusBytes(array)", r: validation.ValidateRMEHRStatusBytes([]byte(`[]`))},
-		{name: "ValidateAQL", r: validation.ValidateAQL(aql.NewQuery("SELECT * FROM EHR e CONTAINS COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]"), c)},
-		{name: "ValidateAQLWithTypeRelation", r: validation.ValidateAQLWithTypeRelation(aql.NewQuery("SELEC x"), c, contain.Default())},
+		{name: "aqlvalidation.Validate", r: aqlvalidation.Validate(aql.NewQuery("SELECT * FROM EHR e CONTAINS COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]"), c)},
+		{name: "aqlvalidation.ValidateWithTypeRelation", r: aqlvalidation.ValidateWithTypeRelation(aql.NewQuery("SELEC x"), c, contain.Default())},
 	} {
 		if len(tc.r.Issues) == 0 {
 			t.Errorf("%s reported nothing; want an issue, so the case is not vacuous", tc.name)

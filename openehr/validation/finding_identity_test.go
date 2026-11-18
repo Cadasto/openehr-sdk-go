@@ -3,12 +3,12 @@ package validation_test
 // finding_identity_test.go: REQ-171 § Finding identity. Every issue an
 // instance validator reports names its Layer and carries a non-empty Rule,
 // except the guards and the walk conditions, which carry neither; so does
-// every issue from ValidateAQL. A rule the pinned BMM names is spelt
-// CLASS.Invariant as that BMM spells it. The checks here run three ways: over
-// every vendored corpus document (the census), over the source of every emit
-// site (so a site the corpus never reaches still fails when it stops setting
-// either field), and over the BMMs (so a rule name cannot drift from the
-// model).
+// every issue from aqlvalidation.Validate. A rule the pinned BMM names is
+// spelt CLASS.Invariant as that BMM spells it. The checks here run three ways:
+// over every vendored corpus document (the census), over the source of every
+// emit site (so a site the corpus never reaches still fails when it stops
+// setting either field), and over the BMMs (so a rule name cannot drift from
+// the model).
 
 import (
 	json "encoding/json/v2"
@@ -32,6 +32,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/aqlvalidation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -310,11 +311,11 @@ func compileCorpusTemplate(t *testing.T, templateID string) (*templatecompile.Co
 	return c, true
 }
 
-// REQ-171 — the guards, the walk conditions and every issue from ValidateAQL
-// carry no layer and an empty rule: each entry point's nil guard, a root
-// outside the closed RM set, input that does not decode, a value that holds
-// itself, a graph past the depth limit, one past the visit limit, and the
-// lint issues of a query.
+// REQ-171 — the guards, the walk conditions and every issue from
+// aqlvalidation.Validate carry no layer and an empty rule: each entry point's
+// nil guard, a root outside the closed RM set, input that does not decode, a
+// value that holds itself, a graph past the depth limit, one past the visit
+// limit, and the lint issues of a query.
 func TestREQ171_GuardsAndWalkConditionsCarryNoIdentity(t *testing.T) {
 	bmm := mustBMMInvariants(t)
 	c := mustCompile(t, "vital_signs")
@@ -365,15 +366,15 @@ func TestREQ171_GuardsAndWalkConditionsCarryNoIdentity(t *testing.T) {
 		})
 	}
 
-	t.Run("ValidateAQL", func(t *testing.T) {
+	t.Run("aqlvalidation.Validate", func(t *testing.T) {
 		for _, q := range []string{"", "SELEC x", "SELECT * FROM EHR e CONTAINS COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]"} {
-			r := validation.ValidateAQL(aql.Query{Q: q}, c)
+			r := aqlvalidation.Validate(aql.Query{Q: q}, c)
 			if len(r.Issues) == 0 {
-				t.Fatalf("ValidateAQL(%q) reported nothing; want lint issues to check", q)
+				t.Fatalf("aqlvalidation.Validate(%q) reported nothing; want lint issues to check", q)
 			}
 			for _, i := range r.Issues {
 				if i.Layer != validation.LayerNone || i.Rule != "" {
-					t.Errorf("ValidateAQL(%q): %s carries layer %q and rule %q, want neither (REQ-171: not an instance finding)", q, i.Code, i.Layer, i.Rule)
+					t.Errorf("aqlvalidation.Validate(%q): %s carries layer %q and rule %q, want neither (REQ-171: not an instance finding)", q, i.Code, i.Layer, i.Rule)
 				}
 			}
 		}
@@ -388,17 +389,12 @@ type sourceIssueLiterals struct {
 	perFile  map[string]int
 }
 
-// identityExemptFuncs are the functions whose Issue literals carry neither a
-// layer nor a rule whatever their code: the bridge from the AQL lint, whose
-// issues are no instance findings.
-var identityExemptFuncs = map[string]bool{"ValidateAQLWithTypeRelation": true}
-
 // issueLiteralProblems parses the non-test Go files in dir and checks every
 // composite literal of Issue, the elided ones in an []Issue literal included.
 // A literal must name its fields and set Code. One whose Code is a guard or a
-// walk condition, written as a string literal, or that sits in an exempt
-// function, must set neither Layer nor Rule; every other must set Layer to
-// something other than LayerNone and Rule to something other than "". It
+// walk condition, written as a string literal, must set neither Layer nor
+// Rule; every other must set Layer to something other than LayerNone and Rule
+// to something other than "". It
 // returns an error when dir holds no Issue literal, so the check cannot pass
 // over nothing.
 func issueLiteralProblems(dir string) (sourceIssueLiterals, error) {
@@ -468,9 +464,9 @@ func issueLiteralProblem(file, fn string, lit *ast.CompositeLit) []string {
 	}
 	layer, hasLayer := fields["Layer"]
 	rule, hasRule := fields["Rule"]
-	if guard || identityExemptFuncs[fn] {
+	if guard {
 		if hasLayer || hasRule {
-			return []string{fmt.Sprintf("%s: the Issue literal with %s sets a layer or a rule; a guard, a walk condition or an AQL issue carries neither", where, code)}
+			return []string{fmt.Sprintf("%s: the Issue literal with %s sets a layer or a rule; a guard or a walk condition carries neither", where, code)}
 		}
 		return nil
 	}
@@ -542,7 +538,7 @@ func TestREQ171_EveryIssueLiteralStatesItsIdentity(t *testing.T) {
 	for _, p := range got.problems {
 		t.Errorf("%s (REQ-171 § Finding identity)", p)
 	}
-	for _, file := range []string{"walk_composition.go", "rmfloor.go", "rmfloor_coded.go", "rmfloor_bytes.go", "validate.go", "composition.go", "aql.go"} {
+	for _, file := range []string{"walk_composition.go", "rmfloor.go", "rmfloor_coded.go", "rmfloor_bytes.go", "validate.go", "composition.go"} {
 		if got.perFile[file] == 0 {
 			t.Errorf("found no Issue literal in %s; the check has gone blind to it", file)
 		}
@@ -618,15 +614,6 @@ func TestREQ171_IssueLiteralCheckFailsOnEachGap(t *testing.T) {
 			name:        "positional literal",
 			src:         header + `func f() Issue { return Issue{"/", "required"} }`,
 			wantProblem: `does not name its fields`,
-		},
-		{
-			name: "AQL bridge without a layer or a rule",
-			src:  header + `func ValidateAQLWithTypeRelation(c string) Issue { return Issue{Code: c} }`,
-		},
-		{
-			name:        "AQL bridge with a rule",
-			src:         header + `func ValidateAQLWithTypeRelation(c string) Issue { return Issue{Code: c, Rule: "x"} }`,
-			wantProblem: `sets a layer or a rule`,
 		},
 		{
 			name:    "package with no Issue literal",

@@ -7,13 +7,15 @@
 // wrappers, cover resources that bind to no operational template
 // (FOLDER, EHR_STATUS, EHR_ACCESS, untemplated demographic PARTY).
 //
-// The package also validates AQL query text:
-// [ValidateAQL] and [ValidateAQLWithTypeRelation] run the
-// openehr/aql/lint layers and report through the same [Issue] /
-// [Result] model, so a caller already using [ValidateComposition] gets
-// one uniform result shape for both kinds of artefact. Their doc
-// comments describe which lint layers a nil template drops and how
-// to supply the RM containment relation.
+// AQL query text is validated by the package
+// [github.com/cadasto/openehr-sdk-go/openehr/validation/aqlvalidation]:
+// its Validate and ValidateWithTypeRelation run the openehr/aql/lint
+// layers and report through the same [Issue] / [Result] model, so a caller
+// already using [ValidateComposition] gets one uniform result shape for
+// both kinds of artefact. Their doc comments describe which lint layers a
+// nil template drops and how to supply the RM containment relation. That
+// package is kept apart so that a program importing this one links no AQL
+// parser.
 //
 // Public entry: one call checks the template constraints and the RM
 // rules together.
