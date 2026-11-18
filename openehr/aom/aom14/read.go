@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/decodeopts"
@@ -209,7 +211,11 @@ const inputBufferMax = 4 << 20
 // needs one is decoded a second time, and so is every document when opts pass
 // what the decode reports to a function, which sees each item once. The
 // second decode reads the input again from where the read started when r is
-// an [io.Seeker], and from a copy the reader keeps of it otherwise.
+// a [*bytes.Reader], a [*strings.Reader], an [*io.SectionReader] or an
+// [*os.File] that can seek, which one holding a pipe cannot, and from a copy
+// the reader keeps of it as the first decode reads it otherwise. Where the
+// first decode fails in a way no second reading mends, the second one reads
+// only the bytes the first one read, so it fails as the first one did.
 //
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
 // [canxml.Decoder] itself gets neither limit and none of these readings
@@ -280,18 +286,28 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	}
 	switch {
 	case rewinds:
-		// Read the whole input again, from where the read started, under the
-		// same limit.
+		// Read the input again, from where the read started. A replay after a
+		// failure no second reading mends reads the bytes the first decode
+		// read, as a copy of them would hold, and stops where it stopped;
+		// any other second reading reads the whole input under the same
+		// limit.
+		whole := tolerant || err == nil
+		limit := int64(readMaxBytes + 1)
+		if !whole {
+			limit -= lr.N
+		}
 		if _, serr := seeker.Seek(start, io.SeekStart); serr != nil {
 			return nil, serr
 		}
 		src = &sourceReader{r: r}
-		lr = &io.LimitedReader{R: src, N: readMaxBytes + 1}
-		grow()
+		lr = &io.LimitedReader{R: src, N: limit}
+		if whole {
+			grow()
+		}
 		if _, cerr := in.ReadFrom(lr); cerr != nil {
 			return nil, cmp.Or(src.err, cerr)
 		}
-		if lr.N == 0 {
+		if whole && lr.N == 0 {
 			return nil, errInputTooLarge()
 		}
 	case tolerant && err != nil:
@@ -326,11 +342,23 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 }
 
 // rewindable reports whether r can seek back to where it is now, and if so
-// returns it as an [io.Seeker] with that offset. A reader whose Seek fails,
-// such as a pipe held in an [os.File], cannot.
+// returns it as an [io.Seeker] with that offset. Only the readers whose Seek
+// is known to go back can: a [*bytes.Reader], a [*strings.Reader], an
+// [*io.SectionReader], and an [*os.File] whose Seek reports its offset, which
+// a pipe's does not. Another reader's Seek may report its offset and still
+// fail to go back.
 func rewindable(r io.Reader) (io.Seeker, int64, bool) {
-	s, ok := r.(io.Seeker)
-	if !ok {
+	var s io.Seeker
+	switch r := r.(type) {
+	case *bytes.Reader:
+		s = r
+	case *strings.Reader:
+		s = r
+	case *io.SectionReader:
+		s = r
+	case *os.File:
+		s = r
+	default:
 		return nil, 0, false
 	}
 	start, err := s.Seek(0, io.SeekCurrent)
