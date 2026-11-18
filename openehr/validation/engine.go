@@ -156,10 +156,10 @@ type engine struct {
 	// when it reads the list, and [engine.visitAttribute] drops them when
 	// it leaves the attribute, so reading a list allocates nothing once the
 	// stack has room for it. Each reading holds its run capped at the run's
-	// end, so nothing appended above it writes into it. An append that
-	// grows the stack while an outer run is held moves the stack to a new
-	// array: the outer run goes on reading the old one, which nothing
-	// writes to again.
+	// end, so an append to the run copies it rather than writing over the
+	// runs read above it. An append that grows the stack while an outer run
+	// is held moves the stack to a new array: the outer run goes on reading
+	// the old one, which nothing writes to again.
 	items []any
 	// verdicts holds, for each node the walk tried a value at, whether the
 	// value validates under the child tried, so that no value is tried
