@@ -1,6 +1,8 @@
 package simplified
 
 import (
+	"bytes"
+	"encoding/base64"
 	jsonv2 "encoding/json/v2"
 	"reflect"
 	"testing"
@@ -20,6 +22,9 @@ var canonValueSeeds = []string{
 	`{ "spaced" : "yes" , "next" : [ 1 , 2 ] , "last" : { } }`,
 	`{"_type":"DV_CODED_TEXT","value":"v","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":"at0001"}}`,
 	`{"value":"\u00e9t\u00e9 \ud83d\ude00"}`,
+	// A quote after an even run of backslashes ends the string; after an odd
+	// run it is escaped.
+	`{"even":"a\\\\","odd":"b\\\"c","tail":"\\","q":"\"","last":"\\\\\""}`,
 }
 
 // TestCanonValueReadsAsDecodedObject holds the in-place readers the capture
@@ -146,5 +151,22 @@ func TestCanonicalObjectNonObjectForms(t *testing.T) {
 	}
 	if _, err := canonicalObject("abc"); err == nil || err.Error() != wantErr.Error() {
 		t.Errorf("canonicalObject(%q) error = %v, want %v", "abc", err, wantErr)
+	}
+}
+
+// BenchmarkCanonValueLargeData reads a DV_MULTIMEDIA canonical form carrying
+// about 5.6 MB of inline data the way the capture check does: every member
+// once, then each member it looks up by name, most of them past the data.
+func BenchmarkCanonValueLargeData(b *testing.B) {
+	data := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte("x"), 4<<20))
+	v := canonValue(`{"_type":"DV_MULTIMEDIA","alternate_text":"a","data":"` + data +
+		`","media_type":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"IANA_media-types"},"code_string":"image/png"},"size":4}`)
+	b.SetBytes(int64(len(v)))
+	for b.Loop() {
+		for range v.members {
+		}
+		for _, name := range []string{"normal_status", "media_type", "integrity_check_algorithm", "compression_algorithm", "uri"} {
+			_ = v.member(name)
+		}
 	}
 }

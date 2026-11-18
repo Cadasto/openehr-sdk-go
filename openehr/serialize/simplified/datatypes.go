@@ -457,19 +457,31 @@ func jsonSpace(b []byte, i int) int {
 
 // jsonValueEnd returns the index just past the JSON value that starts at b[i],
 // or len(b) when the value does not end.
+//
+// A string is skipped quote to quote rather than byte by byte, because a
+// DV_MULTIMEDIA's inline data can run to megabytes and every [canonValue.member]
+// lookup steps over it again: a quote ends the string unless an odd run of
+// backslashes escapes it.
 func jsonValueEnd(b []byte, i int) int {
 	if i >= len(b) {
 		return len(b)
 	}
 	switch b[i] {
 	case '"':
-		for i++; i < len(b); i++ {
-			switch b[i] {
-			case '\\':
-				i++
-			case '"':
-				return i + 1
+		for j := i + 1; ; {
+			k := bytes.IndexByte(b[j:], '"')
+			if k < 0 {
+				return len(b)
 			}
+			q := j + k
+			escapes := 0
+			for p := q - 1; p > i && b[p] == '\\'; p-- {
+				escapes++
+			}
+			if escapes%2 == 0 {
+				return q + 1
+			}
+			j = q + 1
 		}
 	case '{', '[':
 		for depth := 0; i < len(b); i++ {
