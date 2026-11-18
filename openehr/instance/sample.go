@@ -147,6 +147,9 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 		return sampleCode(cp, s)
 
 	case constraints.CDvOrdinal:
+		// A leaf's C_DV_ORDINAL comes narrowed (narrowedLeaf) to the pairs
+		// the generator chooses among, those with a code where the list has
+		// one (ordinalChoices), so the draw is one of them.
 		if len(c.Values) > 0 {
 			return c.Values[s.intN(len(c.Values))].Value
 		}

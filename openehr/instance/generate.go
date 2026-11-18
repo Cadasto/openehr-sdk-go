@@ -3223,10 +3223,13 @@ func writePrimitive(leaf *tcimpl.CompiledNode, rmValue any, attr string, ex any)
 }
 
 // applyOrdinal sets the integer and, when the constraint lists pairs,
-// the symbol of the pair for that integer. ExampleFill's integer is
-// the first pair's value. An empty list keeps the integer and does
-// not invent a code. A pair listed with an empty code gets the
-// placeholder symbol (ordinalSymbolText).
+// the symbol of the pair for that integer (ordinalPair). The constraint
+// comes narrowed (narrowedLeaf) to the pairs the generator chooses among,
+// those with a code where the list has one (ordinalChoices), so
+// ExampleFill's integer is the first of them and a RandomFill draw one of
+// them. An empty list keeps the integer and does not invent a code. Where
+// every pair is listed with an empty code, the pair gets the placeholder
+// symbol (ordinalSymbolText).
 func applyOrdinal(v *rm.DVOrdinal, pc constraints.PrimitiveConstraint, ex any) error {
 	ord, isOrd := pc.(constraints.CDvOrdinal)
 	if !isOrd || len(ord.Values) == 0 {
@@ -3464,8 +3467,31 @@ func proportionOperand(node *tcimpl.CompiledNode, current float64, whole, nonZer
 	return 0, false
 }
 
+// ordinalChoices returns the pairs of values, a C_DV_ORDINAL's list, that
+// the generator chooses among: those whose symbol has a code, where the
+// list has one, since the RM needs the symbol's code; and every pair where
+// none has, each of which then takes the placeholder symbol
+// (ordinalSymbolText). It returns values itself where every pair, or none,
+// has a code, so an example or a draw from it is the one the list gives.
+func ordinalChoices(values []constraints.OrdinalSymbol) []constraints.OrdinalSymbol {
+	uncoded := func(p constraints.OrdinalSymbol) bool { return p.Symbol.CodeString == "" }
+	if !slices.ContainsFunc(values, uncoded) {
+		return values
+	}
+	coded := slices.DeleteFunc(slices.Clone(values), uncoded)
+	if len(coded) == 0 {
+		return values
+	}
+	return coded
+}
+
+// ordinalPair returns the first pair of c's choices (ordinalChoices) whose
+// value is n, so where c lists n both with a code and with none, the one
+// with a code. It reports false where none of them has the value n, as for
+// a value only a pair with no code holds in a list that has a pair with a
+// code.
 func ordinalPair(c constraints.CDvOrdinal, n int64) (constraints.OrdinalSymbol, bool) {
-	for _, s := range c.Values {
+	for _, s := range ordinalChoices(c.Values) {
 		if int64(s.Value) == n {
 			return s, true
 		}
@@ -3479,11 +3505,13 @@ func ordinalPair(c constraints.CDvOrdinal, n int64) (constraints.OrdinalSymbol, 
 // term text. A pair listed with an empty code gets the placeholder code
 // at0000 in that terminology, with the text example, since the RM needs the
 // symbol's code and text; the template validator then reports the pair as
-// not in the list. The placeholder is written here, not by finishNode's
-// repair of a blank symbol, since the walk returns from a C_DV_ORDINAL leaf
-// once it is valued (walkNode) and finishNode never reaches it. The single
-// value (applyOrdinal) and an interval's bounds (ordinalFits, ordinalEnd)
-// take the symbol from here, so they build and compare the same one.
+// not in the list. The generator writes such a pair only where every pair
+// the list holds has an empty code (ordinalChoices). The placeholder is
+// written here, not by finishNode's repair of a blank symbol, since the walk
+// returns from a C_DV_ORDINAL leaf once it is valued (walkNode) and
+// finishNode never reaches it. The single value (applyOrdinal) and an
+// interval's bounds (ordinalFits, ordinalEnd) take the symbol from here, so
+// they build and compare the same one.
 func ordinalSymbolText(ref constraints.CodedTermRef) rm.DVCodedText {
 	term := ref.Terminology
 	if term == "" {

@@ -1497,12 +1497,14 @@ var ordinalScale = scale[ordinalKey]{
 }
 
 // ordinalFits reports whether k suits a side's bound node. When the node
-// lists (value, symbol) pairs, k's symbol must be the one listed for k's
-// value, so a swap cannot hand one side the other side's symbol. A side
-// with no list constrains the value only. Where the node is a
-// C_COMPLEX_OBJECT, the value must fit the C_INTEGER on its value and the
-// RM Integer, and the symbol the constraint on its symbol, a code and a
-// text the side admits (codedTextAdmits).
+// lists (value, symbol) pairs, k's value must be that of a pair the
+// generator chooses among (ordinalPair), and k's symbol the one it writes
+// for that pair (ordinalSymbolText), so a swap cannot hand one side the
+// other side's symbol, nor a value that only a pair with no code holds where
+// the side lists a pair with a code. A side with no list constrains the
+// value only. Where the node is a C_COMPLEX_OBJECT, the value must fit the
+// C_INTEGER on its value and the RM Integer, and the symbol the constraint
+// on its symbol, a code and a text the side admits (codedTextAdmits).
 func ordinalFits(node *tcimpl.CompiledNode, k ordinalKey) bool {
 	pc := primitiveOf(node)
 	if pc == nil {
@@ -1519,15 +1521,17 @@ func ordinalFits(node *tcimpl.CompiledNode, k ordinalKey) bool {
 	return len(pc.Validate(int(k.value))) == 0
 }
 
-// ordinalEnd returns the lowest (low) or highest pair node's C_DV_ORDINAL
-// lists, with the symbol the walk writes for it: for a code in any
-// terminology other than openehr, the text of the term the nearest
-// archetype root defines for it (useTermText). It returns false when node
-// lists no pair its constraint admits. Where node is a C_COMPLEX_OBJECT,
-// the symbol and the value are constrained apart, so the end is the lowest
-// or highest value of the C_INTEGER on its value (integerEndOf) with like's
-// symbol, the side's own, which its constraint on the symbol admitted; there
-// is none where that C_INTEGER has no end.
+// ordinalEnd returns the lowest (low) or highest of the pairs of node's
+// C_DV_ORDINAL that the generator chooses among (ordinalChoices), those with
+// a code where it lists one, with the symbol the walk writes for it: for a
+// code in any terminology other than openehr, the text of the term the
+// nearest archetype root defines for it (useTermText), and the placeholder
+// symbol where every pair has an empty code (ordinalSymbolText). It returns
+// false when node lists no pair its constraint admits. Where node is a
+// C_COMPLEX_OBJECT, the symbol and the value are constrained apart, so the
+// end is the lowest or highest value of the C_INTEGER on its value
+// (integerEndOf) with like's symbol, the side's own, which its constraint on
+// the symbol admitted; there is none where that C_INTEGER has no end.
 func ordinalEnd(node *tcimpl.CompiledNode, like ordinalKey, low bool) (ordinalKey, bool) {
 	c, ok := primitiveOf(node).(constraints.CDvOrdinal)
 	if !ok {
@@ -1542,7 +1546,7 @@ func ordinalEnd(node *tcimpl.CompiledNode, like ordinalKey, low bool) (ordinalKe
 	}
 	var best constraints.OrdinalSymbol
 	found := false
-	for _, v := range c.Values {
+	for _, v := range ordinalChoices(c.Values) {
 		if len(c.Validate(v.Value)) != 0 {
 			continue
 		}

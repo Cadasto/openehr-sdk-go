@@ -47,7 +47,9 @@ var (
 // to that range, and on the precision of a DV_QUANTITY or a DV_PROPORTION
 // to the part of it from -1 up, a side it leaves open being closed within
 // the sampler's window of the side it bounds (narrowInteger). A
-// C_DV_ORDINAL keeps the pairs whose value is an Integer (narrowOrdinal).
+// C_DV_ORDINAL keeps the pairs whose value is an Integer (narrowOrdinal),
+// and of those the pairs whose symbol has a code, where one has, since the
+// RM needs the symbol's code (ordinalChoices).
 // Any other pc comes back as it is, with its own example value. Where
 // nothing of pc is left, the leaf fails with an error wrapping
 // ErrConstraintUnsatisfiable that names the RM type, the attribute and the
@@ -68,11 +70,13 @@ func narrowedLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, pc constr
 		}
 		return narrowed, integerExample(c, narrowed), nil
 	case constraints.CDvOrdinal:
-		// A C_DV_ORDINAL constrains the ordinal itself, and so its value.
+		// A C_DV_ORDINAL constrains the ordinal itself, and so its value
+		// and its symbol.
 		narrowed, err := narrowOrdinal(c)
 		if err != nil {
 			return nil, nil, unsatisfiable("value", err)
 		}
+		narrowed.Values = ordinalChoices(narrowed.Values)
 		return narrowed, narrowed.ExampleValue(), nil
 	}
 	return pc, pc.ExampleValue(), nil
