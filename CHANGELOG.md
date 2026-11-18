@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-11-18
+
+Fifty-first `v0.x` minor: ID-token verification can trust a named project, validating compositions no longer links the AQL parser, the instance generator writes representative magnitudes, and canonical JSON encode is faster. **Breaking:** the AQL entry points of `openehr/validation` move to `aqlvalidation`, the RM floor reads `is_integral` as a precision of 0, and `rminfo`'s class lists are shared.
+
 ### Added
 
 - **ID-token verification in `auth/smart` and `smart`** can trust a named project, accepting every audience of a token whose `aud` lists that project and whose `azp` is the client ID (REQ-062, REQ-064).
