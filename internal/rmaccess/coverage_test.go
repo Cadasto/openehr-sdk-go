@@ -12,7 +12,7 @@ import (
 // access, Acceptance: a test fails when the registry knows a class the
 // generated access does not cover. Every class the type registry decodes is
 // covered, and every attribute rminfo declares for it, own and inherited, is
-// answered by the reader of its kind: a container by multiple, any other
+// answered by the reader of its kind: a container by appendMultiple, any other
 // attribute by single, never by both; and every Hash attribute by hash as
 // well, so a walk can enter its entries. Whether a reader serves a pair is
 // the third answer of the unexported readers, which Single, Multiple and Hash
@@ -46,11 +46,11 @@ func TestAccess_REQ171_CoversEveryRegisteredClass(t *testing.T) {
 				t.Fatalf("rminfo.AttributeRMType(%s, %q) not found for an attribute AttributeNames lists", name, attr)
 			}
 			_, _, bySingle := single(v, attr, false)
-			_, _, _, byMultiple := multiple(v, attr, false)
+			_, _, _, byMultiple := appendMultiple(v, attr, nil, false)
 			_, _, _, byHash := hash(v, attr)
 			switch {
 			case container && !byMultiple:
-				t.Errorf("multiple(%T, %q) does not serve the container %s.%s", v, attr, name, attr)
+				t.Errorf("appendMultiple(%T, %q, nil, false) does not serve the container %s.%s", v, attr, name, attr)
 			case !container && !bySingle:
 				t.Errorf("single(%T, %q) does not serve the attribute %s.%s", v, attr, name, attr)
 			case bySingle && byMultiple:
@@ -66,8 +66,8 @@ func TestAccess_REQ171_CoversEveryRegisteredClass(t *testing.T) {
 		if _, _, served := single(v, "no_such_attribute", false); served {
 			t.Errorf("single(%T, %q) serves an attribute the class does not declare", v, "no_such_attribute")
 		}
-		if _, _, _, served := multiple(v, "no_such_attribute", false); served {
-			t.Errorf("multiple(%T, %q) serves an attribute the class does not declare", v, "no_such_attribute")
+		if _, _, _, served := appendMultiple(v, "no_such_attribute", nil, false); served {
+			t.Errorf("appendMultiple(%T, %q, nil, false) serves an attribute the class does not declare", v, "no_such_attribute")
 		}
 		if _, _, _, served := hash(v, "no_such_attribute"); served {
 			t.Errorf("hash(%T, %q) serves an attribute the class does not declare", v, "no_such_attribute")

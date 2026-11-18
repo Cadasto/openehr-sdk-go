@@ -90,19 +90,11 @@ func AppendMultiple(dst []any, parent any, attr string) (items []any, present bo
 // Array of Octet, is counted, not boxed one byte at a time. An absent list,
 // and any pair [Multiple] reads as absent, reads as (0, false).
 func Len(parent any, attr string) (n int, present bool) {
-	_, n, present, _ = multiple(parent, attr, false)
+	_, n, present, _ = appendMultiple(parent, attr, nil, false)
 	if !present {
 		return 0, false
 	}
 	return n, true
-}
-
-// multiple reads the container attribute attr on parent as the generated
-// appendMultiple does, into no buffer: its items, boxed only when box is set,
-// its length, whether the list is present, and whether parent's class
-// declares attr as a container at all.
-func multiple(parent any, attr string, box bool) ([]any, int, bool, bool) {
-	return appendMultiple(parent, attr, nil, box)
 }
 
 // Hash returns the entries of a Hash attribute in ascending key order:
