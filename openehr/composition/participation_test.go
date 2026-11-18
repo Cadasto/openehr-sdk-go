@@ -37,10 +37,10 @@ const requiredExistence = `<existence><lower_included>true</lower_included><uppe
 // TestREQ101_REQ107_ContextParticipationBuildsAndSets checks that a
 // COMPOSITION whose template puts a PARTICIPATION in its context's
 // participations gets a Builder: the skeleton carries that participation,
-// with the mode default openehr 193|not specified| and a PARTY_SELF
-// performer (REQ-107 RM defaults), Set writes a function and a mode the
-// template admits at their own paths, Build keeps them, and the composition
-// passes ValidateComposition.
+// with the mode default openehr 193|not specified| and a performer that is
+// a PARTY_IDENTIFIED named example (REQ-107 RM defaults), Set writes a
+// function and a mode the template admits at their own paths, Build keeps
+// them, and the composition passes ValidateComposition.
 func TestREQ101_REQ107_ContextParticipationBuildsAndSets(t *testing.T) {
 	t.Parallel()
 	c := compileInline(t, participationOPT)
@@ -67,8 +67,12 @@ func TestREQ101_REQ107_ContextParticipationBuildsAndSets(t *testing.T) {
 	if seeded.Mode == nil || seeded.Mode.DefiningCode != notSpecified || seeded.Mode.Value != "not specified" {
 		t.Errorf("skeleton PARTICIPATION.mode = %+v, want openehr 193 not specified", seeded.Mode)
 	}
-	if _, ok := seeded.Performer.(*rm.PartySelf); !ok {
-		t.Errorf("skeleton PARTICIPATION.performer is %T, want *rm.PartySelf", seeded.Performer)
+	if performer, ok := seeded.Performer.(*rm.PartyIdentified); !ok {
+		t.Errorf("skeleton PARTICIPATION.performer is %T, want *rm.PartyIdentified", seeded.Performer)
+	} else if performer.Name == nil {
+		t.Error("skeleton PARTICIPATION.performer has no name, want example")
+	} else if *performer.Name != "example" {
+		t.Errorf("skeleton PARTICIPATION.performer name = %q, want example", *performer.Name)
 	}
 
 	// The PARTICIPATION has no node id, so its path carries the positional

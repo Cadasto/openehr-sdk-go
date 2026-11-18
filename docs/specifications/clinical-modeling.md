@@ -1034,7 +1034,8 @@ When both of these hold, the generator **SHOULD** write the default given here, 
 
 A `COMPOSITION`'s `context` is written under every policy, `Required` included, as its item says:
 
-- an abstract `PARTY_PROXY` other than a `COMPOSITION`'s `composer`, such as an ENTRY's `subject` or a `PARTICIPATION`'s `performer`: a `PARTY_SELF`, never an empty `PARTY_IDENTIFIED`, which would break `Basic_validity`;
+- an abstract `PARTY_PROXY` other than a `COMPOSITION`'s `composer` and a `PARTICIPATION`'s `performer`, such as an ENTRY's `subject`: a `PARTY_SELF`, never an empty `PARTY_IDENTIFIED`, which would break `Basic_validity`;
+- a `PARTICIPATION`'s `performer` that is an abstract `PARTY_PROXY`: a `PARTY_IDENTIFIED`, whose `name` § [Precedence](#precedence) 2 writes as `example`, since FLAT and STRUCTURED spell a `PARTY_SELF` performer by no party key, which a reader that knows only the `PARTY_IDENTIFIED` keys the Simplified Formats specification shows for a performer reads as an empty `PARTY_IDENTIFIED` ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes));
 - an abstract `OBJECT_ID` or `UID_BASED_ID`, such as the `id` of a `PARTY_REF`, an `OBJECT_REF` or a `LOCATABLE_REF`: a `HIER_OBJECT_ID` whose `value` *Identity* gives;
 - an ENTRY's `language`: `Options.Language` in `ISO_639-1`; its `encoding`: `UTF-8` in `IANA_character-sets`; so that `Language_valid` and `Encoding_valid` hold (§ [REQ-112](#req-112--template-less-reference-model-validation-floor) *Coded invariants*);
 - a `DV_TEXT`'s or `DV_CODED_TEXT`'s `language`, and a `DV_ENCAPSULATED`'s: `Options.Language` in `ISO_639-1`; a `DV_TEXT`'s or `DV_CODED_TEXT`'s `encoding`, and a `DV_ENCAPSULATED`'s `charset`: `UTF-8` in `IANA_character-sets`; so that their `Language_valid`, `Encoding_valid` and `Charset_valid` hold;
@@ -1074,7 +1075,12 @@ Under `Large`, `Generate` **MUST** write the optional RM attributes below where 
 - an ENTRY's `provider`, a `PARTY_SELF`, and one member of its `other_participations`;
 - an `ACTIVITY`'s `timing`: a `DV_PARSABLE` whose `formalism` is `ISO8601` and whose `value` is an ISO 8601 recurring interval, `R/`, the date-time *Clock* gives and `/P1D`, the form the RM prefers for it (RM `ACTIVITY.timing`: "the preferred syntax is ISO8601 'R' format").
 
-Each participation has a `PARTY_SELF` performer, the `mode` `openehr` `193|not specified|` with its rubric, and a `function` that is a plain `DV_TEXT` whose `value` is `unknown`, the rubric of its RM default `253`, since FLAT's `|function` key carries only a plain `DV_TEXT` ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes)) and `Function_valid` binds only a coded `function`.
+Each participation has:
+
+- a `performer` that is a `PARTY_IDENTIFIED` whose `name` is `example`;
+- the `mode` `openehr` `193|not specified|` with its rubric;
+- a `function` that is a plain `DV_TEXT` whose `value` is `unknown`, the rubric of its RM default `253`, since FLAT's `|function` key carries only a plain `DV_TEXT` ([wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes)) and `Function_valid` binds only a coded `function`.
+
 An attribute the OPT node names is the visit's: `Large` builds it under the OPT's constraints where the OPT allows it, a `feeder_audit` excepted (*Known gap: attributes the generator cannot write*), and leaves it out where the OPT prohibits it.
 Beyond those *Leaf values*, *RM defaults* and § [Precedence](#precedence) 4 write under every policy, `Large` writes no other optional RM attribute the OPT does not name, such as an ENTRY's `workflow_id` or `guideline_id`, a LOCATABLE's `links`, or a `HISTORY`'s `duration` or `period`.
 The skeleton the composition builder seeds a `Builder` with under `Large` holds none of them ([§ REQ-101](#req-101--generic-opt-driven-composition-builder)).

@@ -121,7 +121,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "vital_signs",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 977, archetypes: map[string]int{
+				instance.Large: {values: 986, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.blood_pressure.v1":   2,
 					"openEHR-EHR-OBSERVATION.body_temperature.v1": 2,
@@ -147,7 +147,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "social",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 1905, archetypes: map[string]int{
+				instance.Large: {values: 1918, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.livingsituation.v1":        2,
 					"openEHR-EHR-OBSERVATION.languageproficiency.v1":    2,
@@ -182,7 +182,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 			name:    "Corona_Anamnese",
 			compile: compileCoronaAnamnese,
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 5028, archetypes: map[string]int{
+				instance.Large: {values: 5059, archetypes: map[string]int{
 					report:                                              1,
 					"openEHR-EHR-CLUSTER.address_cc.v0":                 8,
 					"openEHR-EHR-CLUSTER.dwelling.v0":                   4,

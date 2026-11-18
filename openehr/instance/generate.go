@@ -594,8 +594,9 @@ func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) boo
 
 // nodeClass is the bare BMM class of the value the walk builds for
 // optNode (builtRMType): the class it names, or its concrete substitute
-// (concreteFor), without generic parameters, or, for an untyped node, the
-// class of the type the BMM declares for its attribute (untypedRMType), and
+// where it is held (nodeConcrete), without generic parameters, or, for an
+// untyped node, the class of the type the BMM declares for its attribute
+// (untypedRMType), and
 // for a bound of a DV_INTERVAL over an abstract DV_ORDERED class, the class
 // the interval is built over (intervalBoundType). A DV_INTERVAL is one class
 // whatever its parameter, so its parameter is not resolved here.
@@ -607,7 +608,7 @@ func nodeClass(optNode *tcimpl.CompiledNode) string {
 	if bound := intervalBoundType(optNode, declared); bound != "" {
 		return bound
 	}
-	return bmmtype.Class(concreteFor(declared))
+	return bmmtype.Class(nodeConcrete(optNode, declared))
 }
 
 // rootComposer reports whether attr is the composer of optNode, a
@@ -928,8 +929,10 @@ func bindingAlternative(children []*tcimpl.CompiledNode, built string) *tcimpl.C
 }
 
 // builtRMType is the RM type the walk builds for node, an OPT child: the
-// type it names, or its concrete substitute (concreteFor). An untyped node,
-// which names no type, is built as the type the BMM declares for the
+// type it names, or its concrete substitute where it is held
+// (nodeConcrete), as a PARTICIPATION's performer that names the abstract
+// PARTY_PROXY is built as a PARTY_IDENTIFIED. An untyped node, which
+// names no type, is built as the type the BMM declares for the
 // attribute that holds it (untypedRMType), and a DV_INTERVAL over an
 // abstract DV_ORDERED class other than DV_ORDERED itself as an interval
 // over one concrete class that holds both its bounds (concreteInterval). A
@@ -949,7 +952,7 @@ func builtRMType(node *tcimpl.CompiledNode) string {
 	if bound := intervalBoundType(node, declared); bound != "" {
 		return bound
 	}
-	return concreteFor(declared)
+	return nodeConcrete(node, declared)
 }
 
 // intervalBoundType returns the class the walk builds node as where node,
@@ -986,8 +989,8 @@ func intervalBoundType(node *tcimpl.CompiledNode, declared string) string {
 // names no RM type: the type the BMM declares for the attribute that holds
 // it, read on the type the walk builds for its parent, so a formal
 // parameter such as the T of a DV_INTERVAL's lower takes its actual type,
-// or that type's concrete substitute (concreteFor). It is "" for a node no
-// attribute holds, the template root.
+// or that type's concrete substitute where that attribute holds it
+// (concreteAt). It is "" for a node no attribute holds, the template root.
 func untypedRMType(node *tcimpl.CompiledNode) string {
 	parent := node.Parent()
 	if parent == nil {
@@ -1011,7 +1014,7 @@ func untypedRMType(node *tcimpl.CompiledNode) string {
 	if !ok || declared == "" {
 		declared = attr.RMTypeName()
 	}
-	return concreteFor(attrType(parentType, declared))
+	return concreteAt(bmmtype.Class(parentType), attr.Name(), attrType(parentType, declared))
 }
 
 // concreteInterval returns the interval the walk builds for node, a
@@ -1354,7 +1357,10 @@ func (g *generator) materialiseImplicitSingle(
 		g.writeBMMString(parentRM, attr.Name())
 		return nil
 	}
-	rmChild, ok := newRMIfKnown(rmType)
+	// The concrete type it is built as, where the attribute holds it, as a
+	// PARTICIPATION's performer is a PARTY_IDENTIFIED (concreteAt).
+	concrete := concreteAt(nodeClass(optNode), attr.Name(), rmType)
+	rmChild, ok := newRMIfKnown(concrete)
 	if !ok {
 		// No RM class to build: a BMM primitive such as Boolean or
 		// Integer, which the parent holds as a Go value, or a type
@@ -1387,8 +1393,8 @@ func (g *generator) materialiseImplicitSingle(
 	// A locatable the OPT does not name (OBSERVATION.data's HISTORY, an
 	// ENTRY's ITEM_TREE) still needs the node id and name the RM floor
 	// requires.
-	g.stampIfLocatable(rmChild, concreteFor(rmType))
-	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
+	g.stampIfLocatable(rmChild, concrete)
+	g.populateBMMRequiredAttrs(rmChild, concrete, 0)
 	g.settleBuilt(rmChild, attr.Name())
 	if replacesTerminology(parentRM, attr.Name(), rmChild) {
 		return nil
@@ -1463,7 +1469,7 @@ func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth
 		g.writeBMMString(parent, attrName)
 		return
 	}
-	concrete := concreteFor(rmType)
+	concrete := concreteAt(bmmtype.Class(parentRMType), attrName, rmType)
 	rmChild, ok := newRMIfKnown(concrete)
 	if !ok {
 		return
@@ -2884,10 +2890,11 @@ func concreteFor(rmType string) string {
 	// PARTY_SELF, not PARTY_IDENTIFIED: the generator fills an unconstrained
 	// PARTY_PROXY with no attributes, and PARTY_SELF is the only subtype that
 	// is RM-valid empty. PARTY_IDENTIFIED requires at least one of `name`,
-	// `identifiers` or `external_ref` (invariant `Basic_validity`), so the
-	// empty one this used to build was invalid the moment it was generated —
-	// and PARTY_SELF is in any case the conventional default for a
-	// self-referencing ENTRY `subject`.
+	// `identifiers` or `external_ref` (invariant `Basic_validity`), so an
+	// empty one would be invalid the moment it was generated, and PARTY_SELF
+	// is in any case the conventional default for a self-referencing ENTRY
+	// `subject`. A PARTICIPATION's performer is the exception, which
+	// concreteAt makes a named PARTY_IDENTIFIED.
 	case "PARTY_PROXY":
 		return "PARTY_SELF"
 	// The id of a reference: a HIER_OBJECT_ID, whose value Identity draws
@@ -2913,6 +2920,38 @@ func concreteFor(rmType string) string {
 		return d
 	}
 	return rmType
+}
+
+// concreteAt is the type the walk builds for a value whose type the BMM or
+// the OPT gives as declared, held by the attribute attr of a value of the
+// class parentClass: a PARTY_IDENTIFIED for a PARTICIPATION's performer
+// given as the abstract PARTY_PROXY, which fillPartyName then names example
+// where it has no name, identifiers or external_ref, and the concrete
+// substitute of declared (concreteFor) otherwise. FLAT and STRUCTURED spell
+// a PARTY_SELF performer by no party key, which a reader that knows only the
+// PARTY_IDENTIFIED keys the Simplified Formats specification shows for a
+// performer reads as an empty PARTY_IDENTIFIED, one RM Basic_validity
+// refuses. Any other PARTY_PROXY, such as an ENTRY's subject, stays a
+// PARTY_SELF, and a performer given as a concrete class is built as that
+// class.
+func concreteAt(parentClass, attr, declared string) string {
+	if declared == "PARTY_PROXY" && parentClass == "PARTICIPATION" && attr == "performer" {
+		return "PARTY_IDENTIFIED"
+	}
+	return concreteFor(declared)
+}
+
+// nodeConcrete is concreteAt for node, an OPT child that names declared:
+// the class the walk builds for its parent node (nodeClass), and the
+// attribute of that node that holds it (holdingAttribute).
+func nodeConcrete(node *tcimpl.CompiledNode, declared string) string {
+	parent := node.Parent()
+	// Only a PARTY_PROXY takes a substitute that depends on where it is,
+	// so no other type needs its parent's class read.
+	if parent == nil || declared != "PARTY_PROXY" {
+		return concreteFor(declared)
+	}
+	return concreteAt(nodeClass(parent), holdingAttribute(node), declared)
 }
 
 // setLocatableIdentity stamps archetype_node_id, name, uid (only where opt
