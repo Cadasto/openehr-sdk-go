@@ -3256,17 +3256,17 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 // magnitude under a C_INTEGER, a representative magnitude
 // (quantityExample, countExample), and any other leaf ex. RandomFill draws
 // a DV_COUNT's magnitude as count does, and any other leaf inside pc
-// (sampleValue), but for a C_REAL on a DV_QUANTITY's magnitude that it
-// draws once the walk has written the quantity's precision
-// (randomQuantityMagnitude), which keeps ex until then. A CString draw can
-// be a list entry its pattern refuses, which applyStringLeaf replaces
-// (stringForConstraint).
+// (sampleValue), but for a C_REAL with no list on a DV_QUANTITY's
+// magnitude, which it draws once the walk has written the quantity's
+// precision (randomQuantityMagnitude) and keeps ex until then. A CString
+// draw can be a list entry its pattern refuses, which applyStringLeaf
+// replaces (stringForConstraint).
 func (g *generator) leafValue(rmValue any, attr string, pc constraints.PrimitiveConstraint, ex any) any {
 	random := g.opts.ValueFill == RandomFill
 	switch c := pc.(type) {
 	case constraints.CReal:
 		if _, isQuantity := rmValue.(*rm.DVQuantity); isQuantity && attr == "magnitude" && random {
-			if _, drawn := openMagnitudeRange(c); drawn {
+			if _, drawn := quantityMagnitudeRange(c); drawn {
 				return ex
 			}
 		}

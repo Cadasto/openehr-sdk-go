@@ -146,16 +146,16 @@ func exampleQuantityMagnitude(opt *tcimpl.CompiledNode, q *rm.DVQuantity) {
 // builds attribute by attribute or leaves without a constraint, opt being
 // its OPT node, to the one RandomFill gives. It runs once the walk has
 // written the precision, wherever the OPT lists it. Where nothing
-// constrains the magnitude, or a C_REAL with no list and a range open or
-// bounded on one side does (openMagnitudeRange), the magnitude is drawn as
-// an open C_DV_QUANTITY entry's is (magnitude), from 1 to 100 or inside
-// the range away from its bound, rounded to the decimals q's precision
-// gives (drawnDecimals), so it is never 0. A draw the constraint rejects,
-// and a magnitude under any other constraint, which the walk drew from it,
-// keep the magnitude the walk wrote, rounded (roundQuantity).
+// constrains the magnitude, or a C_REAL with no list does
+// (quantityMagnitudeRange), the magnitude is drawn as a C_DV_QUANTITY
+// entry's is (magnitude), from 1 to 100 where the range is open and
+// otherwise inside it away from its bounds, rounded to the decimals q's
+// precision gives (drawnDecimals), so it is never 0. A draw the constraint
+// rejects, and a magnitude under any other constraint, which the walk drew
+// from it, keep the magnitude the walk wrote, rounded (roundQuantity).
 func (g *generator) randomQuantityMagnitude(opt *tcimpl.CompiledNode, q *rm.DVQuantity) {
 	node := bindingChild(opt, "magnitude")
-	if r, drawn := openMagnitudeRange(primitiveOf(node)); drawn {
+	if r, drawn := quantityMagnitudeRange(primitiveOf(node)); drawn {
 		if v := g.valueSampler.magnitude(r, drawnDecimals(q.Precision)); componentFits(node, v) {
 			q.Magnitude = rm.Real(v)
 			return
@@ -164,17 +164,17 @@ func (g *generator) randomQuantityMagnitude(opt *tcimpl.CompiledNode, q *rm.DVQu
 	roundQuantity(opt, q)
 }
 
-// openMagnitudeRange returns the range RandomFill draws a DV_QUANTITY's
-// magnitude from where pc is the constraint on that magnitude, and whether
-// it draws it that way rather than as any leaf under pc (sampleValue): an
-// open range where pc is nil, and the range of a C_REAL with no list whose
-// range is open or bounded on one side.
-func openMagnitudeRange(pc constraints.PrimitiveConstraint) (constraints.NumericRange, bool) {
+// quantityMagnitudeRange returns the range RandomFill draws a
+// DV_QUANTITY's magnitude from where pc is the constraint on that
+// magnitude, and whether it draws it that way rather than as any leaf
+// under pc (sampleValue): an open range where pc is nil, and the range of
+// a C_REAL with no list.
+func quantityMagnitudeRange(pc constraints.PrimitiveConstraint) (constraints.NumericRange, bool) {
 	switch c := pc.(type) {
 	case nil:
 		return openRange, true
 	case constraints.CReal:
-		if len(c.List) == 0 && !bothBounds(c.Range) {
+		if len(c.List) == 0 {
 			return c.Range, true
 		}
 	}
