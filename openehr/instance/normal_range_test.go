@@ -402,10 +402,13 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			wantRandom: "DV_COUNT 44; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 10 .. DV_COUNT 10]" + noRefs,
 		},
 		{
+			// RandomFill draws the quantity, 82.11 mm, above the range, where
+			// it stays.
 			name: "DV_QUANTITY with no magnitude constraint, range [10 mm..10 mm], H",
 			value: optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
 				normalRangeOver("DV_QUANTITY", quantityValue("10"), quantityValue("10")), normalStatus("H")),
-			want: "DV_QUANTITY 11 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 10 mm .. DV_QUANTITY 10 mm]" + noRefs,
+			want:       "DV_QUANTITY 11 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 10 mm .. DV_QUANTITY 10 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 82.11 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 10 mm .. DV_QUANTITY 10 mm]" + noRefs,
 		},
 		{
 			name: "DV_PROPORTION unitary with no numerator constraint, range [1/1..1/1], H",
@@ -415,10 +418,14 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 		},
 		{
 			// A low status takes the step below the lower bound: 9 mm.
+			// RandomFill draws the quantity, 82.11 mm, outside the range,
+			// where it stays: the rule asks the value to be outside, on no
+			// side in particular.
 			name: "DV_QUANTITY with no magnitude constraint, range [10 mm..10 mm], L",
 			value: optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
 				normalRangeOver("DV_QUANTITY", quantityValue("10"), quantityValue("10")), normalStatus("L")),
-			want: "DV_QUANTITY 9 mm; normal_status openehr_normal_statuses::L; normal_range [DV_QUANTITY 10 mm .. DV_QUANTITY 10 mm]" + noRefs,
+			want:       "DV_QUANTITY 9 mm; normal_status openehr_normal_statuses::L; normal_range [DV_QUANTITY 10 mm .. DV_QUANTITY 10 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 82.11 mm; normal_status openehr_normal_statuses::L; normal_range [DV_QUANTITY 10 mm .. DV_QUANTITY 10 mm]" + noRefs,
 		},
 		{
 			// The OPT lists 0, 7, 5 and 20. The middle of the range, 5, is

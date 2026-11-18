@@ -3256,11 +3256,20 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 // magnitude under a C_INTEGER, a representative magnitude
 // (quantityExample, countExample), and any other leaf ex. RandomFill draws
 // a DV_COUNT's magnitude as count does, and any other leaf inside pc
-// (sampleValue). A CString draw can be a list entry its pattern refuses,
-// which applyStringLeaf replaces (stringForConstraint).
+// (sampleValue), but for a C_REAL on a DV_QUANTITY's magnitude that it
+// draws once the walk has written the quantity's precision
+// (randomQuantityMagnitude), which keeps ex until then. A CString draw can
+// be a list entry its pattern refuses, which applyStringLeaf replaces
+// (stringForConstraint).
 func (g *generator) leafValue(rmValue any, attr string, pc constraints.PrimitiveConstraint, ex any) any {
 	random := g.opts.ValueFill == RandomFill
 	switch c := pc.(type) {
+	case constraints.CReal:
+		if _, isQuantity := rmValue.(*rm.DVQuantity); isQuantity && attr == "magnitude" && random {
+			if _, drawn := openMagnitudeRange(c); drawn {
+				return ex
+			}
+		}
 	case constraints.CInteger:
 		if _, isCount := rmValue.(*rm.DVCount); isCount && attr == "magnitude" {
 			if random {
@@ -3993,8 +4002,9 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 // opt, that the OPT walk left empty, but for its coded attributes, which
 // finishNode settles next (settleCoded), and a DV_MULTIMEDIA's content,
 // which it settles after them (settleMultimedia). It gives a DV_QUANTITY
-// the OPT builds attribute by attribute its magnitude, rounded under
-// RandomFill and representative under ExampleFill. Under RandomFill it also
+// the OPT builds attribute by attribute, or leaves without a constraint,
+// its magnitude, drawn under RandomFill (randomQuantityMagnitude) and
+// representative under ExampleFill. Under RandomFill it also
 // draws a DV_DURATION's value and a DV_COUNT's magnitude that the OPT
 // leaves unconstrained.
 func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
@@ -4009,11 +4019,11 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 		// A C_DV_QUANTITY's value is given where its leaf is valued
 		// (leafValue). One the OPT builds attribute by attribute, or leaves
 		// without a constraint, is settled here, once the walk has written
-		// its precision: RandomFill rounds its draw, and ExampleFill gives
-		// it a representative magnitude.
+		// its precision: RandomFill draws or rounds it, and ExampleFill
+		// gives it a representative magnitude.
 		if primitiveOf(opt) == nil {
 			if g.opts.ValueFill == RandomFill {
-				roundQuantity(opt, v)
+				g.randomQuantityMagnitude(opt, v)
 			} else {
 				exampleQuantityMagnitude(opt, v)
 			}
