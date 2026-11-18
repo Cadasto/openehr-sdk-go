@@ -553,7 +553,7 @@ Its client scenarios map to SDK coverage as follows:
   On the compiling vendored corpus the same generated value also passes `validation.ValidateRM`, the output rule of [§ REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), outside the cases its *Exceptions and known gaps* lists.
 - **Modes:** In-repo (generator and validator agreement over fixture OPTs; no backend).
 - **Status:** Implemented (inline) — a corpus census beside the probe runs every vendored OPT through the generator, the composition builder and both validators, and pins each remaining failure and each hollow body with its reason.
-- **Satisfies:** REQ-107.
+- **Satisfies:** REQ-107, REQ-178.
 
 #### PROBE-074 — Template-driven validation of non-COMPOSITION roots
 
@@ -642,7 +642,7 @@ Its client scenarios map to SDK coverage as follows:
   A can-fail control: with one operational template member withheld from the decoder, the round-trip leg fails on a corpus file that carries it.
 - **Modes:** In-repo (property across the vendored corpus; no backend).
 - **Status:** Implemented (inline).
-- **Satisfies:** REQ-176.
+- **Satisfies:** REQ-176, REQ-178.
 
 ### Simplified formats and upstream parity
 

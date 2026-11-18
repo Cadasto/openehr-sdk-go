@@ -1773,7 +1773,7 @@ func Folder() *templatecompile.Compiled
 - `EHRStatus` and `Folder` **MUST** compile their template on the first call, and return that same `*templatecompile.Compiled` to every later call, concurrent calls included.
   `Compiled` has no method that changes it, so its callers share it; a caller changes nothing it reaches through it.
 - An instance that `instance.Generate` builds from either compiled template, under every policy and value fill, **MUST** pass `validation.ValidateEHRStatus` or `validation.ValidateFolder` respectively.
-  The corpus ratchet (PROBE-027) holds both templates to it.
+  The package's tests and the corpus ratchet (PROBE-027) hold both templates to it.
 
 Neither `EHRStatus` nor `Folder` returns an error.
 An embedded template that fails to read or compile is a defect of the SDK release, which the package's own tests rule out; the function panics on it, with an error that names the template id.
@@ -1783,7 +1783,7 @@ An embedded template that fails to read or compile is a defect of the SDK releas
 A consumer stores these templates on a server, and stores the instances it writes against them, so the template under an id holds still:
 
 - A change to a template **MUST NOT** refuse an instance that the template under the same id accepted before.
-  A change that would ships under a new id, such as `generic_ehr_status.v2`, and the package keeps the old id's template and constant.
+  A change that would refuse one ships under a new id, such as `generic_ehr_status.v2`, and the package keeps the old id's template and constant.
 - The CHANGELOG **MUST** record a change to either document, under the release that ships it.
 
 A test pins each document's SHA-256 digest, so a change to its bytes fails until the same change moves the pin; the failure message names these two rules.

@@ -2842,7 +2842,7 @@ requirements:
     packages:
       - openehr/template/generic
       - testkit/fixtures
-    probes: []
+    probes: [PROBE-027, PROBE-111]
     tests:
       - openehr/template/generic/compile_internal_test.go
       - openehr/template/generic/example_test.go
