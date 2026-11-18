@@ -227,3 +227,40 @@ func TestDescendOne_SkipsANilSibling(t *testing.T) {
 		t.Errorf("descendOne(%+v) error %q does not list the siblings as <empty>, then the blood pressure id", seg, err)
 	}
 }
+
+// TestDescendOne_ListStepAllocatesNothing holds the list step of a Set path
+// to reading its items into a buffer on the stack: a list of up to eight
+// items, of interfaces or of values, is searched without allocating, by
+// archetype_node_id alone and by id and name.
+func TestDescendOne_ListStepAllocatesNothing(t *testing.T) {
+	content := &rm.Composition{
+		Content: []rm.ContentItem{
+			&rm.Observation{ArchetypeNodeID: "openEHR-EHR-OBSERVATION.heart_rate.v1"},
+			&rm.Observation{ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1"},
+		},
+	}
+	list := &rm.ItemList{
+		Items: []rm.Element{
+			{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "first"}},
+			{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "second"}},
+		},
+	}
+	cases := []struct {
+		parent any
+		seg    pathSegment
+	}{
+		{content, pathSegment{attrName: "content", cardinality: template.Multiple, matchID: "openEHR-EHR-OBSERVATION.blood_pressure.v1"}},
+		{list, pathSegment{attrName: "items", cardinality: template.Multiple, matchID: "at0001", matchName: "second"}},
+	}
+	for _, tc := range cases {
+		if _, err := descendOne(tc.parent, tc.seg); err != nil {
+			t.Fatalf("descendOne(%T, %+v): %v", tc.parent, tc.seg, err)
+		}
+		allocs := testing.AllocsPerRun(100, func() {
+			_, _ = descendOne(tc.parent, tc.seg)
+		})
+		if allocs != 0 {
+			t.Errorf("descendOne(%T, %+v) made %v allocations per call, want 0: the list step copies the items", tc.parent, tc.seg, allocs)
+		}
+	}
+}
