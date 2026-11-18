@@ -14,8 +14,9 @@
 //
 // AppendMultipleHint is AppendMultiple for a caller that knows how many
 // members a list will take: the first member appended to an absent list
-// makes room for hint of them. All five are pure structural setters. Dispatch is a closed type
-// switch on the Go concrete type of `parent`, with no reflection.
+// makes room for hint of them. All five are pure structural setters.
+// Dispatch is a closed type switch on the Go concrete type of `parent`,
+// with no reflection.
 //
 // # Scope
 //

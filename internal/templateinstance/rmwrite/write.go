@@ -200,9 +200,10 @@ func AppendMultiple(parent any, attrName string, child any) error {
 }
 
 // AppendMultipleHint is AppendMultiple for a caller that knows how many
-// members it will append to the list: hint. The first member appended to a
-// list that holds none makes room for hint members, at least one, so the
-// list does not grow as the others arrive. A list that takes no member,
+// members it will append to the list: hint. The first member appended to
+// an absent (nil) list makes room for hint members, at least one, so the
+// list does not grow as the others arrive; a list already present, empty
+// or not, grows as append grows it. A list that takes no member,
 // because the caller appends none or each one is refused, stays nil, as
 // AppendMultiple leaves it.
 func AppendMultipleHint(parent any, attrName string, child any, hint int) error {
