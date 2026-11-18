@@ -1368,7 +1368,7 @@ The SDK **MUST** offer two fills, and read a `ValueFill` other than `RandomFill`
 
 - `ExampleFill` (default) populates each leaf with a single representative value, byte-identical across calls for one OPT: its REQ-103 `PrimitiveConstraint.ExampleValue`, but for the `magnitude` of a `DV_QUANTITY` and of a `DV_COUNT`.
   That magnitude, whether a `C_DV_QUANTITY` entry, a `C_REAL` or `C_INTEGER` on the `magnitude`, or nothing constrains it, is:
-  - where its range has both bounds, the middle of the range, rounded as a `RandomFill` draw is below, a count's to a whole number, and moved one step inside a bound the range excludes;
+  - where its range has both bounds, the middle of the range, rounded to the decimals a `RandomFill` draw keeps below, a count's to a whole number, and moved one step inside a bound the range excludes;
   - otherwise, 10 where the range admits it, and else the range's bound nearest 10, moved one step inside it where the range excludes it.
 
   A step is a unit in the last decimal the magnitude keeps, so 1 for a count and for a precision of 0.

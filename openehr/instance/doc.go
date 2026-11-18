@@ -166,9 +166,9 @@
 // [ExampleFill], an in-constraint draw under [RandomFill]. Under
 // [ExampleFill] the magnitude of a quantity or a count takes a
 // representative value of its range instead: the middle of a range with
-// both bounds, rounded as a draw is, a count's to a whole number; and
-// otherwise 10, or the range's bound nearest 10 where the range does not
-// admit 10. A value on a bound the range excludes moves one step, a unit in
+// both bounds, rounded to the decimals a draw keeps, a count's to a whole
+// number; and otherwise 10, or the range's bound nearest 10 where the range
+// does not admit 10. A value on a bound the range excludes moves one step, a unit in
 // its last decimal, inside it. So a range from 0 to 1000 gives 500, one
 // from 0 up gives 10, and no constraint gives 10; a constraint with a list,
 // or one that rejects that value, keeps its own example. A quantity's
