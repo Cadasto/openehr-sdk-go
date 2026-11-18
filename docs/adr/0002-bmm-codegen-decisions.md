@@ -50,9 +50,9 @@ Every BMM `function` of a class becomes a Go method whose body is `panic("not im
 
 A curated set ([`internal/bmmgen/manual_impl.go`](../../internal/bmmgen/manual_impl.go)), keyed `OWNER.function` on the BMM declaring class, lists functions that are hand-written in a non-generated file. `renderFunctions` skips stub emission for those keys at both emit sites (the abstract-descendant loop and the concrete / abstract-generic loop), so a hand-written method does not collide with a generated panic stub (`method redeclared`). A declaring-owner key (e.g. `UID_BASED_ID.root`, `PATHABLE.item_at_path`) suppresses the stub on every concrete descendant at once. This realises the [ADR 0011](0011-rm-behavioural-functions-surface.md) surface for REQ-120..123; functions absent from the set keep emitting fail-loud stubs (D6).
 
-### D8 — The generator emits no bespoke JSON codec methods
+### D8 — The generator emits the streaming JSON marshaler pair
 
-Superseding the emission policy `internal/bmmgen/render_jsonmar.go` and `internal/bmmgen/render_jsonunmar.go` implemented, the generator no longer emits a `MarshalJSON` / `UnmarshalJSON` pair per generated type. Canonical JSON is produced and consumed by `encoding/json/v2` ([ADR 0022](0022-canonical-json-encoding-json-v2.md)), and the properties the bespoke methods supplied are obtained as follows.
+Superseding the emission policy `internal/bmmgen/render_jsonmar.go` and `internal/bmmgen/render_jsonunmar.go` implemented, the generator emits the streaming pair `MarshalJSONTo` / `UnmarshalJSONFrom` per generated type in place of a `MarshalJSON` / `UnmarshalJSON` pair, and canonical JSON goes through `encoding/json/v2` ([ADR 0022](0022-canonical-json-encoding-json-v2.md)). Decode delegates to it through the wire shapes below. Encode writes `_type` and each member itself as tokens (§ *Encode writes each member itself*), and takes those shapes only as its fallback. The properties the earlier methods supplied are obtained as follows.
 
 | Property | Was | Is |
 |---|---|---|

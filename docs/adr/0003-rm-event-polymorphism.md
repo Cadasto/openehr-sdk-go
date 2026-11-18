@@ -27,7 +27,7 @@ Consequences for `EVENT`:
 - `type Event interface { isEvent() }`
 - `PointEvent[T]` / `IntervalEvent[T]` flatten `EVENT` fields and implement `isEvent()`
 - `History[T].Events` is `[]Event` (interface slice), not `[]Event[T]`
-- Decode dispatches `events` through the `Event` hook of [ADR 0002 D8](0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods), which replaced the generated `UnmarshalJSON` and its `typereg.DecodeAs[Event]` call
+- Decode dispatches `events` through the `Event` hook of [ADR 0002 D8](0002-bmm-codegen-decisions.md#d8--the-generator-emits-the-streaming-json-marshaler-pair), which replaced the generated `UnmarshalJSON` and its `typereg.DecodeAs[Event]` call
 
 Other abstract generics (including **VERSION**) continue to emit as generic structs until whitelisted.
 
