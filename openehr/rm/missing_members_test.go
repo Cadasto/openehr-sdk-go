@@ -33,7 +33,9 @@ func TestREQ175_ClassDescriptorsMatchRMTables(t *testing.T) {
 			continue
 		}
 		checked++
-		want := slices.DeleteFunc(rminfo.Default.RequiredAttributes(class), func(attr string) bool {
+		// Clone: the lookup shares its list with every caller, and DeleteFunc
+		// and the loop below change it in place.
+		want := slices.DeleteFunc(slices.Clone(rminfo.Default.RequiredAttributes(class)), func(attr string) bool {
 			return rminfo.IsNonStorableAttr(class, attr) || slices.Contains(intervalFlags, attr)
 		})
 		for i, attr := range want {
