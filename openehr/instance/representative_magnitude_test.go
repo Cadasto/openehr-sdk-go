@@ -263,15 +263,15 @@ const quantitySeeds = 200
 // TestREQ107_RandomQuantityIsNotZeroWhereItsMagnitudeIsOpen is the REQ-107
 // Primitive-leaf value fill check on the magnitude RandomFill draws for a
 // DV_QUANTITY the template leaves unconstrained, or builds attribute by
-// attribute with no constraint on its magnitude or a C_REAL whose range is
-// open or bounded on one side: it is drawn as an open C_DV_QUANTITY entry's
-// is, inside the range away from its bound, or from 1 to 100 where it is
-// open, rounded to the precision, and is never 0. The draws vary between
-// seeds.
+// attribute with no constraint on its magnitude or a C_REAL with no list:
+// it is drawn as a C_DV_QUANTITY entry's is, inside the range away from its
+// bounds, or from 1 to 100 where it is open, rounded to the precision, and
+// is never 0. The draws vary between seeds.
 func TestREQ107_RandomQuantityIsNotZeroWhereItsMagnitudeIsOpen(t *testing.T) {
 	r, closed, open, noEnd := instance.RealRange, instance.Closed, instance.Open, instance.NoEnd
 	units := optSingle("units", optPrimitive("STRING", "C_STRING", "<list>mm</list>"))
 	precision0 := optProportionPart("precision", instance.IntList(0))
+	precision1 := optProportionPart("precision", instance.IntList(1))
 	quantity := func(magnitude string, precision ...string) string {
 		attrs := append([]string{optSingle("magnitude", optPrimitive("REAL", "C_REAL", magnitude)), units}, precision...)
 		return optNode("DV_QUANTITY", "", attrs...)
@@ -281,6 +281,9 @@ func TestREQ107_RandomQuantityIsNotZeroWhereItsMagnitudeIsOpen(t *testing.T) {
 		opt      string
 		decimals int
 		lo, hi   float64 // the magnitude lies from lo to hi
+		// inside says the magnitude is neither lo nor hi, the bounds of a
+		// range the template gives.
+		inside bool
 	}{
 		{name: "no constraint", opt: optNode("DV_QUANTITY", ""), decimals: 2, lo: 1, hi: 100},
 		{name: "no magnitude constraint", opt: optNode("DV_QUANTITY", "", units), decimals: 2, lo: 1, hi: 100},
@@ -290,6 +293,9 @@ func TestREQ107_RandomQuantityIsNotZeroWhereItsMagnitudeIsOpen(t *testing.T) {
 		{name: ">=0 precision 0", opt: quantity(r(closed(0), noEnd), precision0), decimals: 0, lo: 1, hi: 100},
 		{name: ">30", opt: quantity(r(open(30), noEnd)), decimals: 2, lo: 30.01, hi: 130},
 		{name: "<=0 precision 0", opt: quantity(r(noEnd, closed(0)), precision0), decimals: 0, lo: -100, hi: -1},
+		{name: "0..100 precision 0", opt: quantity(r(closed(0), closed(100)), precision0), decimals: 0, lo: 0, hi: 100, inside: true},
+		{name: "0..1", opt: quantity(r(closed(0), closed(1))), decimals: 2, lo: 0, hi: 1, inside: true},
+		{name: "-5..5 precision 1", opt: quantity(r(closed(-5), closed(5)), precision1), decimals: 1, lo: -5, hi: 5, inside: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -306,6 +312,9 @@ func TestREQ107_RandomQuantityIsNotZeroWhereItsMagnitudeIsOpen(t *testing.T) {
 					m := float64(onlyQuantity(t, what, out).Magnitude)
 					if m == 0 || m < tc.lo || m > tc.hi || !decimalsAtMost(m, tc.decimals) {
 						t.Errorf("%s: DV_QUANTITY magnitude %v, want one from %v to %v with at most %d decimals and not 0", what, m, tc.lo, tc.hi, tc.decimals)
+					}
+					if tc.inside && (m == tc.lo || m == tc.hi) {
+						t.Errorf("%s: DV_QUANTITY magnitude %v, want one away from the bounds %v and %v", what, m, tc.lo, tc.hi)
 					}
 					seen[m] = true
 					checkValid(t, out, c)
