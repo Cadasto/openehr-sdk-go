@@ -97,11 +97,11 @@ func compositionNameRMAttr(out map[string]any, base string, name rm.DVTextLike, 
 	if name == nil || rm.IsTypedNil(name) {
 		return nil
 	}
-	m, err := canonicalMap(name)
+	m, err := canonicalObject(name)
 	if err != nil {
 		return err
 	}
-	if plainText(m) && m["value"] == implied {
+	if value := m.member("value"); plainText(m) && value.isString() && value.textIs(implied) {
 		return nil
 	}
 	_, err = emitLeafValue(out, base+"/_name", name, "DV_TEXT", false, false)
@@ -110,12 +110,12 @@ func compositionNameRMAttr(out map[string]any, base string, name rm.DVTextLike, 
 
 // plainText reports whether a canonical object is a DV_TEXT that carries
 // nothing but its value.
-func plainText(m map[string]any) bool {
-	if m["_type"] != "DV_TEXT" {
+func plainText(m canonValue) bool {
+	if !m.member("_type").textIs("DV_TEXT") {
 		return false
 	}
-	for k := range m {
-		if k != "_type" && k != "value" {
+	for k := range m.members {
+		if string(k) != "_type" && string(k) != "value" {
 			return false
 		}
 	}

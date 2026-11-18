@@ -456,7 +456,7 @@ func mappingsRMAttr(out map[string]any, base string, mappings []rm.TermMapping) 
 		// strings.Contains holds for "" and for any run of the codes, such as
 		// "<>", so the length check comes first and keeps this function safe on
 		// its own. Through MarshalFlat and MarshalStructured an empty or
-		// multi-character match never reaches it: emitLeafValue's canonicalMap
+		// multi-character match never reaches it: emitLeafValue's canonicalObject
 		// refuses the leaf first, in rm.Character.MarshalJSON, with an error
 		// that wraps canjson.ErrInvalidValue, not ErrUnsupportedDatatype. A
 		// single character outside the codes is refused here.

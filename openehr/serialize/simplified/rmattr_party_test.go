@@ -281,7 +281,8 @@ func TestParticipationModeRoundTripsEveryGroupMember(t *testing.T) {
 		if dc["code_string"] != c.Code {
 			t.Errorf("participationModeJSON(%q) code_string = %v, want %q", c.Rubric, dc["code_string"], c.Code)
 		}
-		if term := codePhraseTerminology(dc); term != terminology.ID {
+		tid, _ := dc["terminology_id"].(map[string]any)
+		if term, _ := tid["value"].(string); term != terminology.ID {
 			t.Errorf("participationModeJSON(%q) terminology = %q, want %q", c.Rubric, term, terminology.ID)
 		}
 		back, err := participationModeRubric("x|mode", rm.DVCodedText{
