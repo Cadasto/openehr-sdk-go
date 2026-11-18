@@ -1,8 +1,8 @@
-// Package generic ships two operational templates for the EHR classes a
-// clinical data repository binds to a template besides COMPOSITION: one for
-// EHR_STATUS and one for FOLDER. CKM publishes no archetype for either class,
-// and the repositories give each a default archetype id, which these
-// templates carry:
+// Package generic ships two operational templates for the EHR classes
+// besides COMPOSITION whose instances name a template in their archetype
+// details: one for EHR_STATUS and one for FOLDER. CKM publishes no archetype
+// for either class; these templates carry the archetype id a clinical data
+// repository gives each by default:
 //
 //   - generic_ehr_status.v1 ([EHRStatusTemplateID]) is rooted at an
 //     EHR_STATUS on openEHR-EHR-EHR_STATUS.generic.v1, with an optional
@@ -17,7 +17,8 @@
 // templates on an empty server, to build a default EHR_STATUS or FOLDER with
 // instance.Generate (package openehr/instance), and to validate one with
 // validation.ValidateEHRStatus or validation.ValidateFolder (package
-// openehr/validation).
+// openehr/validation). A repository may store such an instance without
+// checking it against its template, so validating it is up to the program.
 //
 // [EHRStatusOPT] and [FolderOPT] return each template's XML document, for
 // upload; [EHRStatus] and [Folder] return it compiled. The compiled template

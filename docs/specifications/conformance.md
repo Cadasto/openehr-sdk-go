@@ -631,8 +631,8 @@ Its client scenarios map to SDK coverage as follows:
 
 #### PROBE-111 — Operational template corpus round trip
 
-- **Title:** Every ADL 1.4 OPT the corpus vendors decodes into the generated operational template types with no unmatched content, and encodes back to a document that validates against the pinned AM Release-1.4 schemas and holds the content of the input, as [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) defines.
-- **Preconditions:** Every `.opt` file under `testkit/corpus/`, found by walking the tree rather than from `fixtures.ListAllOPTs`, which leaves out those under `crossformat/`, and the pinned ITS-XML closure under `resources/its-xml/` with `Template.xsd` among its roots.
+- **Title:** Every ADL 1.4 OPT the corpus vendors, and each generic template the SDK ships, decodes into the generated operational template types with no unmatched content, and encodes back to a document that validates against the pinned AM Release-1.4 schemas and holds the content of the input, as [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) defines.
+- **Preconditions:** Every `.opt` file under `testkit/corpus/`, found by walking the tree rather than from `fixtures.ListAllOPTs`, which leaves out those under `crossformat/`; the generic templates of `openehr/template/generic/` ([clinical-modeling.md § REQ-178](clinical-modeling.md#req-178--generic-templates-shipped-with-the-sdk)), which the corpus holds no copy of; and the pinned ITS-XML closure under `resources/its-xml/` with `Template.xsd` among its roots.
   An OPT the pinned schemas refuse as written is listed in a ratchet with its reason and goes through the round-trip leg only, until a re-pin admits it.
 - **Wire assertion:** In-repo property, two legs.
   Round trip: `canxml.Unmarshal` with the report option returns no unmatched item, and with `WithStrict` refuses nothing.

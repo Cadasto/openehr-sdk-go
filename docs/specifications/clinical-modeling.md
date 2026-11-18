@@ -1739,8 +1739,9 @@ PROBE-075 holds this rule against reference Web Templates ([§ REQ-106](#req-106
 
 ## REQ-178 — Generic templates shipped with the SDK
 
-A CDR binds an EHR_STATUS and a FOLDER to a template as it binds a COMPOSITION, and EHRbase gives each a default archetype id: `openEHR-EHR-EHR_STATUS.generic.v1` and `openEHR-EHR-FOLDER.generic.v1`.
+An EHR_STATUS and a FOLDER name their template in their archetype details, as a COMPOSITION does, and EHRbase gives each a default archetype id: `openEHR-EHR-EHR_STATUS.generic.v1` and `openEHR-EHR-FOLDER.generic.v1`.
 CKM publishes no archetype for either class.
+A CDR may store such an instance without checking it against its template, so the SDK's validator is what holds one to it.
 An application that binds them needs a template for each at run time: to install on an empty server, to build a default instance, and to validate a body that names one.
 
 The SDK **MUST** ship two such operational templates embedded in the module, so a program carries them without the source tree or the module cache:
