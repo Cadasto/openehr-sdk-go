@@ -211,3 +211,14 @@ func TestREQ103_UTCMagnitude(t *testing.T) {
 		t.Errorf("UTCMagnitude of 2004-05-20T00:30:00+01:00 = %v, of 2004-05-19T23:30:00Z = %v; want them equal", a, b)
 	}
 }
+
+// TestUTCMagnitudeOfNoZoneAllocatesNothing holds the refusal of the empty
+// zone, which every local time takes, to no allocation.
+func TestUTCMagnitudeOfNoZoneAllocatesNothing(t *testing.T) {
+	if _, ok := UTCMagnitude(1, ""); ok {
+		t.Fatal(`UTCMagnitude(1, "") ok = true, want false`)
+	}
+	if n := testing.AllocsPerRun(100, func() { _, _ = UTCMagnitude(1, "") }); n != 0 {
+		t.Errorf(`UTCMagnitude(1, "") allocates %v times, want 0`, n)
+	}
+}

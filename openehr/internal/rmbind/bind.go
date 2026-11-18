@@ -62,6 +62,20 @@ func describe(v any) string {
 	if name, ok := TypeName(v); ok {
 		return name
 	}
+	// The Go type's own name, as %T writes it. The primitives an RM leaf
+	// holds are named directly, which formatting would allocate for.
+	switch v.(type) {
+	case string:
+		return "string"
+	case bool:
+		return "bool"
+	case rm.Integer:
+		return "rm.Integer"
+	case rm.Integer64:
+		return "rm.Integer64"
+	case rm.Real:
+		return "rm.Real"
+	}
 	return fmt.Sprintf("%T", v)
 }
 

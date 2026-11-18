@@ -279,9 +279,32 @@ func (s *CodeSet) Has(code string) bool {
 	if s == nil {
 		return false
 	}
-	_, ok := s.index[s.key(code)]
+	if !s.ignoreCase {
+		_, ok := s.index[code]
+		return ok
+	}
+	// Fold a short code into a buffer on the stack: indexing the map by the
+	// converted bytes makes no string, where key would for every code that
+	// holds an upper-case letter, as most ISO country codes do.
+	var buf [foldBufLen]byte
+	if len(code) > len(buf) {
+		_, ok := s.index[lowerASCII(code)]
+		return ok
+	}
+	n := copy(buf[:], code)
+	for i, c := range buf[:n] {
+		if 'A' <= c && c <= 'Z' {
+			buf[i] = c + ('a' - 'A')
+		}
+	}
+	_, ok := s.index[string(buf[:n])]
 	return ok
 }
+
+// foldBufLen is the longest code [CodeSet.Has] folds without allocating. The
+// longest pinned code is 73 bytes; a longer one is no member, and takes the
+// allocating path.
+const foldBufLen = 80
 
 // Groups yields every group of the pinned terminology in source order.
 func Groups() iter.Seq[*Group] {
