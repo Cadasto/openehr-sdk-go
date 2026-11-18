@@ -1,6 +1,6 @@
 ---
 kind: plan
-harvested_through: 2026-11-18T10:39:52Z
+harvested_through: 2026-11-18T17:11:58Z
 ---
 # Backlog
 
@@ -33,26 +33,28 @@ Code in openehr/aql/parse and openehr/aql/lint where a class junction with an op
 Code in openehr/instance and internal/templatecompile where a value the generator writes, or the template id it carries, can meet an RM rule, an OPT constraint or a CDR's reading it now leaves to chance; one needs a decision before the code: the template id reading. Lane: maintenance; full where a sentence changes. Size: S each.
 - internal/templatecompile/compile.go:99 · the template id is kept as the OPT writes it, trimmed only at the ends, while ITS-XML types it as a token whose whitespace collapses; EHRbase 2.37.1 stores the corpus id `IDCR -  Adverse Reaction List.v1` with one space and refuses every generated composition as naming no template, FerroEHR 5.6.0 keeps both spaces (with the collapsed id: EHRbase 204, FerroEHR 422), and BASE leaves TEMPLATE_ID's lexical form "to be determined"; decide the reading, then collapse runs of whitespace here so the generator, FLAT and validation carry one id · from: CDR cross-check 2026-11-06
 
-## One copy of each rule: the code defaults and the archetype-id test (REQ-107, REQ-112)
-Code in openehr/instance where a default rule lives in two places, and in openehr/validation and openehr/serialize/simplified where the RM floor and FLAT decode each wrap the archetype-id test, so a change to one copy leaves the other behind. Lane: maintenance. Size: S each.
-- openehr/instance/generate.go:2138 · fillCodeDefault / codeDefaultFor / heldCodes remain a second, build-time default path for language, encoding and charset beside codedRules (coded_settle.go:61); they share only languageCode() and utf8Code(), not the table, so the two could be one · by: sdd-implementer · from: feat/generator-writer-gaps
+## One copy of each rule: the code defaults, the magnitude draw and the archetype-id test (REQ-107, REQ-112)
+Code in openehr/instance where a default rule or a magnitude draw lives in two places, and in openehr/validation and openehr/serialize/simplified where the RM floor and FLAT decode each wrap the archetype-id test, so a change to one copy leaves the other behind. Lane: maintenance. Size: S each.
+- openehr/instance/generate.go:2217 · fillCodeDefault / codeDefaultFor / heldCodes remain a second, build-time default path for language, encoding and charset beside codedRules (coded_settle.go:61); they share only languageCode() and utf8Code(), not the table, so the two could be one · by: sdd-implementer · from: feat/generator-writer-gaps
+- openehr/instance/sample.go:413 · Under RandomFill a DV_COUNT magnitude, and a DV_PROPORTION numerator, whose range has both bounds still comes from the plain C_INTEGER or C_REAL draw (sampleValue), so it can be 0 or a bound (the pin 'upper DV_COUNT 0'), where a quantity magnitude with the same range is drawn away from 0 and both bounds (magnitude, :431) · from: #493
 - openehr/validation/rmfloor.go:397 · isArchetypeID and the FLAT decoder's test at openehr/serialize/simplified/archetype_details.go:92 each wrap rm.ParseArchetypeID behind their own shortcut; one rm helper would keep the floor's set of roots and the nodes FLAT decode gives details from drifting apart · from: #470
 
 ## RM floor: the invariants not yet evaluated (REQ-112, REQ-171)
 The ledger is openehr/validation/invariants.json: each entry whose reason starts "Not yet evaluated" is a mechanical rule the floor could evaluate, and each one taken on adds a catalogue bullet, an evaluator and a PROBE-077 row. Lane: full. Size: L.
 - openehr/validation/invariants.json · 53 entries are out_of_scope with the reason 'Not yet evaluated' (DV_AMOUNT rules, DV_MULTIMEDIA Size_valid, the non-empty rules of ACTOR.roles, ENTRY.other_participations and PARTY.contacts, the change-control coded invariants, VERSION_TREE_ID branch rules and others); each non-empty rule is one rminfo.NonEmptyLists entry (openehr/rm/rminfo/nonempty.go:25), and through REQ-102's list the floor holds non-empty once present (clinical-modeling.md:479) each also changes what template validation reports required · by: sdd-implementer · from: feat/validation-generated-access
 
-## Tests: a 32-bit build (REQ-120)
-A test package that cannot build for a 32-bit target: openehr/rm, under GOARCH=386. Lane: maintenance. Size: S.
+## Tests: a 32-bit build, and a second run in one process (REQ-120)
+A test package that cannot build for a 32-bit target (openehr/rm, under GOARCH=386), and tests that register package-level state, so `go test -count=2` fails them. Lane: maintenance. Size: S each.
 - openehr/rm/temporal_funcs_test.go:392 · With GOARCH=386 the rm test package does not build (`newYear2026` overflows int in t.Errorf), so no test can pin 32-bit behaviour such as a version tree part past a 32-bit int · from: #410
+- internal/rmjsonwalk/polyreg/polyreg_test.go:18 · TestRegisterAndClass and openehr/internal/xmlschema TestREQ176_REQ056_RegisteredNamesReadBack register package-level state, so `go test -count=2` fails both on main (confirmed on macOS arm64 at 5d10b584); reset or uniquify the registration per run, so a -count=2 sweep can catch shared-state leaks · from: #491
 
 ## Performance: allocations in the generated RM access and the RM-floor walk, and the FLAT decode's per-call template ranks and key sorts (REQ-171, REQ-053)
 A generator change in internal/bmmgen on its own branch, measured with BenchmarkValidateComposition and the composition Set+Build benchmark, with the RM-floor walk's allocation bound tightened to what it allocates; and a per-Web-Template cache in openehr/serialize/simplified, measured with BenchmarkUnmarshalFlat. Lane: maintenance. Size: M.
 - openehr/validation/walk_alloc_test.go:31 · the bound of 330 allocations is about 8 times what ValidateRM(BMI) allocates (41 allocs/op), so a regression that writes paths again would not fail it · from: #470
 - internal/bmmgen/render_rmaccess.go:612 · every value arm of the generated `single` hands `&p` to a reader that may return a pointer into it, so reading a class passed by value, such as a data value a composition built in Go holds in an interface field, heap-copies the whole parent; since 6415aaca all 75 such arms escape (go build -gcflags=-m on internal/rmaccess), and Peek on a DV_CODED_TEXT costs 128 B instead of 0, reading its value 144 B instead of 16 · by: go-reviewer · from: perf/hot-path-sweep-2
 - internal/rmaccess/access.go:142 · boxPointers and boxValues (:155) still allocate a fresh []any on every rmaccess.Multiple call, which the walk keeps as attrReading.items and iterates more than once; the box around the slice is gone, so composition Set+Build is down to 6 allocations (2026-10-27) · by: sdd-implementer · from: refactor/template-hot-paths
-- openehr/serialize/simplified/flat_decode.go:3914 · every decode still rebuilds templateRanks (orderByTemplate), now that PR 334 builds the larger template index once per compiled template; the ranks hang off the caller's Web Template, which is mutable, so caching them is a design choice, not a copy of that cache · by: go-reviewer · from: fix/simplified-template-roundtrip
-- openehr/serialize/simplified/flat_decode.go:2081 · settleIsmTransitionsUnder sorts each rebuilt node's keys on every visit, about 9 % of BenchmarkUnmarshalFlat's allocations on 20bc8b7b; with decodeRMAttrFeederAudit's sorts (rmattr_feeder.go:197, about 6 %), the next FLAT decode allocation lead · by: sdd-deliver · from: perf/flat-decode-parse-once
+- openehr/serialize/simplified/flat_decode.go:4002 · every decode still rebuilds templateRanks (orderByTemplate), now that PR 334 builds the larger template index once per compiled template; the ranks hang off the caller's Web Template, which is mutable, so caching them is a design choice, not a copy of that cache · by: go-reviewer · from: fix/simplified-template-roundtrip
+- openehr/serialize/simplified/flat_decode.go:2145 · settleIsmTransitionsUnder sorts each rebuilt node's keys on every visit, about 9 % of BenchmarkUnmarshalFlat's allocations on 20bc8b7b; with decodeRMAttrFeederAudit's sorts (rmattr_feeder.go:197, about 6 %), the next FLAT decode allocation lead · by: sdd-deliver · from: perf/flat-decode-parse-once
 
 ## Developer tools, not gates: the upstream drift reports and the CDR cross-check (REQ-041, REQ-082)
 Code in scripts/sync-bmm.sh and scripts/sync-its-xml-schemas.sh, behind `make bmm-drift` and its ITS-XML twin, and in cmd/cdrcheck, behind `make cdr-crosscheck`: what a drift report compares a pin with, and what a cross-check run asks a CDR for and validates. Lane: maintenance. Size: S each.
