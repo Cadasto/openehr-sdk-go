@@ -20,22 +20,34 @@ import (
 // type switch on the member that lets each shape through by pointer or by
 // value, and nil; for the item the closed set of anyMemberValue, with no
 // interface that any type with a BMMName method satisfies. Each refuses any
-// other value with the member's name and the Go type it holds.
+// other value with the member's name and the Go type it holds. Both encodes
+// run the check before they write anything: the wrapper returns the refusal
+// for json/v2 to settle, and the direct writer settles it itself, naming its
+// class, as json/v2 would.
 func TestREQ176_REQ052_AnyMemberJSONEncoderChecks(t *testing.T) {
 	plan := buildPlanWithITSXML(t, TargetAOM14)
-	for class, want := range map[string][]string{
+	for class, tc := range map[string]struct {
+		goName  string
+		checks  []string
+		refusal string
+	}{
 		"ORDINAL": {
-			"switch _v := o.Symbol.(type) {",
-			"case nil, *rm.DVCodedText, *rm.CodePhrase, rm.DVCodedText, rm.CodePhrase:",
-			`return fmt.Errorf("canjson: ORDINAL.symbol holds %T, which is none of the shapes its canonical XML takes", _v)`,
+			goName: "Ordinal",
+			checks: []string{
+				"switch _v := o.Symbol.(type) {",
+				"case nil, *rm.DVCodedText, *rm.CodePhrase, rm.DVCodedText, rm.CodePhrase:",
+			},
+			refusal: `fmt.Errorf("canjson: ORDINAL.symbol holds %T, which is none of the shapes its canonical XML takes", _v)`,
 		},
 		"SCALE": {
-			"switch _v := s.Symbol.(type) {",
-			`return fmt.Errorf("canjson: SCALE.symbol holds %T, which is none of the shapes its canonical XML takes", _v)`,
+			goName:  "Scale",
+			checks:  []string{"switch _v := s.Symbol.(type) {"},
+			refusal: `fmt.Errorf("canjson: SCALE.symbol holds %T, which is none of the shapes its canonical XML takes", _v)`,
 		},
 		"EXPR_LEAF": {
-			"if _, ok := anyMemberValue(e.Item); !ok {",
-			`return fmt.Errorf("canjson: EXPR_LEAF.item holds %T, which is no registered class, typed string or string", e.Item)`,
+			goName:  "ExprLeaf",
+			checks:  []string{"if _, ok := anyMemberValue(e.Item); !ok {"},
+			refusal: `fmt.Errorf("canjson: EXPR_LEAF.item holds %T, which is no registered class, typed string or string", e.Item)`,
 		},
 	} {
 		pc, ok := plan.Classes[class]
@@ -46,15 +58,28 @@ func TestREQ176_REQ052_AnyMemberJSONEncoderChecks(t *testing.T) {
 		if err != nil {
 			t.Fatalf("renderMarshalJSON(%s): %v", class, err)
 		}
-		body := got[strings.Index(got, "MarshalJSONTo(enc"):]
-		check, _, _ := strings.Cut(body, "json.MarshalEncode(")
-		for _, w := range want {
-			if !strings.Contains(check, w) {
-				t.Errorf("%s's MarshalJSONTo lacks %q before it writes the value:\n%s", class, w, got)
+		for _, enc := range []struct {
+			name, start, write, refusal string
+		}{
+			{"wrapper", "marshalJSONWrapped(enc", "json.MarshalEncode(", "return " + tc.refusal},
+			{
+				"direct writer", ") MarshalJSONTo(enc", "enc.WriteToken(jsontext.BeginObject)",
+				"return typereg.EncodeRefusal[" + tc.goName + "](enc, " + tc.refusal + ")",
+			},
+		} {
+			at := strings.Index(got, enc.start)
+			if at < 0 {
+				t.Fatalf("%s has no %s (%q):\n%s", class, enc.name, enc.start, got)
 			}
-		}
-		if strings.Contains(check, "BMMName()") {
-			t.Errorf("%s's MarshalJSONTo accepts any type with a BMMName method:\n%s", class, got)
+			check, _, _ := strings.Cut(got[at:], enc.write)
+			for _, w := range append(slices.Clone(tc.checks), enc.refusal) {
+				if !strings.Contains(check, w) {
+					t.Errorf("%s's %s lacks %q before it writes the value:\n%s", class, enc.name, w, got)
+				}
+			}
+			if strings.Contains(check, "BMMName()") {
+				t.Errorf("%s's %s accepts any type with a BMMName method:\n%s", class, enc.name, got)
+			}
 		}
 	}
 	pc := plan.Classes["C_STRING"]

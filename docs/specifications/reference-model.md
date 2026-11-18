@@ -319,7 +319,7 @@ A `P_BMM_CONTAINER_PROPERTY` field (`[]T`) carries `omitzero` when its cardinali
 The item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` are the exception: they carry `omitzero`, and [wire.md § An absent mandatory member](wire.md#an-absent-mandatory-member) says how they are written and why `[]` is RM-valid for them.
 Every other optional container keeps `omitempty`; one an invariant keeps non-empty, as `Mappings_valid` keeps `DV_TEXT.mappings`, could not take the exception, since `[]` would be RM-invalid.
 A `P_BMM_GENERIC_PROPERTY` over `Hash` or `List` follows the single-property rule: a mandatory one is `map[string]V` or `[]T` with `omitzero`, and an optional one is `*map[string]V` or `*[]T` with `omitzero`.
-Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md).
+Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-the-streaming-json-marshaler-pair) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md).
 
 The generated `DVQuantity`, its doc comments left out, shows the rules: its abstract ancestors' fields (`Accuracy`, `MagnitudeStatus`, `NormalRange`, …) flattened in with no embedded ancestor, mandatory properties by value, optional single properties as pointers with `omitzero`, and an optional list with `omitempty`:
 

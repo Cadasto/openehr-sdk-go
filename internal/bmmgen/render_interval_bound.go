@@ -532,7 +532,7 @@ func guardOpenIntervalBoundXML(recv, prop, lines string) string {
 	return b.String()
 }
 
-// openBoundDoc is the part of an interval MarshalJSONTo doc comment that
+// openBoundDoc is the part of an interval marshalJSONWrapped doc comment that
 // explains how an open side's empty bound drops out.
 func openBoundDoc() string {
 	var b strings.Builder
@@ -583,18 +583,16 @@ func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs str
 	var b strings.Builder
 	b.WriteString(renderMarshalAliasDecl(pc, typeParams, typeArgs))
 
-	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
-	fmt.Fprintf(&b, "// (value %q) as the leading member. Field order otherwise follows the\n", pc.BMMName)
-	b.WriteString("// struct declaration, and json.Deterministic sorts any Hash keys. A nil\n")
-	b.WriteString("// list or map field is left out by its omit option. The FormatNil*\n")
+	fmt.Fprintf(&b, "// marshalJSONWrapped is the wrapper encode of %s: it marshals an\n", pc.GoName)
+	fmt.Fprintf(&b, "// anonymous struct whose leading field is `_type` (value %q), so json/v2\n", pc.BMMName)
+	b.WriteString("// writes every member under the encoder's options. Field order follows\n")
+	b.WriteString("// the struct declaration, and json.Deterministic sorts any Hash keys. A\n")
+	b.WriteString("// nil list or map field is left out by its omit option. The FormatNil*\n")
 	b.WriteString("// options write any other nil slice or map, such as one held in an any\n")
 	b.WriteString("// field, as `null`.\n")
-	b.WriteString("// The receiver is a value so a concrete instance sitting\n")
-	b.WriteString("// in a polymorphic interface slot by value, the shape the like-interface\n")
-	b.WriteString("// accessors admit, still carries its `_type`.\n")
 	b.WriteString("//\n")
 	b.WriteString(openBoundDoc())
-	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	fmt.Fprintf(&b, "func (%s *%s%s) marshalJSONWrapped(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString(omitFlags(recv))
 	b.WriteString(omitSwitch(func(omitted ...string) string {
 		var r strings.Builder
@@ -604,14 +602,14 @@ func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs str
 		for _, prop := range omitted {
 			fmt.Fprintf(&r, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")
 		}
-		fmt.Fprintf(&r, "\t}{Type: %q, %s: %s%s(%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, alias, typeArgs, recv)
+		fmt.Fprintf(&r, "\t}{Type: %q, %s: %s%s(*%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, alias, typeArgs, recv)
 		return r.String()
 	}))
-	b.WriteString("}\n")
+	b.WriteString("}\n\n")
 	return b.String()
 }
 
-// renderMarshalIntervalBase emits the wire type and MarshalJSONTo of BASE
+// renderMarshalIntervalBase emits the wire type and marshalJSONWrapped of BASE
 // Interval itself. It is abstract, so it writes no `_type`, and AOM 1.4 holds
 // it by value in fields typed by it. The omission mechanism is the one
 // [renderMarshalAliasInterval] uses, and so is the wrapper: it embeds the
@@ -624,16 +622,16 @@ func renderMarshalIntervalBase(pc *PlannedClass, recv, typeParams, typeArgs stri
 	var b strings.Builder
 	b.WriteString(renderMarshalAliasDecl(pc, typeParams, typeArgs))
 
-	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s, which is abstract and\n", pc.GoName)
-	b.WriteString("// so carries no `_type`. Field order follows the struct declaration,\n")
-	b.WriteString("// and json.Deterministic sorts any Hash keys. A nil list or map field is\n")
-	b.WriteString("// left out by its omit option. The FormatNil* options write any other nil\n")
-	b.WriteString("// slice or map, such as one held in an any field, as `null`.\n")
-	b.WriteString("// The receiver is a value so an Interval held by value in a struct field\n")
-	b.WriteString("// takes this encoder.\n")
+	fmt.Fprintf(&b, "// marshalJSONWrapped is the wrapper encode of %s, which is abstract and so\n", pc.GoName)
+	b.WriteString("// carries no `_type`: it marshals an anonymous struct embedding the\n")
+	b.WriteString("// method-free alias, so json/v2 writes every member under the encoder's\n")
+	b.WriteString("// options. Field order follows the struct declaration, and\n")
+	b.WriteString("// json.Deterministic sorts any Hash keys. A nil list or map field is left\n")
+	b.WriteString("// out by its omit option. The FormatNil* options write any other nil slice\n")
+	b.WriteString("// or map, such as one held in an any field, as `null`.\n")
 	b.WriteString("//\n")
 	b.WriteString(openBoundDoc())
-	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	fmt.Fprintf(&b, "func (%s *%s%s) marshalJSONWrapped(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString(omitFlags(recv))
 	b.WriteString(omitSwitch(func(omitted ...string) string {
 		var r strings.Builder
@@ -642,10 +640,10 @@ func renderMarshalIntervalBase(pc *PlannedClass, recv, typeParams, typeArgs stri
 		for _, prop := range omitted {
 			fmt.Fprintf(&r, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")
 		}
-		fmt.Fprintf(&r, "\t}{%s: %s%s(%s)}, typereg.MarshalOptions(enc))\n", alias, alias, typeArgs, recv)
+		fmt.Fprintf(&r, "\t}{%s: %s%s(*%s)}, typereg.MarshalOptions(enc))\n", alias, alias, typeArgs, recv)
 		return r.String()
 	}))
-	b.WriteString("}\n")
+	b.WriteString("}\n\n")
 	return b.String()
 }
 
@@ -706,7 +704,7 @@ func renderIntervalDerivedWire(pc, base *PlannedClass, typeParams, ownFields str
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "// %s is the wire struct the decoder of %s reads\n", wire, pc.GoName)
-	b.WriteString("// through. The encoder does not use it: MarshalJSONTo builds a wrapper\n")
+	b.WriteString("// through. The encoder does not use it: marshalJSONWrapped builds a wrapper\n")
 	fmt.Fprintf(&b, "// of its own. %s embeds BASE Interval, so a method-free alias of\n", pc.GoName)
 	b.WriteString("// the class would promote the base's MarshalJSONTo. The wire struct embeds the\n")
 	b.WriteString("// method-free alias of the base instead, and carries the class's own members\n")
@@ -776,7 +774,7 @@ func intervalDerivedWireValue(pc, base *PlannedClass, recv, typeArgs string, own
 	return b.String()
 }
 
-// renderMarshalIntervalDerived emits the wire struct and MarshalJSONTo of an
+// renderMarshalIntervalDerived emits the wire struct and marshalJSONWrapped of an
 // interval-shaped class that embeds BASE Interval. The encoder does not go
 // through the wire struct, which is the decoder's: each arm of its omit switch
 // encodes an anonymous wrapper that carries `_type`, the base's method-free
@@ -802,18 +800,16 @@ func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, type
 
 	var b strings.Builder
 	b.WriteString(wireDecl)
-	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
-	fmt.Fprintf(&b, "// (value %q) as the leading member. Field order otherwise follows the\n", pc.BMMName)
-	b.WriteString("// struct declaration, and json.Deterministic sorts any Hash keys. A nil\n")
-	b.WriteString("// list or map field is left out by its omit option. The FormatNil*\n")
+	fmt.Fprintf(&b, "// marshalJSONWrapped is the wrapper encode of %s: it marshals an\n", pc.GoName)
+	fmt.Fprintf(&b, "// anonymous struct whose leading field is `_type` (value %q), so json/v2\n", pc.BMMName)
+	b.WriteString("// writes every member under the encoder's options. Field order follows\n")
+	b.WriteString("// the struct declaration, and json.Deterministic sorts any Hash keys. A\n")
+	b.WriteString("// nil list or map field is left out by its omit option. The FormatNil*\n")
 	b.WriteString("// options write any other nil slice or map, such as one held in an any\n")
 	b.WriteString("// field, as `null`.\n")
-	b.WriteString("// The receiver is a value so a concrete instance sitting\n")
-	b.WriteString("// in a polymorphic interface slot by value, the shape the like-interface\n")
-	b.WriteString("// accessors admit, still carries its `_type`.\n")
 	b.WriteString("//\n")
 	b.WriteString(openBoundDoc())
-	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	fmt.Fprintf(&b, "func (%s *%s%s) marshalJSONWrapped(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString(omitFlags(recv))
 	b.WriteString(omitSwitch(func(omitted ...string) string {
 		var r strings.Builder
@@ -830,7 +826,7 @@ func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, type
 		fmt.Fprintf(&r, "\t}{Type: %q, %s: %s%s(%s.%s)%s}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, alias, typeArgs, recv, base.GoName, ownValues)
 		return r.String()
 	}))
-	b.WriteString("}\n")
+	b.WriteString("}\n\n")
 	return b.String(), nil
 }
 

@@ -18,18 +18,56 @@ import (
 // ancestor, so nothing is promoted.
 type rawMeasurementService MeasurementService
 
-// MarshalJSONTo emits canonical openEHR JSON for MeasurementService with `_type`
-// (value "MEASUREMENT_SERVICE") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (m MeasurementService) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of MeasurementService: it marshals an
+// anonymous struct whose leading field is `_type` (value "MEASUREMENT_SERVICE") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (m *MeasurementService) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawMeasurementService
-	}{"MEASUREMENT_SERVICE", rawMeasurementService(m)}, typereg.MarshalOptions(enc))
+	}{"MEASUREMENT_SERVICE", rawMeasurementService(*m)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for MeasurementService: an object whose
+// leading member is `_type` (value "MEASUREMENT_SERVICE"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (m MeasurementService) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return m.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[MeasurementService](enc, false, err)
+	}
+	if err := m.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[MeasurementService](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of MeasurementService after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (m *MeasurementService) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "MEASUREMENT_SERVICE"); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }

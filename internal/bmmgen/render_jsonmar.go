@@ -65,6 +65,16 @@ const typeregImportPath = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 // FormatNil* options ([typereg.MarshalOptions]), and let v2 resolve
 // polymorphic interface fields through the registered decode hooks: there is
 // no per-field routing and no json.RawMessage staging any more.
+//
+// # The direct writer
+//
+// The wrapper of each shape is rendered as marshalJSONWrapped. MarshalJSONTo
+// takes it only under an encoder option that changes how json/v2 writes a
+// member ([typereg.DirectEncode]); otherwise it writes the class's members
+// itself, in the order and by the omission rules of the wrapper
+// ([renderDirectEncode]). The companion of the file [directHelpersFile] names
+// declares the helpers the direct writers of the target share
+// ([renderDirectHelpers]).
 func RenderMarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	concrete, err := codecClassesIn(plan, file)
 	if err != nil {
@@ -88,6 +98,17 @@ func RenderMarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	}
 	if anyFile == file {
 		chunks = append(chunks, renderAnyMemberValue(plan))
+	}
+	helpersFile, err := directHelpersFile(plan)
+	if err != nil {
+		return nil, err
+	}
+	if helpersFile == file {
+		helpers, err := renderDirectHelpers(plan)
+		if err != nil {
+			return nil, fmt.Errorf("render direct-encode helpers: %w", err)
+		}
+		chunks = append(chunks, helpers)
 	}
 
 	needExternal := needsExternalImportForJSONMar(plan, chunks)
@@ -388,8 +409,9 @@ func classJSONWireShape(plan *Plan, pc *PlannedClass) (jsonWireShape, *PlannedCl
 	return shapeIntervalAlias, nil, nil
 }
 
-// renderMarshalJSON emits the wire type + MarshalJSONTo method for a single
-// class, choosing the shape per [classJSONWireShape].
+// renderMarshalJSON emits the wire type, the MarshalJSONTo method and its two
+// encodes for a single class: the wrapper of the shape [classJSONWireShape]
+// picks, as marshalJSONWrapped, and the direct writer ([renderDirectEncode]).
 func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	sc, ok := pc.Class.(*bmm.SimpleClass)
 	if !ok {
@@ -405,26 +427,42 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	checks, err := jsonAnyChecks(plan, pc, recv)
+	checks, err := jsonAnyChecks(plan, pc, recv, refuseAsIs)
 	if err != nil {
 		return "", err
 	}
 	if checks != "" && shape != shapeAlias {
 		return "", fmt.Errorf("%s has an Any member and takes JSON wire shape %d, whose encoder does not check one", pc.BMMName, shape)
 	}
+	var wrapped string
 	switch shape {
 	case shapeFlat:
-		return renderMarshalFlat(plan, pc, recv, typeParams, typeArgs)
+		wrapped, err = renderMarshalFlat(plan, pc, recv, typeParams, typeArgs)
 	case shapeIntervalBase:
-		return renderMarshalIntervalBase(pc, recv, typeParams, typeArgs), nil
+		wrapped = renderMarshalIntervalBase(pc, recv, typeParams, typeArgs)
 	case shapeIntervalDerived:
-		return renderMarshalIntervalDerived(plan, pc, base, recv, typeParams, typeArgs)
+		wrapped, err = renderMarshalIntervalDerived(plan, pc, base, recv, typeParams, typeArgs)
 	case shapeIntervalAlias:
-		return renderMarshalAliasInterval(pc, recv, typeParams, typeArgs), nil
+		wrapped = renderMarshalAliasInterval(pc, recv, typeParams, typeArgs)
 	case shapeAlias:
-		return renderMarshalAlias(pc, recv, typeParams, typeArgs, checks), nil
+		wrapped = renderMarshalAlias(pc, recv, typeParams, typeArgs, checks)
+	default:
+		return "", fmt.Errorf("%s: unhandled JSON wire shape %d", pc.BMMName, shape)
 	}
-	return "", fmt.Errorf("%s: unhandled JSON wire shape %d", pc.BMMName, shape)
+	if err != nil {
+		return "", err
+	}
+	direct, err := renderDirectEncode(plan, pc, shape, base, recv, typeArgs)
+	if err != nil {
+		return "", fmt.Errorf("direct encode: %w", err)
+	}
+	return wrapped + direct, nil
+}
+
+// refuseAsIs renders the error a wrapper's check returns: the refusal as it
+// stands, which json/v2 settles at the method's boundary.
+func refuseAsIs(errExpr string) string {
+	return errExpr
 }
 
 // jsonAnyChecks returns the statements a class's MarshalJSONTo runs before it
@@ -438,7 +476,11 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 // string or a value of a class the type registry constructs, through a
 // pointer or by value. The refusal names the member and the Go type it holds,
 // never the value. It returns "" for a class with no such member.
-func jsonAnyChecks(plan *Plan, pc *PlannedClass, recv string) (string, error) {
+//
+// refuse renders the error a check returns from the expression that builds
+// the refusal: the wrapper returns it as it stands ([refuseAsIs]), and the
+// direct writer settles it first, as json/v2 would ([renderDirectEncode]).
+func jsonAnyChecks(plan *Plan, pc *PlannedClass, recv string, refuse func(errExpr string) string) (string, error) {
 	fields, err := effectiveFields(plan, pc)
 	if err != nil {
 		return "", err
@@ -463,7 +505,7 @@ func jsonAnyChecks(plan *Plan, pc *PlannedClass, recv string) (string, error) {
 		if choice == nil {
 			label := pc.BMMName + "." + p.PropertyName()
 			fmt.Fprintf(&b, "%sif _, ok := %s(%s); !ok {\n", indent, anyMemberFunc, value)
-			fmt.Fprintf(&b, "%s\treturn fmt.Errorf(\"canjson: %s holds %%T, %s\", %s)\n", indent, label, anyMemberRefusal, value)
+			fmt.Fprintf(&b, "%s\treturn %s\n", indent, refuse(fmt.Sprintf("fmt.Errorf(\"canjson: %s holds %%T, %s\", %s)", label, anyMemberRefusal, value)))
 			fmt.Fprintf(&b, "%s}\n", indent)
 			if !p.IsMandatory {
 				b.WriteString("\t}\n")
@@ -480,7 +522,7 @@ func jsonAnyChecks(plan *Plan, pc *PlannedClass, recv string) (string, error) {
 		fmt.Fprintf(&b, "%sswitch _v := %s.(type) {\n", indent, value)
 		fmt.Fprintf(&b, "%scase %s:\n", indent, strings.Join(types, ", "))
 		fmt.Fprintf(&b, "%sdefault:\n", indent)
-		fmt.Fprintf(&b, "%s\treturn fmt.Errorf(\"canjson: %s holds %%T, which is none of the shapes its canonical XML takes\", _v)\n", indent, choice.label)
+		fmt.Fprintf(&b, "%s\treturn %s\n", indent, refuse(fmt.Sprintf("fmt.Errorf(\"canjson: %s holds %%T, which is none of the shapes its canonical XML takes\", _v)", choice.label)))
 		fmt.Fprintf(&b, "%s}\n", indent)
 		if !p.IsMandatory {
 			b.WriteString("\t}\n")
@@ -490,7 +532,8 @@ func jsonAnyChecks(plan *Plan, pc *PlannedClass, recv string) (string, error) {
 }
 
 // renderMarshalAlias emits the alias shape: a method-free alias and a
-// MarshalJSONTo that marshals it through an anonymous `struct{ _type; alias }`.
+// marshalJSONWrapped that marshals it through an anonymous
+// `struct{ _type; alias }`.
 // The wrapper embeds the alias by value, so encode copies the value receiver
 // into it once. Converting a pointer to the receiver instead would move the
 // receiver to the heap, which costs a second allocation per encoded value.
@@ -500,26 +543,24 @@ func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs, checks str
 	var b strings.Builder
 	b.WriteString(renderMarshalAliasDecl(pc, typeParams, typeArgs))
 
-	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
-	fmt.Fprintf(&b, "// (value %q) as the leading member. Field order otherwise follows the\n", pc.BMMName)
-	b.WriteString("// struct declaration, and json.Deterministic sorts any Hash keys. A nil\n")
-	b.WriteString("// list or map field is left out by its omit option. The FormatNil*\n")
-	b.WriteString("// options write any other nil slice or map, such as one held in an any\n")
-	b.WriteString("// field, as `null`.\n")
-	b.WriteString("// The receiver is a value so a concrete instance sitting\n")
-	b.WriteString("// in a polymorphic interface slot by value, the shape the like-interface\n")
-	b.WriteString("// accessors admit, still carries its `_type`.\n")
+	fmt.Fprintf(&b, "// marshalJSONWrapped is the wrapper encode of %s: it marshals an\n", pc.GoName)
+	fmt.Fprintf(&b, "// anonymous struct whose leading field is `_type` (value %q) and whose\n", pc.BMMName)
+	b.WriteString("// second embeds the method-free alias, so json/v2 writes every member\n")
+	b.WriteString("// under the encoder's options. Field order follows the struct\n")
+	b.WriteString("// declaration, and json.Deterministic sorts any Hash keys. A nil list or\n")
+	b.WriteString("// map field is left out by its omit option. The FormatNil* options write\n")
+	b.WriteString("// any other nil slice or map, such as one held in an any field, as `null`.\n")
 	if checks != "" {
 		b.WriteString("// A member typed Any that holds a value its decoder would not read\n")
 		b.WriteString("// back is refused, as the canonical-XML encoder refuses it.\n")
 	}
-	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	fmt.Fprintf(&b, "func (%s *%s%s) marshalJSONWrapped(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString(checks)
 	b.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
 	b.WriteString("\t\tType string `json:\"_type\"`\n")
 	fmt.Fprintf(&b, "\t\t%s%s\n", alias, typeArgs)
-	fmt.Fprintf(&b, "\t}{%q, %s%s(%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, typeArgs, recv)
-	b.WriteString("}\n")
+	fmt.Fprintf(&b, "\t}{%q, %s%s(*%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, typeArgs, recv)
+	b.WriteString("}\n\n")
 	return b.String()
 }
 
@@ -539,7 +580,7 @@ func renderMarshalAliasDecl(pc *PlannedClass, typeParams, typeArgs string) strin
 
 // renderMarshalFlat emits the flat shape for a class that embeds a
 // marshaler-bearing concrete ancestor: a wire struct that flattens every
-// JSON-visible field (so it embeds nothing) and a MarshalJSONTo that copies
+// JSON-visible field (so it embeds nothing) and a marshalJSONWrapped that copies
 // each field in.
 func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs string) (string, error) {
 	fields, err := effectiveFields(plan, pc)
@@ -563,10 +604,10 @@ func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs 
 	}
 	b.WriteString("}\n\n")
 
-	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
-	fmt.Fprintf(&b, "// (value %q) as the leading member. The receiver is a\n", pc.BMMName)
-	b.WriteString("// value so a by-value instance in a polymorphic slot keeps its `_type`.\n")
-	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	fmt.Fprintf(&b, "// marshalJSONWrapped is the wrapper encode of %s: it copies each field\n", pc.GoName)
+	fmt.Fprintf(&b, "// into the flat wire struct, `_type` (value %q) leading, and marshals\n", pc.BMMName)
+	b.WriteString("// it, so json/v2 writes every member under the encoder's options.\n")
+	fmt.Fprintf(&b, "func (%s *%s%s) marshalJSONWrapped(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	fmt.Fprintf(&b, "\treturn json.MarshalEncode(enc, &%s%s{\n", wire, typeArgs)
 	fmt.Fprintf(&b, "\t\tClass: %q,\n", pc.BMMName)
 	for _, ef := range fields {
@@ -574,7 +615,7 @@ func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs 
 		fmt.Fprintf(&b, "\t\t%s: %s.%s,\n", fn, recv, fn)
 	}
 	b.WriteString("\t}, typereg.MarshalOptions(enc))\n")
-	b.WriteString("}\n")
+	b.WriteString("}\n\n")
 	return b.String(), nil
 }
 

@@ -176,6 +176,27 @@ func BenchmarkDecodeWithMissing(b *testing.B) {
 	}
 }
 
+// BenchmarkEncodeCompositionFixture measures encode alone of the
+// benchFixture composition, whose ELEMENT, DV_TEXT and CODE_PHRASE values
+// make up most of a real composition, unlike the synthetic width-400 payload.
+func BenchmarkEncodeCompositionFixture(b *testing.B) {
+	payload, err := os.ReadFile(fixtures.CompositionJSON(benchFixture))
+	if err != nil {
+		b.Fatalf("read fixture %s: %v", benchFixture, err)
+	}
+	var c rm.Composition
+	if err := canjson.Unmarshal(payload, &c); err != nil {
+		b.Fatalf("setup decode of %s: %v", benchFixture, err)
+	}
+	b.SetBytes(int64(len(payload)))
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := canjson.Marshal(&c); err != nil {
+			b.Fatalf("Marshal: %v", err)
+		}
+	}
+}
+
 // BenchmarkDecodeCompositionFixture measures decode plus encode of the largest
 // vendored fixture, the baseline the json/v2 migration is measured against
 // (PR 171 records the results; ADR 0022 sets the regression budget). b.SetBytes reports against

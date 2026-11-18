@@ -7,6 +7,7 @@ import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -18,18 +19,550 @@ import (
 // ancestor, so nothing is promoted.
 type rawArchetype Archetype
 
-// MarshalJSONTo emits canonical openEHR JSON for Archetype with `_type`
-// (value "ARCHETYPE") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (a Archetype) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of Archetype: it marshals an
+// anonymous struct whose leading field is `_type` (value "ARCHETYPE") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (a *Archetype) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawArchetype
-	}{"ARCHETYPE", rawArchetype(a)}, typereg.MarshalOptions(enc))
+	}{"ARCHETYPE", rawArchetype(*a)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for Archetype: an object whose
+// leading member is `_type` (value "ARCHETYPE"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (a Archetype) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return a.marshalJSONWrapped(enc)
+	}
+	definitionSlot := jsonSlot(a.Definition)
+	ontologySlot := jsonSlot(a.Ontology)
+	if (definitionSlot|ontologySlot)&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[Archetype](enc, mark, a.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[Archetype](enc, false, err)
+	}
+	if err := a.writeJSONMembers(enc, definitionSlot, ontologySlot); err != nil {
+		return typereg.EncodeFailure[Archetype](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of Archetype after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (a *Archetype) writeJSONMembers(enc *jsontext.Encoder, definitionSlot uint8, ontologySlot uint8) error {
+	if err := writeJSONString(enc, "_type", "ARCHETYPE"); err != nil {
+		return err
+	}
+	if a.AdlVersion != nil {
+		if err := writeJSONName(enc, "adl_version"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*a.AdlVersion)); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONName(enc, "archetype_id"); err != nil {
+		return err
+	}
+	if err := a.ArchetypeID.MarshalJSONTo(enc); err != nil {
+		return err
+	}
+	if err := writeJSONString(enc, "concept", a.Concept); err != nil {
+		return err
+	}
+	if definitionSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "definition"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, a.Definition, definitionSlot); err != nil {
+			return err
+		}
+	}
+	if a.Description != nil {
+		if err := writeJSONName(enc, "description"); err != nil {
+			return err
+		}
+		if err := a.Description.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if len(a.Invariants) > 0 {
+		if err := writeJSONName(enc, "invariants"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+			return err
+		}
+		for _k := range a.Invariants {
+			if err := a.Invariants[_k].MarshalJSONTo(enc); err != nil {
+				return err
+			}
+		}
+		if err := enc.WriteToken(jsontext.EndArray); err != nil {
+			return err
+		}
+	}
+	if a.IsControlled != nil {
+		if err := writeJSONName(enc, "is_controlled"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.Bool(*a.IsControlled)); err != nil {
+			return err
+		}
+	}
+	if ontologySlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "ontology"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, a.Ontology, ontologySlot); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONName(enc, "original_language"); err != nil {
+		return err
+	}
+	if err := a.OriginalLanguage.MarshalJSONTo(enc); err != nil {
+		return err
+	}
+	if a.ParentArchetypeID != nil {
+		if err := writeJSONName(enc, "parent_archetype_id"); err != nil {
+			return err
+		}
+		if err := a.ParentArchetypeID.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if a.RevisionHistory != nil {
+		if err := writeJSONName(enc, "revision_history"); err != nil {
+			return err
+		}
+		if err := a.RevisionHistory.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if a.Translations != nil {
+		if err := writeJSONName(enc, "translations"); err != nil {
+			return err
+		}
+		if err := json.MarshalEncode(enc, a.Translations, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	if a.UID != nil {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := a.UID.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
+}
+
+// The classes of value [jsonSlot] and [jsonParam] tell apart, for the
+// direct canonical-JSON encoders of this package.
+const (
+	// jsonSlotAbsent is nil, or a nil pointer to a class: json/v2 writes
+	// it as null, and leaves out an omitempty member holding it.
+	jsonSlotAbsent uint8 = 0
+	// jsonSlotClass is a class value, or a non-nil pointer to one, written
+	// through its MarshalJSONTo.
+	jsonSlotClass uint8 = 1
+	// jsonSlotValue is a non-empty string or a number, written as json/v2
+	// writes it.
+	jsonSlotValue uint8 = 2
+	// jsonSlotOther is any other value. In a member that may be left out,
+	// it sends the class to its wrapper encode, which judges it as json/v2
+	// does; anywhere else it is written through json.MarshalEncode.
+	jsonSlotOther uint8 = 4
+)
+
+// jsonSlot classifies v, the value of a member or list element typed by an
+// interface, as jsonSlotAbsent, jsonSlotClass or jsonSlotOther. A class is
+// one the type registry holds, so a value of any other type, a nil pointer
+// to one included, is jsonSlotOther. The check is a type switch and uses
+// no reflection.
+func jsonSlot(v any) uint8 {
+	switch x := v.(type) {
+	case nil:
+		return jsonSlotAbsent
+	case *Annotation:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Archetype:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ArchetypeInternalRef:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ArchetypeOntology:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ArchetypeSlot:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ArchetypeTerm:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Assertion:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *AssertionVariable:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Cardinality:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ConstraintBindingItem:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ConstraintRef:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CArchetypeRoot:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CBoolean:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CCodePhrase:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CCodeReference:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CComplexObject:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CDate:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CDateTime:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CDuration:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CDVOrdinal:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CDVQuantity:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CDVScale:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CDVState:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CInteger:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CMultipleAttribute:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CPrimitiveObject:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CQuantityItem:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CReal:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CSingleAttribute:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CString:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CTime:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CodeDefinitionSet:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ConstraintBindingSet:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ExprBinaryOperator:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ExprLeaf:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ExprUnaryOperator:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *FlatArchetypeOntology:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *NonTerminalState:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *OperationalTemplate:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Ordinal:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Scale:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *StateMachine:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TerminalState:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TermBindingItem:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Transition:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TAttribute:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TComplexObject:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TConstraint:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TView:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TViewConstraint:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TViewConstraintItem:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TermBindingSet:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case Annotation,
+		Archetype,
+		ArchetypeInternalRef,
+		ArchetypeOntology,
+		ArchetypeSlot,
+		ArchetypeTerm,
+		Assertion,
+		AssertionVariable,
+		Cardinality,
+		ConstraintBindingItem,
+		ConstraintRef,
+		CArchetypeRoot,
+		CBoolean,
+		CCodePhrase,
+		CCodeReference,
+		CComplexObject,
+		CDate,
+		CDateTime,
+		CDuration,
+		CDVOrdinal,
+		CDVQuantity,
+		CDVScale,
+		CDVState,
+		CInteger,
+		CMultipleAttribute,
+		CPrimitiveObject,
+		CQuantityItem,
+		CReal,
+		CSingleAttribute,
+		CString,
+		CTime,
+		CodeDefinitionSet,
+		ConstraintBindingSet,
+		ExprBinaryOperator,
+		ExprLeaf,
+		ExprUnaryOperator,
+		FlatArchetypeOntology,
+		NonTerminalState,
+		OperationalTemplate,
+		Ordinal,
+		Scale,
+		StateMachine,
+		TerminalState,
+		TermBindingItem,
+		Transition,
+		TAttribute,
+		TComplexObject,
+		TConstraint,
+		TView,
+		TViewConstraint,
+		TViewConstraintItem,
+		TermBindingSet:
+		return jsonSlotClass
+	}
+	if _, ok := rm.RMTypeName(v); ok {
+		return jsonSlotClass
+	}
+	if rm.IsTypedNil(v) {
+		return jsonSlotAbsent
+	}
+	return jsonSlotOther
+}
+
+// writeJSONSlot writes v, the value of a member or list element typed by
+// an interface, which [jsonSlot] classified as slot: jsonSlotAbsent as
+// null, a class through its MarshalJSONTo, and any other value through
+// json.MarshalEncode.
+func writeJSONSlot(enc *jsontext.Encoder, v any, slot uint8) error {
+	switch slot {
+	case jsonSlotAbsent:
+		return enc.WriteToken(jsontext.Null)
+	case jsonSlotClass:
+		return v.(json.MarshalerTo).MarshalJSONTo(enc)
+	}
+	return json.MarshalEncode(enc, v, typereg.MarshalOptions(enc))
+}
+
+// writeJSONName writes the name of an object member.
+func writeJSONName(enc *jsontext.Encoder, name string) error {
+	return enc.WriteToken(jsontext.String(name))
+}
+
+// writeJSONString writes an object member whose value is a string.
+func writeJSONString(enc *jsontext.Encoder, name, value string) error {
+	if err := enc.WriteToken(jsontext.String(name)); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.String(value))
+}
+
+// writeJSONBool writes an object member whose value is a boolean.
+func writeJSONBool(enc *jsontext.Encoder, name string, value bool) error {
+	if err := enc.WriteToken(jsontext.String(name)); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.Bool(value))
 }

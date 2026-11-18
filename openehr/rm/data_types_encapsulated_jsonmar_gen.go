@@ -18,20 +18,149 @@ import (
 // ancestor, so nothing is promoted.
 type rawDVMultimedia DVMultimedia
 
-// MarshalJSONTo emits canonical openEHR JSON for DVMultimedia with `_type`
-// (value "DV_MULTIMEDIA") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (d DVMultimedia) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of DVMultimedia: it marshals an
+// anonymous struct whose leading field is `_type` (value "DV_MULTIMEDIA") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (d *DVMultimedia) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawDVMultimedia
-	}{"DV_MULTIMEDIA", rawDVMultimedia(d)}, typereg.MarshalOptions(enc))
+	}{"DV_MULTIMEDIA", rawDVMultimedia(*d)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for DVMultimedia: an object whose
+// leading member is `_type` (value "DV_MULTIMEDIA"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (d DVMultimedia) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return d.marshalJSONWrapped(enc)
+	}
+	uriSlot := jsonSlot(d.URI)
+	if uriSlot&jsonSlotOther != 0 {
+		mark := typereg.MarkEncode(enc)
+		return typereg.EncodeFailureSince[DVMultimedia](enc, mark, d.marshalJSONWrapped(enc))
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[DVMultimedia](enc, false, err)
+	}
+	if err := d.writeJSONMembers(enc, uriSlot); err != nil {
+		return typereg.EncodeFailure[DVMultimedia](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of DVMultimedia after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (d *DVMultimedia) writeJSONMembers(enc *jsontext.Encoder, uriSlot uint8) error {
+	if err := writeJSONString(enc, "_type", "DV_MULTIMEDIA"); err != nil {
+		return err
+	}
+	if d.AlternateText != nil {
+		if err := writeJSONName(enc, "alternate_text"); err != nil {
+			return err
+		}
+		if err := enc.WriteToken(jsontext.String(*d.AlternateText)); err != nil {
+			return err
+		}
+	}
+	if d.Charset != nil {
+		if err := writeJSONName(enc, "charset"); err != nil {
+			return err
+		}
+		if err := d.Charset.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if d.CompressionAlgorithm != nil {
+		if err := writeJSONName(enc, "compression_algorithm"); err != nil {
+			return err
+		}
+		if err := d.CompressionAlgorithm.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if len(d.Data) > 0 {
+		if err := writeJSONName(enc, "data"); err != nil {
+			return err
+		}
+		_v := d.Data
+		if err := json.MarshalEncode(enc, &_v, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	if len(d.IntegrityCheck) > 0 {
+		if err := writeJSONName(enc, "integrity_check"); err != nil {
+			return err
+		}
+		_v := d.IntegrityCheck
+		if err := json.MarshalEncode(enc, &_v, typereg.MarshalOptions(enc)); err != nil {
+			return err
+		}
+	}
+	if d.IntegrityCheckAlgorithm != nil {
+		if err := writeJSONName(enc, "integrity_check_algorithm"); err != nil {
+			return err
+		}
+		if err := d.IntegrityCheckAlgorithm.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if d.Language != nil {
+		if err := writeJSONName(enc, "language"); err != nil {
+			return err
+		}
+		if err := d.Language.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONName(enc, "media_type"); err != nil {
+		return err
+	}
+	if err := d.MediaType.MarshalJSONTo(enc); err != nil {
+		return err
+	}
+	if err := writeJSONName(enc, "size"); err != nil {
+		return err
+	}
+	if err := writeJSONInteger(enc, d.Size); err != nil {
+		return err
+	}
+	if d.Thumbnail != nil {
+		if err := writeJSONName(enc, "thumbnail"); err != nil {
+			return err
+		}
+		if err := d.Thumbnail.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if uriSlot != jsonSlotAbsent {
+		if err := writeJSONName(enc, "uri"); err != nil {
+			return err
+		}
+		if err := writeJSONSlot(enc, d.URI, uriSlot); err != nil {
+			return err
+		}
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // rawDVParsable is the method-free canonical-JSON alias for DVParsable. The alias
@@ -40,18 +169,78 @@ func (d DVMultimedia) MarshalJSONTo(enc *jsontext.Encoder) error {
 // ancestor, so nothing is promoted.
 type rawDVParsable DVParsable
 
-// MarshalJSONTo emits canonical openEHR JSON for DVParsable with `_type`
-// (value "DV_PARSABLE") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (d DVParsable) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of DVParsable: it marshals an
+// anonymous struct whose leading field is `_type` (value "DV_PARSABLE") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (d *DVParsable) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawDVParsable
-	}{"DV_PARSABLE", rawDVParsable(d)}, typereg.MarshalOptions(enc))
+	}{"DV_PARSABLE", rawDVParsable(*d)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for DVParsable: an object whose
+// leading member is `_type` (value "DV_PARSABLE"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (d DVParsable) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return d.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[DVParsable](enc, false, err)
+	}
+	if err := d.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[DVParsable](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of DVParsable after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (d *DVParsable) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "DV_PARSABLE"); err != nil {
+		return err
+	}
+	if d.Charset != nil {
+		if err := writeJSONName(enc, "charset"); err != nil {
+			return err
+		}
+		if err := d.Charset.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "formalism", d.Formalism); err != nil {
+		return err
+	}
+	if d.Language != nil {
+		if err := writeJSONName(enc, "language"); err != nil {
+			return err
+		}
+		if err := d.Language.MarshalJSONTo(enc); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONString(enc, "value", d.Value); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }

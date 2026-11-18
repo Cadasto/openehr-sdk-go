@@ -18,20 +18,58 @@ import (
 // ancestor, so nothing is promoted.
 type rawBasicDefinitions BasicDefinitions
 
-// MarshalJSONTo emits canonical openEHR JSON for BasicDefinitions with `_type`
-// (value "BASIC_DEFINITIONS") as the leading member. Field order otherwise follows the
-// struct declaration, and json.Deterministic sorts any Hash keys. A nil
-// list or map field is left out by its omit option. The FormatNil*
-// options write any other nil slice or map, such as one held in an any
-// field, as `null`.
-// The receiver is a value so a concrete instance sitting
-// in a polymorphic interface slot by value, the shape the like-interface
-// accessors admit, still carries its `_type`.
-func (b BasicDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of BasicDefinitions: it marshals an
+// anonymous struct whose leading field is `_type` (value "BASIC_DEFINITIONS") and whose
+// second embeds the method-free alias, so json/v2 writes every member
+// under the encoder's options. Field order follows the struct
+// declaration, and json.Deterministic sorts any Hash keys. A nil list or
+// map field is left out by its omit option. The FormatNil* options write
+// any other nil slice or map, such as one held in an any field, as `null`.
+func (b *BasicDefinitions) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawBasicDefinitions
-	}{"BASIC_DEFINITIONS", rawBasicDefinitions(b)}, typereg.MarshalOptions(enc))
+	}{"BASIC_DEFINITIONS", rawBasicDefinitions(*b)}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for BasicDefinitions: an object whose
+// leading member is `_type` (value "BASIC_DEFINITIONS"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (b BasicDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return b.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[BasicDefinitions](enc, false, err)
+	}
+	if err := b.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[BasicDefinitions](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of BasicDefinitions after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (b *BasicDefinitions) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "BASIC_DEFINITIONS"); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
 }
 
 // jsonWireOpenehrDefinitions is the flat canonical-JSON wire struct for OpenehrDefinitions. OpenehrDefinitions embeds
@@ -42,11 +80,993 @@ type jsonWireOpenehrDefinitions struct {
 	Class string `json:"_type"`
 }
 
-// MarshalJSONTo emits canonical openEHR JSON for OpenehrDefinitions with `_type`
-// (value "OPENEHR_DEFINITIONS") as the leading member. The receiver is a
-// value so a by-value instance in a polymorphic slot keeps its `_type`.
-func (o OpenehrDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
+// marshalJSONWrapped is the wrapper encode of OpenehrDefinitions: it copies each field
+// into the flat wire struct, `_type` (value "OPENEHR_DEFINITIONS") leading, and marshals
+// it, so json/v2 writes every member under the encoder's options.
+func (o *OpenehrDefinitions) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &jsonWireOpenehrDefinitions{
 		Class: "OPENEHR_DEFINITIONS",
 	}, typereg.MarshalOptions(enc))
+}
+
+// MarshalJSONTo writes canonical openEHR JSON for OpenehrDefinitions: an object whose
+// leading member is `_type` (value "OPENEHR_DEFINITIONS"), then each member that is not
+// left out.
+// It writes the members itself, each as a token or through the encoder of
+// the value it holds, with json.Deterministic sorting any Hash keys. A
+// member is left out as its field's omit option leaves it out under
+// encoding/json/v2, such as a nil list or map, a nil pointer, or an
+// interface holding nil or a nil pointer to a class.
+//
+// Under an encoder option that changes how json/v2 writes a member, such
+// as a caller's marshalers, it marshals a wrapper struct through
+// json.MarshalEncode instead, and so it does for a member holding a value
+// of a type outside the model. Both write the same bytes otherwise, and a
+// failure names the class, as json/v2 names a type whose method failed.
+// The receiver is a value so a concrete instance sitting in a polymorphic
+// interface slot by value, the shape the like-interface accessors admit,
+// still carries its `_type`.
+func (o OpenehrDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if !typereg.DirectEncode(enc) {
+		return o.marshalJSONWrapped(enc)
+	}
+	if err := enc.WriteToken(jsontext.BeginObject); err != nil {
+		return typereg.EncodeFailure[OpenehrDefinitions](enc, false, err)
+	}
+	if err := o.writeJSONMembers(enc); err != nil {
+		return typereg.EncodeFailure[OpenehrDefinitions](enc, true, err)
+	}
+	return nil
+}
+
+// writeJSONMembers writes the members of OpenehrDefinitions after the opening brace
+// MarshalJSONTo wrote, then the closing one. It returns a failure as it
+// meets it, for MarshalJSONTo to settle.
+func (o *OpenehrDefinitions) writeJSONMembers(enc *jsontext.Encoder) error {
+	if err := writeJSONString(enc, "_type", "OPENEHR_DEFINITIONS"); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.EndObject)
+}
+
+// The classes of value [jsonSlot] and [jsonParam] tell apart, for the
+// direct canonical-JSON encoders of this package.
+const (
+	// jsonSlotAbsent is nil, or a nil pointer to a class: json/v2 writes
+	// it as null, and leaves out an omitempty member holding it.
+	jsonSlotAbsent uint8 = 0
+	// jsonSlotClass is a class value, or a non-nil pointer to one, written
+	// through its MarshalJSONTo.
+	jsonSlotClass uint8 = 1
+	// jsonSlotValue is a non-empty string or a number, written as json/v2
+	// writes it.
+	jsonSlotValue uint8 = 2
+	// jsonSlotOther is any other value. In a member that may be left out,
+	// it sends the class to its wrapper encode, which judges it as json/v2
+	// does; anywhere else it is written through json.MarshalEncode.
+	jsonSlotOther uint8 = 4
+)
+
+// jsonSlot classifies v, the value of a member or list element typed by an
+// interface, as jsonSlotAbsent, jsonSlotClass or jsonSlotOther. A class is
+// one the type registry holds, so a value of any other type, a nil pointer
+// to one included, is jsonSlotOther. The check is a type switch and uses
+// no reflection.
+func jsonSlot(v any) uint8 {
+	switch x := v.(type) {
+	case nil:
+		return jsonSlotAbsent
+	case *AccessGroupRef:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Action:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Activity:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Address:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *AdminEntry:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Agent:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Archetyped:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ArchetypeID:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Attestation:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *AuditDetails:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *BasicDefinitions:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Capability:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Cluster:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *CodePhrase:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Composition:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Contact:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Contribution:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVBoolean:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVCodedText:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVCount:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVDate:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVDateTime:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVDuration:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVEHRURI:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVGeneralTimeSpecification:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVIdentifier:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVInterval[DVOrdered]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVInterval[DVCount]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVInterval[DVDate]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVInterval[DVDateTime]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVInterval[DVDuration]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVInterval[DVOrdinal]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVInterval[DVProportion]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVInterval[DVQuantity]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVInterval[DVScale]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVInterval[DVTime]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVMultimedia:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVOrdinal:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVParagraph:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVParsable:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVPeriodicTimeSpecification:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVProportion:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVQuantity:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVScale:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVState:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVText:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVTime:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *DVURI:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *EHR:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *EHRAccess:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *EHRStatus:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Element:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Evaluation:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *EventContext:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *FeederAudit:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *FeederAuditDetails:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Folder:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *GenericEntry:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *GenericID:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Group:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *HierObjectID:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *History[ItemStructure]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *History[ItemList]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *History[ItemSingle]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *History[ItemTable]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *History[ItemTree]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ImportedVersion[any]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Instruction:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *InstructionDetails:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *InternetID:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *IntervalEvent[ItemStructure]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *IntervalEvent[ItemList]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *IntervalEvent[ItemSingle]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *IntervalEvent[ItemTable]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *IntervalEvent[ItemTree]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *IsmTransition:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ISOOID:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ItemList:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ItemSingle:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ItemTable:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ItemTag:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ItemTree:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ISO8601Timezone:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Link:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *LocatableRef:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *MeasurementService:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ObjectRef:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ObjectVersionID:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Observation:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *OpenehrCodeSetIdentifiers:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *OpenehrDefinitions:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *OpenehrTerminologyGroupIdentifiers:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Organisation:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *OriginalVersion[any]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Participation:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PartyIdentified:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PartyIdentity:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PartyRef:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PartyRelated:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PartyRelationship:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PartySelf:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Person:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PointEvent[ItemStructure]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PointEvent[ItemList]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PointEvent[ItemSingle]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PointEvent[ItemTable]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PointEvent[ItemTree]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *PointInterval[any]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ProperInterval[any]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ReferenceRange[DVOrdered]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ReferenceRange[DVCount]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ReferenceRange[DVDate]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ReferenceRange[DVDateTime]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ReferenceRange[DVDuration]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ReferenceRange[DVOrdinal]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ReferenceRange[DVProportion]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ReferenceRange[DVQuantity]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ReferenceRange[DVScale]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ReferenceRange[DVTime]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ResourceAnnotations:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ResourceDescription:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *ResourceDescriptionItem:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *RevisionHistory:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *RevisionHistoryItem:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Role:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Section:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TemplateID:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TerminologyID:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TerminologyService:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TermMapping:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TranslationDetails:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *TimeDefinitions:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *Uuid:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *VersionedComposition:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *VersionedEHRAccess:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *VersionedEHRStatus:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *VersionedFolder:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *VersionedObject[any]:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *VersionedParty:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case *VersionTreeID:
+		if x == nil {
+			return jsonSlotAbsent
+		}
+		return jsonSlotClass
+	case AccessGroupRef,
+		Action,
+		Activity,
+		Address,
+		AdminEntry,
+		Agent,
+		Archetyped,
+		ArchetypeID,
+		Attestation,
+		AuditDetails,
+		BasicDefinitions,
+		Capability,
+		Cluster,
+		CodePhrase,
+		Composition,
+		Contact,
+		Contribution,
+		DVBoolean,
+		DVCodedText,
+		DVCount,
+		DVDate,
+		DVDateTime,
+		DVDuration,
+		DVEHRURI,
+		DVGeneralTimeSpecification,
+		DVIdentifier,
+		DVInterval[DVOrdered],
+		DVInterval[DVCount],
+		DVInterval[DVDate],
+		DVInterval[DVDateTime],
+		DVInterval[DVDuration],
+		DVInterval[DVOrdinal],
+		DVInterval[DVProportion],
+		DVInterval[DVQuantity],
+		DVInterval[DVScale],
+		DVInterval[DVTime],
+		DVMultimedia,
+		DVOrdinal,
+		DVParagraph,
+		DVParsable,
+		DVPeriodicTimeSpecification,
+		DVProportion,
+		DVQuantity,
+		DVScale,
+		DVState,
+		DVText,
+		DVTime,
+		DVURI,
+		EHR,
+		EHRAccess,
+		EHRStatus,
+		Element,
+		Evaluation,
+		EventContext,
+		FeederAudit,
+		FeederAuditDetails,
+		Folder,
+		GenericEntry,
+		GenericID,
+		Group,
+		HierObjectID,
+		History[ItemStructure],
+		History[ItemList],
+		History[ItemSingle],
+		History[ItemTable],
+		History[ItemTree],
+		ImportedVersion[any],
+		Instruction,
+		InstructionDetails,
+		InternetID,
+		IntervalEvent[ItemStructure],
+		IntervalEvent[ItemList],
+		IntervalEvent[ItemSingle],
+		IntervalEvent[ItemTable],
+		IntervalEvent[ItemTree],
+		IsmTransition,
+		ISOOID,
+		ItemList,
+		ItemSingle,
+		ItemTable,
+		ItemTag,
+		ItemTree,
+		ISO8601Timezone,
+		Link,
+		LocatableRef,
+		MeasurementService,
+		ObjectRef,
+		ObjectVersionID,
+		Observation,
+		OpenehrCodeSetIdentifiers,
+		OpenehrDefinitions,
+		OpenehrTerminologyGroupIdentifiers,
+		Organisation,
+		OriginalVersion[any],
+		Participation,
+		PartyIdentified,
+		PartyIdentity,
+		PartyRef,
+		PartyRelated,
+		PartyRelationship,
+		PartySelf,
+		Person,
+		PointEvent[ItemStructure],
+		PointEvent[ItemList],
+		PointEvent[ItemSingle],
+		PointEvent[ItemTable],
+		PointEvent[ItemTree],
+		PointInterval[any],
+		ProperInterval[any],
+		ReferenceRange[DVOrdered],
+		ReferenceRange[DVCount],
+		ReferenceRange[DVDate],
+		ReferenceRange[DVDateTime],
+		ReferenceRange[DVDuration],
+		ReferenceRange[DVOrdinal],
+		ReferenceRange[DVProportion],
+		ReferenceRange[DVQuantity],
+		ReferenceRange[DVScale],
+		ReferenceRange[DVTime],
+		ResourceAnnotations,
+		ResourceDescription,
+		ResourceDescriptionItem,
+		RevisionHistory,
+		RevisionHistoryItem,
+		Role,
+		Section,
+		TemplateID,
+		TerminologyID,
+		TerminologyService,
+		TermMapping,
+		TranslationDetails,
+		TimeDefinitions,
+		Uuid,
+		VersionedComposition,
+		VersionedEHRAccess,
+		VersionedEHRStatus,
+		VersionedFolder,
+		VersionedObject[any],
+		VersionedParty,
+		VersionTreeID:
+		return jsonSlotClass
+	}
+	return jsonSlotOther
+}
+
+// jsonParam classifies v, the value of a member typed by a type parameter:
+// as [jsonSlot] does, except that an empty string is jsonSlotAbsent, as an
+// omitempty member leaves it out, and any other string or a Real, an
+// Integer or an Integer64 is jsonSlotValue.
+func jsonParam(v any) uint8 {
+	switch x := v.(type) {
+	case string:
+		if x == "" {
+			return jsonSlotAbsent
+		}
+		return jsonSlotValue
+	case Real, Integer, Integer64:
+		return jsonSlotValue
+	}
+	return jsonSlot(v)
+}
+
+// writeJSONParam writes v, the value of a member typed by a type parameter,
+// which [jsonParam] classified as slot.
+func writeJSONParam(enc *jsontext.Encoder, v any, slot uint8) error {
+	if slot == jsonSlotValue {
+		switch x := v.(type) {
+		case string:
+			return enc.WriteToken(jsontext.String(x))
+		case Real:
+			return writeJSONReal(enc, x)
+		case Integer:
+			return writeJSONInteger(enc, x)
+		case Integer64:
+			return writeJSONInteger64(enc, x)
+		}
+	}
+	return writeJSONSlot(enc, v, slot)
+}
+
+// writeJSONSlot writes v, the value of a member or list element typed by
+// an interface, which [jsonSlot] classified as slot: jsonSlotAbsent as
+// null, a class through its MarshalJSONTo, and any other value through
+// json.MarshalEncode.
+func writeJSONSlot(enc *jsontext.Encoder, v any, slot uint8) error {
+	switch slot {
+	case jsonSlotAbsent:
+		return enc.WriteToken(jsontext.Null)
+	case jsonSlotClass:
+		return v.(json.MarshalerTo).MarshalJSONTo(enc)
+	}
+	return json.MarshalEncode(enc, v, typereg.MarshalOptions(enc))
+}
+
+// writeJSONName writes the name of an object member.
+func writeJSONName(enc *jsontext.Encoder, name string) error {
+	return enc.WriteToken(jsontext.String(name))
+}
+
+// writeJSONString writes an object member whose value is a string.
+func writeJSONString(enc *jsontext.Encoder, name, value string) error {
+	if err := enc.WriteToken(jsontext.String(name)); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.String(value))
+}
+
+// writeJSONBool writes an object member whose value is a boolean.
+func writeJSONBool(enc *jsontext.Encoder, name string, value bool) error {
+	if err := enc.WriteToken(jsontext.String(name)); err != nil {
+		return err
+	}
+	return enc.WriteToken(jsontext.Bool(value))
 }

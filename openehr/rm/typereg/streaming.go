@@ -8,7 +8,8 @@ package typereg
 // place rather than in 110 generated bodies (ADR 0022, REQ-052).
 //
 // This file imports the encoding/json family: v2 and jsontext for the codec,
-// plus encoding/json (v1) for the one ReportErrorsWithLegacySemantics option. It
+// plus encoding/json (v1) for its ReportErrorsWithLegacySemantics and
+// OmitEmptyWithLegacySemantics options. It
 // must not import openehr/rm: the generated trees import typereg, so a reverse
 // edge would form a cycle. Everything here works through Default and the
 // sentinels declared in this package.
@@ -20,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -258,6 +260,171 @@ var encodeOptions = json.JoinOptions(
 // still gets the three options. The encoder is not read, and may be nil.
 func MarshalOptions(_ *jsontext.Encoder) json.Options {
 	return encodeOptions
+}
+
+// DirectEncode reports whether a generated MarshalJSONTo may write its class's
+// members to enc itself, as tokens, instead of marshalling a wrapper struct
+// through json.MarshalEncode. The two ways write the same bytes and word a
+// failure the same, except under an option that changes how json/v2 writes a
+// member or words a failure. DirectEncode is false when enc carries one:
+//
+//   - json.WithMarshalers: a caller's marshaler can replace the encoding of
+//     any type a member holds, and only json/v2 looks it up.
+//   - json.OmitZeroStructFields: json/v2 then leaves out every member that
+//     holds its Go zero value, such as an empty string the class writes.
+//   - json.StringifyNumbers, which json.GetOption also reports while json/v2
+//     writes a struct field tagged with the `string` option: json/v2 refuses
+//     that option on a class, which a caller's field holding one can carry.
+//     The option itself changes nothing the class writes.
+//   - The omitempty of encoding/json (v1), which every v1 entry point sets:
+//     it writes a nil pointer held in an interface member as null, where the
+//     omitempty of json/v2 leaves the member out.
+//   - The error reporting of encoding/json (v1): json/v2 then wraps a failure
+//     in a v1 MarshalerError for each method on the way out.
+//
+// It is false too for a value nested deeper than [directEncodeMaxDepth]
+// levels. json/v2 starts looking for a pointer cycle 1000 levels down, and it
+// sees the pointers on the way only through the wrapper, so a cycle fails with
+// the error it would without the direct writer.
+//
+// Any other option changes no member: the encoder's own options, such as
+// indentation and escaping, apply to the tokens either way, and a member
+// written through json.MarshalEncode, such as a Hash map, takes the options
+// [MarshalOptions] joins, as it does inside the wrapper.
+func DirectEncode(enc *jsontext.Encoder) bool {
+	if enc.StackDepth() > directEncodeMaxDepth {
+		return false
+	}
+	opts := enc.Options()
+	if m, _ := json.GetOption(opts, json.WithMarshalers); m != nil {
+		return false
+	}
+	if v, _ := json.GetOption(opts, json.OmitZeroStructFields); v {
+		return false
+	}
+	if v, _ := json.GetOption(opts, json.StringifyNumbers); v {
+		return false
+	}
+	if v, _ := json.GetOption(opts, jsonv1.OmitEmptyWithLegacySemantics); v {
+		return false
+	}
+	if v, _ := json.GetOption(opts, jsonv1.ReportErrorsWithLegacySemantics); v {
+		return false
+	}
+	return true
+}
+
+// directEncodeMaxDepth is the deepest an encoder may be when a generated
+// MarshalJSONTo writes its members itself ([DirectEncode]). A class the
+// direct writer reaches opens at most a list and its own object below the
+// level it starts at, so every pointer json/v2 meets below its cycle
+// threshold of 1000 levels goes through the wrapper.
+const directEncodeMaxDepth = 900
+
+// EncodeFailure returns err, the failure a generated MarshalJSONTo of class T
+// met while it wrote the class's members itself, settled as json/v2 settles
+// the failure of a MarshalJSONTo method it calls, so the error reads the same
+// as the wrapper's. wrote reports whether the method had written anything,
+// its opening brace at least, when it failed.
+//
+// A *json.SemanticError names T when it names no Go type. A
+// *jsontext.SyntacticError, such as invalid UTF-8 in a string member, is
+// wrapped in a *json.SemanticError naming T. Either carries the JSON Pointer
+// json/v2 gives the failure when it has none. Any other error, such as a
+// failing writer's, passes through unchanged.
+func EncodeFailure[T any](enc *jsontext.Encoder, wrote bool, err error) error {
+	where := 0
+	if !wrote {
+		where = 1
+	}
+	return settleEncodeFailure[T](enc, where, err)
+}
+
+// EncodeRefusal returns err, the refusal of a member's value by a generated
+// MarshalJSONTo of class T before it wrote anything, wrapped in a
+// *json.SemanticError naming T and pointing at the value the method was
+// about to write, as json/v2 wraps an error a MarshalJSONTo method returns.
+func EncodeRefusal[T any](enc *jsontext.Encoder, err error) error {
+	return settleEncodeFailure[T](enc, 1, &json.SemanticError{Err: err})
+}
+
+// EncodeMark is where a value began on an encoder: the encoder's depth and
+// the length of the object or array at that depth. [MarkEncode] takes one.
+type EncodeMark struct {
+	depth  int
+	length int64
+}
+
+// MarkEncode returns the place enc is at, for [EncodeFailureSince].
+func MarkEncode(enc *jsontext.Encoder) EncodeMark {
+	depth := enc.StackDepth()
+	_, length := enc.StackIndex(depth)
+	return EncodeMark{depth: depth, length: length}
+}
+
+// EncodeFailureSince is [EncodeFailure] for a generated MarshalJSONTo of class
+// T that hands its value to json.MarshalEncode after all, through the wrapper,
+// from mark: whether it wrote anything is read off the encoder. err may be
+// nil, and nil is returned for it.
+func EncodeFailureSince[T any](enc *jsontext.Encoder, mark EncodeMark, err error) error {
+	if err == nil {
+		return nil
+	}
+	depth := enc.StackDepth()
+	_, length := enc.StackIndex(depth)
+	where := 0
+	switch {
+	case depth == mark.depth && length == mark.length:
+		where = 1
+	case depth == mark.depth && length == mark.length+1:
+		where = -1
+	}
+	return settleEncodeFailure[T](enc, where, err)
+}
+
+// settleEncodeFailure settles err as json/v2 settles the failure of a
+// MarshalJSONTo method of type T: see [EncodeFailure]. where is json/v2's
+// position of the failure relative to the encoder: +1 when the method wrote
+// nothing, -1 when it wrote one whole value, and 0 otherwise.
+func settleEncodeFailure[T any](enc *jsontext.Encoder, where int, err error) error {
+	var serr *json.SemanticError
+	switch e := err.(type) { //nolint:errorlint // json/v2 settles the error a method returns, not one it wraps
+	case *json.SemanticError:
+		serr = e
+	case *jsontext.SyntacticError:
+		serr = &json.SemanticError{Err: e}
+	default:
+		return err
+	}
+	if serr.JSONPointer == "" {
+		serr.JSONPointer = failurePointer(enc, where)
+	}
+	if serr.GoType == nil {
+		serr.GoType = reflect.TypeFor[T]()
+	}
+	return serr
+}
+
+// failurePointer returns the JSON Pointer json/v2 gives a failure at the
+// encoder's position, where being as for [settleEncodeFailure]: the value
+// most recently written for -1; for 0 the member whose value is being
+// written, or else the object or array being written; for +1 the same, except
+// that in an array it is the element about to be written.
+func failurePointer(enc *jsontext.Encoder, where int) jsontext.Pointer {
+	ptr := enc.StackPointer()
+	depth := enc.StackDepth()
+	if where < 0 || depth == 0 {
+		return ptr
+	}
+	kind, length := enc.StackIndex(depth)
+	array := kind == jsontext.KindBeginArray
+	if length > 0 && (array || length%2 == 0) {
+		ptr = ptr.Parent()
+	}
+	if array && where > 0 {
+		ptr = ptr.AppendToken(strconv.FormatInt(length, 10))
+	}
+	return ptr
 }
 
 // DecodeInto is the shared decode body for a concrete type's
