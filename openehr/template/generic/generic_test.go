@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"os"
@@ -141,11 +142,11 @@ func TestREQ178DocumentReadsAndCompilesStrictly(t *testing.T) {
 				t.Errorf("template id constant = %q, want %q", tc.constant, tc.id)
 			}
 
-			operationalTemplate, err := aom14.ReadOperationalTemplate(bytes.NewReader(tc.document()), canxml.WithStrict())
+			operationalTemplate, err := readStrict(tc.document())
 			if err != nil {
 				t.Fatalf("ReadOperationalTemplate(%s, WithStrict) = %v, want no error", tc.file, err)
 			}
-			c, err := templatecompile.Compile(operationalTemplate, templatecompile.WithStrict())
+			c, err := compileStrict(operationalTemplate)
 			if err != nil {
 				t.Fatalf("Compile(%s, WithStrict) = %v, want no error", tc.file, err)
 			}
@@ -164,6 +165,73 @@ func TestREQ178DocumentReadsAndCompilesStrictly(t *testing.T) {
 				if archetypeID := root.ArchetypeID(); archetypeID != tc.archetypeID {
 					t.Errorf("%s of %s: root archetype id = %q, want %q", name, tc.file, archetypeID, tc.archetypeID)
 				}
+			}
+		})
+	}
+}
+
+// readStrict reads document as TestREQ178DocumentReadsAndCompilesStrictly
+// reads each shipped template, under canxml.WithStrict.
+func readStrict(document []byte) (*aom14.OperationalTemplate, error) {
+	return aom14.ReadOperationalTemplate(bytes.NewReader(document), canxml.WithStrict())
+}
+
+// compileStrict compiles opt as TestREQ178DocumentReadsAndCompilesStrictly
+// compiles each shipped template, under templatecompile.WithStrict.
+func compileStrict(opt *aom14.OperationalTemplate) (*templatecompile.Compiled, error) {
+	return templatecompile.Compile(opt, templatecompile.WithStrict())
+}
+
+// TestREQ178StrictChecksRefuseWhatTheDefaultAccepts proves that readStrict
+// and compileStrict run in strict mode: the shipped documents are clean,
+// so the strict check passes either way. Each control changes a template
+// in one way the default read or compile accepts and strict mode refuses,
+// so dropping WithStrict from either helper fails its control (REQ-178).
+func TestREQ178StrictChecksRefuseWhatTheDefaultAccepts(t *testing.T) {
+	t.Parallel()
+	for _, tc := range templates {
+		t.Run(tc.id+"/read", func(t *testing.T) {
+			t.Parallel()
+			// An element the model does not read, right after the concept.
+			const concept = "</concept>"
+			document := tc.document()
+			if n := bytes.Count(document, []byte(concept)); n != 1 {
+				t.Fatalf("%s holds %q %d times, want once", tc.file, concept, n)
+			}
+			document = bytes.Replace(document, []byte(concept), []byte(concept+"\n  <no_such_element>x</no_such_element>"), 1)
+
+			if _, err := aom14.ReadOperationalTemplate(bytes.NewReader(document)); err != nil {
+				t.Fatalf("ReadOperationalTemplate(%s with an unknown element) = %v, want no error by default", tc.file, err)
+			}
+			if _, err := readStrict(document); !errors.Is(err, canxml.ErrUnknownElement) {
+				t.Errorf("readStrict(%s with an unknown element) error = %v, want an error wrapping canxml.ErrUnknownElement", tc.file, err)
+			}
+		})
+		t.Run(tc.id+"/compile", func(t *testing.T) {
+			t.Parallel()
+			// A default value of the template's constraints that addresses
+			// no node: by default Compile skips it.
+			model, err := readStrict(tc.document())
+			if err != nil {
+				t.Fatalf("readStrict(%s) = %v, want no error", tc.file, err)
+			}
+			if model.Constraints == nil {
+				model.Constraints = &aom14.TConstraint{}
+			}
+			model.Constraints.Attributes = append(model.Constraints.Attributes, aom14.TAttribute{
+				DifferentialPath: "[" + tc.archetypeID + "]/no_such_attribute",
+				RMAttributeName:  "value",
+				Children: []aom14.TComplexObject{{
+					RMTypeName:   "DV_TEXT",
+					DefaultValue: &rm.DVText{Value: "x"},
+				}},
+			})
+
+			if _, err := templatecompile.Compile(model); err != nil {
+				t.Fatalf("Compile(%s with a default value that addresses no node) = %v, want no error by default", tc.file, err)
+			}
+			if _, err := compileStrict(model); !errors.Is(err, templatecompile.ErrInvalidInput) {
+				t.Errorf("compileStrict(%s with a default value that addresses no node) error = %v, want an error wrapping templatecompile.ErrInvalidInput", tc.file, err)
 			}
 		})
 	}
