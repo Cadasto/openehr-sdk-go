@@ -395,7 +395,7 @@ func ParseArchetypeID(s string) (ArchetypeID, error) {
 	if !ok {
 		return ArchetypeID{}, fmt.Errorf("%w: archetype_id %q must be rm_originator-rm_name-rm_entity.concept.vN", ErrMalformedID, s)
 	}
-	if len(strings.Split(q, "-")) < 3 {
+	if strings.Count(q, "-") < 2 {
 		return ArchetypeID{}, fmt.Errorf("%w: archetype_id %q qualified_rm_entity must be originator-name-entity", ErrMalformedID, s)
 	}
 	if len(version) < 2 || version[0] != 'v' {
