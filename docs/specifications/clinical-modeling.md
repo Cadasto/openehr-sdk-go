@@ -1737,6 +1737,62 @@ PROBE-075 holds this rule against reference Web Templates ([§ REQ-106](#req-106
 
 - **Probes:** PROBE-022 (path lookup against a fixture OPT); the builder round-trip is PROBE-023.
 
+## REQ-178 — Generic templates shipped with the SDK
+
+A CDR binds an EHR_STATUS and a FOLDER to a template as it binds a COMPOSITION, and EHRbase gives each a default archetype id: `openEHR-EHR-EHR_STATUS.generic.v1` and `openEHR-EHR-FOLDER.generic.v1`.
+CKM publishes no archetype for either class.
+An application that binds them needs a template for each at run time: to install on an empty server, to build a default instance, and to validate a body that names one.
+
+The SDK **MUST** ship two such operational templates embedded in the module, so a program carries them without the source tree or the module cache:
+
+| Template id | Root | Archetype id | What it constrains |
+|---|---|---|---|
+| `generic_ehr_status.v1` | `EHR_STATUS` | `openEHR-EHR-EHR_STATUS.generic.v1` | An optional `other_details` ITEM_TREE whose items it leaves open. |
+| `generic_folder.v1` | `FOLDER` | `openEHR-EHR-FOLDER.generic.v1` | An optional `details` ITEM_TREE whose items it leaves open; its sub-folders and items are left open too. |
+
+### Surface
+
+```go
+// Package github.com/cadasto/openehr-sdk-go/openehr/template/generic
+
+const (
+	EHRStatusTemplateID = "generic_ehr_status.v1"
+	FolderTemplateID    = "generic_folder.v1"
+)
+
+func EHRStatusOPT() []byte // the operational template's XML document
+func FolderOPT() []byte
+
+func EHRStatus() *templatecompile.Compiled // compiled on first use, then shared
+func Folder() *templatecompile.Compiled
+```
+
+- `EHRStatusOPT` and `FolderOPT` **MUST** return the embedded document byte for byte, in a new slice on each call, so a caller that changes one result changes no other.
+- Each document **MUST** read with `aom14.ReadOperationalTemplate` under `canxml.WithStrict`, and compile with `templatecompile.Compile` under `WithStrict` to a template whose `TemplateID` is its constant.
+- `EHRStatus` and `Folder` **MUST** compile their template on the first call, and return that same `*templatecompile.Compiled` to every later call, concurrent calls included.
+  `Compiled` has no method that changes it, so its callers share it; a caller changes nothing it reaches through it.
+- An instance that `instance.Generate` builds from either compiled template, under every policy and value fill, **MUST** pass `validation.ValidateEHRStatus` or `validation.ValidateFolder` respectively.
+  The corpus ratchet (PROBE-027) holds both templates to it.
+
+Neither `EHRStatus` nor `Folder` returns an error.
+An embedded template that fails to read or compile is a defect of the SDK release, which the package's own tests rule out; the function panics on it, with an error that names the template id.
+
+### Stability
+
+A consumer stores these templates on a server, and stores the instances it writes against them, so the template under an id holds still:
+
+- A change to a template **MUST NOT** refuse an instance that the template under the same id accepted before.
+  A change that would ships under a new id, such as `generic_ehr_status.v2`, and the package keeps the old id's template and constant.
+- The CHANGELOG **MUST** record a change to either document, under the release that ships it.
+
+A test pins each document's SHA-256 digest, so a change to its bytes fails until the same change moves the pin; the failure message names these two rules.
+
+### Out of scope
+
+- Other templates: the package holds these two.
+  A template for another class, such as EHR_ACCESS, is a new requirement.
+- Uploading a template to a server, which the definition client does ([wire.md § REQ-177](wire.md#req-177--template-representations)).
+
 ## REQ-106 — WebTemplate JSON export
 
 **WebTemplate** is a consumer-facing, UI-oriented projection of an operational template: a lossy, flattened JSON view listing each node's stable `id`, cardinality, AQL path, and the leaf **inputs** a form renders.

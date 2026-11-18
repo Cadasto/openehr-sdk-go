@@ -2832,3 +2832,11 @@ requirements:
       - testkit/probes/definition/probe_093_template_list_filters.go
       - testkit/probes/definition/probe_112_template_representations.go
       - testkit/probes/definition/probes_test.go
+
+  - id: REQ-178
+    title: Generic templates shipped with the SDK
+    canonical: docs/specifications/clinical-modeling.md#req-178--generic-templates-shipped-with-the-sdk
+    status: draft
+    implementation: planned
+    packages: []
+    probes: []
