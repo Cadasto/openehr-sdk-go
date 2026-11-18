@@ -11,6 +11,7 @@ import (
 	"cmp"
 	"encoding/base64"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 	"maps"
 	"strings"
@@ -348,7 +349,7 @@ func canonicalMap(v any) (map[string]any, error) {
 		return nil, err
 	}
 	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
+	if err := jsonv2.Unmarshal(b, &m); err != nil {
 		return nil, err
 	}
 	return m, nil
