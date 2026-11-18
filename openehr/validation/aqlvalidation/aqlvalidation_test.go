@@ -204,11 +204,12 @@ func TestValidateWithTypeRelation_OverlayRetiresContainmentError(t *testing.T) {
 	}
 }
 
-// A relation governs the containment codes and nothing else: it cannot retire
-// a Layer-1 syntax failure, a Layer-2 shape or parameter finding, or a Layer-3
-// template finding. An overlay wide enough to admit every pair is the strongest
-// form of the question — if anything outside the containment group survives it,
-// the seam is passing the relation somewhere it does not belong.
+// A relation governs the containment codes and aql_contains_redundant_step,
+// and nothing else: it cannot retire a Layer-1 syntax failure, a Layer-2 shape
+// or parameter finding, or a Layer-3 template finding. An overlay wide enough to
+// admit every pair is the strongest form of the question: if a finding outside
+// those codes does not survive it, the seam is passing the relation somewhere it
+// does not belong.
 func TestValidateWithTypeRelation_DoesNotReachOtherLayers(t *testing.T) {
 	wide := contain.Default().WithOverlay(
 		contain.Edge{From: "EHR", To: "VERSIONED_PARTY"},

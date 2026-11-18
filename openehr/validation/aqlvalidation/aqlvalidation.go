@@ -85,11 +85,13 @@ func Validate(q aql.Query, c *templatecompile.Compiled) validation.Result {
 //	rel := contain.Default().WithOverlay(contain.Edge{From: "EHR", To: "VERSIONED_PARTY"})
 //	res := aqlvalidation.ValidateWithTypeRelation(q, nil, rel)
 //
-// A relation widens or narrows only the five containment codes. The
-// scope is by code, not by lint layer, although the five codes all belong
-// to lint layer 2. The three portability advisories consult no relation, and no
-// other check reads it, so an overlay cannot retire a syntax, shape,
-// parameter-binding, or template finding.
+// A relation widens or narrows only the five containment codes and
+// aql_contains_redundant_step, the path-shape warning that asks whether a
+// containment route goes round a CONTAINS step. The scope is by code, not by
+// lint layer, although all six codes belong to lint layer 2. No other check
+// reads the relation, the three portability advisories included, so an
+// overlay cannot retire a syntax, shape, parameter-binding, or template
+// finding.
 func ValidateWithTypeRelation(q aql.Query, c *templatecompile.Compiled, rel *contain.TypeRelation) validation.Result {
 	res := lint.LintString(q.Q, &lint.Options{Compiled: c, Query: &q, Relation: rel})
 
