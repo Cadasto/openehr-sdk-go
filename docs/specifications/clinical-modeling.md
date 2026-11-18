@@ -1237,6 +1237,8 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
      The value § Contract *Leaf values* gives stays where it has that scheme.
      Otherwise the generator writes the first value with that scheme the OPT lists, or, where the OPT lists none or leaves its list open, one its pattern admits, and else `ehr://example` where the OPT admits it.
      An empty value, which only a pattern that admits nothing else gives, is not narrowed: it gets the placeholder (§ [Exceptions and known gaps](#exceptions-and-known-gaps)).
+   - `Code_string_valid` ([§ REQ-112](#req-112--template-less-reference-model-validation-floor)) narrows the pairs a `C_DV_ORDINAL` lists, on a single value or on an interval's bound, to those whose `symbol` has a code, where it lists one.
+     A list whose every pair has an empty `code_string` is not narrowed: the pair written gets the placeholder (§ [Exceptions and known gaps](#exceptions-and-known-gaps)).
 
    A `C_INTEGER`, a `C_DV_ORDINAL` value or a `precision` range that reaches past the 32-bit range of an RM `Integer` is refused when the template is read: its text does not decode as an `Integer` ([wire.md § REQ-056](wire.md#req-056)), whose range [wire.md § Floating-point precision](wire.md#floating-point-precision) gives.
    So the generator meets none.
@@ -1299,7 +1301,7 @@ A root `Generate` returns can break § Contract's output rule in these cases, an
 - **An attribute the OPT prohibits that an RM rule needs, a list the BMM requires a member in whose cardinality upper bound is 0, or an attribute the OPT requires that an RM rule needs absent** (§ [Precedence](#precedence) 2), such as `CLUSTER.items` or a PARTY's `identities` at cardinality `0..0`, or a `normal_range` on a bound of a REFERENCE_RANGE's `range`, breaks the OPT's prohibition, bound or requirement.
 - **A value the RM needs present that the OPT admits only empty** gets the placeholder *Placeholders* gives (§ [Precedence](#precedence) 2):
   - a `DV_EHR_URI`'s `value`, or the text and code of a `DV_ORDINAL`'s or `DV_SCALE`'s `symbol`, whose OPT pattern admits only the empty string, such as `x{0}`, breaks the OPT's pattern;
-  - the code of a `DV_ORDINAL`'s `symbol` whose `C_DV_ORDINAL` pair is listed with an empty `code_string` is the placeholder code in the pair's terminology, and breaks the OPT's list.
+  - the code of a `DV_ORDINAL`'s `symbol` whose `C_DV_ORDINAL` lists every pair with an empty `code_string` is the placeholder code in the terminology of the pair written, and breaks the OPT's list.
 - **An earlier sibling with room that carries a later, required one's identity, where neither pins a name** (§ Contract *What a visit writes*): the validator binds an item to the first of them that has room and under whose constraints it validates ([§ REQ-102](#req-102--composition-validation) *Structural — binding items*).
   So the earlier sibling takes the member built for the later one wherever that member validates under it.
   Under `Medium` an optional earlier sibling gets no member of its own and takes the later one's.
