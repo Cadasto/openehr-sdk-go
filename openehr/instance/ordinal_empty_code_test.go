@@ -35,14 +35,15 @@ func placeholderSymbol(terminologyID string) rm.DVCodedText {
 	}
 }
 
-// ordinalNotInList counts the not_in_list errors among issues and returns
+// ordinalNotInList counts the errors among issues that report an ordinal's
+// pair as not in its C_DV_ORDINAL's list at a path at accepts, and returns
 // every other error, for the test to report.
-func ordinalNotInList(issues []validation.Issue) (notInList int, others []validation.Issue) {
+func ordinalNotInList(issues []validation.Issue, at func(path string) bool) (notInList int, others []validation.Issue) {
 	for _, iss := range issues {
 		if iss.Severity != validation.Error {
 			continue
 		}
-		if iss.Code == "not_in_list" {
+		if iss.Code == "primitive_not_in_list" && iss.Rule == "not_in_list" && at(iss.Path) {
 			notInList++
 			continue
 		}
@@ -152,7 +153,7 @@ func checkOrdinalSymbol(t *testing.T, c *templatecompile.Compiled, opts instance
 			ord.Value, ord.Symbol.Value, ord.Symbol.DefiningCode, wantSymbol.Value, wantSymbol.DefiningCode)
 	}
 	noFloorErrors(t, out)
-	notInList, others := ordinalNotInList(templateErrors(out, c))
+	notInList, others := ordinalNotInList(templateErrors(out, c), func(path string) bool { return path == "/value" })
 	for _, iss := range others {
 		t.Errorf("template validator: %s @ %s (%s): %s", iss.Code, iss.Path, iss.Rule, iss.Detail)
 	}
@@ -222,7 +223,7 @@ func TestREQ107_OrdinalIntervalBoundWithNoCodeTakesThePlaceholderSymbol(t *testi
 			t.Fatalf("run %d: no DV_INTERVAL<DV_ORDINAL> generated", i)
 		}
 		noFloorErrors(t, out)
-		notInList, others := ordinalNotInList(templateErrors(out, c))
+		notInList, others := ordinalNotInList(templateErrors(out, c), func(path string) bool { return strings.HasSuffix(path, "/value/lower") })
 		for _, iss := range others {
 			t.Errorf("run %d: template validator: %s @ %s (%s): %s", i, iss.Code, iss.Path, iss.Rule, iss.Detail)
 		}

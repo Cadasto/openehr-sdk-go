@@ -3225,7 +3225,8 @@ func writePrimitive(leaf *tcimpl.CompiledNode, rmValue any, attr string, ex any)
 // applyOrdinal sets the integer and, when the constraint lists pairs,
 // the symbol of the pair for that integer. ExampleFill's integer is
 // the first pair's value. An empty list keeps the integer and does
-// not invent a code.
+// not invent a code. A pair listed with an empty code gets the
+// placeholder symbol (ordinalSymbolText).
 func applyOrdinal(v *rm.DVOrdinal, pc constraints.PrimitiveConstraint, ex any) error {
 	ord, isOrd := pc.(constraints.CDvOrdinal)
 	if !isOrd || len(ord.Values) == 0 {
@@ -3472,10 +3473,26 @@ func ordinalPair(c constraints.CDvOrdinal, n int64) (constraints.OrdinalSymbol, 
 	return constraints.OrdinalSymbol{}, false
 }
 
+// ordinalSymbolText is the symbol for a pair a C_DV_ORDINAL lists: the
+// pair's code, in the pair's terminology or in local where it names none,
+// with the code as its text, which useTermText may replace by the code's
+// term text. A pair listed with an empty code gets the placeholder code
+// at0000 in that terminology, with the text example, since the RM needs the
+// symbol's code and text; the template validator then reports the pair as
+// not in the list. The placeholder is written here, not by finishNode's
+// repair of a blank symbol, since the walk returns from a C_DV_ORDINAL leaf
+// once it is valued (walkNode) and finishNode never reaches it. The single
+// value (applyOrdinal) and an interval's bounds (ordinalFits, ordinalEnd)
+// take the symbol from here, so they build and compare the same one.
 func ordinalSymbolText(ref constraints.CodedTermRef) rm.DVCodedText {
 	term := ref.Terminology
 	if term == "" {
 		term = "local"
+	}
+	if ref.CodeString == "" {
+		symbol := localSymbol()
+		symbol.DefiningCode.TerminologyID.Value = term
+		return symbol
 	}
 	return rm.DVCodedText{
 		Value: ref.CodeString,
