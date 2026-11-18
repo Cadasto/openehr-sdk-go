@@ -7,9 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"slices"
-	"strings"
 	"sync"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/decodeopts"
@@ -208,14 +206,9 @@ const inputBufferMax = 4 << 20
 // These are the four readings the reader refuses in every mode.
 //
 // A document that needs none of these readings is decoded once; one that
-// needs one is decoded a second time, and so is every document when opts pass
-// what the decode reports to a function, which sees each item once. The
-// second decode reads the input again from where the read started when r is
-// a [*bytes.Reader], a [*strings.Reader], an [*io.SectionReader] or an
-// [*os.File] holding a regular file, and from a copy the reader keeps of it
-// as the first decode reads it otherwise, as for a pipe or a terminal. Where the
-// first decode fails in a way no second reading mends, the second one reads
-// only the bytes the first one read, so it fails as the first one did.
+// needs one is decoded a second time, from the bytes the reader keeps of the
+// input, and so is every document when opts pass what the decode reports to a
+// function, which sees each item once.
 //
 // A caller that decodes an operational template with [canxml.Unmarshal] or a
 // [canxml.Decoder] itself gets neither limit and none of these readings
@@ -224,11 +217,8 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	// lr.N reaches 0 only once r has given a byte past the limit.
 	src := &sourceReader{r: r}
 	lr := &io.LimitedReader{R: src, N: readMaxBytes + 1}
-	// in holds the input for a second reading and decode; it is made as large
-	// as r says it is. Nothing the read returns refers to it. A reader that
-	// can seek back to where it started is read into in only when a second
-	// reading is needed; any other is copied into in as the first decode
-	// reads it.
+	// in keeps every byte read from r, for a second reading and decode; it
+	// is made as large as r says it is. Nothing the read returns refers to it.
 	in := inputBuffers.Get().(*bytes.Buffer)
 	in.Reset()
 	defer func() {
@@ -236,35 +226,26 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 			inputBuffers.Put(in)
 		}
 	}()
-	grow := func() {
-		if l, ok := r.(interface{ Len() int }); ok {
-			// bytes.MinRead: ReadFrom grows the buffer unless that much is free.
-			in.Grow(min(l.Len(), readMaxBytes) + bytes.MinRead)
-		}
+	if l, ok := r.(interface{ Len() int }); ok {
+		in.Grow(min(l.Len(), readMaxBytes) + 1)
 	}
-	seeker, start, rewinds := rewindable(r)
-	first := io.Reader(lr)
-	if !rewinds {
-		grow()
-		first = io.TeeReader(lr, in)
-	}
-	br := bufio.NewReader(first)
+	br := bufio.NewReader(io.TeeReader(lr, in))
 	settings := decodeopts.Of(opts)
 	// A decode that reports to the caller's function runs once the reader
 	// knows which input it decodes, so that the function sees each item once;
 	// the first decode then reports to none.
-	firstOpts := opts
+	first := opts
 	if settings.Reports {
-		firstOpts = nil
+		first = nil
 		if settings.Strict {
-			firstOpts = []canxml.DecoderOption{canxml.WithStrict()}
+			first = []canxml.DecoderOption{canxml.WithStrict()}
 		}
 	}
 	// The first decode passes its tokens to facts, which decide on a second
 	// reading once it has read the document.
 	var facts tokenFacts
-	firstOpts = slices.Concat(firstOpts, []canxml.DecoderOption{facts.observeOption()})
-	ot, err := readDocument(br, firstOpts)
+	first = slices.Concat(first, []canxml.DecoderOption{facts.observeOption()})
+	ot, err := readDocument(br, first)
 	// An input past the size limit is refused as such, whatever the decode
 	// made of the bytes it read: the limit may have cut it short.
 	if lr.N == 0 {
@@ -284,33 +265,7 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 	if !tolerant && !settings.Reports {
 		return readResult(ot, err)
 	}
-	switch {
-	case rewinds:
-		// Read the input again, from where the read started. A replay after a
-		// failure no second reading mends reads the bytes the first decode
-		// read, as a copy of them would hold, and stops where it stopped;
-		// any other second reading reads the whole input under the same
-		// limit.
-		whole := tolerant || err == nil
-		limit := int64(readMaxBytes + 1)
-		if !whole {
-			limit -= lr.N
-		}
-		if _, serr := seeker.Seek(start, io.SeekStart); serr != nil {
-			return nil, serr
-		}
-		src = &sourceReader{r: r}
-		lr = &io.LimitedReader{R: src, N: limit}
-		if whole {
-			grow()
-		}
-		if _, cerr := in.ReadFrom(lr); cerr != nil {
-			return nil, cmp.Or(src.err, cerr)
-		}
-		if whole && lr.N == 0 {
-			return nil, errInputTooLarge()
-		}
-	case tolerant && err != nil:
+	if tolerant && err != nil {
 		// The decode stopped short of the end, which the second reading needs.
 		if _, cerr := io.Copy(io.Discard, br); cerr != nil {
 			return nil, cmp.Or(src.err, cerr)
@@ -339,38 +294,6 @@ func ReadOperationalTemplate(r io.Reader, opts ...canxml.DecoderOption) (*Operat
 		return readResult(readDocument(bufio.NewReader(bytes.NewReader(data)), opts))
 	}
 	return readResult(ot, err)
-}
-
-// rewindable reports whether r can seek back to where it is now, and if so
-// returns it as an [io.Seeker] with that offset. Only the readers whose Seek
-// is known to go back can: a [*bytes.Reader], a [*strings.Reader], an
-// [*io.SectionReader], and an [*os.File] that is a regular file whose Seek
-// reports its offset. A pipe's Seek fails, and a character device, such as
-// a terminal, can report its offset and still give other bytes when read
-// again. Another reader's Seek may report its offset and still fail to go
-// back.
-func rewindable(r io.Reader) (io.Seeker, int64, bool) {
-	var s io.Seeker
-	switch r := r.(type) {
-	case *bytes.Reader:
-		s = r
-	case *strings.Reader:
-		s = r
-	case *io.SectionReader:
-		s = r
-	case *os.File:
-		if fi, err := r.Stat(); err != nil || !fi.Mode().IsRegular() {
-			return nil, 0, false
-		}
-		s = r
-	default:
-		return nil, 0, false
-	}
-	start, err := s.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return nil, 0, false
-	}
-	return s, start, true
 }
 
 // sourceReader reads r and keeps the first error it returns other than

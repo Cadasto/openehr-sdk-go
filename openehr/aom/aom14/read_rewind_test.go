@@ -69,11 +69,9 @@ func readWith(t *testing.T, r io.Reader, opts []canxml.DecoderOption, report boo
 // offset but cannot seek back give the same reading, the same error and the
 // same reported items for every corpus template, in each mode, with and
 // without a function the decode reports to; and that a seekable reader
-// positioned past some prefix is read from that position (REQ-176).
-//
-// Can-fail control: read every reader whose Seek reports its offset again
-// from where the read started, and the reader that cannot seek back gives
-// the error of its Seek, with no model and no reported item.
+// positioned past some prefix is read from that position (REQ-176). The
+// reader copies every input as it reads it, so these hold by construction;
+// the test keeps them should a reader ever read a seekable input twice.
 func TestReadOperationalTemplateRewindsOrCopies(t *testing.T) {
 	t.Parallel()
 	refs, err := fixtures.ListAllOPTs()
@@ -157,11 +155,8 @@ func (r brokenAt) ReadAt(p []byte, off int64) (int, error) {
 // element past the element limit, a reader that can seek back gives what a
 // copying one gives with a function the decode reports to: the decode's
 // refusal, never a failure of the reader or the size refusal from past the
-// bytes the first decode read (REQ-108).
-//
-// Can-fail control: read the whole input again from where the read started
-// for the replay of the reported items, and the read error past the depth
-// refusal, or the size refusal, comes back instead.
+// bytes the first decode read (REQ-108). A reader that read a seekable input
+// again to its end for the replay would return that later failure instead.
 func TestREQ108_ReadOperationalTemplateReplaysWhatTheFirstDecodeRead(t *testing.T) {
 	t.Parallel()
 	deep := `<template xmlns="http://schemas.openehr.org/v1">` + strings.Repeat("<a>", readElementLimit+1)
@@ -190,8 +185,8 @@ func TestREQ108_ReadOperationalTemplateReplaysWhatTheFirstDecodeRead(t *testing.
 }
 
 // BenchmarkReadOperationalTemplate reads every corpus template from a
-// *bytes.Reader and from an *os.File, which the reader reads again only when
-// it needs a second reading, and from a reader it copies as it reads.
+// *bytes.Reader, from an *os.File and from a reader that can only be read,
+// each of which the reader copies as it reads it.
 func BenchmarkReadOperationalTemplate(b *testing.B) {
 	refs, err := fixtures.ListAllOPTs()
 	if err != nil {
