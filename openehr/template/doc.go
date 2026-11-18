@@ -11,8 +11,9 @@
 //     of an archetype;
 //   - the errors [ErrPathSyntax], [ErrPathNotFound] and [ErrAmbiguousPath];
 //   - the constraints subpackage, the typed primitive constraints and
-//     archetype-slot rules, and the webtemplate subpackage, the Web
-//     Template export of a compiled template.
+//     archetype-slot rules; the webtemplate subpackage, the Web
+//     Template export of a compiled template; and the generic subpackage,
+//     the generic EHR_STATUS and FOLDER templates the SDK ships.
 //
 // To read an OPT, call aom14.ReadOperationalTemplate (package
 // openehr/aom/aom14), which returns the generated operational template
