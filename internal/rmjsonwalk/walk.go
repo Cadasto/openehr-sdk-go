@@ -126,7 +126,7 @@ func (m *Model) Walk(data []byte, root Root, h Hooks) error {
 // holds at most the budget beyond what the two passes hold, and reads the
 // document at most once more than they do.
 func (m *Model) walkOnce(data []byte, root Root, h Hooks) (calls []call, ok bool) {
-	w := &walk{m: m, hooks: h, once: true, budget: max(holdFloor, len(data)), path: make([]level, 0, openLevels)}
+	w := &walk{m: m, classes: m.classes(), hooks: h, once: true, budget: max(holdFloor, len(data)), path: make([]level, 0, openLevels)}
 	if err := w.root(newDecoder(data), root.Nest, root); err != nil {
 		return nil, false
 	}
@@ -156,7 +156,7 @@ func (m *Model) walkIndexed(data []byte, root Root, h Hooks) error {
 	if err != nil {
 		return err
 	}
-	w := &walk{m: m, types: types, hooks: h, path: make([]level, 0, openLevels)}
+	w := &walk{m: m, classes: m.classes(), types: types, hooks: h, path: make([]level, 0, openLevels)}
 	return w.root(newDecoder(data), root.Nest, root)
 }
 
@@ -197,31 +197,46 @@ var errOverBudget = errors.New("rmjsonwalk: the hook calls held exceed their bud
 // so its bytes are the string the decoder reads; JSON whitespace may surround
 // the name, the colon and the value. Any other first member, or none, gives
 // false. Nothing past the value's closing quote is checked: the walk reads
-// the object's members next, and the decoder refuses a malformed one.
-func leadingType(unread []byte) (typ string, ok bool) {
+// the object's members next, and the decoder refuses a malformed one. typ
+// shares unread's bytes.
+func leadingType(unread []byte) (typ []byte, ok bool) {
 	const name = `"_type"`
 	i := skipSpace(unread, 0)
 	if !bytes.HasPrefix(unread[i:], []byte(name)) {
-		return "", false
+		return nil, false
 	}
 	i = skipSpace(unread, i+len(name))
 	if i >= len(unread) || unread[i] != ':' {
-		return "", false
+		return nil, false
 	}
 	i = skipSpace(unread, i+1)
 	if i >= len(unread) || unread[i] != '"' {
-		return "", false
+		return nil, false
 	}
 	start := i + 1
 	for j := start; j < len(unread); j++ {
 		switch c := unread[j]; {
 		case c == '"':
-			return string(unread[start:j]), true
+			return unread[start:j], true
 		case c == '\\' || c < ' ' || c >= utf8.RuneSelf:
-			return "", false
+			return nil, false
 		}
 	}
-	return "", false
+	return nil, false
+}
+
+// readName reads the name of an object's next member from dec, unescaped.
+// The name shares dec's buffer, and is valid only until dec's next Peek, Read
+// or Skip, unless it carries an escape: such a name is a copy.
+func readName(dec *jsontext.Decoder) ([]byte, error) {
+	raw, err := dec.ReadValue() // a JSON string, as an object member's name is
+	if err != nil {
+		return nil, err
+	}
+	if bytes.IndexByte(raw, '\\') < 0 {
+		return raw[1 : len(raw)-1], nil
+	}
+	return jsontext.AppendUnquote(nil, raw)
 }
 
 // skipSpace returns the index of the first byte of b at or after i that is
@@ -349,8 +364,9 @@ func indexValue(dec *jsontext.Decoder, types map[int64]string) error {
 
 // walk is one pass of [Model.Walk] over a document.
 type walk struct {
-	m     *Model
-	hooks Hooks
+	m       *Model
+	classes map[string]*classInfo // m.classes()
+	hooks   Hooks
 	// once marks the one pass ([Model.walkOnce]), which reads each object's
 	// type from a leading "_type" and holds the hook calls back in calls, as
 	// long as budget, the bytes it may still hold, does not run out.
@@ -423,15 +439,37 @@ func (w *walk) memberOf(name string) *reportpath.Node {
 	return p
 }
 
-// typeOf returns the "_type" of the object dec has just opened, and whether
-// it carries one: in the one pass a leading one, read from dec's unread
-// bytes, and otherwise the one the index holds.
-func (w *walk) typeOf(dec *jsontext.Decoder) (string, bool) {
+// typeOf returns the "_type" of the object dec has just opened, the class it
+// names where [Model.classes] holds one, and whether the object carries one:
+// in the one pass a leading one, read from dec's unread bytes, and otherwise
+// the one the index holds.
+func (w *walk) typeOf(dec *jsontext.Decoder) (string, *classInfo, bool) {
 	if w.once {
-		return leadingType(dec.UnreadBuffer())
+		typ, ok := leadingType(dec.UnreadBuffer())
+		if c := w.classes[string(typ)]; c != nil {
+			return c.name, c, ok
+		}
+		return string(typ), nil, ok
 	}
 	typ, ok := w.types[dec.InputOffset()]
-	return typ, ok
+	return typ, w.classes[typ], ok
+}
+
+// resolve is [Model.Resolve] for an object whose "_type" typ names class c,
+// nil where [Model.classes] holds none. It returns the object's RM type and
+// its class, nil where [Model.classes] holds none, and ok false where Resolve
+// gives an error.
+func (w *walk) resolve(typ string, c *classInfo, hasType bool, declared string) (rmType string, class *classInfo, ok bool) {
+	if hasType && c != nil {
+		return c.name, c, true
+	}
+	if !hasType && declared != "" {
+		if d := w.classes[declared]; d != nil {
+			return d.name, d, !d.abstract
+		}
+	}
+	rmType, err := w.m.Resolve(typ, hasType, declared)
+	return rmType, nil, err == nil
 }
 
 // report calls the Missing hook with pointer, or the Unmatched hook when
@@ -465,8 +503,8 @@ func (w *walk) value(dec *jsontext.Decoder, declared, bound string) error {
 	if _, err := dec.ReadToken(); err != nil {
 		return err
 	}
-	typ, hasType := w.typeOf(dec)
-	rmType, err := w.m.Resolve(typ, hasType && typ != "", declared)
+	typ, class, hasType := w.typeOf(dec)
+	rmType, class, resolved := w.resolve(typ, class, hasType && typ != "", declared)
 	// With a Missing hook, required lists the presence-checked attributes
 	// of rmType and seen records which of them the object holds a value for.
 	// Without one both stay nil, and the loop below does nothing for them.
@@ -474,23 +512,24 @@ func (w *walk) value(dec *jsontext.Decoder, declared, bound string) error {
 		required []string
 		seen     []bool
 	)
-	if err == nil && w.hooks.Missing != nil {
+	if resolved && w.hooks.Missing != nil {
 		required = w.m.required(rmType)
 		seen = make([]bool, len(required))
 	}
 	top := w.open()
 	for dec.PeekKind() != '}' {
-		tok, rerr := dec.ReadToken()
+		raw, rerr := readName(dec)
 		if rerr != nil {
 			return rerr
 		}
 		// The one pass reads an object that did not open with its "_type"
 		// as its declared type; a "_type" string among its members may name
-		// another, and the pass is given up. tok is read before dec peeks
-		// at the value: a decoder that reads a copy of the document
-		// invalidates the token it last read when it peeks.
-		late := w.once && !hasType && tok.String() == "_type"
-		if err != nil {
+		// another, and the pass is given up. The name is read before dec
+		// peeks at the value: a decoder that reads a copy of the document
+		// invalidates the bytes it last read when it peeks.
+		isType := string(raw) == "_type"
+		late := w.once && !hasType && isType
+		if !resolved {
 			if late && dec.PeekKind() == '"' {
 				return errLateType
 			}
@@ -501,7 +540,10 @@ func (w *walk) value(dec *jsontext.Decoder, declared, bound string) error {
 			}
 			continue
 		}
-		name := tok.String()
+		name, attr := "_type", (*attrInfo)(nil)
+		if !isType {
+			name, attr = class.member(raw)
+		}
 		if late && dec.PeekKind() == '"' {
 			return errLateType
 		}
@@ -509,7 +551,7 @@ func (w *walk) value(dec *jsontext.Decoder, declared, bound string) error {
 		if i := slices.Index(required, name); i >= 0 && dec.PeekKind() != 'n' {
 			seen[i] = true
 		}
-		if merr := w.member(dec, rmType, name, bound); merr != nil {
+		if merr := w.member(dec, rmType, name, attr, bound); merr != nil {
 			return merr
 		}
 	}
@@ -532,12 +574,21 @@ func (w *walk) value(dec *jsontext.Decoder, declared, bound string) error {
 
 // member reads the value of the member name of an object of type rmType,
 // whose slot binds its type parameter to bound, and reports the member when
-// rmType has no attribute of that name.
-func (w *walk) member(dec *jsontext.Decoder, rmType, name, bound string) error {
+// rmType has no attribute of that name. info is the attribute where
+// [Model.classes] holds it, and nil otherwise.
+func (w *walk) member(dec *jsontext.Decoder, rmType, name string, info *attrInfo, bound string) error {
 	if name == "_type" {
 		return dec.SkipValue()
 	}
-	attr, ok := w.m.Attribute(rmType, name, bound)
+	var (
+		attr Attribute
+		ok   bool
+	)
+	if info != nil {
+		attr, ok = info.bind(bound), true
+	} else {
+		attr, ok = w.m.Attribute(rmType, name, bound)
+	}
 	switch {
 	case !ok:
 		if w.hooks.Unmatched != nil {

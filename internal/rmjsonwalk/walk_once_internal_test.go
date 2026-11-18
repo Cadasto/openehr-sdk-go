@@ -360,7 +360,7 @@ func TestLeadingTypeReadsOnlyAPlainLeadingMember(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			typ, ok := leadingType([]byte(tc.unread))
-			if typ != tc.typ || ok != tc.ok {
+			if string(typ) != tc.typ || ok != tc.ok {
 				t.Errorf("leadingType(%q) = %q, %t; want %q, %t", tc.unread, typ, ok, tc.typ, tc.ok)
 			}
 		})
