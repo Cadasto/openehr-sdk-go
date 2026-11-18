@@ -50,9 +50,9 @@ var (
 	ErrSlotFill = errors.New("validation: slot fill")
 
 	// ErrAQLSyntax is the sentinel for a Layer 1 lint failure reported by
-	// [ValidateAQL]: an empty query (code "aql_empty") or one that does
-	// not parse against the SDK grammar profile (code "aql_syntax").
-	// Map via [Issue.Err]; the parse layer's own aql.ErrSyntax
-	// is the equivalent in the aql package.
+	// [github.com/cadasto/openehr-sdk-go/openehr/validation/aqlvalidation.Validate]:
+	// an empty query (code "aql_empty") or one that does not parse against
+	// the SDK grammar profile (code "aql_syntax"). Map via [Issue.Err]; the
+	// parse layer's own aql.ErrSyntax is the equivalent in the aql package.
 	ErrAQLSyntax = errors.New("validation: aql syntax")
 )

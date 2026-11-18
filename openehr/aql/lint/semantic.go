@@ -368,7 +368,7 @@ func versionPredicateIssues(doc *parse.Document) []Issue {
 // anywhere will admit to. That is the canonical "all versions of one
 // composition" shape (`… CONTAINS VERSIONED_COMPOSITION vo[uid/value=$vo]
 // CONTAINS VERSION v[ALL_VERSIONS]`), and it reaches users through
-// [validation.ValidateAQL] as well as the linter.
+// aqlvalidation.Validate as well as the linter.
 //
 // An anonymous operand (no alias at all — AQL's `classExprOperand` grammar
 // makes the alias optional) is INCLUDED, not skipped: with no alias, no path

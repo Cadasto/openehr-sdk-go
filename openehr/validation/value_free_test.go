@@ -23,6 +23,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/aqlvalidation"
 )
 
 // systolicValuePath is where vital_signs.opt constrains the systolic
@@ -322,10 +323,10 @@ func TestREQ168_DecodeErrorInValue(t *testing.T) {
 
 // TestREQ168_EmptyValue pins the issues that read no value, one case per
 // kind the package emits: something absent, a count, a type or identity
-// mismatch, a guard, and a ValidateAQL issue. Each listed path must carry an
-// issue with the code; a case with no paths takes every issue with the code.
-// The AQL issue's Detail may quote the query by design, so only its Value is
-// checked.
+// mismatch, a guard, and an aqlvalidation.Validate issue. Each listed path must
+// carry an issue with the code; a case with no paths takes every issue with the
+// code. The AQL issue's Detail may quote the query by design, so only its Value
+// is checked.
 //
 // primitive_wrong_type has no case: the walker checks the RM type before it
 // runs a primitive constraint, so no ordinary composition reaches it.
@@ -481,9 +482,9 @@ func TestREQ168_EmptyValue(t *testing.T) {
 			paths: []string{"/"},
 		},
 		{
-			name: "aql_syntax from ValidateAQL",
+			name: "aql_syntax from aqlvalidation.Validate",
 			run: func(*testing.T) validation.Result {
-				return validation.ValidateAQL(aql.NewQuery("SELECT 'MARKER-aql' FROM"), nil)
+				return aqlvalidation.Validate(aql.NewQuery("SELECT 'MARKER-aql' FROM"), nil)
 			},
 			code: "aql_syntax",
 		},

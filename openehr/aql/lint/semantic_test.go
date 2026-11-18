@@ -1097,7 +1097,7 @@ func TestVersionedObjectPredicateScopedOperandStaysSilent(t *testing.T) {
 	}{
 		{
 			// The canonical "all versions of one composition" shape, which
-			// reaches users through validation.ValidateAQL as well as the
+			// reaches users through aqlvalidation.Validate as well as the
 			// linter.
 			"standing predicate on the container: silent",
 			"SELECT v/commit_audit/time_committed/value FROM EHR e[ehr_id/value=$ehr] " +

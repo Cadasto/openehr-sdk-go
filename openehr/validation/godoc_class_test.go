@@ -5,10 +5,11 @@ package validation_test
 // or value-bearing, so a consumer reads it on the type it holds. Each exported
 // field's doc carries one paragraph that opens with its class, as the fields
 // of lint.Issue do. Path and Detail are value-free on issues from the instance
-// validators and value-bearing on issues from ValidateAQL, so their paragraph
-// opens with one class and names the other. This reads the package's non-test
-// Go files and holds each paragraph to the class the table below gives, so
-// deleting it, changing it, or adding an exported field without one fails.
+// validators and value-bearing on issues from aqlvalidation.Validate, so their
+// paragraph opens with one class and names the other. This reads the package's
+// non-test Go files and holds each paragraph to the class the table below
+// gives, so deleting it, changing it, or adding an exported field without one
+// fails.
 import (
 	"errors"
 	"fmt"
@@ -39,9 +40,9 @@ type fieldClass struct {
 
 // issueFieldClasses is the class of every exported field of Issue. Path and
 // Detail open with the class they have on issues from the instance
-// validators and name the one they have on issues from ValidateAQL. Layer and
-// Rule (REQ-171 § Finding identity) carry structure only, so they are
-// value-free on every issue.
+// validators and name the one they have on issues from aqlvalidation.Validate.
+// Layer and Rule (REQ-171 § Finding identity) carry structure only, so they
+// are value-free on every issue.
 var issueFieldClasses = map[string]fieldClass{
 	"Path":     {opens: valueFree, names: valueBearing},
 	"Code":     {opens: valueFree},

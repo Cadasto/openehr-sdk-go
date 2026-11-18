@@ -8,7 +8,7 @@ import (
 )
 
 // Severity is the typed severity attached to every [Issue]. [ValidateComposition]
-// emits only [Error]. [ValidateAQL] may also emit [Warning] for lint
+// emits only [Error]. aqlvalidation.Validate may also emit [Warning] for lint
 // advisories (e.g. aql_from_archetype, aql_select_star; the lint codes pass
 // through verbatim, so the full set is the openehr/aql/lint advisory catalogue).
 type Severity int
@@ -19,7 +19,7 @@ const (
 	Error Severity = iota
 
 	// Warning is an advisory issue that does not make a [Result]
-	// not-OK. [ValidateAQL] emits it for lint advisories (e.g.
+	// not-OK. aqlvalidation.Validate emits it for lint advisories (e.g.
 	// aql_from_archetype, aql_select_star; the full set is the
 	// openehr/aql/lint catalogue); [ValidateComposition] emits only [Error].
 	Warning
@@ -48,8 +48,8 @@ const (
 	// LayerNone marks an issue that judges the call or the walk rather than
 	// the instance: a guard, such as nil_composition or invalid_shape, a
 	// walk condition, such as max_depth or cyclic_value, and every issue
-	// from [ValidateAQL] and [ValidateAQLWithTypeRelation]. Its Rule is
-	// empty.
+	// from aqlvalidation.Validate and aqlvalidation.ValidateWithTypeRelation.
+	// Its Rule is empty.
 	LayerNone Layer = iota
 
 	// LayerTemplate marks an issue that a clause of the operational
@@ -100,10 +100,11 @@ func (l Layer) String() string {
 // template's own constraint, so such an issue can be logged or returned to
 // a client as it is. The value the failed check read is kept only in Value.
 //
-// On an issue from [ValidateAQL] or [ValidateAQLWithTypeRelation], Code,
-// Layer, Rule and Severity never contain text from the query, but Detail
-// and Path carry the lint text and may quote the query, its literals
-// included. Layer is [LayerNone], and Rule and Value are empty.
+// On an issue from aqlvalidation.Validate or
+// aqlvalidation.ValidateWithTypeRelation, Code, Layer, Rule and Severity
+// never contain text from the query, but Detail and Path carry the lint text
+// and may quote the query, its literals included. Layer is [LayerNone], and
+// Rule and Value are empty.
 //
 // Two issues compare equal under == when their paths, codes, layers,
 // rules, details and severities are equal and their held values are equal
@@ -133,13 +134,13 @@ type Issue struct {
 	//
 	// Empty for global issues that do not localise to a specific node,
 	// such as nil_composition or nil_template for a nil argument. On an
-	// issue from [ValidateAQL] or [ValidateAQLWithTypeRelation] it is the
-	// lint path.
+	// issue from aqlvalidation.Validate or
+	// aqlvalidation.ValidateWithTypeRelation it is the lint path.
 	//
 	// Value-free on issues from the instance validators: never contains a
-	// value from the instance. Value-bearing on issues from [ValidateAQL]
-	// and [ValidateAQLWithTypeRelation]: may quote the query, literals
-	// included.
+	// value from the instance. Value-bearing on issues from
+	// aqlvalidation.Validate and aqlvalidation.ValidateWithTypeRelation: may
+	// quote the query, literals included.
 	Path string
 
 	// Code is a stable programmatic identifier (e.g. "required",
@@ -162,8 +163,8 @@ type Issue struct {
 	// instance: a guard (nil_composition, nil_template, nil_root and the
 	// other nil_ codes, rm_type_unknown, and invalid_shape on input that
 	// does not decode), a walk condition (max_depth, max_nodes,
-	// cyclic_value), and every issue from [ValidateAQL] and
-	// [ValidateAQLWithTypeRelation].
+	// cyclic_value), and every issue from aqlvalidation.Validate and
+	// aqlvalidation.ValidateWithTypeRelation.
 	//
 	// Value-free: names a layer, never a value from the instance or text
 	// from the query.
@@ -202,18 +203,19 @@ type Issue struct {
 
 	// Detail is a human-readable message describing the failure; it is
 	// not localised. From an instance validator it names the check that
-	// failed; from [ValidateAQL] or [ValidateAQLWithTypeRelation] it is
-	// the lint text.
+	// failed; from aqlvalidation.Validate or
+	// aqlvalidation.ValidateWithTypeRelation it is the lint text.
 	//
 	// Value-free on issues from the instance validators: never contains a
 	// value from the instance, such as the value the check read.
-	// Value-bearing on issues from [ValidateAQL] and
-	// [ValidateAQLWithTypeRelation]: may quote the query, literals
+	// Value-bearing on issues from aqlvalidation.Validate and
+	// aqlvalidation.ValidateWithTypeRelation: may quote the query, literals
 	// included.
 	Detail string
 
 	// Severity classifies the issue. [ValidateComposition] emits [Error] only;
-	// [ValidateAQL] may emit [Warning] advisories that do not flip [Result.OK].
+	// aqlvalidation.Validate may emit [Warning] advisories that do not flip
+	// [Result.OK].
 	//
 	// Value-free: never carries a value from the instance or text from
 	// the query.
@@ -259,7 +261,8 @@ type Issue struct {
 	// "[redacted]", as [constraints.Redacted] describes, and is left out
 	// of JSON and gob output. Value.Reveal() returns the value itself, to
 	// be called only where showing it is safe. Value is empty on every
-	// issue from [ValidateAQL] and [ValidateAQLWithTypeRelation].
+	// issue from aqlvalidation.Validate and
+	// aqlvalidation.ValidateWithTypeRelation.
 	Value constraints.Redacted `json:"-"`
 }
 
@@ -311,7 +314,8 @@ func (i Issue) Err() error {
 		return ErrSlotFill
 	case "aql_syntax", "aql_empty":
 		// Codes minted by openehr/aql/lint (REQ-109) and carried verbatim
-		// through ValidateAQL; keep this in sync with the lint code strings.
+		// through aqlvalidation.Validate; keep this in sync with the lint
+		// code strings.
 		return ErrAQLSyntax
 	}
 	if strings.HasPrefix(i.Code, "primitive_") {
@@ -325,7 +329,7 @@ func (i Issue) Err() error {
 // issue is present.
 type Result struct {
 	// OK is true when the validator found no [Error]-severity issue.
-	// [Warning]-severity advisories (emitted by [ValidateAQL], e.g.
+	// [Warning]-severity advisories (emitted by aqlvalidation.Validate, e.g.
 	// aql_from_archetype) do not make OK false. Treat OK as the
 	// pass/fail result and inspect Severity for advisories. For
 	// [ValidateComposition], which emits only Error issues, OK is
@@ -334,15 +338,16 @@ type Result struct {
 
 	// Issues is the full list of issues in a stable per-validator order
 	// (composition walk order for [ValidateComposition]; lint layer order
-	// for [ValidateAQL]). Empty when a validator found nothing; never nil
-	// after a validator call (zero-length allocation is acceptable). May be
-	// non-empty while OK is true when it holds only Warning-severity issues.
+	// for aqlvalidation.Validate). Empty when a validator found nothing;
+	// never nil after a validator call (zero-length allocation is
+	// acceptable). May be non-empty while OK is true when it holds only
+	// Warning-severity issues.
 	Issues []Issue
 
 	// Coverage says what the validator did not check, so a caller can tell
 	// "no issue found" from "everything checked", and which Reference Model
 	// invariants of the classes it visited it does not evaluate. Its zero
-	// value, which a guard and [ValidateAQL] return, is complete.
+	// value, which a guard and aqlvalidation.Validate return, is complete.
 	Coverage Coverage
 }
 

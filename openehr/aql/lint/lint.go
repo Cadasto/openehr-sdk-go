@@ -169,7 +169,7 @@ type Options struct {
 }
 
 // LintString parses q against the SDK grammar profile and lints the result.
-// It is the entry point for raw AQL (the [validation.ValidateAQL] bridge uses
+// It is the entry point for raw AQL (the aqlvalidation.Validate bridge uses
 // it). An empty/whitespace-only query yields aql_empty; a parse failure
 // yields aql_syntax; otherwise it runs [Lint].
 func LintString(q string, opts *Options) Result {
