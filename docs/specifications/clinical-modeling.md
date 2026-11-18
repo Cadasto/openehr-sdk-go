@@ -1239,7 +1239,7 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
    Where there is none, the value the walk wrote stays and the root breaks the rule (§ [Exceptions and known gaps](#exceptions-and-known-gaps)), as it does where the OPT admits a coded value of the set that it does not list.
    A DV_PROPORTION whose OPT pins `is_integral` to true, with a `C_BOOLEAN` that admits `true` alone, takes a whole-number `numerator` and `denominator` whatever its kind, under either `ValueFill`.
    Such a proportion, a fraction and an integer fraction take the `precision` 0 wherever the OPT admits 0, whether or not the walk wrote a precision.
-   `is_integral` is read as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_PROPORTION* reads it, so where the OPT admits no `precision` of 0, a fraction or an integer fraction meets its rules only with no `precision`.
+   `is_integral` is read as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_PROPORTION* reads it, so where the OPT admits no `precision` of 0, a fraction or an integer fraction meets its rules only with no `precision`, which it takes where the OPT does not require one.
 
 #### Errors
 

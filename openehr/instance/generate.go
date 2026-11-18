@@ -3240,13 +3240,14 @@ const (
 // is drawn and the value is as reproducible as the walk's. A value whose
 // OPT pins is_integral to true (integralPinned) takes whole numbers too,
 // whatever its kind. Such a value, a fraction and an integer fraction take
-// the precision 0 wherever the OPT admits 0 (zeroPrecisionAdmitted); any
-// other precision is never changed. The RM floor reads is_integral as the
-// RM defines it: a precision of 0 where the precision is set, and
-// whole-number operands where it is not. So where the OPT admits no
-// precision of 0, a fraction or an integer fraction meets its rules only
-// with no precision, and one that has a precision gives way to another
-// kind. The walk writes each attribute from its own OPT constraint, or,
+// the precision 0 wherever the OPT admits 0 (zeroPrecisionAdmitted). The
+// RM floor reads is_integral as the RM defines it: a precision of 0 where
+// the precision is set, and whole-number operands where it is not. So
+// where the OPT admits no precision of 0, a fraction or an integer
+// fraction meets its rules only with no precision: one that has a
+// precision drops it where the OPT does not require one, and gives way to
+// another kind where the OPT does. Any other precision is kept. The walk
+// writes each attribute from its own OPT constraint, or,
 // where the OPT says nothing, leaves its placeholder: 1 for the numerator
 // and the denominator, 0 (a ratio) for the type, and no precision. So the
 // kind is settled here, once all of them are written. opt is the OPT node
@@ -3269,15 +3270,17 @@ func settleProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
 // on numerator and denominator, and reports whether it did. integral says
 // the OPT pins is_integral to true, so the numerator and the denominator
 // are whole numbers whatever the kind. A fraction or an integer fraction
-// also needs no precision or the precision 0 (Fraction_validity), so it
-// cannot be met where p has another precision and the OPT admits no 0. It
+// also needs no precision or the precision 0 (Fraction_validity), so where
+// p has another precision and the OPT admits no 0, it takes no precision
+// where the OPT does not require one, and cannot be met where it does. It
 // leaves p alone when it did not.
 func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64, integral bool) bool {
 	if kind < pkRatio || kind > pkIntegerFraction || !componentFits(bindingChild(opt, "type"), kind) {
 		return false
 	}
 	fraction := wholeOperands(kind, nil)
-	if fraction && p.Precision != nil && *p.Precision != 0 && !zeroPrecisionAdmitted(opt) {
+	dropPrecision := fraction && p.Precision != nil && *p.Precision != 0 && !zeroPrecisionAdmitted(opt)
+	if dropPrecision && !precisionFits(opt, nil) {
 		return false
 	}
 	integral = integral || fraction
@@ -3293,6 +3296,9 @@ func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64
 	p.Type = rm.Integer(kind)
 	p.Numerator = rm.Real(numerator)
 	p.Denominator = rm.Real(denominator)
+	if dropPrecision {
+		p.Precision = nil
+	}
 	if integral && zeroPrecisionAdmitted(opt) {
 		p.Precision = new(rm.Integer(0))
 	}
