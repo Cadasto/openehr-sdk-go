@@ -117,7 +117,7 @@ call made through `sandbox.Backend` as the transport, see
 | [Validate a Composition against the RM and a template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/validate-composition) | `validate-composition` | None | In-memory Composition against the RM and an OPT |
 | [Synthesise a Composition from a template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/generate-example) | `generate-example` | None | OPT → synthesised RM instance → JSON |
 | [Parse AQL into a structured tree](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/aql-parse-structured) | `aql-parse-structured` | None | Parse AQL → structured tree + emit |
-| [Lint an AQL query](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/lint-aql) | `lint-aql` | None | AQL static lint + `ValidateAQL` |
+| [Lint an AQL query](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/lint-aql) | `lint-aql` | None | AQL static lint + `aqlvalidation.Validate` |
 | [Compile, build, and validate](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/compile-build-validate) | `compile-build-validate` | None | Public compile → build → validate |
 | [Explore a compiled template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/template-explore) | `template-explore` | None | Compiled OPT structure + leaf paths |
 | [Export a Web Template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/webtemplate-export) | `webtemplate-export` | None | Compiled OPT → EHRbase Web Template JSON |
