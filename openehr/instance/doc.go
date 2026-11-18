@@ -211,14 +211,14 @@
 // the walk's code stays where the template lists none. A DV_PROPORTION
 // is then settled to the rules of its kind, inside the template's
 // constraints on its parts: a unitary proportion over 1, a percent over
-// 100, a fraction or an integer fraction over whole numbers, any
-// proportion of precision 0, or whose template pins is_integral to true,
-// over whole numbers, and every kind over a denominator that is not 0. A
-// fraction, an integer fraction and a proportion whose template pins
-// is_integral take the precision 0 wherever the template admits it. Where
-// the drawn type cannot meet its rule there, another type the template
-// allows is taken, and where none can, the value stays as the walk wrote
-// it. A
+// 100, a fraction or an integer fraction over whole numbers with no
+// precision or the precision 0, any proportion of precision 0, or whose
+// template pins is_integral to true, over whole numbers, and every kind
+// over a denominator that is not 0. A fraction, an integer fraction and a
+// proportion whose template pins is_integral take the precision 0 wherever
+// the template admits it. Where the drawn type cannot meet its rule there,
+// another type the template allows is taken, and where none can, the
+// value stays as the walk wrote it. A
 // coded text whose code is in the openEHR terminology, on an attribute the
 // RM ties to a group of that terminology (a COMPOSITION's category, an
 // INTERVAL_EVENT's math function, a PARTY_RELATED's relationship, …),

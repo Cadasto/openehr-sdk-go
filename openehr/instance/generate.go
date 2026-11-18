@@ -3240,14 +3240,17 @@ const (
 // is drawn and the value is as reproducible as the walk's. A value whose
 // OPT pins is_integral to true (integralPinned) takes whole numbers too,
 // whatever its kind. Such a value, a fraction and an integer fraction take
-// the precision 0 wherever the OPT admits 0 (zeroPrecisionAdmitted), which
-// meets Fraction_validity whether is_integral is read as whole-number
-// operands, as the RM floor reads it, or as a precision of 0, as the BMM
-// defines it; any other precision is never changed. The walk writes each
-// attribute from its own OPT constraint, or, where the OPT says nothing,
-// leaves its placeholder: 1 for the numerator and the denominator, 0 (a
-// ratio) for the type, and no precision. So the kind is settled here, once
-// all of them are written. opt is the OPT node of p.
+// the precision 0 wherever the OPT admits 0 (zeroPrecisionAdmitted); any
+// other precision is never changed. The RM floor reads is_integral as the
+// RM defines it: a precision of 0 where the precision is set, and
+// whole-number operands where it is not. So where the OPT admits no
+// precision of 0, a fraction or an integer fraction meets its rules only
+// with no precision, and one that has a precision gives way to another
+// kind. The walk writes each attribute from its own OPT constraint, or,
+// where the OPT says nothing, leaves its placeholder: 1 for the numerator
+// and the denominator, 0 (a ratio) for the type, and no precision. So the
+// kind is settled here, once all of them are written. opt is the OPT node
+// of p.
 func settleProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
 	walked := int64(p.Type)
 	integral := integralPinned(opt)
@@ -3265,12 +3268,19 @@ func settleProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
 // that type and the rules of kind can be met inside the OPT's constraints
 // on numerator and denominator, and reports whether it did. integral says
 // the OPT pins is_integral to true, so the numerator and the denominator
-// are whole numbers whatever the kind. It leaves p alone when it did not.
+// are whole numbers whatever the kind. A fraction or an integer fraction
+// also needs no precision or the precision 0 (Fraction_validity), so it
+// cannot be met where p has another precision and the OPT admits no 0. It
+// leaves p alone when it did not.
 func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64, integral bool) bool {
 	if kind < pkRatio || kind > pkIntegerFraction || !componentFits(bindingChild(opt, "type"), kind) {
 		return false
 	}
-	integral = integral || wholeOperands(kind, nil)
+	fraction := wholeOperands(kind, nil)
+	if fraction && p.Precision != nil && *p.Precision != 0 && !zeroPrecisionAdmitted(opt) {
+		return false
+	}
+	integral = integral || fraction
 	whole := integral || wholeOperands(kind, p.Precision)
 	denominator, ok := proportionDenominator(bindingChild(opt, "denominator"), float64(p.Denominator), kind, whole)
 	if !ok {
@@ -3344,10 +3354,11 @@ func zeroPrecisionAdmitted(opt *tcimpl.CompiledNode) bool {
 }
 
 // wholeOperands reports whether a proportion of kind with precision needs
-// a whole-number numerator and denominator: a fraction and an integer
-// fraction do (Fraction_validity), and so does any proportion of precision
-// 0 (Precision_validity). A whole number is one whose floor is itself, as
-// the RM floor reads Is_integral_validity.
+// a whole-number numerator and denominator: any proportion of precision 0
+// does (Precision_validity), and so do a fraction and an integer fraction,
+// which meet Fraction_validity only at the precision 0 or with no
+// precision over whole numbers. A whole number is one whose floor is
+// itself, as the RM floor reads Is_integral_validity.
 func wholeOperands(kind int64, precision *rm.Integer) bool {
 	return kind == pkFraction || kind == pkIntegerFraction || (precision != nil && *precision == 0)
 }

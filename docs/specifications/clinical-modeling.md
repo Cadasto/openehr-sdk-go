@@ -1239,7 +1239,7 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
    Where there is none, the value the walk wrote stays and the root breaks the rule (§ [Exceptions and known gaps](#exceptions-and-known-gaps)), as it does where the OPT admits a coded value of the set that it does not list.
    A DV_PROPORTION whose OPT pins `is_integral` to true, with a `C_BOOLEAN` that admits `true` alone, takes a whole-number `numerator` and `denominator` whatever its kind, under either `ValueFill`.
    Such a proportion, a fraction and an integer fraction take the `precision` 0 wherever the OPT admits 0, whether or not the walk wrote a precision.
-   So `Fraction_validity` holds under both readings of `is_integral`: whole-number operands, as the RM floor reads it, and a `precision` of 0, as the BMM defines it ("integers, i.e. if precision is 0").
+   `is_integral` is read as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_PROPORTION* reads it, so where the OPT admits no `precision` of 0, a fraction or an integer fraction meets its rules only with no `precision`.
 
 #### Errors
 
@@ -1387,7 +1387,7 @@ It validates where it is of the RM type the walk builds for the node and meets t
 It keeps the RM rules where:
 
 - each attribute the BMM marks mandatory is present on it and on each value it holds, as the RM floor reads presence;
-- the settles § [Precedence](#precedence) 3 and 4 run on the walk's own value (a percentage `accuracy`, a DV_PROPORTION's kind, a DV_PERIODIC_TIME_SPECIFICATION's formalism, a coded attribute's group or code set, and `Normal_range_and_status_consistency`) leave it as it is.
+- the settles § [Precedence](#precedence) 3 and 4 run on the walk's own value (a percentage `accuracy`, a DV_PROPORTION's kind, a DV_PERIODIC_TIME_SPECIFICATION's formalism, a coded attribute's group or code set, and `Normal_range_and_status_consistency`) leave it as it is, but for the `precision` 0 they give a DV_PROPORTION that has none, which no RM rule asks for.
 
 A default that does not validate, or breaks such a rule, leaves the value the `ValueFill` gives.
 Compile captures an OPT `<assumed_value>` into the constraint's `Default` field, but the generator does not read it.

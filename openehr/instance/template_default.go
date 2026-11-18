@@ -43,8 +43,11 @@ func (g *generator) templateDefault(node *tcimpl.CompiledNode, built any) any {
 //     (settleRMRules) leave a second copy of def as it is.
 //
 // Each of those settles leaves a value that meets its rule as it is, so one
-// that changes the copy has found def breaking its rule. The settles of an
-// interval's bounds and flags and of a DV_MULTIMEDIA's content are not run:
+// that changes the copy has found def breaking its rule. The one change no
+// RM rule asks for, the precision 0 settleProportion gives a DV_PROPORTION
+// that has none, is not made on the copy (settleRMRules): an absent
+// precision breaks no rule of a proportion. The settles of an interval's
+// bounds and flags and of a DV_MULTIMEDIA's content are not run:
 // they also write what no RM rule asks for, a unit both bounds share, the
 // inclusion of an endpoint the OPT's example gives, or the size of the
 // content, so they would change a default that keeps every RM rule.
@@ -63,14 +66,20 @@ func (g *generator) keepsRMRules(node *tcimpl.CompiledNode, def rm.DataValue) bo
 // specification (fillPeriodicFormalism), each coded attribute's group or
 // code set (settleCoded) and an ordered value's normal range
 // (settleNormalRange). It reports false where a settle finds no value that
-// meets its rule.
+// meets its rule. A DV_PROPORTION that has no precision is left with none:
+// the precision 0 settleProportion gives it meets no RM rule, so a default
+// is not rejected for lacking it.
 func (g *generator) settleRMRules(node *tcimpl.CompiledNode, v any) bool {
 	if settleAccuracy(node, v) != nil {
 		return false
 	}
 	switch x := v.(type) {
 	case *rm.DVProportion:
+		absent := x.Precision == nil
 		settleProportion(node, x)
+		if absent {
+			x.Precision = nil
+		}
 	case *rm.DVPeriodicTimeSpecification:
 		fillPeriodicFormalism(node, x)
 	}
