@@ -1,6 +1,6 @@
 ---
 kind: plan
-harvested_through: 2026-11-18T17:11:58Z
+harvested_through: 2026-11-18T22:36:20Z
 ---
 # Backlog
 
@@ -50,11 +50,11 @@ A test package that cannot build for a 32-bit target (openehr/rm, under GOARCH=3
 
 ## Performance: allocations in the generated RM access and the RM-floor walk, and the FLAT decode's per-call template ranks and key sorts (REQ-171, REQ-053)
 A generator change in internal/bmmgen on its own branch, measured with BenchmarkValidateComposition and the composition Set+Build benchmark, with the RM-floor walk's allocation bound tightened to what it allocates; and a per-Web-Template cache in openehr/serialize/simplified, measured with BenchmarkUnmarshalFlat. Lane: maintenance. Size: M.
-- openehr/validation/walk_alloc_test.go:31 · the bound of 330 allocations is about 8 times what ValidateRM(BMI) allocates (41 allocs/op), so a regression that writes paths again would not fail it · from: #470
+- openehr/validation/walk_alloc_test.go:31 · the bound of 330 allocations is about 9 times what ValidateRM(BMI) allocates (35 allocs/op on 2026-11-18), so a regression that writes paths again would not fail it · from: #470
 - internal/bmmgen/render_rmaccess.go:612 · every value arm of the generated `single` hands `&p` to a reader that may return a pointer into it, so reading a class passed by value, such as a data value a composition built in Go holds in an interface field, heap-copies the whole parent; since 6415aaca all 75 such arms escape (go build -gcflags=-m on internal/rmaccess), and Peek on a DV_CODED_TEXT costs 128 B instead of 0, reading its value 144 B instead of 16 · by: go-reviewer · from: perf/hot-path-sweep-2
 - internal/rmaccess/access.go:142 · boxPointers and boxValues (:155) still allocate a fresh []any on every rmaccess.Multiple call, which the walk keeps as attrReading.items and iterates more than once; the box around the slice is gone, so composition Set+Build is down to 6 allocations (2026-10-27) · by: sdd-implementer · from: refactor/template-hot-paths
 - openehr/serialize/simplified/flat_decode.go:4002 · every decode still rebuilds templateRanks (orderByTemplate), now that PR 334 builds the larger template index once per compiled template; the ranks hang off the caller's Web Template, which is mutable, so caching them is a design choice, not a copy of that cache · by: go-reviewer · from: fix/simplified-template-roundtrip
-- openehr/serialize/simplified/flat_decode.go:2145 · settleIsmTransitionsUnder sorts each rebuilt node's keys on every visit, about 9 % of BenchmarkUnmarshalFlat's allocations on 20bc8b7b; with decodeRMAttrFeederAudit's sorts (rmattr_feeder.go:197, about 6 %), the next FLAT decode allocation lead · by: sdd-deliver · from: perf/flat-decode-parse-once
+- openehr/serialize/simplified/rmattr_feeder.go:201 · decodeRMAttrFeederAudit sorts its suffixes and child segments into a fresh slice on every FEEDER_AUDIT (slices.Sorted(maps.Keys(...))), about 6 % of BenchmarkUnmarshalFlat's allocations on 20bc8b7b and the next FLAT decode allocation lead; the 9 % in settleIsmTransitionsUnder went in PR 483, which sorts into one buffer for the whole walk · by: sdd-deliver · from: perf/flat-decode-parse-once
 
 ## Developer tools, not gates: the upstream drift reports and the CDR cross-check (REQ-041, REQ-082)
 Code in scripts/sync-bmm.sh and scripts/sync-its-xml-schemas.sh, behind `make bmm-drift` and its ITS-XML twin, and in cmd/cdrcheck, behind `make cdr-crosscheck`: what a drift report compares a pin with, and what a cross-check run asks a CDR for and validates. Lane: maintenance. Size: S each.
