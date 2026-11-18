@@ -176,18 +176,6 @@ func BenchmarkDecodeWithMissing(b *testing.B) {
 	}
 }
 
-// BenchmarkDecodeCompositionFixture measures decode plus encode of the largest
-// vendored fixture, the baseline the json/v2 migration is measured against
-// (PR 171 records the results; ADR 0022 sets the regression budget). b.SetBytes reports against
-// the input document, so the MB/s figure is throughput per input byte over a
-// decode and an encode together. It is not comparable with the MB/s of
-// BenchmarkDecodeComposition_400, which decodes only.
-//
-// The fixture now feeds PROBE-030's fidelity legs and is held out of the
-// ValidateRM leg only (its vendored content has inverted DV_INTERVAL bounds);
-// it decodes and encodes cleanly, which is all this benchmark asks of it. The
-// setup decode and encode below are the control: a fixture that stopped
-// decoding would fail here rather than quietly measuring an error path.
 // BenchmarkEncodeCompositionFixture measures encode alone of the
 // benchFixture composition, whose ELEMENT, DV_TEXT and CODE_PHRASE values
 // make up most of a real composition, unlike the synthetic width-400 payload.
@@ -209,6 +197,18 @@ func BenchmarkEncodeCompositionFixture(b *testing.B) {
 	}
 }
 
+// BenchmarkDecodeCompositionFixture measures decode plus encode of the largest
+// vendored fixture, the baseline the json/v2 migration is measured against
+// (PR 171 records the results; ADR 0022 sets the regression budget). b.SetBytes reports against
+// the input document, so the MB/s figure is throughput per input byte over a
+// decode and an encode together. It is not comparable with the MB/s of
+// BenchmarkDecodeComposition_400, which decodes only.
+//
+// The fixture now feeds PROBE-030's fidelity legs and is held out of the
+// ValidateRM leg only (its vendored content has inverted DV_INTERVAL bounds);
+// it decodes and encodes cleanly, which is all this benchmark asks of it. The
+// setup decode and encode below are the control: a fixture that stopped
+// decoding would fail here rather than quietly measuring an error path.
 func BenchmarkDecodeCompositionFixture(b *testing.B) {
 	payload, err := os.ReadFile(fixtures.CompositionJSON(benchFixture))
 	if err != nil {
