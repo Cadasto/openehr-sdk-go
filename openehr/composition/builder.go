@@ -289,6 +289,10 @@ func (b *Builder) Build() (*rm.Composition, error) {
 			passErrs = append(passErrs, fmt.Errorf("%s: %w", p.path, err))
 		}
 	}
+	// The next Set calls queue into the same array, emptied first so that
+	// it holds none of the values it carried.
+	clear(pending)
+	b.pending = pending[:0]
 	if len(passErrs) > 0 {
 		return b.skeleton, errors.Join(passErrs...)
 	}
@@ -311,8 +315,11 @@ func (b *Builder) applyAssignment(p pendingAssignment) error {
 	}
 	// Walk the parent chain from compiled root → parent collecting
 	// (CompiledNode, attrName, predicate) segments. The leaf segment
-	// supplies the attribute on `parent` to write into.
-	segs, err := buildSegments(p.node)
+	// supplies the attribute on `parent` to write into. Nothing keeps the
+	// segments past this call, so a template of usual depth needs no heap
+	// for them.
+	var buf [segmentsOnStack]pathSegment
+	segs, err := buildSegments(buf[:0], p.node)
 	if err != nil {
 		return err
 	}
@@ -370,15 +377,19 @@ type pathSegment struct {
 	matchName string
 }
 
+// segmentsOnStack is the depth of path applyAssignment keeps its segments
+// for without the heap.
+const segmentsOnStack = 16
+
 // buildSegments produces the ordered (attr, predicate) list from
-// compiled root to the supplied node. Walks up via Parent(), filling the
-// list from its end.
-func buildSegments(node *tcimpl.CompiledNode) ([]pathSegment, error) {
+// compiled root to the supplied node, in dst's array where it has room.
+// Walks up via Parent(), filling the list from its end.
+func buildSegments(dst []pathSegment, node *tcimpl.CompiledNode) ([]pathSegment, error) {
 	depth := 0
 	for cur := node; cur != nil && cur.Parent() != nil; cur = cur.Parent() {
 		depth++
 	}
-	segs := make([]pathSegment, depth)
+	segs := slices.Grow(dst[:0], depth)[:depth]
 	i := depth
 	for cur := node; cur != nil && cur.Parent() != nil; cur = cur.Parent() {
 		parent := cur.Parent()

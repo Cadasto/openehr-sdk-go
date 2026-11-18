@@ -55,7 +55,10 @@ func bindRMType(node *tcimpl.CompiledNode, v any) (*tcimpl.CompiledNode, error) 
 	if parent := node.Parent(); parent != nil {
 		attr = findAttributeContaining(parent, node)
 	}
-	alternatives := alternativesAt(node, attr)
+	// A path seldom has more alternatives than buf holds, so they need no
+	// heap.
+	var buf [8]*tcimpl.CompiledNode
+	alternatives := alternativesAt(buf[:0], node, attr)
 	if bound := rmbind.Bind(alternatives, v, anyNode); bound != nil {
 		if err := attributeHolds(bound, attr, v, got); err != nil {
 			return nil, err
@@ -191,23 +194,22 @@ var plainValueTypes = map[string]bool{
 	"String":    true,
 }
 
-// alternativesAt returns, in OPT order, the nodes the template allows at
-// node's path: node and every other child of node's parent attribute,
-// attr, at that same path, the alternatives an OPT lists under one
-// attribute, leaving out a child whose occurrences are 0..0
-// ([tcimpl.AllowedChildNodes]). Compile indexes only the first of them
+// alternativesAt appends to dst, in OPT order, the nodes the template
+// allows at node's path, and returns the result: node and every other child
+// of node's parent attribute, attr, at that same path, the alternatives an
+// OPT lists under one attribute, leaving out a child whose occurrences are
+// 0..0 ([tcimpl.AllowedChildNodes]). Compile indexes only the first of them
 // under the path, so Compiled.NodeAt returns that one alone. The root,
 // which has no parent attribute, is its own only alternative, and so is a
 // node whose attr is nil.
-func alternativesAt(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
+func alternativesAt(dst []*tcimpl.CompiledNode, node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
 	if attr == nil {
-		return []*tcimpl.CompiledNode{node}
+		return append(dst, node)
 	}
-	var alternatives []*tcimpl.CompiledNode
 	for _, c := range tcimpl.AllowedChildNodes(attr) {
 		if c.AQLPath() == node.AQLPath() {
-			alternatives = append(alternatives, c)
+			dst = append(dst, c)
 		}
 	}
-	return alternatives
+	return dst
 }
