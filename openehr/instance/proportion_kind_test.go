@@ -183,12 +183,20 @@ func jsonName(f reflect.StructField) string {
 // proportionKindBreaks names the DV_PROPORTION invariants p breaks among
 // those its type decides (pinned RM BMM, class DV_PROPORTION; codes from
 // PROPORTION_KIND: 0 ratio, 1 unitary, 2 percent, 3 fraction, 4 integer
-// fraction), plus Valid_denominator and Precision_validity. A whole number
-// is read as the floor's Precision_validity reads it.
+// fraction), plus Valid_denominator and Precision_validity. It reads
+// is_integral as the RM floor does (REQ-112): a precision of 0 where the
+// precision is set, and a whole-number numerator and denominator where it
+// is not. A whole number is read as the floor's Precision_validity reads
+// it.
 func proportionKindBreaks(p rm.DVProportion) []string {
 	whole := func(v rm.Real) bool {
 		f := float64(v)
 		return !math.IsInf(f, 0) && math.Trunc(f) == f
+	}
+	wholeOperands := whole(p.Numerator) && whole(p.Denominator)
+	integral := wholeOperands
+	if p.Precision != nil {
+		integral = *p.Precision == 0
 	}
 	var out []string
 	if p.Type < 0 || p.Type > 4 {
@@ -200,13 +208,13 @@ func proportionKindBreaks(p rm.DVProportion) []string {
 	if p.Type == 2 && p.Denominator != 100 {
 		out = append(out, "Percent_validity")
 	}
-	if (p.Type == 3 || p.Type == 4) && !(whole(p.Numerator) && whole(p.Denominator)) {
+	if (p.Type == 3 || p.Type == 4) && !integral {
 		out = append(out, "Fraction_validity")
 	}
 	if p.Denominator == 0 {
 		out = append(out, "Valid_denominator")
 	}
-	if p.Precision != nil && *p.Precision == 0 && !(whole(p.Numerator) && whole(p.Denominator)) {
+	if p.Precision != nil && *p.Precision == 0 && !wholeOperands {
 		out = append(out, "Precision_validity")
 	}
 	return out

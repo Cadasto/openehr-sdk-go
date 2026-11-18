@@ -70,9 +70,10 @@
 //   - DV_QUANTITY and DV_PROPORTION precision, and whole-number operands
 //     on a DV_PROPORTION of precision 0;
 //   - the DV_PROPORTION proportion-kind rules: a type from 0 to 4, a
-//     denominator of 1 on a unitary proportion and of 100 on a percent,
-//     whole-number operands on a fraction or an integer fraction, and no
-//     denominator of 0;
+//     denominator of 1 on a unitary proportion and of 100 on a percent, a
+//     fraction or an integer fraction that is integral as the RM defines
+//     it (a precision of 0 where the precision is set, whole-number
+//     operands where it is not), and no denominator of 0;
 //   - DV_INTERVAL bounds that are strictly comparable (of one class, two
 //     DV_QUANTITY in one unit, two DV_PROPORTION of one type) and in order,
 //     and no side both unbounded and included;

@@ -207,6 +207,19 @@ func valueCases() []valueCase {
 			want:    [2]float64{13579.25, 8642},
 		},
 		{
+			// REQ-168: a fraction whose precision is set and is not 0 is
+			// not is_integral, whatever its operands, and Value holds the
+			// precision.
+			name: "rm_invariant DV_PROPORTION fraction with a precision that is not 0",
+			run: func(*testing.T) validation.Result {
+				return validation.ValidateRM(&rm.DVProportion{Numerator: 13579, Denominator: 8642, Type: rm.Integer(rm.ProportionKindPkFraction), Precision: precision(97531)})
+			},
+			code:    "rm_invariant",
+			path:    "/",
+			markers: []string{"97531", "13579", "8642"},
+			want:    rm.Integer(97531),
+		},
+		{
 			name: "rm_invariant DV_INTERVAL lower above upper",
 			run: func(*testing.T) validation.Result {
 				return validation.ValidateRM(&rm.DVInterval[rm.DVCount]{

@@ -1305,7 +1305,11 @@ func proportionReach(node *tcimpl.CompiledNode, like, other proportionKey, low b
 // proportionPrecision returns the precision a bound of like's type takes
 // where the second pair of orderIntervalBounds rewrites it on node's
 // side, like being the bound that side drew, and false when node admits
-// none. It tries like's own precision, none, the members of the C_INTEGER
+// none. A fraction or an integer fraction meets Fraction_validity only
+// with no precision or the precision 0, as the RM floor reads is_integral,
+// so for those kinds it tries like's own precision where it is one of
+// them, then none, then 0, and takes the first node admits. For any other
+// kind it tries like's own precision, none, the members of the C_INTEGER
 // on precision, 1 and -1, in that order, and takes the first node admits
 // that needs no more whole numbers than the type, or an is_integral node
 // pins to true, does (sideWhole), so the numerator need not be rounded.
@@ -1313,6 +1317,14 @@ func proportionReach(node *tcimpl.CompiledNode, like, other proportionKey, low b
 // admits, which is then 0. It never takes a precision below -1, which the
 // RM floor rejects (-1 is no limit).
 func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Integer, bool) {
+	if wholeOperands(like.kind, nil) {
+		for _, p := range []*rm.Integer{like.precision, nil, new(rm.Integer(0))} {
+			if (p == nil || *p == 0) && precisionFits(node, p) {
+				return p, true
+			}
+		}
+		return nil, false
+	}
 	candidates := []*rm.Integer{like.precision, nil}
 	if c, ok := primitiveOf(bindingChild(node, "precision")).(constraints.CInteger); ok {
 		for _, p := range c.List {

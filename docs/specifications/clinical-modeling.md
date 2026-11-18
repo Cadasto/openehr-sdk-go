@@ -1245,7 +1245,7 @@ Where the rules above meet the OPT or the RM, the generator decides as follows.
    Where there is none, the value the walk wrote stays and the root breaks the rule (§ [Exceptions and known gaps](#exceptions-and-known-gaps)), as it does where the OPT admits a coded value of the set that it does not list.
    A DV_PROPORTION whose OPT pins `is_integral` to true, with a `C_BOOLEAN` that admits `true` alone, takes a whole-number `numerator` and `denominator` whatever its kind, under either `ValueFill`.
    Such a proportion, a fraction and an integer fraction take the `precision` 0 wherever the OPT admits 0, whether or not the walk wrote a precision.
-   So `Fraction_validity` holds under both readings of `is_integral`: whole-number operands, as the RM floor reads it, and a `precision` of 0, as the BMM defines it ("integers, i.e. if precision is 0").
+   `is_integral` is read as [§ REQ-112](#req-112--template-less-reference-model-validation-floor) *DV_PROPORTION* reads it, so where the OPT admits no `precision` of 0, a fraction or an integer fraction meets its rules only with no `precision`, which it takes where the OPT does not require one.
 
 #### Errors
 
@@ -1393,7 +1393,7 @@ It validates where it is of the RM type the walk builds for the node and meets t
 It keeps the RM rules where:
 
 - each attribute the BMM marks mandatory is present on it and on each value it holds, as the RM floor reads presence;
-- the settles § [Precedence](#precedence) 3 and 4 run on the walk's own value (a percentage `accuracy`, a DV_PROPORTION's kind, a DV_PERIODIC_TIME_SPECIFICATION's formalism, a coded attribute's group or code set, and `Normal_range_and_status_consistency`) leave it as it is.
+- the settles § [Precedence](#precedence) 3 and 4 run on the walk's own value (a percentage `accuracy`, a DV_PROPORTION's kind, a DV_PERIODIC_TIME_SPECIFICATION's formalism, a coded attribute's group or code set, and `Normal_range_and_status_consistency`) leave it as it is, but for the `precision` 0 they give a DV_PROPORTION that has none, which no RM rule asks for.
 
 A default that does not validate, or breaks such a rule, leaves the value the `ValueFill` gives.
 Compile captures an OPT `<assumed_value>` into the constraint's `Default` field, but the generator does not read it.
@@ -1963,12 +1963,13 @@ The floor reports an ELEMENT that carries both, and one that carries neither, as
 #### DV_PROPORTION
 
 Two precision arms and the proportion-kind rules.
-`precision`, when set, ≥ -1 under the same RM rule as DV_QUANTITY (-1 means no limit); and the RM invariant `Precision_validity` (`precision = 0 implies is_integral`), read through `Is_integral_validity` as whole-number operands, so the floor reports a `precision` of 0 over a non-integral `numerator` or `denominator`.
+The floor reads the RM function `is_integral` as a `precision` of 0 where `precision` is set, as the RM defines it, and as a whole-number `numerator` and `denominator` where it is not.
+`precision`, when set, ≥ -1 under the same RM rule as DV_QUANTITY (-1 means no limit); and the RM invariants `Precision_validity` (`precision = 0 implies is_integral`) and `Is_integral_validity`, which the floor reports together as `Precision_validity`: a `precision` of 0 over a non-integral `numerator` or `denominator`.
 It also reports the proportion-kind rules:
 
 - a `type` that is not a `PROPORTION_KIND` value, 0 to 4 (`Type_validity`);
 - a `denominator` other than 1 on a unitary proportion (`Unitary_validity`) and other than 100 on a percent (`Percent_validity`);
-- a `numerator` or `denominator` that is not a whole number on a fraction or an integer fraction (`Fraction_validity`, `is_integral` read as for `Precision_validity`);
+- a fraction or an integer fraction that is not `is_integral` (`Fraction_validity`): one whose `precision` is set and is not 0, or one with no `precision` over a `numerator` or `denominator` that is not a whole number;
 - and a `denominator` of 0 (`Valid_denominator`).
 
 The *DV_INTERVAL* entry below leaves a pair of bounds unordered when either has a zero denominator.
@@ -2293,7 +2294,7 @@ On an `Issue` from the instance validators, `Value` **MUST** hold what this tabl
 | `rm_invariant` on a `DV_PROPORTION` with precision 0 and a fractional operand | the numerator and the denominator, as a `[2]float64` |
 | `rm_invariant` on a `DV_PROPORTION` `type` that is not a proportion kind (`Type_validity`) | the type |
 | `rm_invariant` on a `DV_PROPORTION` `denominator` its kind rejects, or of 0 (`Unitary_validity`, `Percent_validity`, `Valid_denominator`) | the denominator |
-| `rm_invariant` on a fraction or integer-fraction `DV_PROPORTION` with a fractional operand (`Fraction_validity`) | the numerator and the denominator, as a `[2]float64` |
+| `rm_invariant` on a fraction or integer-fraction `DV_PROPORTION` that is not `is_integral` (`Fraction_validity`) | the precision where it is set, and else the numerator and the denominator, as a `[2]float64` |
 | `rm_invariant` on a `DV_INTERVAL` whose lower bound is above its upper bound | the two bounds' magnitudes, lower first, as a `[2]float64`, a DV_TIME read in UTC where it carries a zone and the other bound carries a different one or none |
 | `rm_invariant` on a temporal `value` (`Value_valid`) | the `value` string |
 | `term_mapping_match` | the `match` |

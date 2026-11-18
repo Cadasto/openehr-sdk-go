@@ -236,8 +236,11 @@ type Issue struct {
 	//     over the wrong denominator, or for a proportion over a
 	//     denominator of 0, the denominator, an rm.Real;
 	//   - on an rm_invariant issue for a fraction or an integer fraction
-	//     with a fractional operand, the numerator and the denominator, a
-	//     [2]float64;
+	//     whose precision is set and is not 0, the precision, an
+	//     rm.Integer;
+	//   - on an rm_invariant issue for a fraction or an integer fraction
+	//     with no precision and a fractional operand, the numerator and the
+	//     denominator, a [2]float64;
 	//   - on an rm_invariant issue for interval bounds out of order, the
 	//     two bounds' magnitudes, lower first, a [2]float64, a date-time
 	//     with a zone read in UTC, and a time read in UTC where it carries

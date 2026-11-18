@@ -792,6 +792,93 @@ func TestOrderIntervalBoundsKeepIsIntegral(t *testing.T) {
 	}
 }
 
+// TestREQ107_FractionBoundTakesNoPrecisionOrZero pins the REQ-107 ordering
+// rule on the precision a fraction or an integer fraction bound takes where
+// the ordering rewrites it (proportionPrecision): the bound's own where it
+// is none or 0, else none, else 0, the first its side admits, and never 1,
+// -1 or any other, at which the RM floor reads the bound as not is_integral
+// and so breaking Fraction_validity (REQ-112). A side that admits neither
+// none nor 0 gives no precision. A ratio still keeps its own precision.
+func TestREQ107_FractionBoundTakesNoPrecisionOrZero(t *testing.T) {
+	opt := ReadVendoredOPT(t, CountIntervalOPT)
+	side := func(kind, precisionAttr string) *tcimpl.CompiledNode {
+		t.Helper()
+		bound := ProportionKindBound(RealRange(Closed(0), Closed(10)), kind, precisionAttr)
+		lower, _ := boundNodes(intervalNode(t, RetargetInterval(t, opt, "DV_PROPORTION", bound, bound)))
+		return lower
+	}
+	key := func(kind int64, precision *rm.Integer) proportionKey {
+		return proportionKey{numerator: 1, denominator: 3, kind: kind, precision: precision}
+	}
+	text := func(p *rm.Integer) string {
+		if p == nil {
+			return "none"
+		}
+		return fmt.Sprint(*p)
+	}
+	cases := []struct {
+		name string
+		side *tcimpl.CompiledNode
+		like proportionKey
+		// want is the precision taken, nil for none; ok is false where the
+		// side admits none.
+		want *rm.Integer
+		ok   bool
+	}{
+		{
+			name: "a fraction at precision 1 over a side that requires 1 or 0 takes 0",
+			side: side(IntList(3), RequiredPrecision(IntList(1, 0))),
+			like: key(pkFraction, new(rm.Integer(1))),
+			want: new(rm.Integer(0)), ok: true,
+		},
+		{
+			name: "a fraction at precision -1 over a side that admits -1 or 1, or none, takes none",
+			side: side(IntList(3), OptionalPrecision(IntList(-1, 1))),
+			like: key(pkFraction, new(rm.Integer(-1))),
+			want: nil, ok: true,
+		},
+		{
+			name: "an integer fraction with no precision over a side that requires 1, -1 or 0 takes 0",
+			side: side(IntList(4), RequiredPrecision(IntList(1, -1, 0))),
+			like: key(pkIntegerFraction, nil),
+			want: new(rm.Integer(0)), ok: true,
+		},
+		{
+			name: "a fraction at precision 2 over an open precision takes none",
+			side: side(IntList(3), ""),
+			like: key(pkFraction, new(rm.Integer(2))),
+			want: nil, ok: true,
+		},
+		{
+			name: "a fraction keeps its own precision 0",
+			side: side(IntList(3), RequiredPrecision(IntList(1, 0))),
+			like: key(pkFraction, new(rm.Integer(0))),
+			want: new(rm.Integer(0)), ok: true,
+		},
+		{
+			name: "a fraction over a side that requires 1 or -1 takes no precision",
+			side: side(IntList(3), RequiredPrecision(IntList(1, -1))),
+			like: key(pkFraction, new(rm.Integer(1))),
+			ok:   false,
+		},
+		{
+			name: "a ratio keeps its own precision 1",
+			side: side(IntList(0), RequiredPrecision(IntList(1, 0))),
+			like: key(pkRatio, new(rm.Integer(1))),
+			want: new(rm.Integer(1)), ok: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := proportionPrecision(tc.side, tc.like)
+			if ok != tc.ok || (ok && text(got) != text(tc.want)) {
+				t.Errorf("proportionPrecision(type %d, precision %s) = %s, %v; want %s, %v",
+					tc.like.kind, text(tc.like.precision), text(got), ok, text(tc.want), tc.ok)
+			}
+		})
+	}
+}
+
 // proportionWithPrecision renders a DV_PROPORTION bound as
 // numerator/denominator type t precision p, with "none" for no precision.
 func proportionWithPrecision(p rm.DVProportion) string {

@@ -541,36 +541,41 @@ func (f *findings) checkDVQuantity(value any, path issuePath) {
 //     limit" — so only precision < -1 is out of range. (DV_QUANTITY
 //     carries no `invariants` map in the vendored BMM; this arm rests on
 //     the property doc string for both carriers.)
-//   - Integrality. DV_PROPORTION's own BMM invariant
-//     `Precision_validity: precision = 0 implies is_integral`, read
-//     through `Is_integral_validity: is_integral implies
-//     (numerator.floor = numerator and denominator.floor = denominator)`.
-//     A precision of 0 therefore requires whole-number operands, and a
-//     fractional numerator or denominator breaches the RM even though the
-//     precision value itself is in range.
+//   - Integrality. The RM function is_integral is "True if the numerator
+//     and denominator values are integers, i.e. if precision is 0", so the
+//     floor reads it as a precision of 0 where precision is set, and as
+//     whole-number operands where it is not ([isIntegral]). The BMM
+//     invariants `Precision_validity: precision = 0 implies is_integral`
+//     and `Is_integral_validity: is_integral implies (numerator.floor =
+//     numerator and denominator.floor = denominator)` together require
+//     whole-number operands at a precision of 0. The floor reports a
+//     fractional numerator or denominator there under Precision_validity,
+//     even though the precision value itself is in range.
 //   - Fraction_validity: `(type = pk_fraction or type =
-//     pk_integer_fraction) implies is_integral`, with is_integral read as
-//     for Precision_validity, so a fraction or an integer fraction requires
-//     whole-number operands, whatever its precision.
+//     pk_integer_fraction) implies is_integral`, so a fraction or an
+//     integer fraction needs a precision of 0 where precision is set,
+//     whatever its operands, and whole-number operands where it is not.
 //   - Unitary_validity and Percent_validity: a unitary proportion has
 //     denominator 1, and a percent denominator 100.
 //   - Valid_denominator: `denominator /= 0.0`, on every kind.
 //
 // Each rule the value breaks is one issue of its own, with the rule as
-// Rule, so one value can draw several: a fraction of precision 0 over a
-// fractional operand breaks Precision_validity and Fraction_validity, and a
-// percent over denominator 0 Percent_validity and Valid_denominator. No rule
-// is reported twice: Is_integral_validity is decided by the integrality arm,
-// and an integrality rule names every operand that is not whole in its one
-// issue. A type that is no proportion kind draws Type_validity alone of the
-// rules keyed on the kind.
+// Rule, so one value can draw several: a fraction of precision -2 breaks
+// the precision range and Fraction_validity, and a percent over
+// denominator 0 Percent_validity and Valid_denominator. A fraction of
+// precision 0 over a fractional operand breaks Precision_validity alone,
+// since it is_integral. No rule is reported twice: Is_integral_validity is
+// decided by the integrality arm, and an integrality rule names every
+// operand that is not whole in its one issue. A type that is no proportion
+// kind draws Type_validity alone of the rules keyed on the kind.
 //
 // Diagnostics name the attribute, the rule and the offending operand, never
 // a value from the instance (REQ-168). The value the check read is carried
-// in Issue.Value: the precision on the range arm; the type on
-// Type_validity; the denominator on Unitary_validity, Percent_validity and
-// Valid_denominator; and the numerator and the denominator, as a
-// [2]float64, on Precision_validity and Fraction_validity.
+// in Issue.Value: the precision on the range arm, and on Fraction_validity
+// where precision is set; the type on Type_validity; the denominator on
+// Unitary_validity, Percent_validity and Valid_denominator; and the
+// numerator and the denominator, as a [2]float64, on Precision_validity and
+// on Fraction_validity where precision is absent.
 func (f *findings) checkDVProportion(value any, path issuePath) {
 	p, ok := asDVProportion(value)
 	if !ok {
@@ -588,17 +593,22 @@ func (f *findings) checkDVProportion(value any, path issuePath) {
 		})
 	}
 	f.checkProportionPrecision(p, path)
-	if kind == rm.ProportionKindPkFraction || kind == rm.ProportionKindPkIntegerFraction {
-		if fractional := nonIntegralOperands(p); fractional != "" {
-			f.emit(Issue{
-				Path:   path.String(),
-				Code:   "rm_invariant",
-				Layer:  LayerRM,
-				Rule:   ruleProportionFraction,
-				Detail: "DV_PROPORTION.type is a fraction kind, which requires a whole-number numerator and denominator (RM Fraction_validity); not integral: " + fractional,
-				Value:  constraints.Redact([2]float64{float64(p.Numerator), float64(p.Denominator)}),
-			})
+	if (kind == rm.ProportionKindPkFraction || kind == rm.ProportionKindPkIntegerFraction) && !isIntegral(p) {
+		issue := Issue{
+			Path:  path.String(),
+			Code:  "rm_invariant",
+			Layer: LayerRM,
+			Rule:  ruleProportionFraction,
 		}
+		const requires = "DV_PROPORTION.type is a fraction kind, which requires is_integral: a precision of 0, or with no precision a whole-number numerator and denominator (RM Fraction_validity); "
+		if p.Precision != nil {
+			issue.Detail = requires + "precision is set and not 0"
+			issue.Value = constraints.Redact(*p.Precision)
+		} else {
+			issue.Detail = requires + "no precision; not integral: " + nonIntegralOperands(p)
+			issue.Value = constraints.Redact([2]float64{float64(p.Numerator), float64(p.Denominator)})
+		}
+		f.emit(issue)
 	}
 	if kind == rm.ProportionKindPkUnitary && p.Denominator != 1 {
 		f.emit(Issue{
@@ -671,6 +681,16 @@ func isProportionKind(k rm.ProportionKind) bool {
 		return true
 	}
 	return false
+}
+
+// isIntegral reports the RM function is_integral on p: a precision of 0
+// where the precision is set, as the RM defines it, and both operands whole
+// numbers ([nonIntegralOperands]) where it is not.
+func isIntegral(p rm.DVProportion) bool {
+	if p.Precision != nil {
+		return *p.Precision == 0
+	}
+	return nonIntegralOperands(p) == ""
 }
 
 // nonIntegralOperands names the operands of p that are not whole numbers
