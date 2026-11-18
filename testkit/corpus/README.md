@@ -281,7 +281,7 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 | `sdk_crosscheck_siblings.v1` | Two uses of one OBSERVATION archetype under `content` that pin no name. Two ELEMENTs of one node id that pin no name and whose values differ in type. |
 | `sdk_crosscheck_padded.v1` | `rm_type_name` and `rm_attribute_name` values broken onto a second line, as a pretty-printer that wraps long lines writes them. |
 
-The generic EHR_STATUS and FOLDER templates, `generic_ehr_status.v1` and `generic_folder.v1`, are not vendored here: their one copy ships in the [`openehr/template/generic`](../../openehr/template/generic/) package, and [`fixtures.ListAllOPTs`](../fixtures/paths.go) lists them from there under `generic/`. The corpus ratchet (PROBE-027), PROBE-111 and the compiled-tree goldens still cover both.
+The generic EHR_STATUS and FOLDER templates, `generic_ehr_status.v1` and `generic_folder.v1`, are not vendored here: their one copy ships in the [`openehr/template/generic`](../../openehr/template/generic/) package, and [`fixtures.ListAllOPTs`](../fixtures/paths.go) lists them from there under `generic/`. The corpus ratchet (PROBE-027), PROBE-111 and the compiled-tree goldens still cover both. EHRbase and FerroEHR accept both uploads and store every instance the generator writes for them, but neither checks an EHR_STATUS or a FOLDER against its template, so the SDK's own validator is what holds such an instance to them.
 
 ### ITS-REST
 
