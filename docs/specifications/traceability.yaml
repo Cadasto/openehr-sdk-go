@@ -1437,6 +1437,7 @@ requirements:
       - openehr/templatecompile/compile_readings_test.go
       - openehr/validation/absent_part_test.go
       - openehr/validation/aqlvalidation/aqlvalidation_test.go
+      - openehr/validation/bind_stacks_internal_test.go
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/binding_trial_test.go
       - openehr/validation/character_binding_test.go
@@ -1480,6 +1481,7 @@ requirements:
       - openehr/validation/subtype_conformance_corpus_test.go
       - openehr/validation/subtype_conformance_test.go
       - openehr/validation/temporal_constraint_test.go
+      - openehr/validation/walk_alloc_test.go
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/undescribed_census_test.go
       - testkit/probes/validation/probe_025_composition_validate.go
@@ -1524,6 +1526,7 @@ requirements:
       - openehr/template/constraints/temporal_range_precision_test.go
       - openehr/template/constraints/temporal_validate_test.go
       - openehr/template/constraints/temporal_zone_order_test.go
+      - openehr/template/constraints/typed_checks_test.go
       - openehr/template/constraints/value_free_test.go
       - openehr/template/webtemplate/inputs_test.go
       - openehr/templatecompile/compile_readings_test.go
@@ -1534,8 +1537,10 @@ requirements:
       - openehr/validation/optional_string_test.go
       - openehr/validation/ordinal_symbol_test.go
       - openehr/validation/primitive_empty_part_test.go
+      - openehr/validation/primitive_violations_internal_test.go
       - openehr/validation/quantity_property_test.go
       - openehr/validation/temporal_constraint_test.go
+      - openehr/validation/walk_alloc_test.go
       - testkit/probes/template/constraint_fixtures_test.go
       - testkit/probes/template/probe_024_primitive_validate.go
       - testkit/probes/template/probes_test.go
@@ -2645,6 +2650,7 @@ requirements:
       - openehr/instance/rm_defaults_yield_test.go
       - openehr/validation/absent_part_test.go
       - openehr/validation/attribute_not_in_rm_test.go
+      - openehr/validation/bind_stacks_internal_test.go
       - openehr/validation/binding_trial_cost_internal_test.go
       - openehr/validation/binding_trial_test.go
       - openehr/validation/class_facts_internal_test.go

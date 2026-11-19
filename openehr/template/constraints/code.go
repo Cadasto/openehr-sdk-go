@@ -61,20 +61,30 @@ func (c CodePhrase) External() bool {
 }
 
 // Validate accepts either a [CodedTermRef] value or a bare string
-// (treated as the code string under any terminology). When
-// Terminology is set and the input carries a different terminology
-// id, the result includes a CodeInvalidValue violation. When
-// CodeList is non-empty the code must appear in it.
+// (treated as the code string under any terminology), and checks it
+// as [CodePhrase.ValidateCode] does.
 func (c CodePhrase) Validate(value any) []Violation {
-	var ref CodedTermRef
 	switch v := value.(type) {
 	case CodedTermRef:
-		ref = v
+		return c.ValidateCode(v)
 	case string:
-		ref = CodedTermRef{Terminology: c.Terminology, CodeString: v}
+		return c.ValidateCode(CodedTermRef{Terminology: c.Terminology, CodeString: v})
 	default:
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected CodedTermRef or string, got %T", value)}}
 	}
+}
+
+// ValidateCode checks ref against the constraint and returns what
+// [CodePhrase.Validate] returns for the same value. When Terminology is
+// set and ref carries a different terminology id, the result includes a
+// CodeInvalidValue violation. When CodeList is non-empty the code must
+// appear in it, or the result includes a CodeNotInList violation.
+//
+// It takes the code typed, so a caller that holds a [CodedTermRef] checks
+// it without converting it to any, which allocates. A [CodeReference] has
+// ValidateCode through the code phrase it carries, and judges a code by
+// that code phrase alone.
+func (c CodePhrase) ValidateCode(ref CodedTermRef) []Violation {
 	var out []Violation
 	if c.Terminology != "" && ref.Terminology != "" && ref.Terminology != c.Terminology {
 		out = append(out, Violation{

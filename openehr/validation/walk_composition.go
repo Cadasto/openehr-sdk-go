@@ -296,15 +296,12 @@ func childIdentity(c *tcimpl.CompiledNode) string {
 // appendPrimitiveIssues runs the REQ-103 primitive constraint pc against
 // the RM value bound to its node, at path, and appends to issues one Issue
 // per Violation; the path is written only when there is one.
-// The constraint's expected input is computed via dataValueInput;
-// for non-DataValue RM types that map to a primitive (e.g.
-// CODE_PHRASE directly under category/defining_code → C_CODE_PHRASE),
-// the value is passed through as-is.
+// The constraint judges what [primitiveViolations] reads of the value.
 //
 // The violation's Detail is value-free, and the value it read moves
 // over to Issue.Value unchanged, still redacted (REQ-168).
 func appendPrimitiveIssues(issues []Issue, rmValue any, path issuePath, pc constraints.PrimitiveConstraint) []Issue {
-	violations := pc.Validate(primitiveInput(rmValue))
+	violations := primitiveViolations(pc, rmValue)
 	if len(violations) == 0 {
 		return issues
 	}
@@ -323,6 +320,37 @@ func appendPrimitiveIssues(issues []Issue, rmValue any, path issuePath, pc const
 	return issues
 }
 
+// primitiveViolations returns what pc.Validate(primitiveInput(rmValue))
+// returns, pc being the primitive constraint of the node rmValue is bound
+// to. A code phrase constraint, a code reference's included, a quantity
+// constraint and an ordinal constraint check a value [primitiveInput] reads
+// as their structured input with their typed check instead
+// ([constraints.CodePhrase.ValidateCode],
+// [constraints.DvQuantity.ValidateQuantity],
+// [constraints.CDvOrdinal.ValidateOrdinal]), which returns what Validate
+// returns for the same value and does not box the input into an any.
+func primitiveViolations(pc constraints.PrimitiveConstraint, rmValue any) []constraints.Violation {
+	switch c := pc.(type) {
+	case constraints.CodePhrase:
+		if ref, ok := codedTermOf(rmValue); ok {
+			return c.ValidateCode(ref)
+		}
+	case constraints.CodeReference:
+		if ref, ok := codedTermOf(rmValue); ok {
+			return c.ValidateCode(ref)
+		}
+	case constraints.DvQuantity:
+		if q, ok := quantityOf(rmValue); ok {
+			return c.ValidateQuantity(q)
+		}
+	case constraints.CDvOrdinal:
+		if s, ok := ordinalOf(rmValue); ok {
+			return c.ValidateOrdinal(s)
+		}
+	}
+	return pc.Validate(primitiveInput(rmValue))
+}
+
 // primitiveInput converts an RM value into the Go value the typed
 // primitive validator expects. Handles six layers:
 //
@@ -330,7 +358,7 @@ func appendPrimitiveIssues(issues []Issue, rmValue any, path issuePath, pc const
 //     via dataValueInput — REQ-103 primitive types that bind to
 //     ELEMENT.value.
 //   - rm.CodePhrase directly (e.g. category/defining_code) — bind
-//     to constraints.CodedTermRef.
+//     to constraints.CodedTermRef, as [codedTermOf] reads it.
 //   - an optional primitive the RM holds by pointer (an *rm.Integer
 //     precision, an *rm.Real accuracy, a *bool accuracy_is_percent):
 //     the value it points to, read as that value is
@@ -353,21 +381,11 @@ func primitiveInput(rmValue any) any {
 		}
 		return dv
 	}
+	if ref, ok := codedTermOf(rmValue); ok {
+		return ref
+	}
 	value := rmbind.PrimitiveValue(rmValue)
 	switch v := value.(type) {
-	case rm.CodePhrase:
-		return constraints.CodedTermRef{
-			Terminology: v.TerminologyID.Value,
-			CodeString:  v.CodeString,
-		}
-	case *rm.CodePhrase:
-		if v == nil {
-			return constraints.CodedTermRef{}
-		}
-		return constraints.CodedTermRef{
-			Terminology: v.TerminologyID.Value,
-			CodeString:  v.CodeString,
-		}
 	case *string:
 		// An optional String attribute: validate the text, not the pointer.
 		if v == nil {

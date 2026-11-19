@@ -39,7 +39,13 @@
 //
 // Each constraint exposes Validate(value any) []Violation. A nil
 // (empty) result means the value satisfies every clause; a non-empty
-// slice lists every clause that failed. Validators are pure functions.
+// slice lists every clause that failed. Three constraints also take
+// their structured input typed, so a caller that holds one checks it
+// without converting it to any, which allocates:
+// [CodePhrase.ValidateCode], which a [CodeReference] has through the code
+// phrase it carries, [DvQuantity.ValidateQuantity] and
+// [CDvOrdinal.ValidateOrdinal]. Each returns what Validate returns for
+// the same value. Validators are pure functions.
 // They do not consult terminology services, time zones, or any
 // external state, so the result depends only on the constraint
 // values and the input.
