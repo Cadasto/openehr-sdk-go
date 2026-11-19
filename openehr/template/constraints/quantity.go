@@ -133,26 +133,25 @@ func (c DvQuantity) ValidateQuantity(q QuantityValue) []Violation {
 		return c.propertyViolations(q)
 	}
 	// Any entry with the supplied units that admits the value is
-	// enough. When none does, report the ranges of the first one.
-	// Mismatched units short-circuits to CodeUnitUnknown so the
-	// violation list does not pile up a spurious out-of-range against
-	// an unrelated unit.
-	var first []Violation
-	matched := false
-	for _, u := range c.Units {
+	// enough. When none does, report the ranges of the first one, built
+	// only then, so an entry that refuses the value before a later one
+	// admits it costs nothing. Mismatched units short-circuits to
+	// CodeUnitUnknown so the violation list does not pile up a spurious
+	// out-of-range against an unrelated unit.
+	first := -1
+	for i, u := range c.Units {
 		if u.Units != q.Units {
 			continue
 		}
-		out := u.violations(q)
-		if len(out) == 0 {
+		if !u.magnitudeOutside(q) && !u.precisionOutside(q) {
 			return nil
 		}
-		if !matched {
-			first, matched = out, true
+		if first < 0 {
+			first = i
 		}
 	}
-	if matched {
-		return first
+	if first >= 0 {
+		return c.Units[first].violations(q)
 	}
 	allowed := make([]string, len(c.Units))
 	for i, u := range c.Units {
@@ -187,14 +186,14 @@ func (c DvQuantity) propertyViolations(q QuantityValue) []Violation {
 // and precision ranges.
 func (u QuantityUnit) violations(q QuantityValue) []Violation {
 	var out []Violation
-	if u.Magnitude.IsBounded() && !u.Magnitude.Contains(q.Magnitude) {
+	if u.magnitudeOutside(q) {
 		out = append(out, Violation{
 			Code:   CodeOutOfRange,
 			Detail: fmt.Sprintf("magnitude outside %s for units %q", u.Magnitude, u.Units),
 			Value:  Redact(q.Magnitude),
 		})
 	}
-	if u.Precision.IsBounded() && q.Precision >= 0 && !u.Precision.Contains(float64(q.Precision)) {
+	if u.precisionOutside(q) {
 		out = append(out, Violation{
 			Code:   CodeOutOfRange,
 			Detail: fmt.Sprintf("precision outside %s for units %q", u.Precision, u.Units),
@@ -202,6 +201,18 @@ func (u QuantityUnit) violations(q QuantityValue) []Violation {
 		})
 	}
 	return out
+}
+
+// magnitudeOutside reports whether q's magnitude falls outside u's bounded
+// magnitude range.
+func (u QuantityUnit) magnitudeOutside(q QuantityValue) bool {
+	return u.Magnitude.IsBounded() && !u.Magnitude.Contains(q.Magnitude)
+}
+
+// precisionOutside reports whether q states a precision that falls outside
+// u's bounded precision range; a negative precision states none.
+func (u QuantityUnit) precisionOutside(q QuantityValue) bool {
+	return u.Precision.IsBounded() && q.Precision >= 0 && !u.Precision.Contains(float64(q.Precision))
 }
 
 // OrdinalSymbol is one (value, symbol) pair from a DV_ORDINAL

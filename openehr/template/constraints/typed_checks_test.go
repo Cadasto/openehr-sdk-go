@@ -192,13 +192,17 @@ func TestREQ103_TypedChecksDoNotBoxTheirInput(t *testing.T) {
 	code := constraints.CodePhrase{Terminology: "openehr", CodeList: []string{"433", "434"}}
 	reference := constraints.CodeReference{CodePhrase: code, ReferenceSetURI: "terminology:openehr"}
 	ref := constraints.CodedTermRef{Terminology: "openehr", CodeString: "434"}
-	// The first entry with the value's units admits it: a same-units entry
-	// that refuses the value builds its violations before a later one
-	// admits it, which allocates whatever the input's type.
+	// The first entry with the value's units admits it; laterEntry lists
+	// one that refuses it first, whose violations are not built while a
+	// later entry admits the value.
 	listed := constraints.DvQuantity{Units: []constraints.QuantityUnit{
 		{Units: "kg", Magnitude: closed(0, 1000)},
 		{Units: "mm", Magnitude: closed(0, 10), Precision: closed(0, 2)},
 		{Units: "mm", Magnitude: closed(100, 200)},
+	}}
+	laterEntry := constraints.DvQuantity{Units: []constraints.QuantityUnit{
+		{Units: "mm", Magnitude: closed(100, 200)},
+		{Units: "mm", Magnitude: closed(0, 10), Precision: closed(0, 2)},
 	}}
 	property := constraints.DvQuantity{PropertyUnits: []string{"m", "cm", "mm"}}
 	q := constraints.QuantityValue{Magnitude: 5, Units: "mm", Precision: 1}
@@ -215,6 +219,7 @@ func TestREQ103_TypedChecksDoNotBoxTheirInput(t *testing.T) {
 		{name: "CodePhrase.ValidateCode", check: func() []constraints.Violation { return code.ValidateCode(ref) }},
 		{name: "CodeReference.ValidateCode", check: func() []constraints.Violation { return reference.ValidateCode(ref) }},
 		{name: "DvQuantity.ValidateQuantity, units listed", check: func() []constraints.Violation { return listed.ValidateQuantity(q) }},
+		{name: "DvQuantity.ValidateQuantity, a later same-units entry admits", check: func() []constraints.Violation { return laterEntry.ValidateQuantity(q) }},
 		{name: "DvQuantity.ValidateQuantity, property units", check: func() []constraints.Violation { return property.ValidateQuantity(q) }},
 		{name: "CDvOrdinal.ValidateOrdinal", check: func() []constraints.Violation { return ordinal.ValidateOrdinal(s) }},
 	}
