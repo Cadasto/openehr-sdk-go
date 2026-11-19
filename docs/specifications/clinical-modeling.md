@@ -219,10 +219,10 @@ The closed set of REQ-103 primitive constraints maps **one-to-one** to ADL 1.4 O
 | `C_TIME` | `CTime` | `Pattern` (ADL 1.4 time pattern, raw), `Range` (`TemporalRange`), `TimezoneValidity` |
 | `C_DATE_TIME` | `CDateTime` | `Pattern` (ADL 1.4 date/time pattern, raw), `Range` (`TemporalRange`), `TimezoneValidity` |
 | `C_DURATION` | `CDuration` | `Pattern` (ADL 1.4 duration pattern, raw), `Range` (`TemporalRange`) |
-| `C_CODE_PHRASE` | `CodePhrase` | `Terminology`, optional `CodeList`, `External()` predicate |
+| `C_CODE_PHRASE` | `CodePhrase` | `Terminology`, optional `CodeList`, `External()` predicate, `ValidateCode` |
 | `C_CODE_REFERENCE` | `CodeReference` | the code phrase constraint it refines, with the `CodePhrase` surface, and the `reference_set_uri` that names its value set |
-| `C_DV_QUANTITY` | `DvQuantity` | enumerated `Units` (each with magnitude / precision `NumericRange`), optional `Property` (CodedTermRef), `PropertyUnits` (the UCUM units the property admits, primary units first) |
-| `C_DV_ORDINAL` | `CDvOrdinal` | `Values` (closed list of `(int, CodedTermRef)` pairs) |
+| `C_DV_QUANTITY` | `DvQuantity` | enumerated `Units` (each with magnitude / precision `NumericRange`), optional `Property` (CodedTermRef), `PropertyUnits` (the UCUM units the property admits, primary units first), `ValidateQuantity` |
+| `C_DV_ORDINAL` | `CDvOrdinal` | `Values` (closed list of `(int, CodedTermRef)` pairs), `ValidateOrdinal` |
 | `CONSTRAINT_REF` | `ConstraintRef` | `Reference` (the `ac` code that names the value set; the node's `RMTypeName()` is the RM type it constrains, typically `CODE_PHRASE`). The value set is external terminology, so `Validate` reports no violation for a value of that RM type ([§ REQ-102](#req-102--composition-validation) *Terminology binding value-set*) |
 
 Each type implements the sealed interface `constraints.PrimitiveConstraint`:
@@ -324,6 +324,9 @@ Concretely:
   An empty `Values` list constrains the type only: `Validate` **MUST** accept any `int` or `OrdinalSymbol` against it, because an OPT that names `DV_ORDINAL` and lists no pairs leaves the value open, and it **MUST** refuse any other Go type with `CodeWrongType`.
 
 A value whose Go type is not in the accepted set returns a single `CodeWrongType` violation; this is a contract failure on the caller side, not a constraint failure.
+
+Three constraints also take their structured input typed, so a caller that holds one checks it without converting it to `any`: `CodePhrase.ValidateCode` takes a `CodedTermRef`, and a `CodeReference` has it through the code phrase it carries; `DvQuantity.ValidateQuantity` takes a `QuantityValue`; `CDvOrdinal.ValidateOrdinal` takes an `OrdinalSymbol`.
+Each **MUST** return what `Validate` returns for the same value.
 
 A constraint that carries a malformed value of its own **MUST** report a `CodeInvalidValue` on every value, as an unparseable `CString` pattern does.
 Its malformed values are:
