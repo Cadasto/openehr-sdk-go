@@ -1832,6 +1832,7 @@ requirements:
     tests:
       - openehr/aql/internal/semcheck/semcheck_test.go
       - openehr/aql/lint/extract_test.go
+      - openehr/aql/lint/letter_case_test.go
       - openehr/aql/lint/lint_test.go
       - openehr/aql/lint/pathshape_fanout_test.go
       - openehr/aql/lint/pathshape_internal_test.go
@@ -1841,6 +1842,7 @@ requirements:
       - openehr/aql/lint/semantic_test.go
       - openehr/aql/lint/span_test.go
       - openehr/aql/parse/ast_test.go
+      - openehr/aql/parse/letter_case_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/roundtrip_test.go
       - openehr/aql/parse/sll_internal_test.go
@@ -2123,6 +2125,7 @@ requirements:
       - openehr/aql/parse/emit_verify_internal_test.go
       - openehr/aql/parse/emit_verify_test.go
       - openehr/aql/parse/identifier_parity_test.go
+      - openehr/aql/parse/letter_case_test.go
       - openehr/aql/parse/literal_roundtrip_test.go
       - openehr/aql/parse/predicate_confrontation_test.go
       - openehr/aql/parse/predicate_guard_test.go

@@ -304,8 +304,8 @@ func joinIssues(groups ...[]Issue) []Issue {
 	return out
 }
 
-// shapeIssues runs the Layer-2 shape checks: alias binding,
-// identifiable scope, the SELECT * relaxation warning, and the TOP-clause
+// shapeIssues runs the Layer-2 shape checks: alias binding, attribute
+// case, identifiable scope, the SELECT * relaxation warning, and the TOP-clause
 // group. SELECT/FROM presence is guaranteed by a successful parse (the
 // grammar requires both), so no aql_select / aql_from issue can arise here.
 // q is the request envelope from [Options.Query] (nil when the caller supplied
@@ -328,13 +328,17 @@ func shapeIssues(doc *parse.Document, md queryFacts, q *aql.Query) []Issue {
 		issues = append(issues, Issue{
 			Code:     "aql_unknown_alias",
 			Path:     displayPath(p),
-			Detail:   fmt.Sprintf("path alias %q is not bound in FROM/CONTAINS", p.Alias),
+			Detail:   fmt.Sprintf("path alias %q is not bound in FROM/CONTAINS", p.Alias) + aliasSpellingHint(p, doc),
 			Severity: Error,
 			// The alias is the path's first token, so Pos starts it: the span
 			// covers the unbound alias itself, not the whole path.
 			Span: spanOfText(p.Pos, p.Alias),
 		})
 	}
+
+	// aql_path_attribute_case — an attribute name is not folded the way a
+	// keyword or class name is, so an upper-case letter in one names nothing.
+	issues = append(issues, attributeCaseIssues(doc)...)
 
 	// aql_from_archetype — the query SHOULD identify what it selects: at
 	// least one archetype HRID, a $param archetype predicate, a VERSION
@@ -430,14 +434,38 @@ func namesSelectAlias(p parse.IdentifiedPath, selectAliases nameSet) bool {
 	return selectAliases.has(p.Alias)
 }
 
+// aliasSpellingHint is the clause aql_unknown_alias appends when the unbound
+// alias differs only in letter case from a declared one. An alias may be
+// written in any case, but every use repeats the declared spelling (REQ-109
+// § Layer 2), so a case-only near miss is the likely cause and naming the
+// declaration is the fix. A SELECT `AS` alias is offered only where one can
+// resolve, for a bare ORDER BY key. It runs on the failure path only.
+func aliasSpellingHint(p parse.IdentifiedPath, doc *parse.Document) string {
+	folded := asciiLower(p.Alias)
+	for _, ce := range doc.Classes {
+		if ce.Alias != "" && asciiLower(ce.Alias) == folded {
+			return fmt.Sprintf("; an alias keeps the spelling it is declared with, and FROM/CONTAINS declares %q", ce.Alias)
+		}
+	}
+	if p.Clause == parse.ClauseOrderBy && len(p.Segments) == 0 && p.Predicate == "" {
+		for _, a := range doc.SelectAliases {
+			if asciiLower(a) == folded {
+				return fmt.Sprintf("; an alias keeps the spelling it is declared with, and SELECT declares %q", a)
+			}
+		}
+	}
+	return ""
+}
+
 // hasIdentifiableScope reports whether FROM / CONTAINS names a literal
 // archetype HRID (bare, named, or inside an AND / OR bracket), a `$param`
 // archetype bracket, a VERSION operand or an EHR root. A `$param` or a node id
 // inside a junction bracket does not count: only the whole `[$param]` bracket
-// sets ParamArchetype.
+// sets ParamArchetype. The EHR root is matched in any letter case, as every
+// other check reads a class name (REQ-109 § Layer 2).
 func hasIdentifiableScope(doc *parse.Document) bool {
 	return slices.ContainsFunc(doc.Classes, func(ce parse.ClassExpr) bool {
-		return len(classArchetypes(ce)) > 0 || ce.ParamArchetype || ce.Version || ce.RMType == "EHR"
+		return len(classArchetypes(ce)) > 0 || ce.ParamArchetype || ce.Version || asciiUpperRMType(ce.RMType) == "EHR"
 	})
 }
 
