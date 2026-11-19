@@ -19,13 +19,14 @@ import (
 
 // A run is zeroed over what a dropped run left in the stack's array, and
 // ends at its own last value, so an append to it cannot write into a run
-// pushed above it.
+// pushed above it. The stack has room to spare, as it has once a walk has
+// grown it, so the run's end is all that caps it.
 func TestPushRun_ZeroedAndCapped(t *testing.T) {
 	t.Parallel()
-	var stack []int
+	stack := make([]int, 0, 8)
 	outer := pushRun(&stack, 2)
 	if len(outer) != 2 || cap(outer) != 2 {
-		t.Fatalf("pushRun(empty stack, 2): len %d, cap %d, want 2, 2", len(outer), cap(outer))
+		t.Fatalf("pushRun(empty stack with room for 8, 2): len %d, cap %d, want 2, 2", len(outer), cap(outer))
 	}
 	outer[0], outer[1] = 7, 8
 	inner := pushRun(&stack, 1)
