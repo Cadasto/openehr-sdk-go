@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# corpus-pins.sh — check the EHRbase corpora under testkit/corpus/ against
+# corpus-pins.sh — check the corpora vendored under testkit/corpus/ against
 # their one pin per upstream repository, testkit/corpus/UPSTREAM_PINS.txt.
 #
 # Several corpora are vendored from the same upstream repository by different
@@ -13,6 +13,7 @@
 #   flat-conformance/MANIFEST.txt   source_repo: + commit:
 #   crossformat/MANIFEST.txt        every `source` record (repo URL + commit)
 #   ehrbase-service/MANIFEST.txt    every `source` record (repo URL + commit)
+#   reference/MANIFEST.txt          every `source` record (repo URL + commit)
 #   aql/suites/AQL_SOURCE.txt       source_repo: + commit:
 #   ROBOT_SOURCE.txt                source_repo: + commit:
 #
@@ -66,7 +67,7 @@ records() {
       echo "$f - -"
     fi
   done
-  for f in crossformat/MANIFEST.txt ehrbase-service/MANIFEST.txt; do
+  for f in crossformat/MANIFEST.txt ehrbase-service/MANIFEST.txt reference/MANIFEST.txt; do
     if [[ -f "$CORPUS/$f" ]]; then
       awk -F'\t' -v f="$f" '$1 == "source" { sub("^https://github.com/", "", $3); print f, $3, $4 }' "$CORPUS/$f"
     else

@@ -71,7 +71,6 @@ var overAsked = []string{
 var templateRoots = []string{
 	filepath.Join("testdata"),
 	filepath.Join("..", "..", "..", "testkit", "corpus"),
-	filepath.Join("..", "..", "template", "generic"),
 	filepath.Join("..", "..", "..", "internal", "templatecompile", "testdata"),
 	filepath.Join("..", "..", "serialize", "simplified", "testdata"),
 }

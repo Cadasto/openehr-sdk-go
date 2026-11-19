@@ -89,7 +89,6 @@ requirements:
       - openehr/serialize/imports_test.go
       - openehr/serialize/simplified/independence_test.go
       - openehr/template/constraints/pure_imports_test.go
-      - openehr/template/generic/imports_test.go
       - openehr/template/imports_test.go
       - openehr/template/webtemplate/independence_test.go
       - openehr/templatecompile/imports_test.go
@@ -2844,19 +2843,7 @@ requirements:
       - testkit/probes/definition/probes_test.go
 
   - id: REQ-178
-    title: Generic templates shipped with the SDK
-    canonical: docs/specifications/clinical-modeling.md#req-178--generic-templates-shipped-with-the-sdk
-    status: draft
-    implementation: landed
-    packages:
-      - openehr/template/generic
-      - testkit/fixtures
-    probes: [PROBE-027, PROBE-111]
-    tests:
-      - openehr/template/generic/compile_internal_test.go
-      - openehr/template/generic/example_test.go
-      - openehr/template/generic/generic_test.go
-      - openehr/template/generic/imports_test.go
-      - testkit/fixtures/paths_test.go
-      - testkit/probes/template/probe_111_operational_template_round_trip.go
-      - testkit/probes/template/probe_111_operational_template_round_trip_test.go
+    title: Generic templates shipped with the SDK (retired)
+    canonical: docs/specifications/retired-requirements.md#req-178--generic-templates-shipped-with-the-sdk
+    status: deprecated
+    implementation: retired

@@ -96,9 +96,9 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         fmt fmt-check vet lint mod-tidy \
         test test-race test-fused \
         codegen termgen aqlgen spec-generate \
-        bmm-sync bmm-drift its-xml-sync its-xml-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync ehrbase-service-sync corpus-pins-drift \
+        bmm-sync bmm-drift its-xml-sync its-xml-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync ehrbase-service-sync reference-content-sync corpus-pins-drift \
         terminology-sync terminology-drift \
-        mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check its-xml-check flat-check crossformat-check ehrbase-service-check corpus-pins-check terminology-check \
+        mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check its-xml-check flat-check crossformat-check ehrbase-service-check reference-content-check corpus-pins-check terminology-check \
         operational-template-schema-check \
         spec-check sdd-check ci \
         spec-context spec-kwdiff probe-status probe-record cdr-crosscheck \
@@ -228,7 +228,10 @@ crossformat-sync: ## Vendor the cross-format sets from local EHRbase clones
 ehrbase-service-sync: ## Vendor the EHRbase server test templates from a local clone
 	@./scripts/ingest-ehrbase-service.sh ingest
 
-corpus-pins-drift: ## Check the EHRbase corpus pins; report how far each is behind (network)
+reference-content-sync: ## Vendor the openehr-reference-content templates at their pin from a local clone
+	@./scripts/ingest-reference-content.sh ingest
+
+corpus-pins-drift: ## Check the corpus pins; report how far each is behind (network)
 	@./scripts/corpus-pins.sh drift
 
 terminology-sync: ## Vendor the openEHR terminology and regenerate it (network)
@@ -275,6 +278,9 @@ crossformat-check: ## Verify the vendored cross-format sets (offline)
 ehrbase-service-check: ## Verify the vendored EHRbase server test templates (offline)
 	@./scripts/ingest-ehrbase-service.sh verify
 
+reference-content-check: ## Verify the vendored openehr-reference-content templates (offline)
+	@./scripts/ingest-reference-content.sh verify
+
 corpus-pins-check: ## Fail if an EHRbase corpus is not at its upstream pin (offline)
 	@./scripts/corpus-pins.sh verify
 
@@ -285,16 +291,16 @@ terminology-check: ## Verify the vendored terminology (offline sha256)
 # the dev container sees too, it writes the pinned ITS-XML schemas with their
 # namespace read as the http://schemas.openehr.org/v1 that OPTs and the SDK
 # write, and the SDK's re-encoding of every OPT PROBE-111 covers, the corpus's
-# and those in openehr/template/generic, that the ratchet
+# reference/ included, that the ratchet
 # (testkit/probes/template/probe_111_schema_ratchet.txt) does not list. Then
 # xmllint validates those documents, and each of those OPTs as written,
 # against AM/Release-1.4/Template.xsd. It fails on a re-encoded document the
 # schemas refuse, on an OPT they refuse as written that the ratchet does not
-# list, and on a ratchet entry they now accept. The ratchet names a corpus OPT
-# by its path below testkit/corpus and a generic one as generic/<file>.
+# list, and on a ratchet entry they now accept. The ratchet names an OPT by
+# its path below testkit/corpus.
 # mktemp makes the folder private to the host user; it is opened to all so
 # that the dev container's user, whose uid need not be the host's, can read it.
-operational-template-schema-check: ## Validate the corpus and generic OPTs, as written and re-encoded, against the pinned AM 1.4 schemas (xmllint)
+operational-template-schema-check: ## Validate the corpus OPTs, as written and re-encoded, against the pinned AM 1.4 schemas (xmllint)
 	@set -e; mkdir -p .tmp; \
 	dir="$$(mktemp -d .tmp/operational-template-schema-check.XXXXXX)"; \
 	trap '[ -n "$$dir" ] && rm -rf "$$dir"' EXIT; \
@@ -305,8 +311,8 @@ operational-template-schema-check: ## Validate the corpus and generic OPTs, as w
 	done; \
 	out="$$($(GO) test ./testkit/probes/template -run '^TestProbe111WriteSchemaDocuments$$' -count=1 -args -schema-documents "$$dir" 2>&1)" \
 	  || { printf '%s\n' "$$out"; echo "operational-template-schema-check: writing the re-encoded documents failed"; exit 1; }; \
-	files="$$(find testkit/corpus openehr/template/generic "$$dir/re-encoded" -name '*.opt' | wc -l | tr -d ' ')"; \
-	$(XMLLINT_RUN) find testkit/corpus openehr/template/generic "$$dir/re-encoded" -name '*.opt' \
+	files="$$(find testkit/corpus "$$dir/re-encoded" -name '*.opt' | wc -l | tr -d ' ')"; \
+	$(XMLLINT_RUN) find testkit/corpus "$$dir/re-encoded" -name '*.opt' \
 	  -exec xmllint --noout --nonet --schema "$$dir/schemas/components/AM/Release-1.4/Template.xsd" {} + \
 	  > "$$dir/xmllint.log" 2>&1 || true; \
 	judged="$$(grep -cE ' (validates|fails to validate)$$' "$$dir/xmllint.log" || true)"; \
@@ -319,15 +325,13 @@ operational-template-schema-check: ## Validate the corpus and generic OPTs, as w
 	  echo "operational-template-schema-check: the pinned schemas refuse the SDK's re-encoding of the OPTs above"; exit 1; \
 	fi; \
 	sed -n -e 's|^testkit/corpus/\(.*\) fails to validate$$|\1|p' \
-	  -e 's|^openehr/template/generic/\(.*\) fails to validate$$|generic/\1|p' \
 	  "$$dir/xmllint.log" | LC_ALL=C sort > "$$dir/refused.txt"; \
 	LC_ALL=C sort "$$dir/ratchet.txt" > "$$dir/listed.txt"; \
 	unlisted="$$(LC_ALL=C comm -23 "$$dir/refused.txt" "$$dir/listed.txt")"; \
 	stale="$$(LC_ALL=C comm -13 "$$dir/refused.txt" "$$dir/listed.txt")"; \
 	if [ -n "$$unlisted" ]; then \
 	  printf '%s\n' "$$unlisted" | while IFS= read -r f; do \
-	    case "$$f" in generic/*) p="openehr/template/$$f" ;; *) p="testkit/corpus/$$f" ;; esac; \
-	    grep -F "$$p" "$$dir/xmllint.log"; \
+	    grep -F "testkit/corpus/$$f" "$$dir/xmllint.log"; \
 	  done; \
 	  echo "operational-template-schema-check: the pinned schemas refuse these OPTs as written; list each in the ratchet with its reason:"; \
 	  printf '%s\n' "$$unlisted" | sed 's/^/  /'; exit 1; \

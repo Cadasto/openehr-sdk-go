@@ -18,10 +18,10 @@ var schemaDocuments = flag.String("schema-documents", "",
 	"write the re-encoded operational templates PROBE-111's schema leg validates to this folder, relative to the module root (make operational-template-schema-check)")
 
 // probe111CorpusFloor is the number of operational templates PROBE-111
-// covers today: 91, the corpus's 89 and the 2 generic templates. A walk that
-// finds fewer fails, so a corpus that silently empties, or a walk that stops
-// finding a folder, cannot pass as clean. Raise it when the corpus grows.
-const probe111CorpusFloor = 91
+// covers today: 99, the corpus's 89 and the 10 reference templates. A walk
+// that finds fewer fails, so a corpus that silently empties, or a walk that
+// stops finding a folder, cannot pass as clean. Raise it when the corpus grows.
+const probe111CorpusFloor = 99
 
 // probe111Templates returns the names of every operational template PROBE-111
 // covers, the corpus's and the generic ones, sorted.
@@ -46,14 +46,14 @@ func readTemplate(t *testing.T, name string) []byte {
 }
 
 // PROBE-111 (REQ-176 § Round trip): every operational template the
-// corpus vendors, and every generic one the SDK ships, decodes with nothing
+// corpus vendors decodes with nothing
 // unmatched and nothing the strict mode refuses, and re-encodes to a document
 // that decodes to the same value and holds the input's content, compared
 // after the normalisation and rewrites REQ-176 names.
 func TestProbe111OperationalTemplateRoundTrip(t *testing.T) {
 	names := probe111Templates(t)
 	if len(names) < probe111CorpusFloor {
-		t.Fatalf("PROBE-111 covers %d operational templates under %s and %s, want at least %d", len(names), fixtures.CorpusRoot(), fixtures.GenericTemplatesDir(), probe111CorpusFloor)
+		t.Fatalf("PROBE-111 covers %d operational templates under %s, want at least %d", len(names), fixtures.CorpusRoot(), probe111CorpusFloor)
 	}
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestProbe111OperationalTemplateRoundTrip(t *testing.T) {
 
 // PROBE-111 (REQ-176): the walk reaches the operational templates beside the
 // cross-format sets, which fixtures.ListAllOPTs leaves out, so the probe
-// covers the whole corpus and the generic templates.
+// covers the whole corpus.
 func TestProbe111OperationalTemplatesReachTheCrossFormatSets(t *testing.T) {
 	names := probe111Templates(t)
 	listed, err := fixtures.ListAllOPTs()
@@ -92,30 +92,31 @@ func TestProbe111OperationalTemplatesReachTheCrossFormatSets(t *testing.T) {
 	}
 }
 
-// PROBE-111 (REQ-176, REQ-178): the one list of the templates the probe
-// covers holds the two generic templates the SDK ships, each once, read from
-// their package, the one copy of each. No corpus template takes a generic/
-// name: Probe111TemplatePath resolves such a name to the generic templates'
-// folder, so a corpus file named that way would never be read.
-func TestProbe111CoversTheGenericTemplates(t *testing.T) {
-	var generic []string
-	for _, name := range probe111Templates(t) {
-		if strings.HasPrefix(name, "generic/") {
-			generic = append(generic, name)
+// PROBE-111 (REQ-176): the probe covers each reference template the corpus
+// vendors from openehr-reference-content, as fixtures.ListAllOPTs lists it.
+func TestProbe111CoversTheReferenceTemplates(t *testing.T) {
+	names := probe111Templates(t)
+	listed, err := fixtures.ListAllOPTs()
+	if err != nil {
+		t.Fatalf("fixtures.ListAllOPTs: %v", err)
+	}
+	n := 0
+	for _, ref := range listed {
+		stem, ok := strings.CutPrefix(ref.Name, "reference/")
+		if !ok {
+			continue
+		}
+		n++
+		name := "reference/templates/" + stem + ".opt"
+		if !slices.Contains(names, name) {
+			t.Errorf("Probe111OperationalTemplates() has no %s, which fixtures.ListAllOPTs lists as %s", name, ref.Name)
+		}
+		if path := probes.Probe111TemplatePath(name); path != ref.Path {
+			t.Errorf("Probe111TemplatePath(%q) = %s, want %s", name, path, ref.Path)
 		}
 	}
-	want := []string{"generic/generic_ehr_status.v1.opt", "generic/generic_folder.v1.opt"}
-	if !slices.Equal(generic, want) {
-		t.Errorf("Probe111OperationalTemplates() lists %q under generic/, want %q: the generic templates, each once, and no corpus template", generic, want)
-	}
-	for _, name := range generic {
-		path := probes.Probe111TemplatePath(name)
-		if want := filepath.Join(fixtures.GenericTemplatesDir(), strings.TrimPrefix(name, "generic/")); path != want {
-			t.Errorf("Probe111TemplatePath(%q) = %s, want %s", name, path, want)
-		}
-		if _, err := os.Stat(path); err != nil {
-			t.Errorf("Probe111TemplatePath(%q): %v", name, err)
-		}
+	if n == 0 {
+		t.Errorf("fixtures.ListAllOPTs lists no reference/ template, want the ones under %s", fixtures.ReferenceTemplatesDir())
 	}
 }
 
@@ -129,7 +130,7 @@ func TestProbe111SchemaRatchetNamesCorpusTemplates(t *testing.T) {
 	names := probe111Templates(t)
 	for _, e := range entries {
 		if !slices.Contains(names, e.Name) {
-			t.Errorf("the schema ratchet lists %q, which names no operational template under %s or %s", e.Name, fixtures.CorpusRoot(), fixtures.GenericTemplatesDir())
+			t.Errorf("the schema ratchet lists %q, which names no operational template under %s", e.Name, fixtures.CorpusRoot())
 		}
 	}
 }

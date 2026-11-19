@@ -1,5 +1,5 @@
-# PROBE-111 schema ratchet: the operational templates PROBE-111 covers, the
-# corpus's and the generic ones in openehr/template/generic, that the pinned
+# PROBE-111 schema ratchet: the operational templates PROBE-111 covers, every
+# one under testkit/corpus, that the pinned
 # AM Release-1.4 schemas (resources/its-xml, targetNamespace read as
 # http://schemas.openehr.org/v1) refuse as written. Such a template goes
 # through the round-trip leg only, until a re-pin admits it.

@@ -71,10 +71,19 @@ const encodedRoot = "COMPOSITION"
 // expected to have. A template rooted anywhere else, or an entry whose OPT is
 // now rooted at a COMPOSITION, fails the guard instead of passing as a skip.
 var nonCompositionRoots = map[string]string{
-	"Address.v2.opt":            "ADDRESS",
-	"TestPerson.v2.opt":         "PERSON",
-	"generic_ehr_status.v1.opt": "EHR_STATUS",
-	"generic_folder.v1.opt":     "FOLDER",
+	"Address.v2.opt":    "ADDRESS",
+	"TestPerson.v2.opt": "PERSON",
+	// The reference templates of testkit/corpus/reference.
+	"generic_ehr_status.v1.opt":     "EHR_STATUS",
+	"generic_folder.v1.opt":         "FOLDER",
+	"AGENT-generic-agent.v1.opt":    "AGENT",
+	"GROUP-CareTeam.v1.opt":         "GROUP",
+	"GROUP-generic.v1.opt":          "GROUP",
+	"ORGANISATION-generic.v1.opt":   "ORGANISATION",
+	"PERSON-CareProvider.v1.opt":    "PERSON",
+	"PERSON-Patient.v1.opt":         "PERSON",
+	"PERSON-PatientIdentity.v1.opt": "PERSON",
+	"ROLE-generic-role.v1.opt":      "ROLE",
 }
 
 // refusedOPTs are the vendored OPTs a build step refuses, each with the step
@@ -98,7 +107,7 @@ type refusal struct {
 }
 
 // vendoredOPTs lists every OPT this repository vendors: the template corpus,
-// the generic templates the SDK ships in openehr/template/generic and the
+// the reference templates vendored from openehr-reference-content and the
 // PROBE-086 FLAT conformance template.
 func vendoredOPTs(t *testing.T) []string {
 	t.Helper()
@@ -106,7 +115,7 @@ func vendoredOPTs(t *testing.T) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	generic, err := filepath.Glob("../generic/*.opt")
+	reference, err := filepath.Glob("../../../testkit/corpus/reference/templates/*.opt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +123,7 @@ func vendoredOPTs(t *testing.T) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	all := slices.Concat(corpus, generic, flat)
+	all := slices.Concat(corpus, reference, flat)
 	if len(all) == 0 {
 		t.Fatal("no vendored OPT found — corpus layout changed?")
 	}

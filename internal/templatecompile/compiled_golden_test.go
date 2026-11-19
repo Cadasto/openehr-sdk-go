@@ -7,8 +7,7 @@ package templatecompile_test
 // placement REQ-111 § Reading the model names.
 //
 // For every operational template PROBE-111 covers, the ones the corpus
-// vendors and the generic ones the SDK ships (openehr/template/generic),
-// named as Probe111OperationalTemplates names them, for every parity fixture
+// vendors, named as Probe111OperationalTemplates names them, for every parity fixture
 // (testdata/parity) and for every fixture of the model's reader
 // (openehr/aom/aom14/testdata/reader), the test renders the compiled tree as
 // line-oriented text and holds it equal to
@@ -80,12 +79,9 @@ func TestCompiledGolden(t *testing.T) {
 	// only for a reason the change under review gives.
 	sources := []goldenSource{
 		{
-			names: names,
-			path:  templateprobes.Probe111TemplatePath,
-			labels: strings.NewReplacer(
-				fixtures.CorpusRoot(), "<corpus>",
-				filepath.Dir(fixtures.GenericTemplatesDir()), "<openehr/template>",
-			),
+			names:  names,
+			path:   templateprobes.Probe111TemplatePath,
+			labels: strings.NewReplacer(fixtures.CorpusRoot(), "<corpus>"),
 		},
 		fixtureGoldenSource(t, "testdata", "parity"),
 		fixtureGoldenSource(t, readerFixturesRoot, "reader"),

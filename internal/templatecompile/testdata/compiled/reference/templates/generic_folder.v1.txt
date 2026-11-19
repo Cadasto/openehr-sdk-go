@@ -1,4 +1,4 @@
-# compiled tree of generic/generic_folder.v1.opt
+# compiled tree of reference/templates/generic_folder.v1.opt
 template_id="generic_folder.v1" concept="Generic folder" language="en" uid="be12920b-8f93-4839-a0aa-2d1efbb23035" num_nodes=2
 
 node /
