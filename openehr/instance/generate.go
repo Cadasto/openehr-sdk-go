@@ -4324,7 +4324,7 @@ func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tci
 func phraseAdmitted(node *tcimpl.CompiledNode, phrase rm.CodePhrase) bool {
 	if cp, ok := constraints.CodePhraseOf(node.PrimitiveConstraint()); ok {
 		ref := constraints.CodedTermRef{Terminology: phrase.TerminologyID.Value, CodeString: phrase.CodeString}
-		return len(cp.Validate(ref)) == 0
+		return len(cp.ValidateCode(ref)) == 0
 	}
 	if dc := bindingChild(node, "defining_code"); dc != nil {
 		return phraseAdmitted(dc, phrase)
