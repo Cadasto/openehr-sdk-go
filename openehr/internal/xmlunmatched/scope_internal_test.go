@@ -7,6 +7,8 @@ package xmlunmatched
 
 import (
 	"encoding/xml"
+	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -85,6 +87,64 @@ func TestREQ056_LookupPrefixResolvesInScope(t *testing.T) {
 		if !slices.Equal(p.got, d.want) {
 			t.Errorf("%s decode: LookupPrefix answered\n%q\nwant\n%q", name, p.got, d.want)
 		}
+	}
+}
+
+// panicsInDecode panics as soon as a decode reaches it, as a caller's hook or
+// a decoder with a bug might.
+type panicsInDecode struct{}
+
+func (*panicsInDecode) UnmarshalXML(*xml.Decoder, xml.StartElement) error {
+	panic("panicsInDecode")
+}
+
+// TestScopedDecodeUnregisters pins that a scoped decode, the one every
+// untracked canxml decode runs, registers its decoder for that decode only.
+// After a decode that succeeds, one refused for depth, one that fails on
+// malformed input and one whose value panics, no decoder is left registered
+// and the in-progress count is back at zero. A decoder left registered would
+// stay reachable from the package-level map, and with it the reader, the
+// input and the open-element stack, for the life of the process.
+func TestScopedDecodeUnregisters(t *testing.T) {
+	decode := func(doc string, depth int, v any) (err error) {
+		var s Scope
+		s.LimitDepth(depth)
+		dec := s.NewDecoder(strings.NewReader(doc))
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic: %v", r)
+			}
+		}()
+		return s.Decode(dec, v)
+	}
+
+	// The successful decode resolves the root's prefix on a child element,
+	// which only a registered decoder can, so the decoder was registered
+	// while the decode ran.
+	var p prefixProbe
+	if err := decode(scopeDoc, 0, &p); err != nil {
+		t.Fatalf("Decode(scopeDoc) = %v; want nil", err)
+	}
+	if len(p.got) < 2 || p.got[1] != "a p=urn:root q-" {
+		t.Fatalf("Decode(scopeDoc): LookupPrefix answered %q; want the root's binding on a, which needs the decoder registered", p.got)
+	}
+	if err := decode(scopeDoc, 2, new(prefixProbe)); !errors.Is(err, ErrLimitExceeded) {
+		t.Errorf("Decode(scopeDoc, depth 2) = %v; want a depth refusal wrapping ErrLimitExceeded", err)
+	}
+	if err := decode(`<root><a>`, 0, new(prefixProbe)); err == nil {
+		t.Error("Decode(truncated document) = nil; want a syntax error")
+	}
+	if err := decode(scopeDoc, 0, new(panicsInDecode)); err == nil || !strings.Contains(err.Error(), "panicsInDecode") {
+		t.Errorf("Decode(value that panics) = %v; want the recovered panic", err)
+	}
+
+	if n := scoping.Load(); n != 0 {
+		t.Errorf("scoped decodes in progress = %d after every decode returned; want 0", n)
+	}
+	left := 0
+	scoped.Range(func(_, _ any) bool { left++; return true })
+	if left != 0 {
+		t.Errorf("%d decoders still registered after every decode returned; want none", left)
 	}
 }
 

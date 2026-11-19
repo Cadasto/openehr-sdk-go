@@ -71,6 +71,13 @@ func (e *SyntaxError) Unwrap() error { return aql.ErrSyntax }
 // classes, paths, and parameters are extracted during [Parse]. The
 // exported slice fields are an owned, read-only view; callers must not
 // mutate them (lint clones what it carries across its own boundary).
+//
+// A Document keeps the parse tree it was read from, and through it the
+// parser's tokens and state, for as long as the Document is reachable:
+// several times the memory of the [Query] it yields. To keep parsed queries
+// for long, in a cache say, keep the [Query] from [ParseQuery] or
+// [Document.Query], which refers to no part of the tree, and let the
+// Document go.
 type Document struct {
 	tree gen.ISelectQueryContext
 	// src is the text tree was parsed from. The structured extraction reads

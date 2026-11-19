@@ -1,6 +1,7 @@
 package contain
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -182,5 +183,60 @@ func TestUnavoidableDoesNotPoisonTheMemo(t *testing.T) {
 
 	if _, ok := r.memo[0].Load("EHR"); ok {
 		t.Error("memo[0][EHR] was written; Unavoidable reads routes at their widest and must never ask the ByReference-excluded closure")
+	}
+}
+
+// TestUnknownNamesStayOutOfTheCaches pins what keeps the relation's caches
+// bounded: each is keyed by a class the relation knows or an overlay endpoint,
+// never by a name a caller passed that is neither. The default relation lives
+// for the whole process and a linter passes it every class name a query
+// writes, so a cache keyed by those names would grow with every distinct
+// misspelling or dialect class the process ever lints.
+//
+// The calls mix known names with unknown ones, so the caches are in use: a
+// relation that stopped caching would leave them empty and prove nothing,
+// which the premise checks catch.
+func TestUnknownNamesStayOutOfTheCaches(t *testing.T) {
+	r := build(rminfo.Default, defaultOverlays())
+	unknown := []string{"UNKNOWN_CLASS", "unknown_lower_case", "OBSERVATION_X", "DV_NOT_A_TYPE", ""}
+	for _, u := range unknown {
+		r.Containable(u)
+		r.CanContain(u, "OBSERVATION")
+		r.CanContain("COMPOSITION", u)
+		r.Unavoidable("EHR", u, "OBSERVATION")
+		r.Unavoidable(u, "COMPOSITION", "OBSERVATION")
+		r.Unavoidable("EHR", "COMPOSITION", u)
+		r.ArchetypeMatches(u, "openEHR-EHR-OBSERVATION.x.v1")
+	}
+	if r.CanContain("EHR", "OBSERVATION") != Admissible || !r.Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {
+		t.Fatal("premise gone: EHR CONTAINS COMPOSITION CONTAINS OBSERVATION no longer holds, so the caches below may hold nothing")
+	}
+
+	allowed := map[string]bool{}
+	for _, c := range r.known {
+		allowed[c] = true
+	}
+	for _, e := range r.overlays {
+		allowed[e.From], allowed[e.To] = true, true
+	}
+	check := func(cache string, m *sync.Map) int {
+		n := 0
+		m.Range(func(k, _ any) bool {
+			n++
+			if name, _ := k.(string); !allowed[name] {
+				t.Errorf("%s holds %q, which is neither a class the relation knows nor an overlay endpoint", cache, k)
+			}
+			return true
+		})
+		return n
+	}
+	if check("operands", &r.operands) == 0 {
+		t.Error("premise gone: operands holds nothing after Containable on known classes")
+	}
+	if check("memo[0]", &r.memo[0])+check("memo[1]", &r.memo[1]) == 0 {
+		t.Error("premise gone: memo holds nothing after a route question")
+	}
+	if check("succ[0]", &r.succ[0])+check("succ[1]", &r.succ[1]) == 0 {
+		t.Error("premise gone: succ holds nothing after a route question")
 	}
 }
