@@ -56,7 +56,7 @@ func objectOf(o aom14.CObject, parent *CompiledNode) (object, error) {
 	switch v := o.(type) {
 	case *aom14.CArchetypeRoot:
 		if v != nil {
-			archetypeID := strings.TrimSpace(v.ArchetypeID.Value)
+			archetypeID := trimmed(v.ArchetypeID.Value)
 			terms := termsFromModel(v.TermDefinitions)
 			termText := rootTermText(parent)
 			if archetypeID != "" {
@@ -78,7 +78,7 @@ func objectOf(o aom14.CObject, parent *CompiledNode) (object, error) {
 		}
 	case *aom14.ArchetypeSlot:
 		if v != nil {
-			return object{o: o, rmTypeName: strings.TrimSpace(v.RMTypeName), nodeID: strings.TrimSpace(v.NodeID), slot: v}, nil
+			return object{o: o, rmTypeName: trimmed(v.RMTypeName), nodeID: trimmed(v.NodeID), slot: v}, nil
 		}
 	case *aom14.CPrimitiveObject:
 		if v != nil {
@@ -130,8 +130,8 @@ func objectOf(o aom14.CObject, parent *CompiledNode) (object, error) {
 func complexOf(o aom14.CObject, c *aom14.CComplexObject, termText func(key string) string) object {
 	return object{
 		o:           o,
-		rmTypeName:  strings.TrimSpace(c.RMTypeName),
-		nodeID:      strings.TrimSpace(c.NodeID),
+		rmTypeName:  trimmed(c.RMTypeName),
+		nodeID:      trimmed(c.NodeID),
 		nodeName:    nodeNameFromModel(c.Attributes, termText),
 		occurrences: &c.Occurrences,
 		complex:     c,
@@ -143,8 +143,8 @@ func complexOf(o aom14.CObject, c *aom14.CComplexObject, termText func(key strin
 func leafOf(o aom14.CObject, rmTypeName, nodeID string, occurrences *rm.Interval[aom14.Integer]) object {
 	return object{
 		o:           o,
-		rmTypeName:  strings.TrimSpace(rmTypeName),
-		nodeID:      strings.TrimSpace(nodeID),
+		rmTypeName:  trimmed(rmTypeName),
+		nodeID:      trimmed(nodeID),
 		occurrences: occurrences,
 	}
 }
@@ -170,7 +170,7 @@ func attributeOf(a aom14.CAttribute) (modelAttribute, error) {
 		if v != nil {
 			return modelAttribute{
 				key:       a,
-				name:      strings.TrimSpace(v.RMAttributeName),
+				name:      trimmed(v.RMAttributeName),
 				card:      template.Single,
 				existence: &v.Existence,
 				children:  v.Children,
@@ -180,7 +180,7 @@ func attributeOf(a aom14.CAttribute) (modelAttribute, error) {
 		if v != nil {
 			return modelAttribute{
 				key:         a,
-				name:        strings.TrimSpace(v.RMAttributeName),
+				name:        trimmed(v.RMAttributeName),
 				card:        template.Multiple,
 				existence:   &v.Existence,
 				cardinality: &v.Cardinality.Interval,
@@ -294,7 +294,7 @@ func fixedValueString(o aom14.CObject) string {
 			if !ok || s == nil || len(s.List) != 1 || (s.ListOpen != nil && *s.ListOpen) {
 				continue
 			}
-			if name := strings.TrimSpace(s.List[0]); name != "" {
+			if name := trimmed(s.List[0]); name != "" {
 				return name
 			}
 		}
@@ -335,7 +335,7 @@ func codedNameText(o aom14.CObject, termText func(key string) string) string {
 		return ""
 	}
 	text, ok := codeTermText(termText, phrase.Terminology, phrase.CodeList[0])
-	if text = strings.TrimSpace(text); !ok || text == "" {
+	if text = trimmed(text); !ok || text == "" {
 		return ""
 	}
 	if value, ok := valueString(attrs); ok && len(value.Validate(text)) > 0 {
@@ -437,7 +437,7 @@ func multiplicityOf(iv *rm.Interval[aom14.Integer]) (*template.Multiplicity, err
 func termsFromModel(defs []aom14.ArchetypeTerm) map[string]template.ArchetypeTerm {
 	var out map[string]template.ArchetypeTerm
 	for _, d := range defs {
-		code := strings.TrimSpace(d.Code)
+		code := trimmed(d.Code)
 		if code == "" {
 			continue
 		}
@@ -467,7 +467,7 @@ func termItems(raw map[string]string) map[string]string {
 			continue
 		}
 		if k != "" {
-			items[k] = strings.TrimSpace(v)
+			items[k] = trimmed(v)
 		}
 	}
 	if !padded {
@@ -479,10 +479,23 @@ func termItems(raw map[string]string) map[string]string {
 			continue
 		}
 		if _, kept := items[id]; !kept {
-			items[id] = strings.TrimSpace(raw[k])
+			// Trimming k dropped a byte, so the key kept is a copy ([trimmed]).
+			items[strings.Clone(id)] = trimmed(raw[k])
 		}
 	}
 	return items
+}
+
+// trimmed returns s without its leading and trailing white space, as
+// [strings.TrimSpace] does, in a string of its own where that drops a byte.
+// The compiled template keeps the texts it reads trimmed, and a slice of s
+// would keep all of s alive, padding included, once the model is dropped.
+func trimmed(s string) string {
+	t := strings.TrimSpace(s)
+	if len(t) < len(s) {
+		return strings.Clone(t)
+	}
+	return t
 }
 
 // appendTermBindings appends to out an archetype root's term bindings, one
@@ -490,9 +503,9 @@ func termItems(raw map[string]string) map[string]string {
 // and an item with a blank code left out.
 func appendTermBindings(out []template.TermBinding, sets []aom14.TermBindingSet) []template.TermBinding {
 	for _, set := range sets {
-		terminology := strings.TrimSpace(set.Terminology)
+		terminology := trimmed(set.Terminology)
 		for _, item := range set.Items {
-			code := strings.TrimSpace(item.Code)
+			code := trimmed(item.Code)
 			if code == "" {
 				continue
 			}
@@ -500,8 +513,8 @@ func appendTermBindings(out []template.TermBinding, sets []aom14.TermBindingSet)
 				Terminology: terminology,
 				NodeOrPath:  code,
 				Target: template.CodedTermRef{
-					TerminologyID: strings.TrimSpace(item.Value.TerminologyID.Value),
-					CodeString:    strings.TrimSpace(item.Value.CodeString),
+					TerminologyID: trimmed(item.Value.TerminologyID.Value),
+					CodeString:    trimmed(item.Value.CodeString),
 				},
 			})
 		}

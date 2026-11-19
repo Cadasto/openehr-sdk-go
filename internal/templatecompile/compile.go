@@ -96,7 +96,7 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error)
 	if opt == nil {
 		return nil, fmt.Errorf("%w: nil template", ErrInvalidInput)
 	}
-	templateID := strings.TrimSpace(opt.TemplateID.Value)
+	templateID := trimmed(opt.TemplateID.Value)
 	if templateID == "" {
 		return nil, fmt.Errorf("%w: template has no template_id", ErrInvalidInput)
 	}
@@ -120,15 +120,15 @@ func Compile(opt *aom14.OperationalTemplate, opts ...Options) (*Compiled, error)
 
 	c := &Compiled{
 		templateID:    templateID,
-		concept:       strings.TrimSpace(opt.Concept),
-		language:      strings.TrimSpace(opt.Language.CodeString),
+		concept:       trimmed(opt.Concept),
+		language:      trimmed(opt.Language.CodeString),
 		byPath:        make(map[string]*CompiledNode),
 		byNodeID:      make(map[string][]*CompiledNode),
 		byRMType:      make(map[string][]*CompiledNode),
 		byArchetypeID: make(map[string][]*CompiledNode),
 	}
 	if opt.UID != nil {
-		c.uid = strings.TrimSpace(opt.UID.Value)
+		c.uid = trimmed(opt.UID.Value)
 	}
 
 	w := walker{

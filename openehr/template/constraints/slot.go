@@ -35,7 +35,11 @@ type SlotAssertion struct {
 // stored separately so [SlotAssertion.Pattern] (diagnostics) and
 // example synthesis report what the OPT author wrote.
 func NewSlotAssertion(pattern string) (SlotAssertion, error) {
-	pattern = strings.TrimSpace(pattern)
+	// The assertion keeps the pattern: where trimming drops a byte, it keeps
+	// a copy, so it does not keep the caller's padded string alive.
+	if t := strings.TrimSpace(pattern); len(t) < len(pattern) {
+		pattern = strings.Clone(t)
+	}
 	if pattern == "" {
 		return SlotAssertion{}, errors.New("slot assertion: empty pattern")
 	}

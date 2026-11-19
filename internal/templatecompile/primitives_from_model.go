@@ -49,7 +49,7 @@ func primitiveFromModel(o aom14.CObject, strict bool) (constraints.PrimitiveCons
 	case *aom14.CCodeReference:
 		return constraints.CodeReference{
 			CodePhrase:      codePhraseFromModel(&n.CCodePhrase),
-			ReferenceSetURI: strings.TrimSpace(n.ReferenceSetURI),
+			ReferenceSetURI: trimmed(n.ReferenceSetURI),
 		}, nil
 	case *aom14.CDVQuantity:
 		return dvQuantityFromModel(n), nil
@@ -62,7 +62,7 @@ func primitiveFromModel(o aom14.CObject, strict bool) (constraints.PrimitiveCons
 	case *aom14.ConstraintRef:
 		// A reference is required. The default mode keeps a leaf with an
 		// empty one, and the strict mode refuses it.
-		ref := strings.TrimSpace(n.Reference)
+		ref := trimmed(n.Reference)
 		if ref == "" && strict {
 			return nil, fmt.Errorf("CONSTRAINT_REF for %q has no reference", strings.TrimSpace(n.RMTypeName))
 		}
@@ -103,7 +103,7 @@ func primitiveItemFromModel(item aom14.CPrimitive, strict bool) (constraints.Pri
 	case *aom14.CString:
 		var list []string
 		for _, s := range p.List {
-			if s = strings.TrimSpace(s); s != "" {
+			if s = trimmed(s); s != "" {
 				list = append(list, s)
 			}
 		}
@@ -203,7 +203,7 @@ func temporalRangeFromModel(iv *rm.Interval[string], class string, validate func
 		UpperInclusive: iv.UpperIncluded,
 	}
 	if !r.LowerUnbounded {
-		lower := strings.TrimSpace(iv.Lower)
+		lower := trimmed(iv.Lower)
 		switch {
 		case len(validate(lower)) == 0:
 			r.Lower = lower
@@ -214,7 +214,7 @@ func temporalRangeFromModel(iv *rm.Interval[string], class string, validate func
 		}
 	}
 	if !r.UpperUnbounded {
-		upper := strings.TrimSpace(iv.Upper)
+		upper := trimmed(iv.Upper)
 		switch {
 		case len(validate(upper)) == 0:
 			r.Upper = upper
@@ -272,11 +272,11 @@ func timezoneValidityFromModel(tz *aom14.TimezoneValidityKind, class string, str
 func codePhraseFromModel(p *aom14.CCodePhrase) constraints.CodePhrase {
 	var c constraints.CodePhrase
 	if p.TerminologyID != nil {
-		c.Terminology = strings.TrimSpace(p.TerminologyID.Value)
+		c.Terminology = trimmed(p.TerminologyID.Value)
 	}
 	if p.CodeList != nil {
 		for _, code := range *p.CodeList {
-			if s := strings.TrimSpace(code); s != "" {
+			if s := trimmed(code); s != "" {
 				c.CodeList = append(c.CodeList, s)
 			}
 		}
@@ -300,7 +300,7 @@ func dvQuantityFromModel(q *aom14.CDVQuantity) constraints.DvQuantity {
 	}
 	for _, item := range q.List {
 		unit := constraints.QuantityUnit{
-			Units:     strings.TrimSpace(item.Units),
+			Units:     trimmed(item.Units),
 			Magnitude: numericRangeFromModel(item.Magnitude),
 			Precision: numericRangeFromModel(item.Precision),
 		}
@@ -369,15 +369,16 @@ func dvOrdinalFromModel(o *aom14.CDVOrdinal) (constraints.CDvOrdinal, error) {
 // codedTermRef returns the code phrase's terminology and code, trimmed.
 func codedTermRef(code rm.CodePhrase) constraints.CodedTermRef {
 	return constraints.CodedTermRef{
-		Terminology: strings.TrimSpace(code.TerminologyID.Value),
-		CodeString:  strings.TrimSpace(code.CodeString),
+		Terminology: trimmed(code.TerminologyID.Value),
+		CodeString:  trimmed(code.CodeString),
 	}
 }
 
-// trimmedOrEmpty returns the text s points to, trimmed, or "" when s is nil.
+// trimmedOrEmpty returns the text s points to, trimmed ([trimmed]), or ""
+// when s is nil.
 func trimmedOrEmpty(s *string) string {
 	if s == nil {
 		return ""
 	}
-	return strings.TrimSpace(*s)
+	return trimmed(*s)
 }
