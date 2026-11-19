@@ -65,6 +65,15 @@ import (
 func (q *Query) verifyEmitted(out string) error {
 	re, err := ParseQuery(out)
 	if err != nil {
+		// REQ-109 § Nesting limit: the canonical form parenthesises every
+		// nested CONTAINS operand, so a containment written deep without
+		// parentheses can come out nested past the limit. That refusal's
+		// message carries a position and the limit, no source text, so it is
+		// wrapped whole and both of its sentinels stay reachable.
+		if errors.Is(err, aql.ErrLimitExceeded) {
+			return fmt.Errorf("%w: emitted AQL does not re-parse, as it nests deeper than the parser admits: %w",
+				aql.ErrInvalidQuery, err)
+		}
 		// The parser's own message ECHOES the offending source text
 		// ("no viable alternative at input 'a/b=''c''--'"), so wrapping it
 		// verbatim would put predicate content — the identifiable root this

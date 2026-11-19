@@ -18,6 +18,7 @@ package parse_test
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -682,5 +683,43 @@ func TestEmitVerificationCollapsesTheStarEncodings(t *testing.T) {
 	}
 	if strings.Contains(out2, "*") {
 		t.Fatalf("emitted %q; the emitter renders the items, never the ignored flag", out2)
+	}
+}
+
+// TestEmitRefusesTextNestedPastTheLimit pins REQ-119's re-parse refusal for
+// text nested past REQ-109 § Nesting limit. The canonical form writes two
+// parentheses for each level of a `CONTAINS … AND … CONTAINS` chain the
+// source wrote with none, so 64 levels emit 128 and come back, while 65 emit
+// 130 and do not re-parse. Emit refuses those with an error that matches
+// aql.ErrLimitExceeded as well as aql.ErrInvalidQuery and aql.ErrSyntax, so a
+// caller can tell the limit from a defect in a guard.
+func TestEmitRefusesTextNestedPastTheLimit(t *testing.T) {
+	t.Parallel()
+	chain := func(levels int) string {
+		var sb strings.Builder
+		sb.WriteString("SELECT z/uid/value FROM EHR e CONTAINS ")
+		for i := range levels {
+			fmt.Fprintf(&sb, "COMPOSITION c%d AND COMPOSITION k%d CONTAINS ", i, i)
+		}
+		sb.WriteString("COMPOSITION z")
+		return sb.String()
+	}
+	emit := func(levels int) (string, error) {
+		q, err := parse.ParseQuery(chain(levels))
+		if err != nil {
+			t.Fatalf("ParseQuery(chain of %d levels) = %v; want nil", levels, err)
+		}
+		return q.Emit()
+	}
+	if out, err := emit(64); err != nil {
+		t.Errorf("Emit(chain of 64 levels) = %v; want nil", err)
+	} else if n := strings.Count(out, "("); n != 128 {
+		t.Errorf("Emit(chain of 64 levels) wrote %d parentheses; want 128, the premise of the 65-level row", n)
+	}
+	_, err := emit(65)
+	for _, want := range []error{aql.ErrInvalidQuery, aql.ErrSyntax, aql.ErrLimitExceeded} {
+		if !errors.Is(err, want) {
+			t.Errorf("Emit(chain of 65 levels) error = %v; want it to match %v", err, want)
+		}
 	}
 }

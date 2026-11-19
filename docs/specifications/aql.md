@@ -299,7 +299,7 @@ Emitting text the parser **accepts as something else** is silent, invisible to e
 
 ### Round-trip property
 
-For any AQL query the parser accepts and the catalogue of [§ REQ-113](#catalogue-and-residual) models:
+For any AQL query the parser accepts and the catalogue of [§ REQ-113](#catalogue-and-residual) models, unless its emitted text nests past [§ Nesting limit](#nesting-limit):
 
 ```
 Emit(ParseQuery(Emit(ParseQuery(x)))) == Emit(ParseQuery(x))
@@ -480,6 +480,7 @@ Every rule above decides one position from the text handed to it, and that is no
 No per-position validator decides that, and refusing `{/a\/}` outright would refuse text `ParseQuery` reads back unchanged in every ordinary query.
 
 `(*parse.Query).Emit` **MUST** read the emitted text back with the parser before returning it, and refuse, with an error wrapping `aql.ErrInvalidQuery` (and `aql.ErrSyntax` as well where the parser refuses the text) and a diagnostic that follows § The emission closure property, text that does not re-parse or that re-parses as a different query.
+Emitted text nested past [§ Nesting limit](#nesting-limit) is text that does not re-parse, and its refusal wraps `aql.ErrLimitExceeded` as well: the canonical form writes two parentheses for each level of a `CONTAINS … AND … CONTAINS` chain, so such a chain more than 64 levels deep is refused however its source was written.
 `aql.Builder.Build` verifies the projection list it renders against the same definition ([§ REQ-163 § `Build()` verifies the projection it emitted](#build-verifies-the-projection-it-emitted)).
 A different query is one that adds or removes a class expression, a projection, a predicate leaf or a whole clause, or that changes a containment connective, a negation, or the grouping of containment operands across operators.
 A substitution confined to the text of one path position is outside the check, since REQ-055 rule 3 emits a path verbatim by contract.
