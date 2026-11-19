@@ -1481,6 +1481,7 @@ requirements:
       - openehr/validation/subtype_conformance_corpus_test.go
       - openehr/validation/subtype_conformance_test.go
       - openehr/validation/temporal_constraint_test.go
+      - openehr/validation/walk_alloc_test.go
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/undescribed_census_test.go
       - testkit/probes/validation/probe_025_composition_validate.go
@@ -1538,6 +1539,7 @@ requirements:
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/quantity_property_test.go
       - openehr/validation/temporal_constraint_test.go
+      - openehr/validation/walk_alloc_test.go
       - testkit/probes/template/constraint_fixtures_test.go
       - testkit/probes/template/probe_024_primitive_validate.go
       - testkit/probes/template/probes_test.go
