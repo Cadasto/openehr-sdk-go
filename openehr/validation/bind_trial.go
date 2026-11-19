@@ -298,17 +298,19 @@ func (e *engine) try(n engineNode, trial func(engineNode), keep bool) {
 // bindItems binds each of the items of r, the multi-valued attribute a of
 // node n as the walk read it, to one of children, the attribute's OPT
 // children, and returns for each item the child it binds to, nil when none
-// does, and whether it binds by its archetype_node_id ([bindsByNodeID]). An
-// item binds among the children of its rank ([itemRank]): a rank of one
-// binds it to that child. Where an item's rank holds two or more children,
-// [engine.bindRanked] rebinds the items of ranks of two or more, in item
-// order, by [engine.bindAmong]. The walk at attrPath, in role, is where
-// those trials run. Where the visit limit ends the walk inside a trial,
-// bindItems returns with the walk stopped and the binding not decided.
+// does, and whether it binds by its archetype_node_id ([bindsByNodeID]):
+// two runs it pushes onto the engine's binding stacks ([engine].bindings),
+// which the caller drops. An item binds among the children of its rank
+// ([itemRank]): a rank of one binds it to that child. Where an item's rank
+// holds two or more children, [engine.bindRanked] rebinds the items of
+// ranks of two or more, in item order, by [engine.bindAmong]. The walk at
+// attrPath, in role, is where those trials run. Where the visit limit ends
+// the walk inside a trial, bindItems returns with the walk stopped and the
+// binding not decided.
 func (e *engine) bindItems(n *engineNode, a *engineAttr, children []*tcimpl.CompiledNode, r *attrReading, attrPath issuePath, role floorRole) (bound []*tcimpl.CompiledNode, byNodeID []bool) {
 	items := r.items
-	bound = make([]*tcimpl.CompiledNode, len(items))
-	byNodeID = make([]bool, len(items))
+	bound = pushRun(&e.bindings, len(items))
+	byNodeID = pushRun(&e.byNodeID, len(items))
 	// The type the compile reads the bound node as, so an untyped one is
 	// read as the type of the attribute that holds it (REQ-111).
 	parent := tcimpl.ReadAsRMType(n.bound)
@@ -331,8 +333,10 @@ func (e *engine) bindItems(n *engineNode, a *engineAttr, children []*tcimpl.Comp
 // bindRanked rebinds, in item order, each of the items of r whose rank holds
 // two or more children by [engine.bindAmong], counting per child the items
 // bound to it before, so that a child has room while that count is below its
-// occurrences upper bound ([hasRoom]). bound holds each item bound to the
-// first child of its rank, and comes back with the binding; byNodeID holds
+// occurrences upper bound ([hasRoom]); the counts are a run on the engine's
+// counts stack ([engine].counts), dropped once the items are bound. bound
+// holds each item bound to the first child of its rank, and comes back with
+// the binding, written after the trials that walk below it; byNodeID holds
 // how each item binds. Each trial walks the item at the path the shared path
 // rule writes for it under that first binding, against the child tried; the
 // trials are withdrawn, and the caller walks each item once its binding,
@@ -342,9 +346,9 @@ func (e *engine) bindItems(n *engineNode, a *engineAttr, children []*tcimpl.Comp
 // the path of the list ([engine.stopAt]).
 func (e *engine) bindRanked(n *engineNode, a *engineAttr, children []*tcimpl.CompiledNode, r *attrReading, bound []*tcimpl.CompiledNode, byNodeID []bool, attrPath issuePath, role floorRole) {
 	items := r.items
-	from := len(e.preds)
+	from, countsFrom := len(e.preds), len(e.counts)
 	e.preds = appendBoundPredicates(e.preds, items, bound, a.shape == shapeHash)
-	counts := make([]int, len(children))
+	counts := pushRun(&e.counts, len(children))
 	var buf [8]*tcimpl.CompiledNode
 	for i, item := range items {
 		rank := itemRank(buf[:0], children, item, byNodeID[i])
@@ -362,6 +366,17 @@ func (e *engine) bindRanked(n *engineNode, a *engineAttr, children []*tcimpl.Com
 		}
 	}
 	e.preds = e.preds[:from]
+	e.counts = e.counts[:countsFrom]
+}
+
+// pushRun appends a run of n zero values to the stack *s and returns the
+// run, capped at its end, for the caller to drop by truncating *s to the
+// length it had before ([engine].bindings).
+func pushRun[T any](s *[]T, n int) []T {
+	from := len(*s)
+	*s = append(*s, make([]T, n)...)
+	end := len(*s)
+	return (*s)[from:end:end]
 }
 
 // stopAt reports at the path at the issues the walk recorded from position

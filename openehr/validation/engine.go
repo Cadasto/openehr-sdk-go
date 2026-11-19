@@ -161,6 +161,25 @@ type engine struct {
 	// is held moves the stack to a new array: the outer run goes on reading
 	// the old one, which nothing writes to again.
 	items []any
+	// bindings, byNodeID and admitted hold, for each list the walk is
+	// inside whose items the template binds, the child each item binds to,
+	// whether it binds by its archetype_node_id and whether the template
+	// admits it; counts holds, for each list whose items
+	// [engine.bindRanked] rebinds by trial, the items bound to each child so
+	// far. Each is a stack as items is, outermost first, a run per list
+	// ([pushRun]), so binding a list allocates nothing once the stacks have
+	// room for it. The visit that pushes a run drops it on every path it
+	// returns by ([engine.visitDeclaredItems], [engine.bindRanked]). A run
+	// is capped at its end, so an append to it copies it rather than
+	// writing over the runs pushed above it. A push that grows a stack while
+	// an outer run is held moves the stack to a new array: the outer run's
+	// holder goes on reading and writing it on the old one, as bindRanked
+	// writes the binding a trial that walked below it decided, and nothing
+	// else reads the old array.
+	bindings []*tcimpl.CompiledNode
+	byNodeID []bool
+	admitted []bool
+	counts   []int
 	// verdicts holds, for each node the walk tried a value at, whether the
 	// value validates under the child tried, so that no value is tried
 	// twice under one child at one depth ([engine.verdict]). Nil until a
@@ -1285,7 +1304,9 @@ func (e *engine) admitSingle(decl *tcimpl.CompiledAttribute, v engineNode) {
 // is walked with the RM rules alone, which report an item that holds no RM
 // value ([engine.walkUnconstrained]). A nil item under an attribute that
 // declares children binds to none, so it is refused above and the RM rules
-// never see it.
+// never see it. The binding is held in runs on the engine's binding stacks
+// ([engine].bindings), dropped once the visit is done, whichever way it
+// ends.
 func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)
@@ -1301,18 +1322,20 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 		return
 	}
 	children := tcimpl.ChildNodes(a.decl)
+	binds := len(children) > 0 && a.shape != shapeCounted
 	var bound []*tcimpl.CompiledNode
 	var admitted []bool
-	from := len(e.preds)
-	if len(children) > 0 && a.shape != shapeCounted {
+	from, held := len(e.preds), e.bindingMark()
+	if binds {
 		var byNodeID []bool
 		bound, byNodeID = e.bindItems(n, a, children, r, attrPath, role)
 		if e.stopped {
+			e.dropBindings(held)
 			return // the visit limit ended the walk inside a trial
 		}
 		e.preds = appendBoundPredicates(e.preds, r.items, bound, a.shape == shapeHash)
 		allowed := allowedChildren(a.decl)
-		admitted = make([]bool, len(r.items))
+		admitted = pushRun(&e.admitted, len(r.items))
 		for i, item := range r.items {
 			switch {
 			case bound[i] == nil:
@@ -1335,7 +1358,7 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 		// list's are.
 		countOut = false
 		occurrences = appendMissingChildIssues(nil, a.decl, attrPath)
-	case bound != nil:
+	case binds:
 		occurrences = appendOccurrenceIssues(nil, a.decl, children, bound, attrPath)
 	}
 	if r.count == 0 && (a.shape.multiValued() || a.decl.Cardinality() == template.Multiple) {
@@ -1351,7 +1374,7 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 	switch {
 	case len(children) == 0:
 		e.walkUnconstrained(n, a, r, attrPath, role)
-	case bound != nil:
+	case binds:
 		for i, item := range r.items {
 			if !admitted[i] {
 				continue
@@ -1360,6 +1383,25 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 		}
 	}
 	e.preds = e.preds[:from]
+	e.dropBindings(held)
+}
+
+// bindingMark is how far the stacks [engine.visitDeclaredItems] binds a
+// list's items on reach at one point ([engine].bindings).
+type bindingMark struct {
+	bindings, byNodeID, admitted int
+}
+
+// bindingMark returns how far the binding stacks reach now.
+func (e *engine) bindingMark() bindingMark {
+	return bindingMark{bindings: len(e.bindings), byNodeID: len(e.byNodeID), admitted: len(e.admitted)}
+}
+
+// dropBindings drops the runs pushed onto the binding stacks since m.
+func (e *engine) dropBindings(m bindingMark) {
+	e.bindings = e.bindings[:m.bindings]
+	e.byNodeID = e.byNodeID[:m.byNodeID]
+	e.admitted = e.admitted[:m.admitted]
 }
 
 // optionalList reports whether the template declares attr multi-valued and
