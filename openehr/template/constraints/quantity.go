@@ -6,7 +6,8 @@ import (
 )
 
 // QuantityValue is the runtime value shape accepted by
-// [DvQuantity.Validate] and [CDvOrdinal.Validate]. Construct it directly.
+// [DvQuantity.Validate] and [DvQuantity.ValidateQuantity]. Construct it
+// directly.
 // It is kept minimal so callers need not import the rm package to
 // validate a single value.
 type QuantityValue struct {
@@ -104,20 +105,30 @@ func exampleMagnitude(r NumericRange) float64 {
 	return 0
 }
 
-// Validate accepts a [QuantityValue]. Anything else returns
-// CodeWrongType. When Units is empty the constraint accepts any
-// magnitude, and any units the property admits: units outside a
-// non-empty PropertyUnits are a CodeUnitUnknown, and with PropertyUnits
-// empty too any units are accepted, the OPT having marked the node
-// "DV_QUANTITY without further constraint". A non-empty Units decides
-// the units alone. When several entries have the value's units, any one
-// whose ranges admit the value is enough; when none does, the violations
-// name the first of them.
+// Validate accepts a [QuantityValue] and checks it as
+// [DvQuantity.ValidateQuantity] does. Anything else returns
+// CodeWrongType.
 func (c DvQuantity) Validate(value any) []Violation {
 	q, ok := value.(QuantityValue)
 	if !ok {
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected QuantityValue, got %T", value)}}
 	}
+	return c.ValidateQuantity(q)
+}
+
+// ValidateQuantity checks q against the constraint and returns what
+// [DvQuantity.Validate] returns for the same value. When Units is empty
+// the constraint accepts any magnitude, and any units the property
+// admits: units outside a non-empty PropertyUnits are a CodeUnitUnknown,
+// and with PropertyUnits empty too any units are accepted, the OPT having
+// marked the node "DV_QUANTITY without further constraint". A non-empty
+// Units decides the units alone. When several entries have the value's
+// units, any one whose ranges admit the value is enough; when none does,
+// the violations name the first of them.
+//
+// It takes the quantity typed, so a caller that holds a [QuantityValue]
+// checks it without converting it to any, which allocates.
+func (c DvQuantity) ValidateQuantity(q QuantityValue) []Violation {
 	if len(c.Units) == 0 {
 		return c.propertyViolations(q)
 	}
@@ -222,26 +233,18 @@ func (c CDvOrdinal) ExampleValue() any {
 }
 
 // Validate accepts either an int (the ordinal value) or a full
-// [OrdinalSymbol] (value + symbol). When Values is empty the constraint
-// fixes the type only, so any int or OrdinalSymbol is accepted. Otherwise
-// an int must match the value of an entry in Values, and an
-// [OrdinalSymbol] must match both the value and the symbol of one: the
-// code strings must be equal, and the terminologies equal or either one
-// empty, as [CodePhrase.Validate] compares a terminology. A listed symbol
-// that names no terminology therefore admits the one the input carries.
+// [OrdinalSymbol] (value + symbol), which it checks as
+// [CDvOrdinal.ValidateOrdinal] does. When Values is empty the constraint
+// fixes the type only, so any int is accepted. Otherwise an int must
+// match the value of an entry in Values.
 func (c CDvOrdinal) Validate(value any) []Violation {
-	// An OPT that names DV_ORDINAL and lists no pairs constrains the
-	// type only. A closed list is what rejects a value.
-	if len(c.Values) == 0 {
-		switch value.(type) {
-		case int, OrdinalSymbol:
-			return nil
-		default:
-			return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected int or OrdinalSymbol, got %T", value)}}
-		}
-	}
 	switch v := value.(type) {
 	case int:
+		// An OPT that names DV_ORDINAL and lists no pairs constrains the
+		// type only. A closed list is what rejects a value.
+		if len(c.Values) == 0 {
+			return nil
+		}
 		for _, s := range c.Values {
 			if s.Value == v {
 				return nil
@@ -257,22 +260,41 @@ func (c CDvOrdinal) Validate(value any) []Violation {
 			Value:  Redact(value),
 		}}
 	case OrdinalSymbol:
-		for _, s := range c.Values {
-			if s.Value == v.Value && s.Symbol.CodeString == v.Symbol.CodeString &&
-				(s.Symbol.Terminology == "" || v.Symbol.Terminology == "" || s.Symbol.Terminology == v.Symbol.Terminology) {
-				return nil
-			}
-		}
-		allowed := make([]string, len(c.Values))
-		for i, s := range c.Values {
-			allowed[i] = fmt.Sprintf("%d|%s", s.Value, s.Symbol)
-		}
-		return []Violation{{
-			Code:   CodeNotInList,
-			Detail: fmt.Sprintf("ordinal (value, symbol) pair not in allowed %v", allowed),
-			Value:  Redact(value),
-		}}
+		return c.ValidateOrdinal(v)
 	default:
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected int or OrdinalSymbol, got %T", value)}}
 	}
+}
+
+// ValidateOrdinal checks s against the constraint and returns what
+// [CDvOrdinal.Validate] returns for the same value. When Values is empty
+// the constraint fixes the type only, so any pair is accepted. Otherwise
+// s must match both the value and the symbol of an entry in Values: the
+// code strings must be equal, and the terminologies equal or either one
+// empty, as [CodePhrase.ValidateCode] compares a terminology. A listed
+// symbol that names no terminology therefore admits the one s carries.
+//
+// It takes the pair typed, so a caller that holds an [OrdinalSymbol]
+// checks it without converting it to any, which allocates.
+func (c CDvOrdinal) ValidateOrdinal(s OrdinalSymbol) []Violation {
+	// An OPT that names DV_ORDINAL and lists no pairs constrains the
+	// type only. A closed list is what rejects a value.
+	if len(c.Values) == 0 {
+		return nil
+	}
+	for _, e := range c.Values {
+		if e.Value == s.Value && e.Symbol.CodeString == s.Symbol.CodeString &&
+			(e.Symbol.Terminology == "" || s.Symbol.Terminology == "" || e.Symbol.Terminology == s.Symbol.Terminology) {
+			return nil
+		}
+	}
+	allowed := make([]string, len(c.Values))
+	for i, e := range c.Values {
+		allowed[i] = fmt.Sprintf("%d|%s", e.Value, e.Symbol)
+	}
+	return []Violation{{
+		Code:   CodeNotInList,
+		Detail: fmt.Sprintf("ordinal (value, symbol) pair not in allowed %v", allowed),
+		Value:  Redact(s),
+	}}
 }

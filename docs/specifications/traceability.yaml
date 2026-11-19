@@ -1524,6 +1524,7 @@ requirements:
       - openehr/template/constraints/temporal_range_precision_test.go
       - openehr/template/constraints/temporal_validate_test.go
       - openehr/template/constraints/temporal_zone_order_test.go
+      - openehr/template/constraints/typed_checks_test.go
       - openehr/template/constraints/value_free_test.go
       - openehr/template/webtemplate/inputs_test.go
       - openehr/templatecompile/compile_readings_test.go
