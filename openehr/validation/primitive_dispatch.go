@@ -34,6 +34,10 @@ const noPrecision rm.Integer = -1
 //   - DV_TIME      → string (value, ISO 8601)
 //   - DV_DATE_TIME → string (value, ISO 8601)
 //   - DV_DURATION  → string (value, ISO 8601 duration)
+//
+// A quantity, a coded text and an ordinal are read by the readers the typed
+// checks read them with ([quantityOf], [codedTermOf], [ordinalOf]), so the
+// two paths read one value alike.
 func dataValueInput(dv rm.DataValue) (any, bool) {
 	// Belt-and-suspenders typed-nil guard. The walk's primary
 	// defence is the generated access, which reads an interface holding
@@ -44,29 +48,16 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 	if dv == nil {
 		return nil, false
 	}
+	if q, ok := quantityOf(dv); ok {
+		return q, true
+	}
+	if ref, ok := codedTermOf(dv); ok {
+		return ref, true
+	}
+	if s, ok := ordinalOf(dv); ok {
+		return s, true
+	}
 	switch v := dv.(type) {
-	case *rm.DVQuantity:
-		return constraints.QuantityValue{
-			Magnitude: float64(v.Magnitude),
-			Units:     v.Units,
-			Precision: int(deref(v.Precision, noPrecision)),
-		}, true
-	case rm.DVQuantity:
-		return constraints.QuantityValue{
-			Magnitude: float64(v.Magnitude),
-			Units:     v.Units,
-			Precision: int(deref(v.Precision, noPrecision)),
-		}, true
-	case *rm.DVCodedText:
-		return constraints.CodedTermRef{
-			Terminology: v.DefiningCode.TerminologyID.Value,
-			CodeString:  v.DefiningCode.CodeString,
-		}, true
-	case rm.DVCodedText:
-		return constraints.CodedTermRef{
-			Terminology: v.DefiningCode.TerminologyID.Value,
-			CodeString:  v.DefiningCode.CodeString,
-		}, true
 	case *rm.DVText:
 		return v.Value, true
 	case rm.DVText:
@@ -82,10 +73,6 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 		return int64(v.Magnitude), true
 	case rm.DVCount:
 		return int64(v.Magnitude), true
-	case *rm.DVOrdinal:
-		return ordinalInput(v), true
-	case rm.DVOrdinal:
-		return ordinalInput(&v), true
 	case *rm.DVDate:
 		return v.Value, true
 	case rm.DVDate:
@@ -106,8 +93,75 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 	return nil, false
 }
 
-// ordinalInput returns the value [constraints.CDvOrdinal.Validate] checks
-// for o: the value and the symbol's defining_code as one
+// codedTermOf returns the code a code phrase constraint checks for rmValue,
+// the RM value bound to a node, typed ([constraints.CodePhrase.ValidateCode]),
+// and whether [primitiveInput] reads rmValue as a code: the defining_code of
+// a DV_CODED_TEXT, or a CODE_PHRASE, a nil *rm.CodePhrase giving the zero
+// code.
+func codedTermOf(rmValue any) (constraints.CodedTermRef, bool) {
+	switch v := rmValue.(type) {
+	case *rm.DVCodedText:
+		return codePhraseInput(&v.DefiningCode), true
+	case rm.DVCodedText:
+		return codePhraseInput(&v.DefiningCode), true
+	case rm.CodePhrase:
+		return codePhraseInput(&v), true
+	case *rm.CodePhrase:
+		if v == nil {
+			return constraints.CodedTermRef{}, true
+		}
+		return codePhraseInput(v), true
+	}
+	return constraints.CodedTermRef{}, false
+}
+
+// quantityOf returns the quantity a quantity constraint checks for rmValue,
+// the RM value bound to a node, typed ([constraints.DvQuantity.ValidateQuantity]),
+// and whether [primitiveInput] reads rmValue as a quantity: a DV_QUANTITY.
+func quantityOf(rmValue any) (constraints.QuantityValue, bool) {
+	switch v := rmValue.(type) {
+	case *rm.DVQuantity:
+		return quantityInput(v), true
+	case rm.DVQuantity:
+		return quantityInput(&v), true
+	}
+	return constraints.QuantityValue{}, false
+}
+
+// ordinalOf returns the pair an ordinal constraint checks for rmValue, the
+// RM value bound to a node, typed ([constraints.CDvOrdinal.ValidateOrdinal]),
+// and whether [primitiveInput] reads rmValue as a pair: a DV_ORDINAL.
+func ordinalOf(rmValue any) (constraints.OrdinalSymbol, bool) {
+	switch v := rmValue.(type) {
+	case *rm.DVOrdinal:
+		return ordinalInput(v), true
+	case rm.DVOrdinal:
+		return ordinalInput(&v), true
+	}
+	return constraints.OrdinalSymbol{}, false
+}
+
+// codePhraseInput returns the code a code phrase constraint checks for c:
+// its terminology id and its code string.
+func codePhraseInput(c *rm.CodePhrase) constraints.CodedTermRef {
+	return constraints.CodedTermRef{
+		Terminology: c.TerminologyID.Value,
+		CodeString:  c.CodeString,
+	}
+}
+
+// quantityInput returns the quantity a quantity constraint checks for q: its
+// magnitude, its units and its precision, [noPrecision] where it has none.
+func quantityInput(q *rm.DVQuantity) constraints.QuantityValue {
+	return constraints.QuantityValue{
+		Magnitude: float64(q.Magnitude),
+		Units:     q.Units,
+		Precision: int(deref(q.Precision, noPrecision)),
+	}
+}
+
+// ordinalInput returns the value [constraints.CDvOrdinal.ValidateOrdinal]
+// checks for o: the value and the symbol's defining_code as one
 // [constraints.OrdinalSymbol], so a symbol that does not match its value is
 // reported; a code naming no terminology matches a listed pair by its code
 // (REQ-103) while the RM rules report the missing terminology. An absent
@@ -119,13 +173,9 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 // DV_ORDINAL.value is Integer (int32) per the RM; widening it to int is
 // safe on every supported Go platform.
 func ordinalInput(o *rm.DVOrdinal) constraints.OrdinalSymbol {
-	code := o.Symbol.DefiningCode
 	return constraints.OrdinalSymbol{
-		Value: int(o.Value),
-		Symbol: constraints.CodedTermRef{
-			Terminology: code.TerminologyID.Value,
-			CodeString:  code.CodeString,
-		},
+		Value:  int(o.Value),
+		Symbol: codePhraseInput(&o.Symbol.DefiningCode),
 	}
 }
 

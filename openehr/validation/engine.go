@@ -763,7 +763,7 @@ func appendLeftIssues(issues []Issue, n engineNode, class string, absent partSet
 			return appendPrimitiveIssues(issues, n.value, n.path, unboundedMagnitudes(q))
 		}
 	case "DV_ORDINAL":
-		in, ok := primitiveInput(n.value).(constraints.OrdinalSymbol)
+		in, ok := ordinalOf(n.value)
 		if !ok || (absent.has(ordinalSymbol) && absent.has(ordinalValue)) {
 			return issues
 		}
@@ -790,13 +790,13 @@ func unboundedMagnitudes(q constraints.DvQuantity) constraints.DvQuantity {
 
 // ordinalAdmitsSymbol reports whether pc, the constraint of a DV_ORDINAL,
 // admits symbol beside the value of a pair it lists, by its own rule
-// ([constraints.CDvOrdinal.Validate]): the rule a listed symbol that names
-// no terminology meets is applied as it is, not copied. It reports false
-// for any other constraint, and for one that lists no pair.
+// ([constraints.CDvOrdinal.ValidateOrdinal]): the rule a listed symbol that
+// names no terminology meets is applied as it is, not copied. It reports
+// false for any other constraint, and for one that lists no pair.
 func ordinalAdmitsSymbol(pc constraints.PrimitiveConstraint, symbol constraints.CodedTermRef) bool {
 	c, ok := pc.(constraints.CDvOrdinal)
 	return ok && slices.ContainsFunc(c.Values, func(p constraints.OrdinalSymbol) bool {
-		return len(c.Validate(constraints.OrdinalSymbol{Value: p.Value, Symbol: symbol})) == 0
+		return len(c.ValidateOrdinal(constraints.OrdinalSymbol{Value: p.Value, Symbol: symbol})) == 0
 	})
 }
 
