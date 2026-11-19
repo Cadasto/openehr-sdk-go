@@ -1537,6 +1537,7 @@ requirements:
       - openehr/validation/optional_string_test.go
       - openehr/validation/ordinal_symbol_test.go
       - openehr/validation/primitive_empty_part_test.go
+      - openehr/validation/primitive_violations_internal_test.go
       - openehr/validation/quantity_property_test.go
       - openehr/validation/temporal_constraint_test.go
       - openehr/validation/walk_alloc_test.go

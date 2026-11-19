@@ -50,8 +50,11 @@ func TestValidateRM_REQ171_WritesNoPathWhereNothingIsReported(t *testing.T) {
 // after the commit "perf(validation): REQ-103 check a code, a quantity and
 // an ordinal typed" and 24 after "perf(validation): REQ-102 bind a list's
 // items on stacks, not per-list slices". The bound sits just above that, so
-// undoing either change fails here. The race detector's instrumentation
-// changes what the walk allocates, so a race build skips the count.
+// undoing either change fails here. BMI's template constrains codes and
+// quantities but no ordinal and no code reference, so
+// TestPrimitiveViolations_REQ103_TypedArmsAllocateNothing holds those arms.
+// The race detector's instrumentation changes what the walk allocates, so a
+// race build skips the count.
 func TestValidateComposition_REQ171_ChecksLeavesTypedAndBindsListsOnStacks(t *testing.T) {
 	if raceEnabled {
 		t.Skip("the race detector's instrumentation changes what the walk allocates")
