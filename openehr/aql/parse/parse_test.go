@@ -169,14 +169,22 @@ func nestedQuery(depth int, closed bool) string {
 	return q
 }
 
+// bracketQuery is a query whose WHERE operand nests depth path predicates,
+// one inside the other, after parens parentheses.
+func bracketQuery(parens, depth int) string {
+	return "SELECT e/ehr_id/value FROM EHR e WHERE " + strings.Repeat("(", parens) + "e/a" +
+		strings.Repeat("[b", depth) + strings.Repeat("='x']", depth) + " = 'x'" + strings.Repeat(")", parens)
+}
+
 // TestREQ109_ParseRefusesNestingPastTheLimit pins REQ-109 § Nesting limit:
-// Parse admits parentheses nested 128 levels deep and refuses 129, at the
-// parenthesis that opens level 129, with a SyntaxError that matches both
-// aql.ErrSyntax and aql.ErrLimitExceeded. The limit refusal is told apart
-// from the parser's own: an unclosed query nested 128 deep is a syntax error
-// that does not match aql.ErrLimitExceeded, the same query 129 deep is the
-// limit's. A parenthesis inside a string literal does not count, and a
-// closing parenthesis with none open lends no depth to the ones after it.
+// Parse admits parentheses and brackets nested 128 levels deep, counted
+// together, and refuses 129, at the parenthesis or bracket that opens level
+// 129, with a SyntaxError that matches both aql.ErrSyntax and
+// aql.ErrLimitExceeded. The limit refusal is told apart from the parser's
+// own: an unclosed query nested 128 deep is a syntax error that does not
+// match aql.ErrLimitExceeded, the same query 129 deep is the limit's. A
+// parenthesis inside a string literal does not count, and a closing
+// parenthesis with none open lends no depth to the ones after it.
 func TestREQ109_ParseRefusesNestingPastTheLimit(t *testing.T) {
 	t.Parallel()
 	const prefix = "SELECT e/ehr_id/value FROM EHR e WHERE "
@@ -205,6 +213,18 @@ func TestREQ109_ParseRefusesNestingPastTheLimit(t *testing.T) {
 	limitErr(t, nestedQuery(129, false), len(prefix)+129)
 	stray := "SELECT e/ehr_id/value FROM EHR e WHERE e/ehr_id/value = 'x' ))) AND " + strings.Repeat("(", 129) + "e/ehr_id/value = 'x'" + strings.Repeat(")", 129)
 	limitErr(t, stray, strings.Index(stray, "AND ")+len("AND ")+129)
+
+	// Brackets count as parentheses do, and together with them.
+	bracketAt := func(q string, n int) int { // the column of the n-th '[' after "e/a"
+		return strings.Index(q, "e/a[") + len("e/a") + 2*(n-1) + 1
+	}
+	for _, q := range []string{bracketQuery(0, 128), bracketQuery(64, 64)} {
+		if _, err := parse.Parse(q); err != nil {
+			t.Errorf("Parse(%d bytes, nested 128 deep) = %v; want nil", len(q), err)
+		}
+	}
+	limitErr(t, bracketQuery(0, 129), bracketAt(bracketQuery(0, 129), 129))
+	limitErr(t, bracketQuery(64, 65), bracketAt(bracketQuery(64, 65), 65))
 
 	_, err := parse.Parse(nestedQuery(128, false))
 	if !errors.Is(err, aql.ErrSyntax) || errors.Is(err, aql.ErrLimitExceeded) {

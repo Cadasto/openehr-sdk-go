@@ -46,11 +46,12 @@ func TestParseSLLAnswersOrDeclines(t *testing.T) {
 }
 
 // TestREQ109_NestingRefusedBeforeParsing pins REQ-109 § Nesting limit's
-// "before parsing": a query nested past the limit, closed or not, leaves the
-// parser's shared prediction state as it found it, so no caller can grow it
-// past what the limit admits. The state is counted as the DFA states of
-// every decision, which every parser shares. The test runs serially: a
-// parallel test parsing a new shape meanwhile would add states of its own.
+// "before parsing": a query nested past the limit, closed or not, through
+// parentheses or path-predicate brackets, leaves the parser's shared
+// prediction state as it found it, so no caller can grow it past what the
+// limit admits. The state is counted as the DFA states of every decision,
+// which every parser shares. The test runs serially: a parallel test parsing
+// a new shape meanwhile would add states of its own.
 func TestREQ109_NestingRefusedBeforeParsing(t *testing.T) {
 	p := gen.NewAqlParser(antlr.NewCommonTokenStream(gen.NewAqlLexer(antlr.NewInputStream("")), antlr.TokenDefaultChannel))
 	states := func() (n int) {
@@ -60,7 +61,8 @@ func TestREQ109_NestingRefusedBeforeParsing(t *testing.T) {
 		return n
 	}
 	deep := "SELECT e/ehr_id/value FROM EHR e WHERE " + strings.Repeat("(", maxNesting+64) + "e/ehr_id/value = 'x'"
-	for _, q := range []string{deep, deep + strings.Repeat(")", maxNesting+64)} {
+	brackets := "SELECT e/ehr_id/value FROM EHR e WHERE e/a" + strings.Repeat("[b", maxNesting+64) + strings.Repeat("='x']", maxNesting+64) + " = 'x'"
+	for _, q := range []string{deep, deep + strings.Repeat(")", maxNesting+64), brackets} {
 		before := states()
 		if _, err := Parse(q); !errors.Is(err, aql.ErrLimitExceeded) {
 			t.Fatalf("Parse(nested %d deep) error = %v; want a refusal matching aql.ErrLimitExceeded", maxNesting+64, err)

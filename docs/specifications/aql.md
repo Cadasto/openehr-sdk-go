@@ -723,10 +723,10 @@ Recording a decline never widens the profile: admitting an engine extension is a
 
 #### Nesting limit
 
-`parse.Parse` **MUST** refuse a query whose parentheses nest more than 128 levels deep, and **MUST** refuse it before parsing it.
-The depth counts the `(` tokens the lexer reads that no `)` has closed yet, so a parenthesis inside a string literal does not count.
+`parse.Parse` **MUST** refuse a query whose parentheses and brackets, counted together, nest more than 128 levels deep, and **MUST** refuse it before parsing it.
+The depth counts the `(` and `[` tokens the lexer reads that no `)` or `]` has closed yet, so one inside a string literal does not count.
 The parser keeps what it learns about each new depth in state that every parse shares for the life of the process, and a query it refuses adds to that state too, so only a limit applied before parsing bounds it.
-The refusal is a `*parse.SyntaxError` positioned at the parenthesis that opens level 129, and it wraps `aql.ErrLimitExceeded` as well as `aql.ErrSyntax`.
+The refusal is a `*parse.SyntaxError` positioned at the parenthesis or bracket that opens level 129, and it wraps `aql.ErrLimitExceeded` as well as `aql.ErrSyntax`.
 
 ### Layer 1 — Syntax
 

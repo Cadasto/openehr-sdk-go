@@ -41,14 +41,14 @@ func (s Span) IsZero() bool { return s == Span{} }
 
 // SyntaxError is a parse failure at a position. It wraps [aql.ErrSyntax], so
 // callers can branch with errors.Is(err, aql.ErrSyntax). One that [Parse]
-// returns for parentheses nested past its limit matches [aql.ErrLimitExceeded]
-// as well.
+// returns for parentheses and brackets nested past its limit matches
+// [aql.ErrLimitExceeded] as well.
 type SyntaxError struct {
 	Pos Position
 	Msg string
 
-	// limit marks the refusal of parentheses nested past maxNesting, which
-	// [SyntaxError.Is] matches to aql.ErrLimitExceeded.
+	// limit marks the refusal of parentheses and brackets nested past
+	// maxNesting, which [SyntaxError.Is] matches to aql.ErrLimitExceeded.
 	limit bool
 }
 
@@ -73,8 +73,8 @@ func (e *SyntaxError) Error() string {
 // classifies as a syntax error exactly as a real one does.
 func (e *SyntaxError) Unwrap() error { return aql.ErrSyntax }
 
-// Is reports whether e is the refusal of parentheses nested past [Parse]'s
-// limit and target is [aql.ErrLimitExceeded]. A nil receiver matches no
+// Is reports whether e is the refusal of parentheses and brackets nested past
+// [Parse]'s limit and target is [aql.ErrLimitExceeded]. A nil receiver matches no
 // limit, as the zero SyntaxError does not.
 func (e *SyntaxError) Is(target error) bool {
 	return e != nil && e.limit && target == aql.ErrLimitExceeded //nolint:errorlint // an Is method compares its target as it is, by contract
@@ -180,12 +180,13 @@ type Document struct {
 // document. On the first syntax error it returns a *[SyntaxError] (wrapping
 // [aql.ErrSyntax]) and a nil document.
 //
-// Parse refuses a query whose parentheses nest more than 128 levels deep,
-// before it parses the query, with a *[SyntaxError] at the parenthesis that
-// opens level 129 that matches [aql.ErrLimitExceeded] as well. The parser
-// keeps what it learns about each new nesting depth for the life of the
-// process, so the limit bounds the memory a caller's query can make it keep.
-// A parenthesis inside a string literal does not count.
+// Parse refuses a query whose parentheses and path-predicate brackets,
+// counted together, nest more than 128 levels deep, before it parses the
+// query, with a *[SyntaxError] at the parenthesis or bracket that opens level
+// 129 that matches [aql.ErrLimitExceeded] as well. The parser keeps what it
+// learns about each new nesting depth for the life of the process, so the
+// limit bounds what a deeply nested query can make it keep. A parenthesis or
+// bracket inside a string literal does not count.
 func Parse(q string) (*Document, error) {
 	stream, lexErrors := lex(q)
 	if err := checkNesting(stream.GetAllTokens()); err != nil {
@@ -220,11 +221,12 @@ func Parse(q string) (*Document, error) {
 	return doc, nil
 }
 
-// maxNesting is the deepest parenthesis nesting [Parse] admits (REQ-109
-// § Nesting limit). The parser's prediction state is shared by every parse
-// for the life of the process and grows with each new depth a query reaches,
-// a refused query's included, so the depth is counted on the tokens before
-// any parse runs.
+// maxNesting is the deepest nesting of parentheses and brackets, counted
+// together, that [Parse] admits (REQ-109 § Nesting limit). The parser's
+// prediction state is shared by every parse for the life of the process and
+// grows with each new depth a query reaches, through either delimiter, a
+// refused query's included, so the depth is counted on the tokens before any
+// parse runs.
 const maxNesting = 128
 
 // lex reads q into a token stream, filled to its end, and returns it with the
@@ -239,24 +241,24 @@ func lex(q string) (*antlr.CommonTokenStream, []*SyntaxError) {
 	return stream, errs.errors
 }
 
-// checkNesting refuses tokens whose parentheses nest more than maxNesting
-// levels deep, at the parenthesis that opens the first level past it. A
-// closing parenthesis with none open leaves the depth at zero, so it cannot
-// lend depth to the parentheses after it.
+// checkNesting refuses tokens whose parentheses and brackets, counted
+// together, nest more than maxNesting levels deep, at the one that opens the
+// first level past it. A closing parenthesis or bracket with none open leaves
+// the depth at zero, so it cannot lend depth to the ones after it.
 func checkNesting(tokens []antlr.Token) error {
 	depth := 0
 	for _, t := range tokens {
 		switch t.GetTokenType() {
-		case gen.AqlLexerSYM_LEFT_PAREN:
+		case gen.AqlLexerSYM_LEFT_PAREN, gen.AqlLexerSYM_LEFT_BRACKET:
 			depth++
 			if depth > maxNesting {
 				return &SyntaxError{
 					Pos:   Position{Line: t.GetLine(), Col: t.GetColumn() + 1}, // ANTLR columns are 0-based
-					Msg:   fmt.Sprintf("parentheses nested more than %d levels deep", maxNesting),
+					Msg:   fmt.Sprintf("parentheses and brackets nested more than %d levels deep", maxNesting),
 					limit: true,
 				}
 			}
-		case gen.AqlLexerSYM_RIGHT_PAREN:
+		case gen.AqlLexerSYM_RIGHT_PAREN, gen.AqlLexerSYM_RIGHT_BRACKET:
 			depth = max(depth-1, 0)
 		}
 	}
