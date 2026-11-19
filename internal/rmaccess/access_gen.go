@@ -685,289 +685,290 @@ func single(parent any, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multiple reads the container attribute attr of parent: its items, boxed only when
-// box is set, its length, whether the list is present, and whether
-// parent's class declares attr as a container at all.
-func multiple(parent any, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiple reads the container attribute attr of parent: dst with its items appended,
+// only when box is set, its length, whether the list is present, and
+// whether parent's class declares attr as a container at all. Any other
+// parent hands dst back unchanged.
+func appendMultiple(parent any, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	switch p := parent.(type) {
 	case *rm.Action:
-		return multipleAction(p, attr, box)
+		return appendMultipleAction(p, attr, dst, box)
 	case rm.Action:
-		return multipleAction(&p, attr, box)
+		return appendMultipleAction(&p, attr, dst, box)
 	case *rm.Activity:
-		return multipleActivity(p, attr, box)
+		return appendMultipleActivity(p, attr, dst, box)
 	case rm.Activity:
-		return multipleActivity(&p, attr, box)
+		return appendMultipleActivity(&p, attr, dst, box)
 	case *rm.Address:
-		return multipleAddress(p, attr, box)
+		return appendMultipleAddress(p, attr, dst, box)
 	case rm.Address:
-		return multipleAddress(&p, attr, box)
+		return appendMultipleAddress(&p, attr, dst, box)
 	case *rm.AdminEntry:
-		return multipleAdminEntry(p, attr, box)
+		return appendMultipleAdminEntry(p, attr, dst, box)
 	case rm.AdminEntry:
-		return multipleAdminEntry(&p, attr, box)
+		return appendMultipleAdminEntry(&p, attr, dst, box)
 	case *rm.Agent:
-		return multipleAgent(p, attr, box)
+		return appendMultipleAgent(p, attr, dst, box)
 	case rm.Agent:
-		return multipleAgent(&p, attr, box)
+		return appendMultipleAgent(&p, attr, dst, box)
 	case *rm.Attestation:
-		return multipleAttestation(p, attr, box)
+		return appendMultipleAttestation(p, attr, dst, box)
 	case rm.Attestation:
-		return multipleAttestation(&p, attr, box)
+		return appendMultipleAttestation(&p, attr, dst, box)
 	case *rm.Capability:
-		return multipleCapability(p, attr, box)
+		return appendMultipleCapability(p, attr, dst, box)
 	case rm.Capability:
-		return multipleCapability(&p, attr, box)
+		return appendMultipleCapability(&p, attr, dst, box)
 	case *rm.Cluster:
-		return multipleCluster(p, attr, box)
+		return appendMultipleCluster(p, attr, dst, box)
 	case rm.Cluster:
-		return multipleCluster(&p, attr, box)
+		return appendMultipleCluster(&p, attr, dst, box)
 	case *rm.Composition:
-		return multipleComposition(p, attr, box)
+		return appendMultipleComposition(p, attr, dst, box)
 	case rm.Composition:
-		return multipleComposition(&p, attr, box)
+		return appendMultipleComposition(&p, attr, dst, box)
 	case *rm.Contact:
-		return multipleContact(p, attr, box)
+		return appendMultipleContact(p, attr, dst, box)
 	case rm.Contact:
-		return multipleContact(&p, attr, box)
+		return appendMultipleContact(&p, attr, dst, box)
 	case *rm.Contribution:
-		return multipleContribution(p, attr, box)
+		return appendMultipleContribution(p, attr, dst, box)
 	case rm.Contribution:
-		return multipleContribution(&p, attr, box)
+		return appendMultipleContribution(&p, attr, dst, box)
 	case *rm.DVCodedText:
-		return multipleDVCodedText(p, attr, box)
+		return appendMultipleDVCodedText(p, attr, dst, box)
 	case rm.DVCodedText:
-		return multipleDVCodedText(&p, attr, box)
+		return appendMultipleDVCodedText(&p, attr, dst, box)
 	case *rm.DVCount:
-		return multipleDVCount(p, attr, box)
+		return appendMultipleDVCount(p, attr, dst, box)
 	case rm.DVCount:
-		return multipleDVCount(&p, attr, box)
+		return appendMultipleDVCount(&p, attr, dst, box)
 	case *rm.DVDate:
-		return multipleDVDate(p, attr, box)
+		return appendMultipleDVDate(p, attr, dst, box)
 	case rm.DVDate:
-		return multipleDVDate(&p, attr, box)
+		return appendMultipleDVDate(&p, attr, dst, box)
 	case *rm.DVDateTime:
-		return multipleDVDateTime(p, attr, box)
+		return appendMultipleDVDateTime(p, attr, dst, box)
 	case rm.DVDateTime:
-		return multipleDVDateTime(&p, attr, box)
+		return appendMultipleDVDateTime(&p, attr, dst, box)
 	case *rm.DVDuration:
-		return multipleDVDuration(p, attr, box)
+		return appendMultipleDVDuration(p, attr, dst, box)
 	case rm.DVDuration:
-		return multipleDVDuration(&p, attr, box)
+		return appendMultipleDVDuration(&p, attr, dst, box)
 	case *rm.DVMultimedia:
-		return multipleDVMultimedia(p, attr, box)
+		return appendMultipleDVMultimedia(p, attr, dst, box)
 	case rm.DVMultimedia:
-		return multipleDVMultimedia(&p, attr, box)
+		return appendMultipleDVMultimedia(&p, attr, dst, box)
 	case *rm.DVOrdinal:
-		return multipleDVOrdinal(p, attr, box)
+		return appendMultipleDVOrdinal(p, attr, dst, box)
 	case rm.DVOrdinal:
-		return multipleDVOrdinal(&p, attr, box)
+		return appendMultipleDVOrdinal(&p, attr, dst, box)
 	case *rm.DVParagraph:
-		return multipleDVParagraph(p, attr, box)
+		return appendMultipleDVParagraph(p, attr, dst, box)
 	case rm.DVParagraph:
-		return multipleDVParagraph(&p, attr, box)
+		return appendMultipleDVParagraph(&p, attr, dst, box)
 	case *rm.DVProportion:
-		return multipleDVProportion(p, attr, box)
+		return appendMultipleDVProportion(p, attr, dst, box)
 	case rm.DVProportion:
-		return multipleDVProportion(&p, attr, box)
+		return appendMultipleDVProportion(&p, attr, dst, box)
 	case *rm.DVQuantity:
-		return multipleDVQuantity(p, attr, box)
+		return appendMultipleDVQuantity(p, attr, dst, box)
 	case rm.DVQuantity:
-		return multipleDVQuantity(&p, attr, box)
+		return appendMultipleDVQuantity(&p, attr, dst, box)
 	case *rm.DVScale:
-		return multipleDVScale(p, attr, box)
+		return appendMultipleDVScale(p, attr, dst, box)
 	case rm.DVScale:
-		return multipleDVScale(&p, attr, box)
+		return appendMultipleDVScale(&p, attr, dst, box)
 	case *rm.DVText:
-		return multipleDVText(p, attr, box)
+		return appendMultipleDVText(p, attr, dst, box)
 	case rm.DVText:
-		return multipleDVText(&p, attr, box)
+		return appendMultipleDVText(&p, attr, dst, box)
 	case *rm.DVTime:
-		return multipleDVTime(p, attr, box)
+		return appendMultipleDVTime(p, attr, dst, box)
 	case rm.DVTime:
-		return multipleDVTime(&p, attr, box)
+		return appendMultipleDVTime(&p, attr, dst, box)
 	case *rm.EHR:
-		return multipleEHR(p, attr, box)
+		return appendMultipleEHR(p, attr, dst, box)
 	case rm.EHR:
-		return multipleEHR(&p, attr, box)
+		return appendMultipleEHR(&p, attr, dst, box)
 	case *rm.EHRAccess:
-		return multipleEHRAccess(p, attr, box)
+		return appendMultipleEHRAccess(p, attr, dst, box)
 	case rm.EHRAccess:
-		return multipleEHRAccess(&p, attr, box)
+		return appendMultipleEHRAccess(&p, attr, dst, box)
 	case *rm.EHRStatus:
-		return multipleEHRStatus(p, attr, box)
+		return appendMultipleEHRStatus(p, attr, dst, box)
 	case rm.EHRStatus:
-		return multipleEHRStatus(&p, attr, box)
+		return appendMultipleEHRStatus(&p, attr, dst, box)
 	case *rm.Element:
-		return multipleElement(p, attr, box)
+		return appendMultipleElement(p, attr, dst, box)
 	case rm.Element:
-		return multipleElement(&p, attr, box)
+		return appendMultipleElement(&p, attr, dst, box)
 	case *rm.Evaluation:
-		return multipleEvaluation(p, attr, box)
+		return appendMultipleEvaluation(p, attr, dst, box)
 	case rm.Evaluation:
-		return multipleEvaluation(&p, attr, box)
+		return appendMultipleEvaluation(&p, attr, dst, box)
 	case *rm.EventContext:
-		return multipleEventContext(p, attr, box)
+		return appendMultipleEventContext(p, attr, dst, box)
 	case rm.EventContext:
-		return multipleEventContext(&p, attr, box)
+		return appendMultipleEventContext(&p, attr, dst, box)
 	case *rm.FeederAudit:
-		return multipleFeederAudit(p, attr, box)
+		return appendMultipleFeederAudit(p, attr, dst, box)
 	case rm.FeederAudit:
-		return multipleFeederAudit(&p, attr, box)
+		return appendMultipleFeederAudit(&p, attr, dst, box)
 	case *rm.Folder:
-		return multipleFolder(p, attr, box)
+		return appendMultipleFolder(p, attr, dst, box)
 	case rm.Folder:
-		return multipleFolder(&p, attr, box)
+		return appendMultipleFolder(&p, attr, dst, box)
 	case *rm.GenericEntry:
-		return multipleGenericEntry(p, attr, box)
+		return appendMultipleGenericEntry(p, attr, dst, box)
 	case rm.GenericEntry:
-		return multipleGenericEntry(&p, attr, box)
+		return appendMultipleGenericEntry(&p, attr, dst, box)
 	case *rm.Group:
-		return multipleGroup(p, attr, box)
+		return appendMultipleGroup(p, attr, dst, box)
 	case rm.Group:
-		return multipleGroup(&p, attr, box)
+		return appendMultipleGroup(&p, attr, dst, box)
 	case *rm.History[rm.ItemStructure]:
-		return multipleHistoryItemStructure(p, attr, box)
+		return appendMultipleHistoryItemStructure(p, attr, dst, box)
 	case rm.History[rm.ItemStructure]:
-		return multipleHistoryItemStructure(&p, attr, box)
+		return appendMultipleHistoryItemStructure(&p, attr, dst, box)
 	case *rm.History[rm.ItemList]:
-		return multipleHistoryItemList(p, attr, box)
+		return appendMultipleHistoryItemList(p, attr, dst, box)
 	case rm.History[rm.ItemList]:
-		return multipleHistoryItemList(&p, attr, box)
+		return appendMultipleHistoryItemList(&p, attr, dst, box)
 	case *rm.History[rm.ItemSingle]:
-		return multipleHistoryItemSingle(p, attr, box)
+		return appendMultipleHistoryItemSingle(p, attr, dst, box)
 	case rm.History[rm.ItemSingle]:
-		return multipleHistoryItemSingle(&p, attr, box)
+		return appendMultipleHistoryItemSingle(&p, attr, dst, box)
 	case *rm.History[rm.ItemTable]:
-		return multipleHistoryItemTable(p, attr, box)
+		return appendMultipleHistoryItemTable(p, attr, dst, box)
 	case rm.History[rm.ItemTable]:
-		return multipleHistoryItemTable(&p, attr, box)
+		return appendMultipleHistoryItemTable(&p, attr, dst, box)
 	case *rm.History[rm.ItemTree]:
-		return multipleHistoryItemTree(p, attr, box)
+		return appendMultipleHistoryItemTree(p, attr, dst, box)
 	case rm.History[rm.ItemTree]:
-		return multipleHistoryItemTree(&p, attr, box)
+		return appendMultipleHistoryItemTree(&p, attr, dst, box)
 	case *rm.Instruction:
-		return multipleInstruction(p, attr, box)
+		return appendMultipleInstruction(p, attr, dst, box)
 	case rm.Instruction:
-		return multipleInstruction(&p, attr, box)
+		return appendMultipleInstruction(&p, attr, dst, box)
 	case *rm.IntervalEvent[rm.ItemStructure]:
-		return multipleIntervalEventItemStructure(p, attr, box)
+		return appendMultipleIntervalEventItemStructure(p, attr, dst, box)
 	case rm.IntervalEvent[rm.ItemStructure]:
-		return multipleIntervalEventItemStructure(&p, attr, box)
+		return appendMultipleIntervalEventItemStructure(&p, attr, dst, box)
 	case *rm.IntervalEvent[rm.ItemList]:
-		return multipleIntervalEventItemList(p, attr, box)
+		return appendMultipleIntervalEventItemList(p, attr, dst, box)
 	case rm.IntervalEvent[rm.ItemList]:
-		return multipleIntervalEventItemList(&p, attr, box)
+		return appendMultipleIntervalEventItemList(&p, attr, dst, box)
 	case *rm.IntervalEvent[rm.ItemSingle]:
-		return multipleIntervalEventItemSingle(p, attr, box)
+		return appendMultipleIntervalEventItemSingle(p, attr, dst, box)
 	case rm.IntervalEvent[rm.ItemSingle]:
-		return multipleIntervalEventItemSingle(&p, attr, box)
+		return appendMultipleIntervalEventItemSingle(&p, attr, dst, box)
 	case *rm.IntervalEvent[rm.ItemTable]:
-		return multipleIntervalEventItemTable(p, attr, box)
+		return appendMultipleIntervalEventItemTable(p, attr, dst, box)
 	case rm.IntervalEvent[rm.ItemTable]:
-		return multipleIntervalEventItemTable(&p, attr, box)
+		return appendMultipleIntervalEventItemTable(&p, attr, dst, box)
 	case *rm.IntervalEvent[rm.ItemTree]:
-		return multipleIntervalEventItemTree(p, attr, box)
+		return appendMultipleIntervalEventItemTree(p, attr, dst, box)
 	case rm.IntervalEvent[rm.ItemTree]:
-		return multipleIntervalEventItemTree(&p, attr, box)
+		return appendMultipleIntervalEventItemTree(&p, attr, dst, box)
 	case *rm.IsmTransition:
-		return multipleIsmTransition(p, attr, box)
+		return appendMultipleIsmTransition(p, attr, dst, box)
 	case rm.IsmTransition:
-		return multipleIsmTransition(&p, attr, box)
+		return appendMultipleIsmTransition(&p, attr, dst, box)
 	case *rm.ItemList:
-		return multipleItemList(p, attr, box)
+		return appendMultipleItemList(p, attr, dst, box)
 	case rm.ItemList:
-		return multipleItemList(&p, attr, box)
+		return appendMultipleItemList(&p, attr, dst, box)
 	case *rm.ItemSingle:
-		return multipleItemSingle(p, attr, box)
+		return appendMultipleItemSingle(p, attr, dst, box)
 	case rm.ItemSingle:
-		return multipleItemSingle(&p, attr, box)
+		return appendMultipleItemSingle(&p, attr, dst, box)
 	case *rm.ItemTable:
-		return multipleItemTable(p, attr, box)
+		return appendMultipleItemTable(p, attr, dst, box)
 	case rm.ItemTable:
-		return multipleItemTable(&p, attr, box)
+		return appendMultipleItemTable(&p, attr, dst, box)
 	case *rm.ItemTree:
-		return multipleItemTree(p, attr, box)
+		return appendMultipleItemTree(p, attr, dst, box)
 	case rm.ItemTree:
-		return multipleItemTree(&p, attr, box)
+		return appendMultipleItemTree(&p, attr, dst, box)
 	case *rm.Observation:
-		return multipleObservation(p, attr, box)
+		return appendMultipleObservation(p, attr, dst, box)
 	case rm.Observation:
-		return multipleObservation(&p, attr, box)
+		return appendMultipleObservation(&p, attr, dst, box)
 	case *rm.Organisation:
-		return multipleOrganisation(p, attr, box)
+		return appendMultipleOrganisation(p, attr, dst, box)
 	case rm.Organisation:
-		return multipleOrganisation(&p, attr, box)
+		return appendMultipleOrganisation(&p, attr, dst, box)
 	case *rm.OriginalVersion[any]:
-		return multipleOriginalVersionAny(p, attr, box)
+		return appendMultipleOriginalVersionAny(p, attr, dst, box)
 	case rm.OriginalVersion[any]:
-		return multipleOriginalVersionAny(&p, attr, box)
+		return appendMultipleOriginalVersionAny(&p, attr, dst, box)
 	case *rm.PartyIdentified:
-		return multiplePartyIdentified(p, attr, box)
+		return appendMultiplePartyIdentified(p, attr, dst, box)
 	case rm.PartyIdentified:
-		return multiplePartyIdentified(&p, attr, box)
+		return appendMultiplePartyIdentified(&p, attr, dst, box)
 	case *rm.PartyIdentity:
-		return multiplePartyIdentity(p, attr, box)
+		return appendMultiplePartyIdentity(p, attr, dst, box)
 	case rm.PartyIdentity:
-		return multiplePartyIdentity(&p, attr, box)
+		return appendMultiplePartyIdentity(&p, attr, dst, box)
 	case *rm.PartyRelated:
-		return multiplePartyRelated(p, attr, box)
+		return appendMultiplePartyRelated(p, attr, dst, box)
 	case rm.PartyRelated:
-		return multiplePartyRelated(&p, attr, box)
+		return appendMultiplePartyRelated(&p, attr, dst, box)
 	case *rm.PartyRelationship:
-		return multiplePartyRelationship(p, attr, box)
+		return appendMultiplePartyRelationship(p, attr, dst, box)
 	case rm.PartyRelationship:
-		return multiplePartyRelationship(&p, attr, box)
+		return appendMultiplePartyRelationship(&p, attr, dst, box)
 	case *rm.Person:
-		return multiplePerson(p, attr, box)
+		return appendMultiplePerson(p, attr, dst, box)
 	case rm.Person:
-		return multiplePerson(&p, attr, box)
+		return appendMultiplePerson(&p, attr, dst, box)
 	case *rm.PointEvent[rm.ItemStructure]:
-		return multiplePointEventItemStructure(p, attr, box)
+		return appendMultiplePointEventItemStructure(p, attr, dst, box)
 	case rm.PointEvent[rm.ItemStructure]:
-		return multiplePointEventItemStructure(&p, attr, box)
+		return appendMultiplePointEventItemStructure(&p, attr, dst, box)
 	case *rm.PointEvent[rm.ItemList]:
-		return multiplePointEventItemList(p, attr, box)
+		return appendMultiplePointEventItemList(p, attr, dst, box)
 	case rm.PointEvent[rm.ItemList]:
-		return multiplePointEventItemList(&p, attr, box)
+		return appendMultiplePointEventItemList(&p, attr, dst, box)
 	case *rm.PointEvent[rm.ItemSingle]:
-		return multiplePointEventItemSingle(p, attr, box)
+		return appendMultiplePointEventItemSingle(p, attr, dst, box)
 	case rm.PointEvent[rm.ItemSingle]:
-		return multiplePointEventItemSingle(&p, attr, box)
+		return appendMultiplePointEventItemSingle(&p, attr, dst, box)
 	case *rm.PointEvent[rm.ItemTable]:
-		return multiplePointEventItemTable(p, attr, box)
+		return appendMultiplePointEventItemTable(p, attr, dst, box)
 	case rm.PointEvent[rm.ItemTable]:
-		return multiplePointEventItemTable(&p, attr, box)
+		return appendMultiplePointEventItemTable(&p, attr, dst, box)
 	case *rm.PointEvent[rm.ItemTree]:
-		return multiplePointEventItemTree(p, attr, box)
+		return appendMultiplePointEventItemTree(p, attr, dst, box)
 	case rm.PointEvent[rm.ItemTree]:
-		return multiplePointEventItemTree(&p, attr, box)
+		return appendMultiplePointEventItemTree(&p, attr, dst, box)
 	case *rm.ResourceDescription:
-		return multipleResourceDescription(p, attr, box)
+		return appendMultipleResourceDescription(p, attr, dst, box)
 	case rm.ResourceDescription:
-		return multipleResourceDescription(&p, attr, box)
+		return appendMultipleResourceDescription(&p, attr, dst, box)
 	case *rm.ResourceDescriptionItem:
-		return multipleResourceDescriptionItem(p, attr, box)
+		return appendMultipleResourceDescriptionItem(p, attr, dst, box)
 	case rm.ResourceDescriptionItem:
-		return multipleResourceDescriptionItem(&p, attr, box)
+		return appendMultipleResourceDescriptionItem(&p, attr, dst, box)
 	case *rm.RevisionHistory:
-		return multipleRevisionHistory(p, attr, box)
+		return appendMultipleRevisionHistory(p, attr, dst, box)
 	case rm.RevisionHistory:
-		return multipleRevisionHistory(&p, attr, box)
+		return appendMultipleRevisionHistory(&p, attr, dst, box)
 	case *rm.RevisionHistoryItem:
-		return multipleRevisionHistoryItem(p, attr, box)
+		return appendMultipleRevisionHistoryItem(p, attr, dst, box)
 	case rm.RevisionHistoryItem:
-		return multipleRevisionHistoryItem(&p, attr, box)
+		return appendMultipleRevisionHistoryItem(&p, attr, dst, box)
 	case *rm.Role:
-		return multipleRole(p, attr, box)
+		return appendMultipleRole(p, attr, dst, box)
 	case rm.Role:
-		return multipleRole(&p, attr, box)
+		return appendMultipleRole(&p, attr, dst, box)
 	case *rm.Section:
-		return multipleSection(p, attr, box)
+		return appendMultipleSection(p, attr, dst, box)
 	case rm.Section:
-		return multipleSection(&p, attr, box)
+		return appendMultipleSection(&p, attr, dst, box)
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // hash reads the Hash attribute attr of parent: the keys of its entries in
@@ -1053,18 +1054,18 @@ func singleAction(x *rm.Action, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleAction reads the containers of rm.Action.
-func multipleAction(x *rm.Action, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleAction reads the containers of rm.Action.
+func appendMultipleAction(x *rm.Action, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "other_participations":
-		return boxPointers(box, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
+		return appendPointers(box, dst, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleActivity reads the single-valued attributes of rm.Activity.
@@ -1093,16 +1094,16 @@ func singleActivity(x *rm.Activity, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleActivity reads the containers of rm.Activity.
-func multipleActivity(x *rm.Activity, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleActivity reads the containers of rm.Activity.
+func appendMultipleActivity(x *rm.Activity, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleAddress reads the single-valued attributes of rm.Address.
@@ -1127,16 +1128,16 @@ func singleAddress(x *rm.Address, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleAddress reads the containers of rm.Address.
-func multipleAddress(x *rm.Address, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleAddress reads the containers of rm.Address.
+func appendMultipleAddress(x *rm.Address, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleAdminEntry reads the single-valued attributes of rm.AdminEntry.
@@ -1171,18 +1172,18 @@ func singleAdminEntry(x *rm.AdminEntry, attr string, peek bool) (any, bool, bool
 	return nil, false, false
 }
 
-// multipleAdminEntry reads the containers of rm.AdminEntry.
-func multipleAdminEntry(x *rm.AdminEntry, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleAdminEntry reads the containers of rm.AdminEntry.
+func appendMultipleAdminEntry(x *rm.AdminEntry, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "other_participations":
-		return boxPointers(box, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
+		return appendPointers(box, dst, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleAgent reads the single-valued attributes of rm.Agent.
@@ -1207,26 +1208,26 @@ func singleAgent(x *rm.Agent, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleAgent reads the containers of rm.Agent.
-func multipleAgent(x *rm.Agent, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleAgent reads the containers of rm.Agent.
+func appendMultipleAgent(x *rm.Agent, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "contacts":
-		return boxPointers(box, x.Contacts), len(x.Contacts), x.Contacts != nil, true
+		return appendPointers(box, dst, x.Contacts), len(x.Contacts), x.Contacts != nil, true
 	case "identities":
-		return boxPointers(box, x.Identities), len(x.Identities), x.Identities != nil, true
+		return appendPointers(box, dst, x.Identities), len(x.Identities), x.Identities != nil, true
 	case "languages":
-		return boxValues(box, x.Languages), len(x.Languages), x.Languages != nil, true
+		return appendValues(box, dst, x.Languages), len(x.Languages), x.Languages != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "relationships":
-		return boxPointers(box, x.Relationships), len(x.Relationships), x.Relationships != nil, true
+		return appendPointers(box, dst, x.Relationships), len(x.Relationships), x.Relationships != nil, true
 	case "roles":
-		return boxPointers(box, x.Roles), len(x.Roles), x.Roles != nil, true
+		return appendPointers(box, dst, x.Roles), len(x.Roles), x.Roles != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleArchetyped reads the single-valued attributes of rm.Archetyped.
@@ -1285,16 +1286,16 @@ func singleAttestation(x *rm.Attestation, attr string, peek bool) (any, bool, bo
 	return nil, false, false
 }
 
-// multipleAttestation reads the containers of rm.Attestation.
-func multipleAttestation(x *rm.Attestation, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleAttestation reads the containers of rm.Attestation.
+func appendMultipleAttestation(x *rm.Attestation, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxPointers(box, x.Items), len(x.Items), x.Items != nil, true
+		return appendPointers(box, dst, x.Items), len(x.Items), x.Items != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleAuditDetails reads the single-valued attributes of rm.AuditDetails.
@@ -1341,16 +1342,16 @@ func singleCapability(x *rm.Capability, attr string, peek bool) (any, bool, bool
 	return nil, false, false
 }
 
-// multipleCapability reads the containers of rm.Capability.
-func multipleCapability(x *rm.Capability, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleCapability reads the containers of rm.Capability.
+func appendMultipleCapability(x *rm.Capability, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleCluster reads the single-valued attributes of rm.Cluster.
@@ -1373,18 +1374,18 @@ func singleCluster(x *rm.Cluster, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleCluster reads the containers of rm.Cluster.
-func multipleCluster(x *rm.Cluster, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleCluster reads the containers of rm.Cluster.
+func appendMultipleCluster(x *rm.Cluster, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxValues(box, x.Items), len(x.Items), x.Items != nil, true
+		return appendValues(box, dst, x.Items), len(x.Items), x.Items != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleCodePhrase reads the single-valued attributes of rm.CodePhrase.
@@ -1433,18 +1434,18 @@ func singleComposition(x *rm.Composition, attr string, peek bool) (any, bool, bo
 	return nil, false, false
 }
 
-// multipleComposition reads the containers of rm.Composition.
-func multipleComposition(x *rm.Composition, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleComposition reads the containers of rm.Composition.
+func appendMultipleComposition(x *rm.Composition, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "content":
-		return boxValues(box, x.Content), len(x.Content), x.Content != nil, true
+		return appendValues(box, dst, x.Content), len(x.Content), x.Content != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleContact reads the single-valued attributes of rm.Contact.
@@ -1469,18 +1470,18 @@ func singleContact(x *rm.Contact, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleContact reads the containers of rm.Contact.
-func multipleContact(x *rm.Contact, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleContact reads the containers of rm.Contact.
+func appendMultipleContact(x *rm.Contact, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "addresses":
-		return boxPointers(box, x.Addresses), len(x.Addresses), x.Addresses != nil, true
+		return appendPointers(box, dst, x.Addresses), len(x.Addresses), x.Addresses != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleContribution reads the single-valued attributes of rm.Contribution.
@@ -1497,16 +1498,16 @@ func singleContribution(x *rm.Contribution, attr string, peek bool) (any, bool, 
 	return nil, false, false
 }
 
-// multipleContribution reads the containers of rm.Contribution.
-func multipleContribution(x *rm.Contribution, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleContribution reads the containers of rm.Contribution.
+func appendMultipleContribution(x *rm.Contribution, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "versions":
-		return boxValues(box, x.Versions), len(x.Versions), x.Versions != nil, true
+		return appendValues(box, dst, x.Versions), len(x.Versions), x.Versions != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVBoolean reads the single-valued attributes of rm.DVBoolean.
@@ -1543,16 +1544,16 @@ func singleDVCodedText(x *rm.DVCodedText, attr string, peek bool) (any, bool, bo
 	return nil, false, false
 }
 
-// multipleDVCodedText reads the containers of rm.DVCodedText.
-func multipleDVCodedText(x *rm.DVCodedText, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVCodedText reads the containers of rm.DVCodedText.
+func appendMultipleDVCodedText(x *rm.DVCodedText, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "mappings":
-		return boxPointers(box, x.Mappings), len(x.Mappings), x.Mappings != nil, true
+		return appendPointers(box, dst, x.Mappings), len(x.Mappings), x.Mappings != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVCount reads the single-valued attributes of rm.DVCount.
@@ -1577,16 +1578,16 @@ func singleDVCount(x *rm.DVCount, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleDVCount reads the containers of rm.DVCount.
-func multipleDVCount(x *rm.DVCount, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVCount reads the containers of rm.DVCount.
+func appendMultipleDVCount(x *rm.DVCount, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return appendPointers(box, dst, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVDate reads the single-valued attributes of rm.DVDate.
@@ -1609,16 +1610,16 @@ func singleDVDate(x *rm.DVDate, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleDVDate reads the containers of rm.DVDate.
-func multipleDVDate(x *rm.DVDate, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVDate reads the containers of rm.DVDate.
+func appendMultipleDVDate(x *rm.DVDate, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return appendPointers(box, dst, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVDateTime reads the single-valued attributes of rm.DVDateTime.
@@ -1641,16 +1642,16 @@ func singleDVDateTime(x *rm.DVDateTime, attr string, peek bool) (any, bool, bool
 	return nil, false, false
 }
 
-// multipleDVDateTime reads the containers of rm.DVDateTime.
-func multipleDVDateTime(x *rm.DVDateTime, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVDateTime reads the containers of rm.DVDateTime.
+func appendMultipleDVDateTime(x *rm.DVDateTime, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return appendPointers(box, dst, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVDuration reads the single-valued attributes of rm.DVDuration.
@@ -1675,16 +1676,16 @@ func singleDVDuration(x *rm.DVDuration, attr string, peek bool) (any, bool, bool
 	return nil, false, false
 }
 
-// multipleDVDuration reads the containers of rm.DVDuration.
-func multipleDVDuration(x *rm.DVDuration, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVDuration reads the containers of rm.DVDuration.
+func appendMultipleDVDuration(x *rm.DVDuration, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return appendPointers(box, dst, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVEHRURI reads the single-valued attributes of rm.DVEHRURI.
@@ -1977,18 +1978,18 @@ func singleDVMultimedia(x *rm.DVMultimedia, attr string, peek bool) (any, bool, 
 	return nil, false, false
 }
 
-// multipleDVMultimedia reads the containers of rm.DVMultimedia.
-func multipleDVMultimedia(x *rm.DVMultimedia, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVMultimedia reads the containers of rm.DVMultimedia.
+func appendMultipleDVMultimedia(x *rm.DVMultimedia, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "data":
-		return boxPointers(box, x.Data), len(x.Data), x.Data != nil, true
+		return appendPointers(box, dst, x.Data), len(x.Data), x.Data != nil, true
 	case "integrity_check":
-		return boxPointers(box, x.IntegrityCheck), len(x.IntegrityCheck), x.IntegrityCheck != nil, true
+		return appendPointers(box, dst, x.IntegrityCheck), len(x.IntegrityCheck), x.IntegrityCheck != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVOrdinal reads the single-valued attributes of rm.DVOrdinal.
@@ -2009,28 +2010,28 @@ func singleDVOrdinal(x *rm.DVOrdinal, attr string, peek bool) (any, bool, bool) 
 	return nil, false, false
 }
 
-// multipleDVOrdinal reads the containers of rm.DVOrdinal.
-func multipleDVOrdinal(x *rm.DVOrdinal, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVOrdinal reads the containers of rm.DVOrdinal.
+func appendMultipleDVOrdinal(x *rm.DVOrdinal, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return appendPointers(box, dst, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
-// multipleDVParagraph reads the containers of rm.DVParagraph.
-func multipleDVParagraph(x *rm.DVParagraph, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVParagraph reads the containers of rm.DVParagraph.
+func appendMultipleDVParagraph(x *rm.DVParagraph, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxValues(box, x.Items), len(x.Items), x.Items != nil, true
+		return appendValues(box, dst, x.Items), len(x.Items), x.Items != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVParsable reads the single-valued attributes of rm.DVParsable.
@@ -2091,16 +2092,16 @@ func singleDVProportion(x *rm.DVProportion, attr string, peek bool) (any, bool, 
 	return nil, false, false
 }
 
-// multipleDVProportion reads the containers of rm.DVProportion.
-func multipleDVProportion(x *rm.DVProportion, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVProportion reads the containers of rm.DVProportion.
+func appendMultipleDVProportion(x *rm.DVProportion, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return appendPointers(box, dst, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVQuantity reads the single-valued attributes of rm.DVQuantity.
@@ -2133,16 +2134,16 @@ func singleDVQuantity(x *rm.DVQuantity, attr string, peek bool) (any, bool, bool
 	return nil, false, false
 }
 
-// multipleDVQuantity reads the containers of rm.DVQuantity.
-func multipleDVQuantity(x *rm.DVQuantity, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVQuantity reads the containers of rm.DVQuantity.
+func appendMultipleDVQuantity(x *rm.DVQuantity, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return appendPointers(box, dst, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVScale reads the single-valued attributes of rm.DVScale.
@@ -2163,16 +2164,16 @@ func singleDVScale(x *rm.DVScale, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleDVScale reads the containers of rm.DVScale.
-func multipleDVScale(x *rm.DVScale, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVScale reads the containers of rm.DVScale.
+func appendMultipleDVScale(x *rm.DVScale, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return appendPointers(box, dst, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVState reads the single-valued attributes of rm.DVState.
@@ -2209,16 +2210,16 @@ func singleDVText(x *rm.DVText, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleDVText reads the containers of rm.DVText.
-func multipleDVText(x *rm.DVText, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVText reads the containers of rm.DVText.
+func appendMultipleDVText(x *rm.DVText, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "mappings":
-		return boxPointers(box, x.Mappings), len(x.Mappings), x.Mappings != nil, true
+		return appendPointers(box, dst, x.Mappings), len(x.Mappings), x.Mappings != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVTime reads the single-valued attributes of rm.DVTime.
@@ -2241,16 +2242,16 @@ func singleDVTime(x *rm.DVTime, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleDVTime reads the containers of rm.DVTime.
-func multipleDVTime(x *rm.DVTime, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleDVTime reads the containers of rm.DVTime.
+func appendMultipleDVTime(x *rm.DVTime, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "other_reference_ranges":
-		return boxPointers(box, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
+		return appendPointers(box, dst, x.OtherReferenceRanges), len(x.OtherReferenceRanges), x.OtherReferenceRanges != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleDVURI reads the single-valued attributes of rm.DVURI.
@@ -2287,22 +2288,22 @@ func singleEHR(x *rm.EHR, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleEHR reads the containers of rm.EHR.
-func multipleEHR(x *rm.EHR, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleEHR reads the containers of rm.EHR.
+func appendMultipleEHR(x *rm.EHR, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "compositions":
-		return boxValues(box, x.Compositions), len(x.Compositions), x.Compositions != nil, true
+		return appendValues(box, dst, x.Compositions), len(x.Compositions), x.Compositions != nil, true
 	case "contributions":
-		return boxValues(box, x.Contributions), len(x.Contributions), x.Contributions != nil, true
+		return appendValues(box, dst, x.Contributions), len(x.Contributions), x.Contributions != nil, true
 	case "folders":
-		return boxValues(box, x.Folders), len(x.Folders), x.Folders != nil, true
+		return appendValues(box, dst, x.Folders), len(x.Folders), x.Folders != nil, true
 	case "tags":
-		return boxValues(box, x.Tags), len(x.Tags), x.Tags != nil, true
+		return appendValues(box, dst, x.Tags), len(x.Tags), x.Tags != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleEHRAccess reads the single-valued attributes of rm.EHRAccess.
@@ -2327,16 +2328,16 @@ func singleEHRAccess(x *rm.EHRAccess, attr string, peek bool) (any, bool, bool) 
 	return nil, false, false
 }
 
-// multipleEHRAccess reads the containers of rm.EHRAccess.
-func multipleEHRAccess(x *rm.EHRAccess, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleEHRAccess reads the containers of rm.EHRAccess.
+func appendMultipleEHRAccess(x *rm.EHRAccess, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleEHRStatus reads the single-valued attributes of rm.EHRStatus.
@@ -2367,16 +2368,16 @@ func singleEHRStatus(x *rm.EHRStatus, attr string, peek bool) (any, bool, bool) 
 	return nil, false, false
 }
 
-// multipleEHRStatus reads the containers of rm.EHRStatus.
-func multipleEHRStatus(x *rm.EHRStatus, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleEHRStatus reads the containers of rm.EHRStatus.
+func appendMultipleEHRStatus(x *rm.EHRStatus, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleElement reads the single-valued attributes of rm.Element.
@@ -2405,16 +2406,16 @@ func singleElement(x *rm.Element, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleElement reads the containers of rm.Element.
-func multipleElement(x *rm.Element, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleElement reads the containers of rm.Element.
+func appendMultipleElement(x *rm.Element, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleEvaluation reads the single-valued attributes of rm.Evaluation.
@@ -2453,18 +2454,18 @@ func singleEvaluation(x *rm.Evaluation, attr string, peek bool) (any, bool, bool
 	return nil, false, false
 }
 
-// multipleEvaluation reads the containers of rm.Evaluation.
-func multipleEvaluation(x *rm.Evaluation, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleEvaluation reads the containers of rm.Evaluation.
+func appendMultipleEvaluation(x *rm.Evaluation, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "other_participations":
-		return boxPointers(box, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
+		return appendPointers(box, dst, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleEventContext reads the single-valued attributes of rm.EventContext.
@@ -2489,16 +2490,16 @@ func singleEventContext(x *rm.EventContext, attr string, peek bool) (any, bool, 
 	return nil, false, false
 }
 
-// multipleEventContext reads the containers of rm.EventContext.
-func multipleEventContext(x *rm.EventContext, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleEventContext reads the containers of rm.EventContext.
+func appendMultipleEventContext(x *rm.EventContext, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "participations":
-		return boxPointers(box, x.Participations), len(x.Participations), x.Participations != nil, true
+		return appendPointers(box, dst, x.Participations), len(x.Participations), x.Participations != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleFeederAudit reads the single-valued attributes of rm.FeederAudit.
@@ -2517,18 +2518,18 @@ func singleFeederAudit(x *rm.FeederAudit, attr string, peek bool) (any, bool, bo
 	return nil, false, false
 }
 
-// multipleFeederAudit reads the containers of rm.FeederAudit.
-func multipleFeederAudit(x *rm.FeederAudit, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleFeederAudit reads the containers of rm.FeederAudit.
+func appendMultipleFeederAudit(x *rm.FeederAudit, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "feeder_system_item_ids":
-		return boxPointers(box, x.FeederSystemItemIds), len(x.FeederSystemItemIds), x.FeederSystemItemIds != nil, true
+		return appendPointers(box, dst, x.FeederSystemItemIds), len(x.FeederSystemItemIds), x.FeederSystemItemIds != nil, true
 	case "originating_system_item_ids":
-		return boxPointers(box, x.OriginatingSystemItemIds), len(x.OriginatingSystemItemIds), x.OriginatingSystemItemIds != nil, true
+		return appendPointers(box, dst, x.OriginatingSystemItemIds), len(x.OriginatingSystemItemIds), x.OriginatingSystemItemIds != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleFeederAuditDetails reads the single-valued attributes of rm.FeederAuditDetails.
@@ -2577,20 +2578,20 @@ func singleFolder(x *rm.Folder, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleFolder reads the containers of rm.Folder.
-func multipleFolder(x *rm.Folder, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleFolder reads the containers of rm.Folder.
+func appendMultipleFolder(x *rm.Folder, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "folders":
-		return boxPointers(box, x.Folders), len(x.Folders), x.Folders != nil, true
+		return appendPointers(box, dst, x.Folders), len(x.Folders), x.Folders != nil, true
 	case "items":
-		return boxValues(box, x.Items), len(x.Items), x.Items != nil, true
+		return appendValues(box, dst, x.Items), len(x.Items), x.Items != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleGenericEntry reads the single-valued attributes of rm.GenericEntry.
@@ -2615,16 +2616,16 @@ func singleGenericEntry(x *rm.GenericEntry, attr string, peek bool) (any, bool, 
 	return nil, false, false
 }
 
-// multipleGenericEntry reads the containers of rm.GenericEntry.
-func multipleGenericEntry(x *rm.GenericEntry, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleGenericEntry reads the containers of rm.GenericEntry.
+func appendMultipleGenericEntry(x *rm.GenericEntry, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleGenericID reads the single-valued attributes of rm.GenericID.
@@ -2663,26 +2664,26 @@ func singleGroup(x *rm.Group, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleGroup reads the containers of rm.Group.
-func multipleGroup(x *rm.Group, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleGroup reads the containers of rm.Group.
+func appendMultipleGroup(x *rm.Group, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "contacts":
-		return boxPointers(box, x.Contacts), len(x.Contacts), x.Contacts != nil, true
+		return appendPointers(box, dst, x.Contacts), len(x.Contacts), x.Contacts != nil, true
 	case "identities":
-		return boxPointers(box, x.Identities), len(x.Identities), x.Identities != nil, true
+		return appendPointers(box, dst, x.Identities), len(x.Identities), x.Identities != nil, true
 	case "languages":
-		return boxValues(box, x.Languages), len(x.Languages), x.Languages != nil, true
+		return appendValues(box, dst, x.Languages), len(x.Languages), x.Languages != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "relationships":
-		return boxPointers(box, x.Relationships), len(x.Relationships), x.Relationships != nil, true
+		return appendPointers(box, dst, x.Relationships), len(x.Relationships), x.Relationships != nil, true
 	case "roles":
-		return boxPointers(box, x.Roles), len(x.Roles), x.Roles != nil, true
+		return appendPointers(box, dst, x.Roles), len(x.Roles), x.Roles != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleHierObjectID reads the single-valued attributes of rm.HierObjectID.
@@ -2725,18 +2726,18 @@ func singleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string, pe
 	return nil, false, false
 }
 
-// multipleHistoryItemStructure reads the containers of rm.History[rm.ItemStructure].
-func multipleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleHistoryItemStructure reads the containers of rm.History[rm.ItemStructure].
+func appendMultipleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "events":
-		return boxValues(box, x.Events), len(x.Events), x.Events != nil, true
+		return appendValues(box, dst, x.Events), len(x.Events), x.Events != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleHistoryItemList reads the single-valued attributes of rm.History[rm.ItemList].
@@ -2767,18 +2768,18 @@ func singleHistoryItemList(x *rm.History[rm.ItemList], attr string, peek bool) (
 	return nil, false, false
 }
 
-// multipleHistoryItemList reads the containers of rm.History[rm.ItemList].
-func multipleHistoryItemList(x *rm.History[rm.ItemList], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleHistoryItemList reads the containers of rm.History[rm.ItemList].
+func appendMultipleHistoryItemList(x *rm.History[rm.ItemList], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "events":
-		return boxValues(box, x.Events), len(x.Events), x.Events != nil, true
+		return appendValues(box, dst, x.Events), len(x.Events), x.Events != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleHistoryItemSingle reads the single-valued attributes of rm.History[rm.ItemSingle].
@@ -2809,18 +2810,18 @@ func singleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string, peek boo
 	return nil, false, false
 }
 
-// multipleHistoryItemSingle reads the containers of rm.History[rm.ItemSingle].
-func multipleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleHistoryItemSingle reads the containers of rm.History[rm.ItemSingle].
+func appendMultipleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "events":
-		return boxValues(box, x.Events), len(x.Events), x.Events != nil, true
+		return appendValues(box, dst, x.Events), len(x.Events), x.Events != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleHistoryItemTable reads the single-valued attributes of rm.History[rm.ItemTable].
@@ -2851,18 +2852,18 @@ func singleHistoryItemTable(x *rm.History[rm.ItemTable], attr string, peek bool)
 	return nil, false, false
 }
 
-// multipleHistoryItemTable reads the containers of rm.History[rm.ItemTable].
-func multipleHistoryItemTable(x *rm.History[rm.ItemTable], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleHistoryItemTable reads the containers of rm.History[rm.ItemTable].
+func appendMultipleHistoryItemTable(x *rm.History[rm.ItemTable], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "events":
-		return boxValues(box, x.Events), len(x.Events), x.Events != nil, true
+		return appendValues(box, dst, x.Events), len(x.Events), x.Events != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleHistoryItemTree reads the single-valued attributes of rm.History[rm.ItemTree].
@@ -2893,18 +2894,18 @@ func singleHistoryItemTree(x *rm.History[rm.ItemTree], attr string, peek bool) (
 	return nil, false, false
 }
 
-// multipleHistoryItemTree reads the containers of rm.History[rm.ItemTree].
-func multipleHistoryItemTree(x *rm.History[rm.ItemTree], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleHistoryItemTree reads the containers of rm.History[rm.ItemTree].
+func appendMultipleHistoryItemTree(x *rm.History[rm.ItemTree], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "events":
-		return boxValues(box, x.Events), len(x.Events), x.Events != nil, true
+		return appendValues(box, dst, x.Events), len(x.Events), x.Events != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleImportedVersionAny reads the single-valued attributes of rm.ImportedVersion[any].
@@ -2965,20 +2966,20 @@ func singleInstruction(x *rm.Instruction, attr string, peek bool) (any, bool, bo
 	return nil, false, false
 }
 
-// multipleInstruction reads the containers of rm.Instruction.
-func multipleInstruction(x *rm.Instruction, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleInstruction reads the containers of rm.Instruction.
+func appendMultipleInstruction(x *rm.Instruction, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "activities":
-		return boxPointers(box, x.Activities), len(x.Activities), x.Activities != nil, true
+		return appendPointers(box, dst, x.Activities), len(x.Activities), x.Activities != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "other_participations":
-		return boxPointers(box, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
+		return appendPointers(box, dst, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleInstructionDetails reads the single-valued attributes of rm.InstructionDetails.
@@ -3041,16 +3042,16 @@ func singleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], att
 	return nil, false, false
 }
 
-// multipleIntervalEventItemStructure reads the containers of rm.IntervalEvent[rm.ItemStructure].
-func multipleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleIntervalEventItemStructure reads the containers of rm.IntervalEvent[rm.ItemStructure].
+func appendMultipleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleIntervalEventItemList reads the single-valued attributes of rm.IntervalEvent[rm.ItemList].
@@ -3085,16 +3086,16 @@ func singleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string, 
 	return nil, false, false
 }
 
-// multipleIntervalEventItemList reads the containers of rm.IntervalEvent[rm.ItemList].
-func multipleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleIntervalEventItemList reads the containers of rm.IntervalEvent[rm.ItemList].
+func appendMultipleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleIntervalEventItemSingle reads the single-valued attributes of rm.IntervalEvent[rm.ItemSingle].
@@ -3129,16 +3130,16 @@ func singleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr stri
 	return nil, false, false
 }
 
-// multipleIntervalEventItemSingle reads the containers of rm.IntervalEvent[rm.ItemSingle].
-func multipleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleIntervalEventItemSingle reads the containers of rm.IntervalEvent[rm.ItemSingle].
+func appendMultipleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleIntervalEventItemTable reads the single-valued attributes of rm.IntervalEvent[rm.ItemTable].
@@ -3173,16 +3174,16 @@ func singleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string
 	return nil, false, false
 }
 
-// multipleIntervalEventItemTable reads the containers of rm.IntervalEvent[rm.ItemTable].
-func multipleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleIntervalEventItemTable reads the containers of rm.IntervalEvent[rm.ItemTable].
+func appendMultipleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleIntervalEventItemTree reads the single-valued attributes of rm.IntervalEvent[rm.ItemTree].
@@ -3217,16 +3218,16 @@ func singleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string, 
 	return nil, false, false
 }
 
-// multipleIntervalEventItemTree reads the containers of rm.IntervalEvent[rm.ItemTree].
-func multipleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleIntervalEventItemTree reads the containers of rm.IntervalEvent[rm.ItemTree].
+func appendMultipleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleIsmTransition reads the single-valued attributes of rm.IsmTransition.
@@ -3245,16 +3246,16 @@ func singleIsmTransition(x *rm.IsmTransition, attr string, peek bool) (any, bool
 	return nil, false, false
 }
 
-// multipleIsmTransition reads the containers of rm.IsmTransition.
-func multipleIsmTransition(x *rm.IsmTransition, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleIsmTransition reads the containers of rm.IsmTransition.
+func appendMultipleIsmTransition(x *rm.IsmTransition, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "reason":
-		return boxValues(box, x.Reason), len(x.Reason), x.Reason != nil, true
+		return appendValues(box, dst, x.Reason), len(x.Reason), x.Reason != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleISOOID reads the single-valued attributes of rm.ISOOID.
@@ -3289,18 +3290,18 @@ func singleItemList(x *rm.ItemList, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleItemList reads the containers of rm.ItemList.
-func multipleItemList(x *rm.ItemList, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleItemList reads the containers of rm.ItemList.
+func appendMultipleItemList(x *rm.ItemList, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxPointers(box, x.Items), len(x.Items), x.Items != nil, true
+		return appendPointers(box, dst, x.Items), len(x.Items), x.Items != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleItemSingle reads the single-valued attributes of rm.ItemSingle.
@@ -3325,16 +3326,16 @@ func singleItemSingle(x *rm.ItemSingle, attr string, peek bool) (any, bool, bool
 	return nil, false, false
 }
 
-// multipleItemSingle reads the containers of rm.ItemSingle.
-func multipleItemSingle(x *rm.ItemSingle, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleItemSingle reads the containers of rm.ItemSingle.
+func appendMultipleItemSingle(x *rm.ItemSingle, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleItemTable reads the single-valued attributes of rm.ItemTable.
@@ -3357,18 +3358,18 @@ func singleItemTable(x *rm.ItemTable, attr string, peek bool) (any, bool, bool) 
 	return nil, false, false
 }
 
-// multipleItemTable reads the containers of rm.ItemTable.
-func multipleItemTable(x *rm.ItemTable, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleItemTable reads the containers of rm.ItemTable.
+func appendMultipleItemTable(x *rm.ItemTable, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "rows":
-		return boxPointers(box, x.Rows), len(x.Rows), x.Rows != nil, true
+		return appendPointers(box, dst, x.Rows), len(x.Rows), x.Rows != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleItemTag reads the single-valued attributes of rm.ItemTag.
@@ -3411,18 +3412,18 @@ func singleItemTree(x *rm.ItemTree, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleItemTree reads the containers of rm.ItemTree.
-func multipleItemTree(x *rm.ItemTree, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleItemTree reads the containers of rm.ItemTree.
+func appendMultipleItemTree(x *rm.ItemTree, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxValues(box, x.Items), len(x.Items), x.Items != nil, true
+		return appendValues(box, dst, x.Items), len(x.Items), x.Items != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleLink reads the single-valued attributes of rm.Link.
@@ -3525,18 +3526,18 @@ func singleObservation(x *rm.Observation, attr string, peek bool) (any, bool, bo
 	return nil, false, false
 }
 
-// multipleObservation reads the containers of rm.Observation.
-func multipleObservation(x *rm.Observation, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleObservation reads the containers of rm.Observation.
+func appendMultipleObservation(x *rm.Observation, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "other_participations":
-		return boxPointers(box, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
+		return appendPointers(box, dst, x.OtherParticipations), len(x.OtherParticipations), x.OtherParticipations != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleOrganisation reads the single-valued attributes of rm.Organisation.
@@ -3561,26 +3562,26 @@ func singleOrganisation(x *rm.Organisation, attr string, peek bool) (any, bool, 
 	return nil, false, false
 }
 
-// multipleOrganisation reads the containers of rm.Organisation.
-func multipleOrganisation(x *rm.Organisation, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleOrganisation reads the containers of rm.Organisation.
+func appendMultipleOrganisation(x *rm.Organisation, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "contacts":
-		return boxPointers(box, x.Contacts), len(x.Contacts), x.Contacts != nil, true
+		return appendPointers(box, dst, x.Contacts), len(x.Contacts), x.Contacts != nil, true
 	case "identities":
-		return boxPointers(box, x.Identities), len(x.Identities), x.Identities != nil, true
+		return appendPointers(box, dst, x.Identities), len(x.Identities), x.Identities != nil, true
 	case "languages":
-		return boxValues(box, x.Languages), len(x.Languages), x.Languages != nil, true
+		return appendValues(box, dst, x.Languages), len(x.Languages), x.Languages != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "relationships":
-		return boxPointers(box, x.Relationships), len(x.Relationships), x.Relationships != nil, true
+		return appendPointers(box, dst, x.Relationships), len(x.Relationships), x.Relationships != nil, true
 	case "roles":
-		return boxPointers(box, x.Roles), len(x.Roles), x.Roles != nil, true
+		return appendPointers(box, dst, x.Roles), len(x.Roles), x.Roles != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleOriginalVersionAny reads the single-valued attributes of rm.OriginalVersion[any].
@@ -3610,18 +3611,18 @@ func singleOriginalVersionAny(x *rm.OriginalVersion[any], attr string, peek bool
 	return nil, false, false
 }
 
-// multipleOriginalVersionAny reads the containers of rm.OriginalVersion[any].
-func multipleOriginalVersionAny(x *rm.OriginalVersion[any], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleOriginalVersionAny reads the containers of rm.OriginalVersion[any].
+func appendMultipleOriginalVersionAny(x *rm.OriginalVersion[any], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "attestations":
-		return boxPointers(box, x.Attestations), len(x.Attestations), x.Attestations != nil, true
+		return appendPointers(box, dst, x.Attestations), len(x.Attestations), x.Attestations != nil, true
 	case "other_input_version_uids":
-		return boxPointers(box, x.OtherInputVersionUids), len(x.OtherInputVersionUids), x.OtherInputVersionUids != nil, true
+		return appendPointers(box, dst, x.OtherInputVersionUids), len(x.OtherInputVersionUids), x.OtherInputVersionUids != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleParticipation reads the single-valued attributes of rm.Participation.
@@ -3656,16 +3657,16 @@ func singlePartyIdentified(x *rm.PartyIdentified, attr string, peek bool) (any, 
 	return nil, false, false
 }
 
-// multiplePartyIdentified reads the containers of rm.PartyIdentified.
-func multiplePartyIdentified(x *rm.PartyIdentified, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiplePartyIdentified reads the containers of rm.PartyIdentified.
+func appendMultiplePartyIdentified(x *rm.PartyIdentified, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "identifiers":
-		return boxPointers(box, x.Identifiers), len(x.Identifiers), x.Identifiers != nil, true
+		return appendPointers(box, dst, x.Identifiers), len(x.Identifiers), x.Identifiers != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singlePartyIdentity reads the single-valued attributes of rm.PartyIdentity.
@@ -3690,16 +3691,16 @@ func singlePartyIdentity(x *rm.PartyIdentity, attr string, peek bool) (any, bool
 	return nil, false, false
 }
 
-// multiplePartyIdentity reads the containers of rm.PartyIdentity.
-func multiplePartyIdentity(x *rm.PartyIdentity, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiplePartyIdentity reads the containers of rm.PartyIdentity.
+func appendMultiplePartyIdentity(x *rm.PartyIdentity, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singlePartyRef reads the single-valued attributes of rm.PartyRef.
@@ -3734,16 +3735,16 @@ func singlePartyRelated(x *rm.PartyRelated, attr string, peek bool) (any, bool, 
 	return nil, false, false
 }
 
-// multiplePartyRelated reads the containers of rm.PartyRelated.
-func multiplePartyRelated(x *rm.PartyRelated, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiplePartyRelated reads the containers of rm.PartyRelated.
+func appendMultiplePartyRelated(x *rm.PartyRelated, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "identifiers":
-		return boxPointers(box, x.Identifiers), len(x.Identifiers), x.Identifiers != nil, true
+		return appendPointers(box, dst, x.Identifiers), len(x.Identifiers), x.Identifiers != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singlePartyRelationship reads the single-valued attributes of rm.PartyRelationship.
@@ -3774,16 +3775,16 @@ func singlePartyRelationship(x *rm.PartyRelationship, attr string, peek bool) (a
 	return nil, false, false
 }
 
-// multiplePartyRelationship reads the containers of rm.PartyRelationship.
-func multiplePartyRelationship(x *rm.PartyRelationship, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiplePartyRelationship reads the containers of rm.PartyRelationship.
+func appendMultiplePartyRelationship(x *rm.PartyRelationship, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singlePartySelf reads the single-valued attributes of rm.PartySelf.
@@ -3820,26 +3821,26 @@ func singlePerson(x *rm.Person, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multiplePerson reads the containers of rm.Person.
-func multiplePerson(x *rm.Person, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiplePerson reads the containers of rm.Person.
+func appendMultiplePerson(x *rm.Person, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "contacts":
-		return boxPointers(box, x.Contacts), len(x.Contacts), x.Contacts != nil, true
+		return appendPointers(box, dst, x.Contacts), len(x.Contacts), x.Contacts != nil, true
 	case "identities":
-		return boxPointers(box, x.Identities), len(x.Identities), x.Identities != nil, true
+		return appendPointers(box, dst, x.Identities), len(x.Identities), x.Identities != nil, true
 	case "languages":
-		return boxValues(box, x.Languages), len(x.Languages), x.Languages != nil, true
+		return appendValues(box, dst, x.Languages), len(x.Languages), x.Languages != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "relationships":
-		return boxPointers(box, x.Relationships), len(x.Relationships), x.Relationships != nil, true
+		return appendPointers(box, dst, x.Relationships), len(x.Relationships), x.Relationships != nil, true
 	case "roles":
-		return boxPointers(box, x.Roles), len(x.Roles), x.Roles != nil, true
+		return appendPointers(box, dst, x.Roles), len(x.Roles), x.Roles != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singlePointEventItemStructure reads the single-valued attributes of rm.PointEvent[rm.ItemStructure].
@@ -3868,16 +3869,16 @@ func singlePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr stri
 	return nil, false, false
 }
 
-// multiplePointEventItemStructure reads the containers of rm.PointEvent[rm.ItemStructure].
-func multiplePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiplePointEventItemStructure reads the containers of rm.PointEvent[rm.ItemStructure].
+func appendMultiplePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singlePointEventItemList reads the single-valued attributes of rm.PointEvent[rm.ItemList].
@@ -3906,16 +3907,16 @@ func singlePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string, peek b
 	return nil, false, false
 }
 
-// multiplePointEventItemList reads the containers of rm.PointEvent[rm.ItemList].
-func multiplePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiplePointEventItemList reads the containers of rm.PointEvent[rm.ItemList].
+func appendMultiplePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singlePointEventItemSingle reads the single-valued attributes of rm.PointEvent[rm.ItemSingle].
@@ -3944,16 +3945,16 @@ func singlePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string, pe
 	return nil, false, false
 }
 
-// multiplePointEventItemSingle reads the containers of rm.PointEvent[rm.ItemSingle].
-func multiplePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiplePointEventItemSingle reads the containers of rm.PointEvent[rm.ItemSingle].
+func appendMultiplePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singlePointEventItemTable reads the single-valued attributes of rm.PointEvent[rm.ItemTable].
@@ -3982,16 +3983,16 @@ func singlePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string, peek
 	return nil, false, false
 }
 
-// multiplePointEventItemTable reads the containers of rm.PointEvent[rm.ItemTable].
-func multiplePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiplePointEventItemTable reads the containers of rm.PointEvent[rm.ItemTable].
+func appendMultiplePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singlePointEventItemTree reads the single-valued attributes of rm.PointEvent[rm.ItemTree].
@@ -4020,16 +4021,16 @@ func singlePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string, peek b
 	return nil, false, false
 }
 
-// multiplePointEventItemTree reads the containers of rm.PointEvent[rm.ItemTree].
-func multiplePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string, box bool) ([]any, int, bool, bool) {
+// appendMultiplePointEventItemTree reads the containers of rm.PointEvent[rm.ItemTree].
+func appendMultiplePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singlePointIntervalAny reads the single-valued attributes of rm.PointInterval[any].
@@ -4263,16 +4264,16 @@ func singleResourceDescription(x *rm.ResourceDescription, attr string, peek bool
 	return nil, false, false
 }
 
-// multipleResourceDescription reads the containers of rm.ResourceDescription.
-func multipleResourceDescription(x *rm.ResourceDescription, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleResourceDescription reads the containers of rm.ResourceDescription.
+func appendMultipleResourceDescription(x *rm.ResourceDescription, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "other_contributors":
-		return boxPointers(box, x.OtherContributors), len(x.OtherContributors), x.OtherContributors != nil, true
+		return appendPointers(box, dst, x.OtherContributors), len(x.OtherContributors), x.OtherContributors != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // hashResourceDescription reads the Hash attributes of rm.ResourceDescription.
@@ -4321,16 +4322,16 @@ func singleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string, p
 	return nil, false, false
 }
 
-// multipleResourceDescriptionItem reads the containers of rm.ResourceDescriptionItem.
-func multipleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleResourceDescriptionItem reads the containers of rm.ResourceDescriptionItem.
+func appendMultipleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "keywords":
-		return boxPointers(box, x.Keywords), len(x.Keywords), x.Keywords != nil, true
+		return appendPointers(box, dst, x.Keywords), len(x.Keywords), x.Keywords != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // hashResourceDescriptionItem reads the Hash attributes of rm.ResourceDescriptionItem.
@@ -4355,16 +4356,16 @@ func hashResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) ([]
 	return nil, nil, false, false
 }
 
-// multipleRevisionHistory reads the containers of rm.RevisionHistory.
-func multipleRevisionHistory(x *rm.RevisionHistory, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleRevisionHistory reads the containers of rm.RevisionHistory.
+func appendMultipleRevisionHistory(x *rm.RevisionHistory, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxPointers(box, x.Items), len(x.Items), x.Items != nil, true
+		return appendPointers(box, dst, x.Items), len(x.Items), x.Items != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleRevisionHistoryItem reads the single-valued attributes of rm.RevisionHistoryItem.
@@ -4379,16 +4380,16 @@ func singleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string, peek bool
 	return nil, false, false
 }
 
-// multipleRevisionHistoryItem reads the containers of rm.RevisionHistoryItem.
-func multipleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleRevisionHistoryItem reads the containers of rm.RevisionHistoryItem.
+func appendMultipleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "audits":
-		return boxValues(box, x.Audits), len(x.Audits), x.Audits != nil, true
+		return appendValues(box, dst, x.Audits), len(x.Audits), x.Audits != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleRole reads the single-valued attributes of rm.Role.
@@ -4417,24 +4418,24 @@ func singleRole(x *rm.Role, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleRole reads the containers of rm.Role.
-func multipleRole(x *rm.Role, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleRole reads the containers of rm.Role.
+func appendMultipleRole(x *rm.Role, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "capabilities":
-		return boxPointers(box, x.Capabilities), len(x.Capabilities), x.Capabilities != nil, true
+		return appendPointers(box, dst, x.Capabilities), len(x.Capabilities), x.Capabilities != nil, true
 	case "contacts":
-		return boxPointers(box, x.Contacts), len(x.Contacts), x.Contacts != nil, true
+		return appendPointers(box, dst, x.Contacts), len(x.Contacts), x.Contacts != nil, true
 	case "identities":
-		return boxPointers(box, x.Identities), len(x.Identities), x.Identities != nil, true
+		return appendPointers(box, dst, x.Identities), len(x.Identities), x.Identities != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	case "relationships":
-		return boxPointers(box, x.Relationships), len(x.Relationships), x.Relationships != nil, true
+		return appendPointers(box, dst, x.Relationships), len(x.Relationships), x.Relationships != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleSection reads the single-valued attributes of rm.Section.
@@ -4457,18 +4458,18 @@ func singleSection(x *rm.Section, attr string, peek bool) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multipleSection reads the containers of rm.Section.
-func multipleSection(x *rm.Section, attr string, box bool) ([]any, int, bool, bool) {
+// appendMultipleSection reads the containers of rm.Section.
+func appendMultipleSection(x *rm.Section, attr string, dst []any, box bool) ([]any, int, bool, bool) {
 	if x == nil {
-		return nil, 0, false, false
+		return dst, 0, false, false
 	}
 	switch attr {
 	case "items":
-		return boxValues(box, x.Items), len(x.Items), x.Items != nil, true
+		return appendValues(box, dst, x.Items), len(x.Items), x.Items != nil, true
 	case "links":
-		return boxPointers(box, x.Links), len(x.Links), x.Links != nil, true
+		return appendPointers(box, dst, x.Links), len(x.Links), x.Links != nil, true
 	}
-	return nil, 0, false, false
+	return dst, 0, false, false
 }
 
 // singleTemplateID reads the single-valued attributes of rm.TemplateID.

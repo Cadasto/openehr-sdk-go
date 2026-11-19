@@ -117,7 +117,7 @@ func TestRenderRMAccessFile_REQ171_Deterministic(t *testing.T) {
 // pointer and value form, exactly the Go types the reverse registry
 // recognises for the classes the type registry decodes, and that every arm's
 // readers answer exactly the attributes the class declares (the fold rminfo
-// is generated from), containers through multiple and every other attribute
+// is generated from), containers through appendMultiple and every other attribute
 // through single, and every Hash attribute through hash as well.
 func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 	plan, _, file := rmAccessOutput(t)
@@ -189,7 +189,7 @@ func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 		for _, reader := range []struct {
 			prefix string
 			attrs  []string
-		}{{"single", arm.single}, {"multiple", arm.multi}, {"hash", arm.hash}} {
+		}{{"single", arm.single}, {"appendMultiple", arm.multi}, {"hash", arm.hash}} {
 			fd := funcDecl(file, reader.prefix+arm.suffix)
 			if fd == nil {
 				if len(reader.attrs) > 0 {
@@ -244,8 +244,8 @@ func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 		{"singleDVProportion", "precision", "return x.Precision, x.Precision != nil, true"},
 		{"singleOriginalVersionAny", "data", "if x.Data == nil {\n\treturn nil, false, true\n}\nreturn *x.Data, true, true"},
 		{"singleCodePhrase", "terminology_id", "return &x.TerminologyID, !isZeroTerminologyID(x.TerminologyID), true"},
-		{"multipleComposition", "content", "return boxValues(box, x.Content), len(x.Content), x.Content != nil, true"},
-		{"multipleItemList", "items", "return boxPointers(box, x.Items), len(x.Items), x.Items != nil, true"},
+		{"appendMultipleComposition", "content", "return appendValues(box, dst, x.Content), len(x.Content), x.Content != nil, true"},
+		{"appendMultipleItemList", "items", "return appendPointers(box, dst, x.Items), len(x.Items), x.Items != nil, true"},
 		{"singleResourceDescription", "details", "return x.Details, x.Details != nil, true"},
 		{"singleResourceDescription", "other_details", "return x.OtherDetails, x.OtherDetails != nil, true"},
 		{"hashResourceDescription", "details", "keys, values := entryPointers(x.Details)\nreturn keys, values, x.Details != nil, true"},
@@ -284,12 +284,12 @@ func TestRenderRMAccessFile_REQ171_ListAndHashReadings(t *testing.T) {
 			continue
 		}
 		switch {
-		case strings.HasPrefix(fd.Name.Name, "multiple") && fd.Name.Name != "multiple":
+		case strings.HasPrefix(fd.Name.Name, "appendMultiple") && fd.Name.Name != "appendMultiple":
 			for attr, body := range caseBodies(t, fd) {
 				containers++
 				field := "x." + FieldName(attr)
-				want := fmt.Sprintf("return boxPointers(box, %s), len(%s), %s != nil, true", field, field, field)
-				alt := fmt.Sprintf("return boxValues(box, %s), len(%s), %s != nil, true", field, field, field)
+				want := fmt.Sprintf("return appendPointers(box, dst, %s), len(%s), %s != nil, true", field, field, field)
+				alt := fmt.Sprintf("return appendValues(box, dst, %s), len(%s), %s != nil, true", field, field, field)
 				if got := strings.TrimSpace(body); got != want && got != alt {
 					t.Errorf("%s case %q:\n%s\nwant the list reading %s != nil", fd.Name.Name, attr, got, field)
 				}

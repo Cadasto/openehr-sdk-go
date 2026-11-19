@@ -151,6 +151,16 @@ type engine struct {
 	// when it enters the list and drops it when it leaves, so a list of any
 	// length holds its predicates without a slice of its own.
 	preds []predicate
+	// items holds the items of each list the walk is inside, outermost
+	// first, a run per list: [engine.readAttribute] appends a list's items
+	// when it reads the list, and [engine.visitAttribute] drops them when
+	// it leaves the attribute, so reading a list allocates nothing once the
+	// stack has room for it. Each reading holds its run capped at the run's
+	// end, so an append to the run copies it rather than writing over the
+	// runs read above it. An append that grows the stack while an outer run
+	// is held moves the stack to a new array: the outer run goes on reading
+	// the old one, which nothing writes to again.
+	items []any
 	// verdicts holds, for each node the walk tried a value at, whether the
 	// value validates under the child tried, so that no value is tried
 	// twice under one child at one depth ([engine.verdict]). Nil until a
@@ -176,6 +186,7 @@ func newEngine(lim Limits) *engine {
 		ancestry: make([]any, 0, 16),
 		path:     pathStack{steps: make([]pathStep, 0, 16)},
 		preds:    make([]predicate, 0, 16),
+		items:    make([]any, 0, 16),
 	}
 }
 
@@ -279,7 +290,11 @@ type attrReading struct {
 	// of a Hash.
 	count int
 	// items holds the items of a list or the entries of a Hash, in key
-	// order; nil for a counted list and a single-valued attribute.
+	// order; nil for a list that holds no item, a counted list and a
+	// single-valued attribute. A list's items are its run on the engine's
+	// items stack ([engine].items), which holds them until the walk leaves
+	// the attribute ([engine.visitAttribute]); a Hash's entries are a slice
+	// of their own.
 	items []any
 	// keys holds the keys of the entries of a Hash, in the order of items,
 	// as the generated access returns them beside the entries; nil for every
@@ -300,12 +315,21 @@ type attrReading struct {
 	missing *missingNode
 }
 
-// readAttribute reads the attribute a of value, by its shape.
-func readAttribute(value any, a *engineAttr) attrReading {
+// readAttribute reads the attribute a of value, by its shape. The items of
+// a list are appended to the engine's items stack ([engine].items) and read
+// as their run there, which the caller drops once it is done with the
+// reading ([engine.visitAttribute]).
+func (e *engine) readAttribute(value any, a *engineAttr) attrReading {
 	switch a.shape {
 	case shapeList:
-		items, present := rmaccess.Multiple(value, a.name)
-		return attrReading{present: present, count: len(items), items: items}
+		from := len(e.items)
+		var present bool
+		e.items, present = rmaccess.AppendMultiple(e.items, value, a.name)
+		r := attrReading{present: present, count: len(e.items) - from}
+		if end := len(e.items); end > from {
+			r.items = e.items[from:end:end]
+		}
+		return r
 	case shapeCounted:
 		n, present := rmaccess.Len(value, a.name)
 		return attrReading{present: present, count: n}
@@ -1050,8 +1074,26 @@ func shapeFrom(container, primitiveItems, hash bool) attrShape {
 // one the node's role lets be blank, that rule reports from the value as
 // before. The report names the item of a list or the entry of a Hash below
 // the attribute by its position or its key ([attrReading.itemMissing]).
+//
+// The items of a list are read onto the engine's items stack
+// ([engine].items) and dropped once the visit is done, whichever way it
+// ends: the walk below, the bind trials included, reads its own lists above
+// them and drops those in turn.
 func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
-	r := readAttribute(n.value, a)
+	// Not a defer: every attribute of every value comes through here, and
+	// a deferred drop made the whole walk 6 to 10% slower than this split
+	// (BenchmarkValidateComposition, macOS arm64). visitReading returns on
+	// every path, so the drop below follows each of them.
+	from := len(e.items)
+	e.visitReading(n, class, a)
+	e.items = e.items[:from]
+}
+
+// visitReading reads the attribute a of node n, of class class, and visits
+// it as [engine.visitAttribute] says, leaving the items of a list it read on
+// the engine's items stack for visitAttribute to drop.
+func (e *engine) visitReading(n *engineNode, class string, a *engineAttr) {
+	r := e.readAttribute(n.value, a)
 	reported := false
 	if n.missing != nil {
 		if r.missing = n.missing.child(a.name); r.missing.marked() {

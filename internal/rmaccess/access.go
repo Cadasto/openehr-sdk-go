@@ -62,12 +62,26 @@ func Peek(parent any, attr string) (value any, present, leaf bool) {
 // The items of a list of values are pointers into its backing array, so a
 // walk can descend into each and change it in place; the items of a list of
 // interfaces or pointers come back as they are.
+//
+// Multiple allocates a new slice for the items of every list that holds any;
+// [AppendMultiple] reads them into a buffer the caller owns.
 func Multiple(parent any, attr string) (items []any, present bool) {
-	items, _, present, _ = multiple(parent, attr, true)
-	if !present {
-		return nil, false
-	}
-	return items, true
+	return AppendMultiple(nil, parent, attr)
+}
+
+// AppendMultiple appends the items of the container attribute attr on parent
+// to dst, as [Multiple] reads them, and returns the extended slice and
+// whether the list is present. A list that is absent or empty, and any pair
+// [Multiple] reads as absent, appends nothing, so dst comes back as it was:
+// (dst, true) for a present empty list and (dst, false) otherwise.
+//
+// A walk that reads lists one at a time can pass the same buffer, emptied, to
+// each call, as in AppendMultiple(buf[:0], parent, attr): once the buffer has
+// room for a list's items, reading that list allocates nothing. A later call
+// into the same buffer overwrites the items an earlier one appended.
+func AppendMultiple(dst []any, parent any, attr string) (items []any, present bool) {
+	items, _, present, _ = appendMultiple(parent, attr, dst, true)
+	return items, present
 }
 
 // Len returns the number of items of the container attribute attr on parent
@@ -76,7 +90,7 @@ func Multiple(parent any, attr string) (items []any, present bool) {
 // Array of Octet, is counted, not boxed one byte at a time. An absent list,
 // and any pair [Multiple] reads as absent, reads as (0, false).
 func Len(parent any, attr string) (n int, present bool) {
-	_, n, present, _ = multiple(parent, attr, false)
+	_, n, present, _ = appendMultiple(parent, attr, nil, false)
 	if !present {
 		return 0, false
 	}
@@ -136,32 +150,32 @@ func leafValue[T any](peek bool, v T) any {
 	return v
 }
 
-// boxPointers boxes, when box is set, each item of a list of values as a
-// pointer into the backing array. It returns nil when box is not set and for
-// an empty list.
-func boxPointers[T any](box bool, xs []T) []any {
-	if !box || len(xs) == 0 {
-		return nil
+// appendPointers appends to dst, when box is set, each item of a list of
+// values as a pointer into the backing array, and returns the extended
+// slice. dst comes back unchanged when box is not set and for an empty list.
+func appendPointers[T any](box bool, dst []any, xs []T) []any {
+	if !box {
+		return dst
 	}
-	out := make([]any, len(xs))
+	dst = slices.Grow(dst, len(xs))
 	for i := range xs {
-		out[i] = &xs[i]
+		dst = append(dst, &xs[i])
 	}
-	return out
+	return dst
 }
 
-// boxValues boxes, when box is set, each item of a list of interfaces or
-// pointers as it is. It returns nil when box is not set and for an empty
-// list.
-func boxValues[T any](box bool, xs []T) []any {
-	if !box || len(xs) == 0 {
-		return nil
+// appendValues appends to dst, when box is set, each item of a list of
+// interfaces or pointers as it is, and returns the extended slice. dst comes
+// back unchanged when box is not set and for an empty list.
+func appendValues[T any](box bool, dst []any, xs []T) []any {
+	if !box {
+		return dst
 	}
-	out := make([]any, len(xs))
-	for i, x := range xs {
-		out[i] = x
+	dst = slices.Grow(dst, len(xs))
+	for _, x := range xs {
+		dst = append(dst, x)
 	}
-	return out
+	return dst
 }
 
 // entryPointers returns the keys of a Hash of values in ascending order and,

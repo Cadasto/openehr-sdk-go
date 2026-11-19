@@ -7,6 +7,7 @@
 //	Single(parent any, attr string) (value any, present bool)
 //	Peek(parent any, attr string) (value any, present, leaf bool)
 //	Multiple(parent any, attr string) (items []any, present bool)
+//	AppendMultiple(dst []any, parent any, attr string) (items []any, present bool)
 //	Len(parent any, attr string) (n int, present bool)
 //	Hash(parent any, attr string) (keys []string, values []any, present bool)
 //	Covers(v any) bool
