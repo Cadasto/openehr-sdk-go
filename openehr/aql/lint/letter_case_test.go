@@ -288,12 +288,23 @@ func TestAliasMayTakeAnyCaseButMustBeUsedAsDeclared(t *testing.T) {
 		})
 	}
 
-	// An alias bound nowhere in any spelling gets no spelling hint: there is
-	// no declaration to point at.
-	q := "SELECT x/uid/value AS id FROM EHR e CONTAINS COMPOSITION c"
-	for _, is := range lint.LintString(q, nil).Issues {
-		if is.Code == "aql_unknown_alias" && strings.Contains(is.Detail, "spelling") {
-			t.Errorf("LintString(%q): Detail %q offers a spelling hint, want none: no alias differs from x only in case", q, is.Detail)
+	// No spelling hint where no respelling would bind the alias: an alias
+	// declared nowhere, and a SELECT `AS` alias used as a path root, which
+	// stays unbound in its declared spelling too (only a bare ORDER BY key
+	// resolves through a SELECT alias).
+	for _, q := range []string{
+		"SELECT x/uid/value AS id FROM EHR e CONTAINS COMPOSITION c",
+		"SELECT c/uid/value AS Id FROM EHR e CONTAINS COMPOSITION c WHERE id/name/value = 'x'",
+		"SELECT c/uid/value AS Id FROM EHR e CONTAINS COMPOSITION c ORDER BY id/value",
+	} {
+		r := lint.LintString(q, nil)
+		if !has(r, "aql_unknown_alias") {
+			t.Errorf("LintString(%q) codes = %v, want aql_unknown_alias", q, codes(r))
+		}
+		for _, is := range r.Issues {
+			if is.Code == "aql_unknown_alias" && strings.Contains(is.Detail, "spelling") {
+				t.Errorf("LintString(%q): Detail %q offers a spelling hint, want none: no respelling binds the alias here", q, is.Detail)
+			}
 		}
 	}
 }

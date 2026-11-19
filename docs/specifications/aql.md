@@ -758,7 +758,8 @@ Its span covers the step when the step belongs to the identified path; otherwise
 An alias is not folded either.
 One declared in FROM / CONTAINS or by a SELECT `AS` may be written in lower, upper or mixed case, and every use **MUST** repeat that spelling: `aql_unknown_alias` matches an alias exactly.
 This is stricter than the QUERY text, which calls variable names not case-sensitive.
-When the unbound alias differs from a declared one only in letter case, the issue's `Detail` **SHOULD** name the declared spelling.
+When the unbound alias differs only in letter case from an alias that could bind it, the issue's `Detail` **SHOULD** name the declared spelling.
+That is a FROM / CONTAINS alias in any position, or a SELECT `AS` alias for a bare ORDER BY key, the one place a SELECT alias resolves.
 
 Layer 2 additionally carries the semantic, portability and path-shape check groups of [§ REQ-161](#req-161--aql-semantic-and-portability-lint), whose codes, severities and firing rules are specified once there.
 
