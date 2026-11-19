@@ -736,7 +736,8 @@ Each code in this table and in the § Layer 3 table **MUST** be raised exactly w
 | Check | Code | Severity | Fires when |
 |---|---|---|---|
 | Alias binding | `aql_unknown_alias` | Error | An identified path's root alias binds to no class in FROM / CONTAINS. |
-| Identifiable scope | `aql_from_archetype` | Warning | FROM/CONTAINS names no archetype HRID, no `$param` archetype predicate, no `VERSION` operand and no `EHR` root, so the query scans broadly. |
+| Attribute case | `aql_path_attribute_case` | Error | An attribute name in a path carries an ASCII upper-case letter: a step of an identified path, or a step of a relative path inside a structured predicate ([§ REQ-113 § Structured node predicates](#structured-node-predicates)) on an alias root, a path step or a FROM / CONTAINS class. Every attribute the pinned Reference Model declares is lower case, so the step names nothing. It fires once per such name. A predicate the parser does not structure is not read. |
+| Identifiable scope | `aql_from_archetype` | Warning | FROM/CONTAINS names no archetype HRID, no `$param` archetype predicate, no `VERSION` operand and no `EHR` root in any letter case, so the query scans broadly. |
 | Bound parameters | `aql_unbound_param` | Error | When linting an `aql.Query`, a `$name` the query references has no key in `Query.Parameters`. |
 | Unused parameters | `aql_unused_param` | Warning | A `Query.Parameters` key is never referenced; the code is advisory. |
 | Deprecated `TOP` | `aql_deprecated_top` | Warning | The query carries a `SELECT TOP` clause; it fires once per query. The remedy is `LIMIT` with `ORDER BY`: the modifier is deprecated from QUERY Release-1.1.0 and slated for removal ([§ REQ-113 § The `TOP` carrier](#the-top-carrier)). |
@@ -748,6 +749,17 @@ The three `TOP` codes **MUST** key on the `TOP` clause's presence in the source,
 The other half of each pair is read from its own channel: the in-text `LIMIT` clause for `aql_top_with_limit`, the request envelope's `Fetch` for `aql_top_with_fetch`.
 
 SELECT-present-with-≥1-projection and FROM-present are guaranteed by a successful parse (the grammar requires both), so they raise no Layer-2 issue.
+
+The lint reads keywords, operators, function names and RM class names in any letter case, as the grammar's lexer and the [§ REQ-160](#reachability-semantics) relation read them.
+Respelling only the letter case of one of them **MUST NOT** change which codes the lint raises, or their severities.
+An attribute name in a path is not folded, which is why `aql_path_attribute_case` exists.
+Its span covers the step when the step belongs to the identified path; otherwise it covers the path, or the class's RM type, whose predicate holds the step.
+
+An alias is not folded either.
+One declared in FROM / CONTAINS or by a SELECT `AS` may be written in lower, upper or mixed case, and every use **MUST** repeat that spelling: `aql_unknown_alias` matches an alias exactly.
+This is stricter than the QUERY text, which calls variable names not case-sensitive.
+When the unbound alias differs only in letter case from an alias that could bind it, the issue's `Detail` **SHOULD** name the declared spelling.
+That is a FROM / CONTAINS alias in any position, or a SELECT `AS` alias for a bare ORDER BY key, the one place a SELECT alias resolves.
 
 Layer 2 additionally carries the semantic, portability and path-shape check groups of [§ REQ-161](#req-161--aql-semantic-and-portability-lint), whose codes, severities and firing rules are specified once there.
 
