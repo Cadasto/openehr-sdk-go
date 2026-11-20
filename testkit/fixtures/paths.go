@@ -1,6 +1,5 @@
 // Package fixtures resolves paths to the vendored fixture documents under
-// testkit/corpus/, and to the generic operational templates the SDK ships in
-// openehr/template/generic/, which the corpus holds no copy of.
+// testkit/corpus/.
 //
 // Layout of testkit/corpus/:
 //
@@ -22,9 +21,8 @@
 //	  template.opt | canonical.json | canonical.xml | flat.json | structured.json
 //	ehrbase-service/              # pinned EHRbase server test templates (MANIFEST.txt)
 //	  templates/{template-id}.opt
-//
-// Outside it, [GenericTemplatesDir] is openehr/template/generic/, holding
-// {template-id}.opt for the generic EHR_STATUS and FOLDER templates.
+//	reference/                    # pinned openehr-reference-content templates (MANIFEST.txt)
+//	  templates/{template-id}.opt
 //
 // Vendor provenance is indexed in testkit/corpus/README.md (not in paths).
 package fixtures
@@ -41,14 +39,6 @@ import (
 // vendored fixture tree.
 func CorpusRoot() string {
 	return filepath.Join(packageDir(), "..", "corpus")
-}
-
-// GenericTemplatesDir returns the absolute path of openehr/template/generic,
-// the package that ships the SDK's generic EHR_STATUS and FOLDER operational
-// templates. Those templates have that one copy: the fixture tree holds none,
-// and [ListAllOPTs] lists them under the generic label.
-func GenericTemplatesDir() string {
-	return filepath.Join(packageDir(), "..", "..", "openehr", "template", "generic")
 }
 
 // packageDir returns the absolute path of this package's folder,
@@ -187,8 +177,18 @@ func optDirs() []optDir {
 		{label: "flat-conformance", path: filepath.Join(FlatConformanceRoot(), "templates")},
 		{label: "ehrbase-service", path: filepath.Join(CorpusRoot(), "ehrbase-service", "templates")},
 		{label: "definition", path: filepath.Join(CorpusRoot(), "its_rest", "definition")},
-		{label: "generic", path: GenericTemplatesDir()},
+		{label: "reference", path: ReferenceTemplatesDir()},
 	}
+}
+
+// ReferenceTemplatesDir returns the absolute path of
+// testkit/corpus/reference/templates, the operational templates vendored
+// from Cadasto/openehr-reference-content at the commit
+// testkit/corpus/UPSTREAM_PINS.txt names: the generic EHR_STATUS and FOLDER
+// templates and the demographic ones. [ListAllOPTs] lists them under the
+// reference label.
+func ReferenceTemplatesDir() string {
+	return filepath.Join(CorpusRoot(), "reference", "templates")
 }
 
 // OPTRef is one vendored operational template: a stable Name (the
@@ -202,9 +202,9 @@ type OPTRef struct {
 
 // ListAllOPTs returns every operational template vendored under
 // [CorpusRoot] (across templates/, webtemplate/, the FLAT
-// conformance corpus, the EHRbase server's test templates, and the ITS-REST
-// definition fixtures) and the generic templates of [GenericTemplatesDir],
-// named generic/{template-id}, sorted by Name. The operational templates of
+// conformance corpus, the EHRbase server's test templates, the ITS-REST
+// definition fixtures and the reference templates), sorted by Name. The
+// operational templates of
 // the cross-format sets are not listed. Callers that must cover the whole
 // corpus (such as the compiled-path regression guard for name-predicated
 // template paths) use this rather than naming templates individually, so a

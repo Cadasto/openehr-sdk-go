@@ -1,0 +1,229 @@
+# compiled tree of reference/templates/PERSON-Patient.v1.opt
+template_id="PERSON-Patient.v1" concept="Patient" language="en" uid="1c86b6b3-ea97-4c33-9846-c38f16085e54" num_nodes=35
+
+node /
+  rm_type="PERSON" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-PERSON.generic_person.v1" node_name="" occurrences=1..1 slot=false
+  term[en] "at0000" code="at0000" description="A human being recorded as a party in a demographic service, independent of any role the person plays." text="Person"
+  attr "details" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "identities" rm_type="PARTY_IDENTITY" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=true children=1
+  attr "contacts" rm_type="CONTACT" cardinality=multiple existence=0..0 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "relationships" rm_type="PARTY_RELATIONSHIP" cardinality=multiple existence=0..1 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=2
+  attr "languages" rm_type="DV_TEXT" cardinality=multiple existence=0..0 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="Data about the person other than names and contacts." text="Details"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=4
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=1..* slot=false
+  term[en] "at0002" code="at0002" comment="Record the kind of identifier in type (for example a code of HL7 v2 table 0203: MR, PI, ANON, NI, PPN, DL, PRN, NPI, LN), the authority whose scheme it belongs to in issuer, and the organisation that assigned it in assigner. Corresponds to FHIR Patient.identifier and Practitioner.identifier." description="An identifier issued for the person, such as a patient number, a pseudonym, a national person number, a passport number or a professional registration number." text="Identifier"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0002]/value
+  rm_type="DV_IDENTIFIER" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0003" code="at0003" comment="A partial date, such as the year alone, may be recorded. Corresponds to FHIR birthDate." description="The date on which the person was born." text="Date of birth"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0003]/value
+  rm_type="DV_DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+
+node /details/items[at0003]/value/value
+  rm_type="DATE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CDate{Pattern:"yyyy-XX-XX" Range:constraints.TemporalRange{Lower:"" Upper:"" LowerInclusive:false UpperInclusive:false LowerUnbounded:false UpperUnbounded:false} TimezoneValidity:0}
+
+node /details/items[at0004]
+  rm_type="ELEMENT" node_id="at0004" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0004" code="at0004" comment="The four codes match FHIR AdministrativeGender one to one. It is not an observation of sex or of gender identity; those belong in the health record." description="The gender of the person used for administrative purposes." text="Administrative gender"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0004]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0004]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0005" "at0006" "at0007" "at0008"]}
+  code_term[en] "at0005" code="at0005" description="Male. FHIR AdministrativeGender code male." text="Male"
+  code_term[en] "at0006" code="at0006" description="Female. FHIR AdministrativeGender code female." text="Female"
+  code_term[en] "at0007" code="at0007" description="Other than male or female. FHIR AdministrativeGender code other." text="Other"
+  code_term[en] "at0008" code="at0008" description="The gender is not known. FHIR AdministrativeGender code unknown." text="Unknown"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0009" code="at0009" comment="Corresponds to FHIR deceasedBoolean." description="Whether the person is known to have died." text="Deceased"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /details/items[at0009]/value
+  rm_type="DV_BOOLEAN" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="Boolean" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[at0043]
+  rm_type="PARTY_IDENTITY" node_id="at0043" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0043" code="at0043" comment="For a person whose name is held elsewhere, for example where the identity is kept apart from the health record." description="A designation by which the person is known in place of a name." text="Pseudonym"
+  attr "details" rm_type="ITEM_STRUCTURE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[at0043]/details
+  rm_type="ITEM_TREE" node_id="at0044" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0044" code="at0044" description="The pseudonym." text="Pseudonym details"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[at0043]/details/items[at0045]
+  rm_type="ELEMENT" node_id="at0045" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0045" code="at0045" description="A designation that does not by itself identify the person, such as a patient number or a randomly assigned label." text="Pseudonym"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /identities[at0043]/details/items[at0045]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]
+  rm_type="PARTY_RELATIONSHIP" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="The source party, usually a patient, is in the care of the target party: a care provider, a care team or an organisation." text="Care relationship"
+  attr "details" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "target" rm_type="PARTY_REF" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "source" rm_type="PARTY_REF" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/details
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="Data about the relationship." text="Details"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=3
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/details/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0002" code="at0002" description="The part the target plays in the source party's care." text="Care relationship type"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/details/items[at0002]/value
+  rm_type="DV_CODED_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "defining_code" rm_type="CODE_PHRASE" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/details/items[at0002]/value/defining_code
+  rm_type="CODE_PHRASE" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CodePhrase{Terminology:"local" CodeList:["at0003" "at0004" "at0005" "at0006" "at0007"]}
+  code_term[en] "at0003" code="at0003" description="The target is the source party's primary care provider, such as a general practitioner. Corresponds to FHIR Patient.generalPractitioner." text="Primary care provider"
+  code_term[en] "at0004" code="at0004" description="The target is responsible for the source party's care." text="Responsible care provider"
+  code_term[en] "at0005" code="at0005" description="The target is a care team that cares for the source party. Corresponds to FHIR CareTeam.subject." text="Care team"
+  code_term[en] "at0006" code="at0006" description="The target coordinates the source party's care across providers." text="Case manager"
+  code_term[en] "at0007" code="at0007" description="The target is the organisation that manages the source party's care and record. Corresponds to FHIR Patient.managingOrganization." text="Managing organisation"
+  attr "terminology_id" rm_type="TERMINOLOGY_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "code_string" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/details/items[at0002]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/details/items[at0008]
+  rm_type="ELEMENT" node_id="at0008" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0008" code="at0008" description="Why the care relationship exists, such as the condition or the referral it follows." text="Reason"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/details/items[at0008]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/details/items[at0009]
+  rm_type="ELEMENT" node_id="at0009" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0009" code="at0009" description="A note about the relationship." text="Comment"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/details/items[at0009]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/target
+  rm_type="PARTY_REF" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "type" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "namespace" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "id" rm_type="OBJECT_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.care_relationship.v1]/target/type
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["PERSON" "GROUP" "ORGANISATION"] ListOpen:false Default:""}
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.role_assignment.v1]
+  rm_type="PARTY_RELATIONSHIP" node_id="at0000" archetype_id="openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.role_assignment.v1" node_name="" occurrences=0..* slot=false
+  term[en] "at0000" code="at0000" description="The source actor holds the target role." text="Role assignment"
+  attr "details" rm_type="ITEM_STRUCTURE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "target" rm_type="PARTY_REF" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "source" rm_type="PARTY_REF" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.role_assignment.v1]/details
+  rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false
+  term[en] "at0001" code="at0001" description="Data about the relationship." text="Details"
+  attr "items" rm_type="ITEM" cardinality=multiple existence=1..1 child_multiplicity=1..* implicit=false not_in_rm=false required=false children=2
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.role_assignment.v1]/details/items[at0002]
+  rm_type="ELEMENT" node_id="at0002" archetype_id="" node_name="" occurrences=0..* slot=false
+  term[en] "at0002" code="at0002" comment="Corresponds to FHIR PractitionerRole.specialty." description="The specialty in which the actor holds the role." text="Specialty"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.role_assignment.v1]/details/items[at0002]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.role_assignment.v1]/details/items[at0003]
+  rm_type="ELEMENT" node_id="at0003" archetype_id="" node_name="" occurrences=0..1 slot=false
+  term[en] "at0003" code="at0003" description="A note about the assignment." text="Comment"
+  attr "value" rm_type="DATA_VALUE" cardinality=single existence=0..1 child_multiplicity=none implicit=false not_in_rm=false required=false children=1
+  attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.role_assignment.v1]/details/items[at0003]/value
+  rm_type="DV_TEXT" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "value" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.role_assignment.v1]/target
+  rm_type="PARTY_REF" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  attr "type" rm_type="String" cardinality=single existence=1..1 child_multiplicity=none implicit=false not_in_rm=false required=true children=1
+  attr "namespace" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+  attr "id" rm_type="OBJECT_ID" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
+
+node /relationships[openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.role_assignment.v1]/target/type
+  rm_type="STRING" node_id="" archetype_id="" node_name="" occurrences=1..1 slot=false
+  primitive=constraints.CString{Pattern:"" List:["ROLE"] ListOpen:false Default:""}
+
+# walked nodes=36

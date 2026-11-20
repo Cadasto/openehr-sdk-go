@@ -75,17 +75,13 @@ func TestREQ176_REQ052_OperationalTemplateCanonicalJSON(t *testing.T) {
 }
 
 // TestREQ176_REQ052_CorpusOperationalTemplatesCanonicalJSON pins the canonical
-// JSON round trip of every operational template under testkit/corpus and of
-// the generic templates the SDK ships in openehr/template/generic: each,
+// JSON round trip of every operational template under testkit/corpus: each,
 // read from canonical XML, writes canonical JSON that decodes, strictly, to
 // the value read. A typed EXPR_LEAF item compares by its text and the
 // primitive its Type reads as, since canonical JSON keeps neither the prefix
 // nor which of the primitive's built-ins Type names.
 func TestREQ176_REQ052_CorpusOperationalTemplatesCanonicalJSON(t *testing.T) {
-	const (
-		corpus  = "../../../testkit/corpus"
-		generic = "../../template/generic"
-	)
+	const corpus = "../../../testkit/corpus"
 	type document struct{ name, path string }
 	var docs []document
 	err := filepath.WalkDir(corpus, func(path string, d fs.DirEntry, err error) error {
@@ -98,17 +94,10 @@ func TestREQ176_REQ052_CorpusOperationalTemplatesCanonicalJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("walking %s: %v", corpus, err)
 	}
-	shipped, err := filepath.Glob(filepath.Join(generic, "*.opt"))
-	if err != nil {
-		t.Fatalf("listing %s: %v", generic, err)
-	}
-	for _, path := range shipped {
-		docs = append(docs, document{name: "generic/" + filepath.Base(path), path: path})
-	}
-	// The corpus holds 89 operational templates and the generic package 2;
-	// fewer means the walk lost some.
-	if len(docs) < 91 {
-		t.Fatalf("found %d operational templates under %s and %s; want at least 91", len(docs), corpus, generic)
+	// The corpus holds 99 operational templates, the 10 reference ones
+	// included; fewer means the walk lost some.
+	if len(docs) < 99 {
+		t.Fatalf("found %d operational templates under %s; want at least 99", len(docs), corpus)
 	}
 	for _, doc := range docs {
 		path := doc.path

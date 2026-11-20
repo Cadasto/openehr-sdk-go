@@ -90,9 +90,7 @@ func booleanFindings(r io.Reader) ([]string, error) {
 }
 
 // TestCorpusOPTBooleansAreLexicallyValid guards REQ-176 fixture hygiene: no
-// vendored OPT, and no generic template the SDK ships in
-// openehr/template/generic, may spell an xs:boolean element as an empty
-// element.
+// vendored OPT may spell an xs:boolean element as an empty element.
 func TestCorpusOPTBooleansAreLexicallyValid(t *testing.T) {
 	type document struct{ rel, path string }
 	var files []document
@@ -117,13 +115,6 @@ func TestCorpusOPTBooleansAreLexicallyValid(t *testing.T) {
 	}
 	if len(files) == 0 {
 		t.Fatalf("no .opt files under %s", fixtures.CorpusRoot())
-	}
-	generic, err := filepath.Glob(filepath.Join(fixtures.GenericTemplatesDir(), "*.opt"))
-	if err != nil || len(generic) == 0 {
-		t.Fatalf("no .opt files in %s (error %v)", fixtures.GenericTemplatesDir(), err)
-	}
-	for _, p := range generic {
-		files = append(files, document{rel: "generic/" + filepath.Base(p), path: p})
 	}
 	for _, doc := range files {
 		rel, p := doc.rel, doc.path

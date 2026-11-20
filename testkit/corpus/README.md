@@ -29,6 +29,9 @@ corpus/
   ehrbase-service/                    # pinned EHRbase server test templates
     MANIFEST.txt                      #   commit pin + per-file sha256
     templates/{template-id}.opt       #   OPT only, no compositions
+  reference/                          # pinned openehr-reference-content templates
+    MANIFEST.txt                      #   commit pin (a released tag) + per-file sha256
+    templates/{template-id}.opt       #   OPT only: generic EHR_STATUS, FOLDER, demographic parties
   aql/lint/{name}.aql                 # hand-written AQL lint inputs
   aql/suites/                         # pinned upstream AQL suites + their CSVs (PROBE-107)
     AQL_SOURCE.txt                    #   commit pin (authoritative — byte copies)
@@ -281,7 +284,7 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 | `sdk_crosscheck_siblings.v1` | Two uses of one OBSERVATION archetype under `content` that pin no name. Two ELEMENTs of one node id that pin no name and whose values differ in type. |
 | `sdk_crosscheck_padded.v1` | `rm_type_name` and `rm_attribute_name` values broken onto a second line, as a pretty-printer that wraps long lines writes them. |
 
-The generic EHR_STATUS and FOLDER templates, `generic_ehr_status.v1` and `generic_folder.v1`, are not vendored here: their one copy ships in the [`openehr/template/generic`](../../openehr/template/generic/) package, and [`fixtures.ListAllOPTs`](../fixtures/paths.go) lists them from there under `generic/`. The corpus ratchet (PROBE-027), PROBE-111 and the compiled-tree goldens still cover both. EHRbase and FerroEHR accept both uploads and store every instance the generator writes for them, but neither checks an EHR_STATUS or a FOLDER against its template, so the SDK's own validator is what holds such an instance to them.
+`reference/` holds the operational templates of [openehr-reference-content](https://github.com/Cadasto/openehr-reference-content), byte for byte at the released tag's commit `UPSTREAM_PINS.txt` names: the generic EHR_STATUS and FOLDER templates, `generic_ehr_status.v1` and `generic_folder.v1`, and one template for each party a demographic service holds (PERSON, ROLE, AGENT, ORGANISATION, GROUP). That repository holds the archetypes they are built from and checks each template with this SDK; here they reach the corpus ratchet (PROBE-027), PROBE-111 and the compiled-tree goldens through [`fixtures.ListAllOPTs`](../fixtures/paths.go), under `reference/`. `make reference-content-sync` re-vendors them from a local clone (`REFERENCE_CONTENT_CLONE`) after the pin moves, and `scripts/ingest-reference-content.sh verify`, which `make test` runs, holds them to their manifest. EHRbase and FerroEHR accept all ten uploads. Neither checks an EHR_STATUS or a FOLDER against its template, FerroEHR checks a party against its template only where its configuration maps that template, and EHRbase serves no demographic API, so the SDK's own validator is what holds such an instance to them.
 
 ### ITS-REST
 

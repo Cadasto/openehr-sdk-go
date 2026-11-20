@@ -1,4 +1,4 @@
-# Upstream pins of the EHRbase corpora under testkit/corpus/.
+# Upstream pins of the corpora vendored under testkit/corpus/.
 #
 # One commit per upstream repository. Every script that vendors from one of
 # these repositories reads its commit here, so every file copied from a
@@ -12,6 +12,7 @@
 #   ehrbase/integration-tests  scripts/ingest-robot-fixtures.sh;
 #                              scripts/ingest-robot-aql.sh; make crossformat-sync
 #   ehrbase/ehrbase            make ehrbase-service-sync
+#   Cadasto/openehr-reference-content  make reference-content-sync (pin a released tag's commit)
 # The files vendored by hand from openEHR_SDK (rm/, the template triplets,
 # webtemplate/) have no script: THIRD_PARTY_LICENSES.md names this pin as
 # theirs, so check them against the new commit too. The same holds for the
@@ -22,3 +23,4 @@
 ehrbase/openEHR_SDK          develop  e07110a2d969d6971ff157b93288f64ee30764af
 ehrbase/integration-tests    main     8c737bb7b4e2157b1a6dba56e8ad7e45476b5d3e
 ehrbase/ehrbase              develop  cc7ddcefdfb77c30b7833ba02ad98cfb0cf24956
+Cadasto/openehr-reference-content main 918f62d061436914a604eb99790df7f1a9a2d8f2

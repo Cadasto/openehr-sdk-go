@@ -113,6 +113,20 @@ Licensed under Creative Commons Attribution-ShareAlike (CKM content), as are the
 
 **Vendored:** `templates/Vital signs CKM.opt`. **Modifications:** renamed so its id, and the id the reference Web Template derives from it, differ from `vital_signs`: its `template_id` (in the header and on the root node) and `concept` read `Vital signs CKM`, its uid is a new one, and the name it pins on the COMPOSITION, `vital_signs2` upstream, reads `Vital signs CKM`. Nothing else in it is edited. The derived work stays under the same terms.
 
+## Cadasto/openehr-reference-content
+
+**Source:** https://github.com/Cadasto/openehr-reference-content  
+**Pinned commit:** the `Cadasto/openehr-reference-content` line of [`UPSTREAM_PINS.txt`](UPSTREAM_PINS.txt), a released tag's commit, recorded with its tag in [`reference/MANIFEST.txt`](reference/MANIFEST.txt)  
+**Path within source:** `tech/templates/{template-id}/opt/{template-id}.opt`
+
+```
+Licensed under the Creative Commons Attribution-ShareAlike 4.0 International License.
+```
+
+The templates embed published openEHR CKM archetypes, © openEHR Foundation, under the same licence; the source repository's `ATTRIBUTION.md` credits them and the HL7 FHIR and LOINC content the templates use.
+
+**Vendored:** `reference/templates/{template-id}.opt`, unmodified upstream bytes, each `sha256` in `reference/MANIFEST.txt`. `scripts/ingest-reference-content.sh` copies them (`make reference-content-sync`) and verifies them offline. Not part of the SDK runtime.
+
 ## RippleOSI/Ripple-openEHR
 
 **Source:** https://github.com/RippleOSI/Ripple-openEHR  

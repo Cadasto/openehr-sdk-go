@@ -174,3 +174,9 @@ Its checks are now [aql.md § REQ-161](aql.md#req-161--aql-semantic-and-portabil
 ## REQ-172 — Typed 2xx body-read failure
 
 Its rules moved to [transport.md § REQ-151](transport.md#req-151--typed-2xx-decode-failure), and its retry rule to [transport.md § REQ-091](transport.md#req-091--retry-policy).
+
+## REQ-178 — Generic templates shipped with the SDK
+
+The SDK ships no operational templates.
+The generic EHR_STATUS and FOLDER templates, under the same template ids, are maintained with demographic ones in the [openehr-reference-content](https://github.com/Cadasto/openehr-reference-content) repository, from which a program downloads or imports them.
+The SDK vendors that repository's templates as test fixtures under `testkit/corpus/reference/`, described in [testkit/corpus/README.md](../../testkit/corpus/README.md).

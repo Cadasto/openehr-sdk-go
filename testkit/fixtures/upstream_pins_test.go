@@ -44,11 +44,13 @@ func TestCorpusPinsVerifyNamesTheDisagreeingRecord(t *testing.T) {
 		robot  = "2222222222222222222222222222222222222222"
 		other  = "3333333333333333333333333333333333333333"
 		server = "4444444444444444444444444444444444444444"
+		ref    = "5555555555555555555555555555555555555555"
 	)
 	pins := "# scratch pins\n" +
 		"ehrbase/openEHR_SDK          develop  " + sdk + "\n" +
 		"ehrbase/integration-tests    main     " + robot + "\n" +
-		"ehrbase/ehrbase              develop  " + server + "\n"
+		"ehrbase/ehrbase              develop  " + server + "\n" +
+		"Cadasto/openehr-reference-content main " + ref + "\n"
 	pinned := func(repo, commit string) string {
 		return "# provenance\nsource_repo: " + repo + "\ncommit: " + commit + "\n"
 	}
@@ -61,6 +63,10 @@ func TestCorpusPinsVerifyNamesTheDisagreeingRecord(t *testing.T) {
 		return "# generated\n" +
 			"source\tehrbase\thttps://github.com/ehrbase/ehrbase\t" + commit + "\tApache-2.0\n"
 	}
+	reference := func(commit string) string {
+		return "# generated\n" +
+			"source\treference\thttps://github.com/Cadasto/openehr-reference-content\t" + commit + "\tCC-BY-SA-4.0\n"
+	}
 	// base is the scratch tree, by path relative to its root; every record
 	// agrees with its pin.
 	base := map[string]string{
@@ -71,6 +77,7 @@ func TestCorpusPinsVerifyNamesTheDisagreeingRecord(t *testing.T) {
 		"testkit/corpus/ROBOT_SOURCE.txt":              pinned("ehrbase/integration-tests", robot),
 		"testkit/corpus/crossformat/MANIFEST.txt":      crossformat(sdk, robot),
 		"testkit/corpus/ehrbase-service/MANIFEST.txt":  service(server),
+		"testkit/corpus/reference/MANIFEST.txt":        reference(ref),
 	}
 
 	cases := []struct {
@@ -111,6 +118,11 @@ func TestCorpusPinsVerifyNamesTheDisagreeingRecord(t *testing.T) {
 			name:   "EHRbase server templates' manifest missing",
 			change: map[string]string{"testkit/corpus/ehrbase-service/MANIFEST.txt": ""},
 			want:   "MISSING: ehrbase-service/MANIFEST.txt",
+		},
+		{
+			name:   "reference templates on another commit",
+			change: map[string]string{"testkit/corpus/reference/MANIFEST.txt": reference(other)},
+			want:   "STALE: reference/MANIFEST.txt records Cadasto/openehr-reference-content",
 		},
 		{
 			name:   "corpus from a repository with no pin",

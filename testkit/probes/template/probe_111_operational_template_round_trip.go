@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,32 +18,11 @@ import (
 
 // Probe111OperationalTemplates returns the name of every ADL 1.4 operational
 // template PROBE-111 covers, sorted, and [Probe111TemplatePath] resolves each
-// name to its file. The list holds two kinds of name:
-//
-//   - each `.opt` file under [fixtures.CorpusRoot], found by walking the whole
-//     tree, as a slash-separated path relative to that root; the walk reaches
-//     the files [fixtures.ListAllOPTs] leaves out, the ones beside the
-//     cross-format sets among them;
-//   - each `.opt` file of [fixtures.GenericTemplatesDir], the generic
-//     templates the SDK ships, which the corpus holds no copy of, as generic/
-//     and its file name.
-func Probe111OperationalTemplates() ([]string, error) { // PROBE-111 (REQ-176, REQ-178)
-	corpus, err := probe111CorpusTemplates()
-	if err != nil {
-		return nil, err
-	}
-	generic, err := probe111GenericTemplates()
-	if err != nil {
-		return nil, err
-	}
-	names := slices.Concat(corpus, generic)
-	slices.Sort(names)
-	return names, nil
-}
-
-// probe111CorpusTemplates returns the name of each `.opt` file under
-// [fixtures.CorpusRoot]: its slash-separated path relative to that root.
-func probe111CorpusTemplates() ([]string, error) {
+// name to its file: each `.opt` file under [fixtures.CorpusRoot], found by
+// walking the whole tree, as a slash-separated path relative to that root.
+// The walk reaches the files [fixtures.ListAllOPTs] leaves out, the ones
+// beside the cross-format sets among them.
+func Probe111OperationalTemplates() ([]string, error) { // PROBE-111 (REQ-176)
 	root := fixtures.CorpusRoot()
 	var names []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -64,38 +42,14 @@ func probe111CorpusTemplates() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("PROBE-111: walk the corpus: %w", err)
 	}
-	return names, nil
-}
-
-// probe111GenericPrefix starts the name of each generic template, as
-// [fixtures.ListAllOPTs] labels them.
-const probe111GenericPrefix = "generic/"
-
-// probe111GenericTemplates returns the name of each `.opt` file of
-// [fixtures.GenericTemplatesDir], the operational templates the SDK ships in
-// openehr/template/generic: generic/ and its file name.
-func probe111GenericTemplates() ([]string, error) {
-	entries, err := os.ReadDir(fixtures.GenericTemplatesDir())
-	if err != nil {
-		return nil, fmt.Errorf("PROBE-111: list the generic templates: %w", err)
-	}
-	var names []string
-	for _, e := range entries {
-		if !e.Type().IsRegular() || filepath.Ext(e.Name()) != ".opt" {
-			continue
-		}
-		names = append(names, probe111GenericPrefix+e.Name())
-	}
+	slices.Sort(names)
 	return names, nil
 }
 
 // Probe111TemplatePath returns the file of the operational template name, as
-// [Probe111OperationalTemplates] gives it: a generic/ name in
-// [fixtures.GenericTemplatesDir], any other below [fixtures.CorpusRoot].
-func Probe111TemplatePath(name string) string { // PROBE-111 (REQ-176, REQ-178)
-	if file, ok := strings.CutPrefix(name, probe111GenericPrefix); ok {
-		return filepath.Join(fixtures.GenericTemplatesDir(), filepath.FromSlash(file))
-	}
+// [Probe111OperationalTemplates] gives it: its path below
+// [fixtures.CorpusRoot].
+func Probe111TemplatePath(name string) string { // PROBE-111 (REQ-176)
 	return filepath.Join(fixtures.CorpusRoot(), filepath.FromSlash(name))
 }
 
