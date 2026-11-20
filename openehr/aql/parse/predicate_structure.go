@@ -21,6 +21,7 @@ package parse
 // structuredNodePredicate handles nodePredicate including its own recursion.
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
@@ -71,6 +72,46 @@ func namedArchetypeHRID(pp gen.IPathPredicateContext) string {
 		}
 	}
 	return ""
+}
+
+// bracketArchetypes returns the distinct literal archetype HRIDs a class
+// bracket names as operands, in source order, for [ClassExpr.Archetypes]:
+// archetypePredicate's HRID, nodePredicate's `ARCHETYPE_HRID (SYM_COMMA
+// name)?` alternative, and the operands of an AND / OR junction over them. It
+// reads the parse tree, not the structured model, so a junction that
+// [structuredPathPredicate] leaves unstructured still yields its HRIDs (the
+// lint's identifiable-scope and template-membership checks read them). It
+// never descends into an objectPath, so an HRID in a path operand's own
+// predicate, `items[openEHR-EHR-CLUSTER.x.v1]/value`, is not one the class
+// names. A `$param` names none. nil when there is none.
+func bracketArchetypes(pp gen.IPathPredicateContext) []string {
+	if ap := pp.ArchetypePredicate(); ap != nil {
+		if hrid := ap.ARCHETYPE_HRID(); hrid != nil {
+			return []string{hrid.GetText()}
+		}
+		return nil
+	}
+	var hrids []string
+	var visit func(np gen.INodePredicateContext)
+	visit = func(np gen.INodePredicateContext) {
+		if np == nil {
+			return
+		}
+		// Junction first, as in structuredNodePredicate: only the recursive
+		// alternatives have two nodePredicate children.
+		if kids := np.AllNodePredicate(); len(kids) == 2 {
+			visit(kids[0])
+			visit(kids[1])
+			return
+		}
+		if hrid := np.ARCHETYPE_HRID(); hrid != nil {
+			if h := hrid.GetText(); !slices.Contains(hrids, h) {
+				hrids = append(hrids, h)
+			}
+		}
+	}
+	visit(pp.NodePredicate())
+	return hrids
 }
 
 // structuredStandardPredicate lifts the standing comparison shared by

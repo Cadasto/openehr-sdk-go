@@ -392,10 +392,12 @@ func TestREQ113_NamedArchetypeClassMismatch(t *testing.T) {
 
 // REQ-113, REQ-109: a class bracket that is an AND / OR junction holds its
 // archetype HRIDs in its operands, so ClassExpr.Archetype is empty and the
-// HRIDs are read from ClassExpr.ParsedPredicate. The tests below pin each
-// reader of a class's archetypes on the two junction forms: the
-// identifiable-scope check, the Metadata list behind template membership,
-// path resolution and the archetype/class check.
+// HRIDs are read from ClassExpr.Archetypes, whether or not the parser
+// structures the bracket. The tests below pin each reader of a class's
+// archetypes on the junction forms, a junction the parser leaves unstructured
+// (a node-code operand) included: the identifiable-scope check, the Metadata
+// list behind template membership, path resolution and the archetype/class
+// check.
 const (
 	bloodPressureHRID   = "openEHR-EHR-OBSERVATION.blood_pressure.v1"
 	bodyTemperatureHRID = "openEHR-EHR-OBSERVATION.body_temperature.v1"
@@ -404,6 +406,9 @@ const (
 
 	andLabResult             = "OBSERVATION o[" + labResultHRID + " and name/value='x']"
 	orBloodPressureLabResult = "OBSERVATION o[" + bloodPressureHRID + " or " + labResultHRID + "]"
+	// The parser leaves this junction unstructured: its node-code operand is
+	// outside the value vocabulary, so ParsedPredicate is nil.
+	andNodeCodeLabResult = "OBSERVATION o[" + labResultHRID + " and archetype_node_id=at0001]"
 )
 
 // issuePaths returns the Path of every issue carrying code, in order.
@@ -429,7 +434,7 @@ func issueDetails(r lint.Result, code string) []string {
 }
 
 func TestREQ113_REQ109_JunctionArchetypeIsIdentifiableScope(t *testing.T) {
-	for _, class := range []string{andLabResult, orBloodPressureLabResult} {
+	for _, class := range []string{andLabResult, orBloodPressureLabResult, andNodeCodeLabResult} {
 		q := "SELECT o/data FROM " + class
 		if r := lint.LintString(q, nil); has(r, "aql_from_archetype") {
 			t.Errorf("LintString(%q) codes = %v, want no aql_from_archetype: the junction names an archetype", q, codes(r))
@@ -444,6 +449,10 @@ func TestREQ113_REQ109_JunctionWithoutArchetypeStillWarns(t *testing.T) {
 		"OBSERVATION o[$p and name/value='x']",
 		"OBSERVATION o[at0001]",
 		"OBSERVATION o[at0001 or at0002]",
+		// An HRID in a path operand's own predicate is not one the class
+		// names, in a structured bracket and in an unstructured one.
+		"OBSERVATION o[items[openEHR-EHR-CLUSTER.device.v1]/name/value='x']",
+		"OBSERVATION o[at0001 and items[openEHR-EHR-CLUSTER.device.v1]/name/value=at0002]",
 	} {
 		q := "SELECT o/data FROM " + class
 		if r := lint.LintString(q, nil); !has(r, "aql_from_archetype") {
@@ -455,9 +464,10 @@ func TestREQ113_REQ109_JunctionWithoutArchetypeStillWarns(t *testing.T) {
 func TestREQ113_REQ109_JunctionArchetypesInMetadata(t *testing.T) {
 	q := "SELECT o/data FROM COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1 and name/value='x'] " +
 		"CONTAINS (OBSERVATION o[" + bloodPressureHRID + " or " + labResultHRID + " or " + bloodPressureHRID + "] " +
-		"AND OBSERVATION p[" + labResultHRID + "] AND OBSERVATION s[$p or " + bodyTemperatureHRID + "])"
+		"AND OBSERVATION p[" + labResultHRID + "] AND OBSERVATION s[$p or " + bodyTemperatureHRID + "] " +
+		"AND OBSERVATION u[" + labTestHRID + " and archetype_node_id=at0001])"
 	got := lint.Extract(mustParse(t, q)).Archetypes
-	want := []string{"openEHR-EHR-COMPOSITION.encounter.v1", bloodPressureHRID, labResultHRID, bodyTemperatureHRID}
+	want := []string{"openEHR-EHR-COMPOSITION.encounter.v1", bloodPressureHRID, labResultHRID, bodyTemperatureHRID, labTestHRID}
 	if !slices.Equal(got, want) {
 		t.Fatalf("Extract(%q).Archetypes = %v, want %v (distinct, in document order)", q, got, want)
 	}
@@ -471,6 +481,7 @@ func TestREQ113_REQ109_JunctionArchetypeNotInTemplate(t *testing.T) {
 	}{
 		{class: andLabResult, want: []string{labResultHRID}},
 		{class: orBloodPressureLabResult, want: []string{labResultHRID}},
+		{class: andNodeCodeLabResult, want: []string{labResultHRID}},
 		{
 			class: "OBSERVATION o[" + labResultHRID + " or " + labTestHRID + " or " + labResultHRID + "]",
 			want:  []string{labResultHRID, labTestHRID},
@@ -489,6 +500,7 @@ func TestREQ113_REQ109_PathResolvesUnderJunctionArchetype(t *testing.T) {
 	for _, class := range []string{
 		"OBSERVATION o[" + bloodPressureHRID + " and name/value='x']",
 		orBloodPressureLabResult,
+		"OBSERVATION o[" + bloodPressureHRID + " and archetype_node_id=at0001]",
 	} {
 		bad := "SELECT o/data[at0001]/eventz/value FROM " + class
 		r := lint.LintString(bad, &lint.Options{Compiled: c})
@@ -530,6 +542,7 @@ func TestREQ113_REQ109_JunctionArchetypeClassMismatch(t *testing.T) {
 	for _, class := range []string{
 		"EVALUATION ev[" + bloodPressureHRID + " and name/value='x']",
 		"EVALUATION ev[openEHR-EHR-EVALUATION.problem_diagnosis.v1 or " + bloodPressureHRID + "]",
+		"EVALUATION ev[" + bloodPressureHRID + " and archetype_node_id=at0001]",
 	} {
 		q := "SELECT ev FROM " + class
 		r := lint.LintString(q, nil)

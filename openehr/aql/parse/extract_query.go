@@ -579,6 +579,9 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 			// same production as a path step, so it gets the same typed form.
 			// Both class extractors populate it, as both path extractors do.
 			ce.ParsedPredicate = structuredPathPredicate(pp)
+			// REQ-113: every literal HRID the bracket names, structured or
+			// not, as the flat view fills it.
+			ce.Archetypes = bracketArchetypes(pp)
 			switch {
 			case pp.ArchetypePredicate() != nil:
 				ap := pp.ArchetypePredicate()

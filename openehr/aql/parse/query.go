@@ -882,16 +882,33 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 // wholly zero).
 //
 // [Position] is source metadata rather than query content, so it is zeroed
-// first, and so is [ClassExpr.ParsedPredicate], the structured model emission
-// never reads (REQ-119 § Emission ignores the structured model); everything
-// else is compared BY VALUE against the zero ClassExpr, so a field added later
-// is covered the day it lands rather than the day someone remembers to extend
-// a list. A future field that is not comparable stops this compiling, which is
-// the loud failure rather than a silent gap.
+// first, and so are [ClassExpr.ParsedPredicate] and [ClassExpr.Archetypes],
+// the structured model emission never reads (REQ-119 § Emission ignores the
+// structured model); everything else is compared BY VALUE against the zero
+// ClassExpr. Archetypes is a slice, so ClassExpr itself is not comparable and
+// the comparison runs on classData's copy of the other fields. A field added
+// to ClassExpr fails TestClassDataCoversEveryClassExprField until classData
+// copies it or the test sets it aside, which is the loud failure rather than
+// a silent gap.
 func (c ClassExpr) carriesData() bool {
-	c.Pos = Position{}
-	c.ParsedPredicate = nil
-	return c != ClassExpr{}
+	return classData(c) != classData(ClassExpr{})
+}
+
+// comparableClassExpr is [ClassExpr] without its read-side derivations and
+// source position, which carriesData sets aside.
+type comparableClassExpr struct {
+	RMType, Alias, Archetype, Predicate   string
+	ParamArchetype, Version, HasPredicate bool
+	PredicateComparison                   *aql.Comparison
+}
+
+// classData returns the fields of c that carriesData compares.
+func classData(c ClassExpr) comparableClassExpr {
+	return comparableClassExpr{
+		RMType: c.RMType, Alias: c.Alias, Archetype: c.Archetype, Predicate: c.Predicate,
+		ParamArchetype: c.ParamArchetype, Version: c.Version, HasPredicate: c.HasPredicate,
+		PredicateComparison: c.PredicateComparison,
+	}
 }
 
 func emitClassExpr(c ClassExpr) string {

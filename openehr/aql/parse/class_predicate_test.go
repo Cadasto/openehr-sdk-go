@@ -7,6 +7,7 @@ package parse_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
@@ -404,6 +405,90 @@ func TestREQ113_JunctionClassBracketNamesNoArchetype(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if out, err := pq.Emit(); err != nil || out != src {
+		t.Errorf("Emit = %q, %v; want %q", out, err, src)
+	}
+}
+
+// TestREQ113_ClassArchetypesListsEveryHRIDOperand pins ClassExpr.Archetypes
+// in both views: each distinct literal HRID the bracket names as an operand,
+// in source order, whether or not ParsedPredicate structures the bracket.
+// The unstructured junctions are the case it exists for: their
+// ParsedPredicate is nil, so a reader of the model alone sees no archetype.
+func TestREQ113_ClassArchetypesListsEveryHRIDOperand(t *testing.T) {
+	t.Parallel()
+	const (
+		lab    = "openEHR-EHR-OBSERVATION.lab_result.v1"
+		device = "openEHR-EHR-CLUSTER.device.v1"
+	)
+	cases := []struct {
+		name, query  string
+		want         []string
+		unstructured bool // ParsedPredicate is nil for this bracket
+	}{
+		{name: "no bracket", query: "SELECT o FROM OBSERVATION o"},
+		{name: "bare", query: "SELECT o FROM OBSERVATION o[" + bloodPressure + "]", want: []string{bloodPressure}},
+		{name: "named", query: "SELECT o FROM OBSERVATION o[" + bloodPressure + ", 'x']", want: []string{bloodPressure}},
+		{name: "$param", query: "SELECT o FROM OBSERVATION o[$arch]"},
+		{name: "node id", query: "SELECT o FROM OBSERVATION o[at0001]"},
+		{name: "standing comparison", query: "SELECT o FROM OBSERVATION o[name/value='x']"},
+		{
+			name:  "structured junction, repeated HRID",
+			query: "SELECT o FROM OBSERVATION o[" + bloodPressure + " or " + lab + " or " + bloodPressure + "]",
+			want:  []string{bloodPressure, lab},
+		},
+		{
+			name:  "junction with a $param",
+			query: "SELECT o FROM OBSERVATION o[$arch or " + lab + "]",
+			want:  []string{lab},
+		},
+		{
+			name:  "junction with a node-code operand",
+			query: "SELECT o FROM OBSERVATION o[" + lab + " and archetype_node_id=at0001]",
+			want:  []string{lab}, unstructured: true,
+		},
+		{
+			name:  "junction with a path operand",
+			query: "SELECT o FROM OBSERVATION o[" + bloodPressure + ", 'x' and name/value=other/value or " + lab + "]",
+			want:  []string{bloodPressure, lab}, unstructured: true,
+		},
+		{
+			name:  "an HRID in a path operand's own predicate",
+			query: "SELECT o FROM OBSERVATION o[at0001 and items[" + device + "]/name/value=at0002]",
+			want:  nil, unstructured: true,
+		},
+		{name: "VERSION class", query: "SELECT v/commit_audit FROM VERSION v[LATEST_VERSION]"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			flat, structured := classesOf(t, tc.query)
+			for view, classes := range map[string]map[string]parse.ClassExpr{"Parse": flat, "ParseQuery": structured} {
+				ce, ok := classes["o"]
+				if !ok {
+					ce = classes["v"]
+				}
+				if got := ce.Archetypes; !slices.Equal(got, tc.want) {
+					t.Errorf("%s(%q): Archetypes = %q; want %q", view, tc.query, got, tc.want)
+				}
+				if tc.unstructured && ce.ParsedPredicate != nil {
+					t.Errorf("%s(%q): ParsedPredicate = %+v; want nil, the bracket this case pins is unstructured", view, tc.query, ce.ParsedPredicate)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ119_ClassArchetypesIsNotEmitted holds Archetypes to the read side:
+// a class whose Archetypes is changed emits the source unchanged.
+func TestREQ119_ClassArchetypesIsNotEmitted(t *testing.T) {
+	t.Parallel()
+	const src = "SELECT o/data FROM OBSERVATION o[" + bloodPressure + " and archetype_node_id=at0001]"
+	pq, err := parse.ParseQuery(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pq.From.Root.Archetypes = []string{"openEHR-EHR-OBSERVATION.other.v1"}
 	if out, err := pq.Emit(); err != nil || out != src {
 		t.Errorf("Emit = %q, %v; want %q", out, err, src)
 	}

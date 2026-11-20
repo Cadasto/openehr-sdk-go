@@ -47,7 +47,6 @@ package lint
 import (
 	"slices"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
@@ -58,10 +57,8 @@ type Metadata struct {
 	// Archetypes are the distinct literal archetype HRIDs bound in the
 	// FROM / CONTAINS tree, in document order: the HRID of a bare or named
 	// archetype bracket, and each HRID an AND / OR bracket names among its
-	// operands, read from [parse.ClassExpr.ParsedPredicate]. $param archetype
-	// predicates are not listed here (see [parse.ClassExpr.ParamArchetype]),
-	// and neither is an HRID inside a bracket the parser leaves unstructured
-	// (a nil ParsedPredicate).
+	// operands, read from [parse.ClassExpr.Archetypes]. $param archetype
+	// predicates are not listed here (see [parse.ClassExpr.ParamArchetype]).
 	Archetypes []string
 	// Aliases maps each bound alias to its class expression. Anonymous
 	// class expressions (no alias) are absent.
@@ -220,42 +217,15 @@ func (b bindings) lookup(alias string) (parse.ClassExpr, bool) {
 }
 
 // classArchetypes returns the distinct literal archetype HRIDs ce names, in
-// source order. A bare or named archetype bracket names the one HRID on
-// ce.Archetype. A junction bracket (`[hrid and name/value='x']`,
-// `[hrid1 or hrid2]`) leaves Archetype empty, and its HRIDs are read from the
-// archetype operands of ce.ParsedPredicate, AND and OR alike. A `$param`, a
-// node id or a comparison names no HRID, and neither does a bracket the parser
-// leaves unstructured (a nil ParsedPredicate).
+// source order: [parse.ClassExpr.Archetypes], the one HRID of a bare or named
+// bracket, or each one an AND / OR bracket names among its operands, whether
+// or not the parser structures that bracket. A `$param` or a node id names no
+// HRID.
 //
 // Every reader of a class's archetypes goes through here: the
 // identifiable-scope check, [Extract], path resolution and the archetype/class
 // check.
 func classArchetypes(ce parse.ClassExpr) []string {
 	// REQ-113 § The class and alias-root brackets carry the same model.
-	if ce.Archetype != "" && !ce.ParamArchetype {
-		return []string{ce.Archetype}
-	}
-	return junctionArchetypes(ce.ParsedPredicate)
-}
-
-// junctionArchetypes is [classArchetypes] for a bracket that leaves
-// Archetype empty: the distinct HRIDs among p's archetype operands. Kept apart
-// so that classArchetypes stays small enough to inline, and its one-HRID slice
-// can live on the caller's stack.
-func junctionArchetypes(p aql.SegmentPredicate) []string {
-	var hrids []string
-	var visit func(p aql.SegmentPredicate)
-	visit = func(p aql.SegmentPredicate) {
-		switch p := p.(type) {
-		case aql.ArchetypePredicate:
-			if !slices.Contains(hrids, p.HRID) {
-				hrids = append(hrids, p.HRID)
-			}
-		case aql.JunctionPredicate:
-			visit(p.Left)
-			visit(p.Right)
-		}
-	}
-	visit(p)
-	return hrids
+	return ce.Archetypes
 }

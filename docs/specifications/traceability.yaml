@@ -2123,6 +2123,7 @@ requirements:
       - openehr/aql/lint/lint_test.go
       - openehr/aql/lint/pathshape_internal_test.go
       - openehr/aql/lint/pathshape_test.go
+      - openehr/aql/parse/class_data_internal_test.go
       - openehr/aql/parse/class_predicate_internal_test.go
       - openehr/aql/parse/class_predicate_test.go
       - openehr/aql/parse/dispatch_tripwire_test.go

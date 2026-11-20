@@ -225,6 +225,8 @@ The bracket after a class in `FROM` / `CONTAINS` and the bracket on a path's ali
 Each **MUST** carry the structured model beside its existing fields, derived as a path step's is, so one form yields one structure at all three: `parse.ClassExpr.ParsedPredicate` beside `Archetype`, `ParamArchetype`, `Predicate` and `PredicateComparison`, and `aql.IdentifiedPath.ParsedPredicate` beside `Predicate`.
 Both extractors fill it, the flat lint view included; it is nil where the bracket is absent and on a `VERSION` class, whose bracket is `versionPredicate`.
 `ClassExpr.Archetype` **MUST** carry the HRID of the named form `[hrid, name]` as well as of the bare one, so a reader of `Archetype` alone sees the archetype the class names.
+`ClassExpr.Archetypes` **MUST** list, in both extractors, each distinct literal HRID the bracket names as an archetype operand, in source order: the HRID of the bare and named forms, and each HRID operand of an `AND` / `OR` junction, whether or not the bracket is structured.
+A `$param` is not listed, and neither is an HRID inside a path operand's own predicate.
 `ClassExpr.Predicate` keeps the named form's whole bracket text, which emission renders ([§ REQ-119 § Emit-side structural parity](#emit-side-structural-parity)).
 
 #### What the model leaves out
