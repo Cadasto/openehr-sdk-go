@@ -26,7 +26,7 @@ func slotRulesFromModel(s *aom14.ArchetypeSlot, cache slotAssertionCache) constr
 		}
 	}
 	return constraints.SlotRules{
-		RMTypeName:      strings.TrimSpace(s.RMTypeName),
+		RMTypeName:      trimmed(s.RMTypeName),
 		Includes:        cache.assertions(s.Includes),
 		Excludes:        cache.assertions(s.Excludes),
 		RawIncludeCount: raw,
@@ -53,7 +53,9 @@ func (c slotAssertionCache) assertion(pattern string) (constraints.SlotAssertion
 	if r, seen := c[pattern]; seen {
 		return r.sa, r.ok
 	}
-	sa, err := constraints.NewSlotAssertion(pattern)
+	// The assertion keeps the pattern, which may be cut from the text of the
+	// model's assertion ([assertionSlotPatterns]): it keeps a copy.
+	sa, err := constraints.NewSlotAssertion(strings.Clone(pattern))
 	if c != nil {
 		c[pattern] = compiledSlotAssertion{sa: sa, ok: err == nil}
 	}
@@ -78,11 +80,14 @@ func (c slotAssertionCache) assertions(as []aom14.Assertion) []constraints.SlotA
 // slotPatterns returns the archetype-id pattern of each assertion, the first
 // it gives as the slot rules read it, in order, leaving out an assertion that
 // gives none. These are a slot's includes and excludes on the compiled node.
+// Each is a copy, as a pattern may be cut from the text of the model's
+// assertion ([assertionSlotPatterns]), which the node would otherwise keep
+// whole.
 func slotPatterns(as []aom14.Assertion) []string {
 	var out []string
 	for _, a := range as {
 		if patterns := assertionSlotPatterns(a); len(patterns) > 0 {
-			out = append(out, patterns[0])
+			out = append(out, strings.Clone(patterns[0]))
 		}
 	}
 	return out

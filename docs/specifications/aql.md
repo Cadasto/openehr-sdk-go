@@ -299,7 +299,7 @@ Emitting text the parser **accepts as something else** is silent, invisible to e
 
 ### Round-trip property
 
-For any AQL query the parser accepts and the catalogue of [§ REQ-113](#catalogue-and-residual) models:
+For any AQL query the parser accepts and the catalogue of [§ REQ-113](#catalogue-and-residual) models, unless its emitted text nests past [§ Nesting limit](#nesting-limit):
 
 ```
 Emit(ParseQuery(Emit(ParseQuery(x)))) == Emit(ParseQuery(x))
@@ -480,6 +480,7 @@ Every rule above decides one position from the text handed to it, and that is no
 No per-position validator decides that, and refusing `{/a\/}` outright would refuse text `ParseQuery` reads back unchanged in every ordinary query.
 
 `(*parse.Query).Emit` **MUST** read the emitted text back with the parser before returning it, and refuse, with an error wrapping `aql.ErrInvalidQuery` (and `aql.ErrSyntax` as well where the parser refuses the text) and a diagnostic that follows § The emission closure property, text that does not re-parse or that re-parses as a different query.
+Emitted text nested past [§ Nesting limit](#nesting-limit) is text that does not re-parse, and its refusal wraps `aql.ErrLimitExceeded` as well: the canonical form writes two parentheses for each level of a `CONTAINS … AND … CONTAINS` chain, so such a chain more than 64 levels deep is refused however its source was written.
 `aql.Builder.Build` verifies the projection list it renders against the same definition ([§ REQ-163 § `Build()` verifies the projection it emitted](#build-verifies-the-projection-it-emitted)).
 A different query is one that adds or removes a class expression, a projection, a predicate leaf or a whole clause, or that changes a containment connective, a negation, or the grouping of containment operands across operators.
 A substitution confined to the text of one path position is outside the check, since REQ-055 rule 3 emits a path verbatim by contract.
@@ -717,14 +718,21 @@ Deltas are classed **relaxation** (admits more than official AQL, e.g. `SELECT *
 
 Because the profile deliberately admits relaxations and the CDR is the path authority, a query the SDK lints clean can still be rejected on execution; conversely the lint targets only the contract below.
 
-The profile **MUST** admit every query the foundation grammar admits.
-A query that a conformant engine answers and the profile refuses therefore lies outside foundation AQL, as an engine grammar extension, and [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) records it by name, with that reason, as a decline; an unexplained refusal is a defect in the profile.
+The profile **MUST** admit every query the foundation grammar admits, apart from a query nested past [§ Nesting limit](#nesting-limit).
+Any other query that a conformant engine answers and the profile refuses therefore lies outside foundation AQL, as an engine grammar extension, and [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) records it by name, with that reason, as a decline; an unexplained refusal is a defect in the profile.
 Recording a decline never widens the profile: admitting an engine extension is a separate `SDK-AQL-NNN` relaxation.
+
+#### Nesting limit
+
+`parse.Parse` **MUST** refuse a query whose parentheses and brackets, counted together, nest more than 128 levels deep, and **MUST** refuse it before parsing it.
+The depth counts the `(` and `[` tokens the lexer reads that no `)` or `]` has closed yet, so one inside a string literal does not count.
+The parser keeps what it learns about each new depth in state that every parse shares for the life of the process, and a query it refuses adds to that state too, so only a limit applied before parsing bounds it.
+The refusal is a `*parse.SyntaxError` positioned at the parenthesis or bracket that opens level 129, and it wraps `aql.ErrLimitExceeded` as well as `aql.ErrSyntax`.
 
 ### Layer 1 — Syntax
 
 - Empty / whitespace-only input **MUST** yield code `aql_empty` (before parse).
-- Input that does not parse as `selectQuery` per the profile **MUST** yield code `aql_syntax`.
+- Input that does not parse as `selectQuery` per the profile, or that is nested past [§ Nesting limit](#nesting-limit), **MUST** yield code `aql_syntax`.
 - The `aql_syntax` `Detail` **SHOULD** carry the parser's `line:column` when the parser reports a position, and **SHOULD NOT** invent one when it does not, because a reader takes a printed coordinate for a real one: a `parse.SyntaxError` whose `Pos` is zero prints no `0:0` from `Error()`, and its `Detail` carries no `L:C:` prefix.
 - `parse.Parse` returns a `*parse.SyntaxError` wrapping the building-block sentinel `aql.ErrSyntax`; the `aqlvalidation.Validate` bridge maps `aql_syntax` / `aql_empty` to `validation.ErrAQLSyntax` via `validation.Issue.Err`.
 

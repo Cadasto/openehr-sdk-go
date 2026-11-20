@@ -49,12 +49,14 @@ func (s *scope) open(attrs []xml.Attr) []xml.Attr {
 }
 
 // close records the innermost open element as closed, dropping the prefixes it
-// declared.
+// declared. They are cleared as they go, so the room bindings keeps for a
+// later element holds no prefix or namespace from the input meanwhile.
 func (s *scope) close() {
 	n := len(s.marks)
 	if n == 0 {
 		return
 	}
+	clear(s.bindings[s.marks[n-1]:])
 	s.bindings = s.bindings[:s.marks[n-1]]
 	s.marks = s.marks[:n-1]
 }

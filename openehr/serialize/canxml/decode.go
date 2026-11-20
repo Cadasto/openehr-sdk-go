@@ -330,6 +330,12 @@ type recorder struct {
 // minRead is the least room a recorder makes for one read of its source.
 const minRead = 4096
 
+// maxIdleRoom is the most room a recorder keeps, past the bytes it still
+// holds, when a new value begins ([recorder.from]). A value larger than that
+// grows the buffer to its own size; without the bound, a long-lived decoder
+// would keep its largest value's size for every small value after it.
+const maxIdleRoom = 64 << 10
+
 // ReadByte returns the next byte of the stream.
 func (r *recorder) ReadByte() (byte, error) {
 	if r.pos == len(r.buf) {
@@ -410,10 +416,17 @@ func (r *recorder) takeByte() (byte, error) {
 }
 
 // from drops the bytes before off, an offset in the stream no later than the
-// next byte to return, which a value decoded from off on does not need.
+// next byte to return, which a value decoded from off on does not need. When
+// that leaves more than maxIdleRoom of room, the bytes kept move to a buffer
+// of their own size, so the large one is freed.
 func (r *recorder) from(off int64) {
 	n := int(off - r.base)
-	r.buf = r.buf[:copy(r.buf, r.buf[n:])]
+	rest := r.buf[n:]
+	if cap(r.buf)-len(rest) > maxIdleRoom {
+		r.buf = append(make([]byte, 0, max(len(rest), minRead)), rest...)
+	} else {
+		r.buf = r.buf[:copy(r.buf, rest)]
+	}
 	r.pos -= n
 	r.base = off
 }
@@ -442,11 +455,16 @@ type byteReplay struct {
 	src io.ByteReader // the recorder's source
 }
 
-// ReadByte returns the next byte of the stream.
+// ReadByte returns the next byte of the stream. It lets go of the recorded
+// bytes once it has returned the last of them: an emptied slice of them
+// would still keep the whole buffer for as long as the decoder lives.
 func (r *byteReplay) ReadByte() (byte, error) {
 	if len(r.rec) > 0 {
 		c := r.rec[0]
 		r.rec = r.rec[1:]
+		if len(r.rec) == 0 {
+			r.rec = nil
+		}
 		return c, nil
 	}
 	return r.src.ReadByte()

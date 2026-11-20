@@ -419,3 +419,39 @@ func TestREQ170_TrackedDecodeConvertsTextAsEncodingXML(t *testing.T) {
 		}
 	}
 }
+
+// TestClosedFramesKeepNoInputNames pins that a tracker keeps no name from its
+// input in the frames it holds for elements that have closed, nor in the
+// room of their child-name slices, so a long-lived decoder does not keep a
+// past value's element names, however long, until a later element reaches
+// as deep. It holds too for the frames a failed decode left open, which the
+// next value's reset releases.
+func TestClosedFramesKeepNoInputNames(t *testing.T) {
+	tr := NewTracker(nil, false)
+	decode := func(doc string) error {
+		return tr.Decode(tr.NewDecoder(strings.NewReader(doc)), new(readsNothing))
+	}
+	long := strings.Repeat("n", 64)
+	if err := decode("<r><a" + long + "><b" + long + "><c" + long + "/><c" + long + "/></b" + long + "></a" + long + "></r>"); err != nil {
+		t.Fatalf("Decode(nested document) = %v; want nil", err)
+	}
+	if err := decode("<r><a" + long + "><b" + long + "><c" + long + ">"); err == nil {
+		t.Fatal("Decode(truncated document) = nil; want a syntax error")
+	}
+	if err := decode("<r/>"); err != nil {
+		t.Fatalf("Decode(<r/>) = %v; want nil", err)
+	}
+	if cap(tr.open) < 4 {
+		t.Fatalf("premise gone: the tracker holds %d frames, want room for the 4 levels decoded", cap(tr.open))
+	}
+	for i, f := range tr.open[len(tr.open):cap(tr.open)] {
+		if f.name != "" || f.elem != nil || f.ptr != nil {
+			t.Errorf("frame %d past the open ones holds name %q, a path or a pointer; want none", len(tr.open)+i, f.name)
+		}
+		for _, c := range f.children[:cap(f.children)] {
+			if c.name != "" {
+				t.Errorf("frame %d past the open ones keeps child name %q in its room; want none", len(tr.open)+i, c.name)
+			}
+		}
+	}
+}

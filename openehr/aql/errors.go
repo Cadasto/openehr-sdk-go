@@ -28,6 +28,15 @@ var ErrEngineCapability = errors.New("aql: engine does not implement this AQL ca
 // re-parse. Detect with errors.Is.
 var ErrSyntax = errors.New("aql: syntax error")
 
+// ErrLimitExceeded indicates AQL refused because it passes a limit that bounds
+// what parsing it costs, not because the grammar refuses it: parse.Parse
+// refuses a query whose parentheses and path-predicate brackets, counted
+// together, nest more than 128 levels deep, since the parser keeps what it
+// learns about each new depth for the life of the process. The refusal is a
+// *parse.SyntaxError, so it matches [ErrSyntax] too, and the lint layer
+// surfaces it as code "aql_syntax". Detect with errors.Is.
+var ErrLimitExceeded = errors.New("aql: limit exceeded")
+
 // ErrIncompleteAST indicates that the source AQL parsed cleanly but contains
 // a shape outside the structured-AST catalogue, so the parser cannot surface
 // it as a structured [parse.Query] without losing semantics.

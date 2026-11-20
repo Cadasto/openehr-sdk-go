@@ -214,3 +214,23 @@ func TestREQ056_UnmarshalDecodesAgainForUnresolvedPrefix(t *testing.T) {
 		}
 	}
 }
+
+// TestScopeClosedBindingsKeepNoInput pins that a scoped decode keeps no prefix
+// or namespace from its input in the room of its bindings once the elements
+// that declared them have closed, so a long-lived decoder does not keep a
+// past value's namespace declarations, however long.
+func TestScopeClosedBindingsKeepNoInput(t *testing.T) {
+	var s Scope
+	if err := s.Decode(s.NewDecoder(strings.NewReader(scopeDoc)), new(prefixProbe)); err != nil {
+		t.Fatalf("Decode(scopeDoc) = %v; want nil", err)
+	}
+	sc := &s.reader.scope
+	if cap(sc.bindings) < 2 {
+		t.Fatalf("premise gone: the scope kept room for %d bindings, want the 2 scopeDoc declares", cap(sc.bindings))
+	}
+	for i, b := range sc.bindings[len(sc.bindings):cap(sc.bindings)] {
+		if b != (binding{}) {
+			t.Errorf("binding %d past the open ones holds %+v; want none", len(sc.bindings)+i, b)
+		}
+	}
+}

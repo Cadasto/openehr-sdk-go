@@ -158,3 +158,83 @@ func TestParseSyntaxErrorPosition(t *testing.T) {
 		t.Fatalf("position = %+v", se.Pos)
 	}
 }
+
+// nestedQuery is a query whose WHERE operand opens depth parentheses, all
+// closed when closed is true.
+func nestedQuery(depth int, closed bool) string {
+	q := "SELECT e/ehr_id/value FROM EHR e WHERE " + strings.Repeat("(", depth) + "e/ehr_id/value = 'x'"
+	if closed {
+		q += strings.Repeat(")", depth)
+	}
+	return q
+}
+
+// bracketQuery is a query whose WHERE operand nests depth path predicates,
+// one inside the other, after parens parentheses.
+func bracketQuery(parens, depth int) string {
+	return "SELECT e/ehr_id/value FROM EHR e WHERE " + strings.Repeat("(", parens) + "e/a" +
+		strings.Repeat("[b", depth) + strings.Repeat("='x']", depth) + " = 'x'" + strings.Repeat(")", parens)
+}
+
+// TestREQ109_ParseRefusesNestingPastTheLimit pins REQ-109 § Nesting limit:
+// Parse admits parentheses and brackets nested 128 levels deep, counted
+// together, and refuses 129, at the parenthesis or bracket that opens level
+// 129, with a SyntaxError that matches both aql.ErrSyntax and
+// aql.ErrLimitExceeded. The limit refusal is told apart from the parser's
+// own: an unclosed query nested 128 deep is a syntax error that does not
+// match aql.ErrLimitExceeded, the same query 129 deep is the limit's. A
+// parenthesis inside a string literal does not count, and a closing
+// parenthesis with none open lends no depth to the ones after it.
+func TestREQ109_ParseRefusesNestingPastTheLimit(t *testing.T) {
+	t.Parallel()
+	const prefix = "SELECT e/ehr_id/value FROM EHR e WHERE "
+	limitErr := func(t *testing.T, q string, col int) {
+		t.Helper()
+		_, err := parse.Parse(q)
+		se, ok := errors.AsType[*parse.SyntaxError](err)
+		if !ok || se == nil {
+			t.Fatalf("Parse(%d bytes) error = %v; want a *parse.SyntaxError", len(q), err)
+		}
+		if !errors.Is(err, aql.ErrSyntax) || !errors.Is(err, aql.ErrLimitExceeded) {
+			t.Errorf("Parse(%d bytes) error = %v; want it to match aql.ErrSyntax and aql.ErrLimitExceeded", len(q), err)
+		}
+		if want := (parse.Position{Line: 1, Col: col}); se.Pos != want {
+			t.Errorf("Parse(%d bytes) error at %+v; want %+v, the parenthesis that opens level 129", len(q), se.Pos, want)
+		}
+		if !strings.Contains(se.Msg, "128") {
+			t.Errorf("Parse(%d bytes) message %q; want it to name the limit, 128", len(q), se.Msg)
+		}
+	}
+
+	if _, err := parse.Parse(nestedQuery(128, true)); err != nil {
+		t.Errorf("Parse(nested 128 deep) = %v; want nil", err)
+	}
+	limitErr(t, nestedQuery(129, true), len(prefix)+129)
+	limitErr(t, nestedQuery(129, false), len(prefix)+129)
+	stray := "SELECT e/ehr_id/value FROM EHR e WHERE e/ehr_id/value = 'x' ))) AND " + strings.Repeat("(", 129) + "e/ehr_id/value = 'x'" + strings.Repeat(")", 129)
+	limitErr(t, stray, strings.Index(stray, "AND ")+len("AND ")+129)
+
+	// Brackets count as parentheses do, and together with them.
+	bracketAt := func(q string, n int) int { // the column of the n-th '[' after "e/a"
+		return strings.Index(q, "e/a[") + len("e/a") + 2*(n-1) + 1
+	}
+	for _, q := range []string{bracketQuery(0, 128), bracketQuery(64, 64)} {
+		if _, err := parse.Parse(q); err != nil {
+			t.Errorf("Parse(%d bytes, nested 128 deep) = %v; want nil", len(q), err)
+		}
+	}
+	limitErr(t, bracketQuery(0, 129), bracketAt(bracketQuery(0, 129), 129))
+	limitErr(t, bracketQuery(64, 65), bracketAt(bracketQuery(64, 65), 65))
+
+	_, err := parse.Parse(nestedQuery(128, false))
+	if !errors.Is(err, aql.ErrSyntax) || errors.Is(err, aql.ErrLimitExceeded) {
+		t.Errorf("Parse(unclosed, nested 128 deep) error = %v; want a syntax error that does not match aql.ErrLimitExceeded", err)
+	}
+	if _, err := parse.Parse(prefix + "e/ehr_id/value = '" + strings.Repeat("(", 200) + "'"); err != nil {
+		t.Errorf("Parse(200 parentheses inside a string literal) = %v; want nil", err)
+	}
+	var nilErr *parse.SyntaxError
+	if nilErr.Is(aql.ErrLimitExceeded) || (&parse.SyntaxError{}).Is(aql.ErrLimitExceeded) {
+		t.Error("a nil or zero SyntaxError matches aql.ErrLimitExceeded; want neither")
+	}
+}

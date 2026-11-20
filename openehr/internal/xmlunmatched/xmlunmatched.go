@@ -315,9 +315,20 @@ const linearChildNames = 8
 // pos, keeping the slice a frame left over from an earlier element had, so a
 // long decode does not allocate one per element. A map from an earlier wide
 // element is dropped rather than cleared, so a later narrow element never pays
-// for it.
+// for it. A frame past the open ones was released when its element closed or
+// its value began ([frame.release]), so its slices hold nothing to clear.
 func (f *frame) open(local string, pos int) {
 	*f = frame{name: local, pos: pos, children: f.children[:0], skipped: f.skipped[:0]}
+}
+
+// release empties f once its element has closed, or its value has ended, so
+// a frame the decoder keeps for a later element holds no name, child name or
+// path from the input meanwhile. It keeps the room of the frame's slices, and
+// clears the child names in it, which [frame.count] writes and a later
+// element would otherwise only overwrite as far as it reaches.
+func (f *frame) release() {
+	clear(f.children)
+	*f = frame{children: f.children[:0], skipped: f.skipped[:0]}
 }
 
 // skip notes one more skipped child named like the i-th of the n members
@@ -389,6 +400,13 @@ func (t *Tracker) Decode(dec *xml.Decoder, v any) error {
 // of the values decoded before, so every path is relative to the value being
 // decoded, and no primitive failure is kept.
 func (t *Tracker) reset() {
+	// A decode that failed leaves the elements it was inside open; their
+	// frames are released here rather than kept until a later element
+	// reaches as deep, and so is the document frame's count of the earlier
+	// value's top-level names.
+	for i := range t.open {
+		t.open[i].release()
+	}
 	t.open = t.open[:1]
 	t.open[0].open("", 0)
 	t.failure = nil
@@ -442,6 +460,7 @@ func (t *Tracker) pop() {
 	if t.checksPresence() {
 		t.closing(n)
 	}
+	t.open[n-1].release()
 	t.open = t.open[:n-1]
 }
 

@@ -78,6 +78,26 @@ func TestLintStringSyntax(t *testing.T) {
 	}
 }
 
+// TestREQ109_LintReportsNestingPastTheLimit pins REQ-109 Layer 1: a query
+// whose parentheses nest past § Nesting limit yields aql_syntax, even when
+// every parenthesis is closed and the grammar alone would accept it, and the
+// Detail names the limit at the parenthesis that passes it.
+func TestREQ109_LintReportsNestingPastTheLimit(t *testing.T) {
+	nested := func(depth int) string {
+		return "SELECT e/ehr_id/value FROM EHR e WHERE " + strings.Repeat("(", depth) + "e/ehr_id/value = 'x'" + strings.Repeat(")", depth)
+	}
+	r := lint.LintString(nested(129), nil)
+	if r.OK() || !has(r, "aql_syntax") {
+		t.Fatalf("LintString(nested 129 deep) = %v; want aql_syntax", codes(r))
+	}
+	if d := r.Issues[0].Detail; !strings.Contains(d, "1:168") || !strings.Contains(d, "128") {
+		t.Errorf("LintString(nested 129 deep) Detail = %q; want the position 1:168 and the limit 128", d)
+	}
+	if r := lint.LintString(nested(128), nil); has(r, "aql_syntax") {
+		t.Errorf("LintString(nested 128 deep) = %v; want no aql_syntax", codes(r))
+	}
+}
+
 func TestLintUnparsedDocument(t *testing.T) {
 	r := lint.Lint(&parse.Document{}, nil)
 	if r.OK() || !has(r, "aql_syntax") {

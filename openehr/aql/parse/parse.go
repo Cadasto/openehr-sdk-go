@@ -40,10 +40,16 @@ type Span struct {
 func (s Span) IsZero() bool { return s == Span{} }
 
 // SyntaxError is a parse failure at a position. It wraps [aql.ErrSyntax], so
-// callers can branch with errors.Is(err, aql.ErrSyntax).
+// callers can branch with errors.Is(err, aql.ErrSyntax). One that [Parse]
+// returns for parentheses and brackets nested past its limit matches
+// [aql.ErrLimitExceeded] as well.
 type SyntaxError struct {
 	Pos Position
 	Msg string
+
+	// limit marks the refusal of parentheses and brackets nested past
+	// maxNesting, which [SyntaxError.Is] matches to aql.ErrLimitExceeded.
+	limit bool
 }
 
 // Error names the position and the message. A nil receiver answers with
@@ -66,6 +72,13 @@ func (e *SyntaxError) Error() string {
 // Unwrap exposes [aql.ErrSyntax]. It reads no field, so a nil receiver
 // classifies as a syntax error exactly as a real one does.
 func (e *SyntaxError) Unwrap() error { return aql.ErrSyntax }
+
+// Is reports whether e is the refusal of parentheses and brackets nested past
+// [Parse]'s limit and target is [aql.ErrLimitExceeded]. A nil receiver matches no
+// limit, as the zero SyntaxError does not.
+func (e *SyntaxError) Is(target error) bool {
+	return e != nil && e.limit && target == aql.ErrLimitExceeded //nolint:errorlint // an Is method compares its target as it is, by contract
+}
 
 // Document is a parsed, syntactically valid AQL query. Clause presence,
 // classes, paths, and parameters are extracted during [Parse]. The
@@ -166,20 +179,34 @@ type Document struct {
 // Parse validates q against the SDK grammar profile and returns the parsed
 // document. On the first syntax error it returns a *[SyntaxError] (wrapping
 // [aql.ErrSyntax]) and a nil document.
+//
+// Parse refuses a query whose parentheses and path-predicate brackets,
+// counted together, nest more than 128 levels deep, before it parses the
+// query, with a *[SyntaxError] at the parenthesis or bracket that opens level
+// 129 that matches [aql.ErrLimitExceeded] as well. The parser keeps what it
+// learns about each new nesting depth for the life of the process, so the
+// limit bounds what a deeply nested query can make it keep. A parenthesis or
+// bracket inside a string literal does not count.
 func Parse(q string) (*Document, error) {
-	if tree, ok := parseSLL(q); ok {
+	stream, lexErrors := lex(q)
+	if err := checkNesting(stream.GetAllTokens()); err != nil {
+		return nil, err
+	}
+	if tree, ok := parseSLL(stream, len(lexErrors)); ok {
 		doc := &Document{tree: tree, src: q}
 		doc.populate()
 		doc.extract()
 		return doc, nil
 	}
+	// The default parse reads q again, so that the lexer's errors and the
+	// parser's arrive in the order the parse meets them and the error
+	// returned is the first in the input.
 	lexer := gen.NewAqlLexer(antlr.NewInputStream(q))
 	collector := &errorCollector{}
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(collector)
 
-	stream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	p := gen.NewAqlParser(stream)
+	p := gen.NewAqlParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
 	p.RemoveErrorListeners()
 	p.AddErrorListener(collector)
 
@@ -194,22 +221,67 @@ func Parse(q string) (*Document, error) {
 	return doc, nil
 }
 
-// parseSLL parses q in ANTLR's SLL prediction mode, stopping at the first
-// error, and reports whether that parse succeeded. SLL prediction skips the
-// full-context analysis the default LL mode runs where the grammar needs more
-// than one token of lookahead to choose, as it does inside path predicates.
-// ANTLR guarantees that an SLL parse that succeeds builds the tree LL builds,
-// while one that fails may only lack LL's power, so [Parse] reads a failure
-// as no answer and parses q again in the default mode. The second parse, and
-// it alone, reports the errors, so a query Parse refuses gets the error it
-// always got.
-func parseSLL(q string) (tree gen.ISelectQueryContext, ok bool) {
-	lexer := gen.NewAqlLexer(antlr.NewInputStream(q))
-	lexErrors := &errorCollector{}
-	lexer.RemoveErrorListeners()
-	lexer.AddErrorListener(lexErrors)
+// maxNesting is the deepest nesting of parentheses and brackets, counted
+// together, that [Parse] admits (REQ-109 § Nesting limit). The parser's
+// prediction state is shared by every parse for the life of the process and
+// grows with each new depth a query reaches, through either delimiter, a
+// refused query's included, so the depth is counted on the tokens before any
+// parse runs.
+const maxNesting = 128
 
-	p := gen.NewAqlParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
+// lex reads q into a token stream, filled to its end, and returns it with the
+// errors the lexer reported while reading it.
+func lex(q string) (*antlr.CommonTokenStream, []*SyntaxError) {
+	lexer := gen.NewAqlLexer(antlr.NewInputStream(q))
+	errs := &errorCollector{}
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errs)
+	stream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	stream.Fill()
+	return stream, errs.errors
+}
+
+// checkNesting refuses tokens whose parentheses and brackets, counted
+// together, nest more than maxNesting levels deep, at the one that opens the
+// first level past it. A closing parenthesis or bracket with none open leaves
+// the depth at zero, so it cannot lend depth to the ones after it.
+func checkNesting(tokens []antlr.Token) error {
+	depth := 0
+	for _, t := range tokens {
+		switch t.GetTokenType() {
+		case gen.AqlLexerSYM_LEFT_PAREN, gen.AqlLexerSYM_LEFT_BRACKET:
+			depth++
+			if depth > maxNesting {
+				return &SyntaxError{
+					Pos:   Position{Line: t.GetLine(), Col: t.GetColumn() + 1}, // ANTLR columns are 0-based
+					Msg:   fmt.Sprintf("parentheses and brackets nested more than %d levels deep", maxNesting),
+					limit: true,
+				}
+			}
+		case gen.AqlLexerSYM_RIGHT_PAREN, gen.AqlLexerSYM_RIGHT_BRACKET:
+			depth = max(depth-1, 0)
+		}
+	}
+	return nil
+}
+
+// parseSLL parses the tokens of stream in ANTLR's SLL prediction mode,
+// stopping at the first error, and reports whether that parse succeeded.
+// SLL prediction skips the full-context analysis the default LL mode runs
+// where the grammar needs more than one token of lookahead to choose, as it
+// does inside path predicates. ANTLR guarantees that an SLL parse that
+// succeeds builds the tree LL builds, while one that fails may only lack LL's
+// power, so [Parse] reads a failure as no answer and parses the query again in
+// the default mode. The second parse, and it alone, reports the errors, so a
+// query Parse refuses gets the error it always got. lexErrors is how many
+// errors the lexer reported while filling stream: with any, the SLL parse
+// declines without parsing, since a character the lexer dropped can leave
+// tokens the parser accepts.
+func parseSLL(stream *antlr.CommonTokenStream, lexErrors int) (tree gen.ISelectQueryContext, ok bool) {
+	if lexErrors > 0 {
+		return nil, false
+	}
+	p := gen.NewAqlParser(stream)
 	p.RemoveErrorListeners()
 	p.SetErrorHandler(&bailOnError{DefaultErrorStrategy: antlr.NewDefaultErrorStrategy()})
 	p.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
@@ -222,11 +294,7 @@ func parseSLL(q string) (tree gen.ISelectQueryContext, ok bool) {
 			tree, ok = nil, false
 		}
 	}()
-	tree = p.SelectQuery()
-	if len(lexErrors.errors) > 0 {
-		return nil, false
-	}
-	return tree, true
+	return p.SelectQuery(), true
 }
 
 // errBailedOut is what [bailOnError] panics with to stop the SLL parse at its
