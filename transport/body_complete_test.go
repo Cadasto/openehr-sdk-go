@@ -329,8 +329,8 @@ func h2ResponseHeaders(contentLength, contentEncoding string) []byte {
 
 // h2cServer answers the first request on each connection, over HTTP/2 with
 // prior knowledge, with status 200, the declared contentLength and
-// contentEncoding, and one DATA frame of data that ends the stream. It sets answered once it has written
-// the response, and then reads frames until the client closes the connection.
+// contentEncoding, and one DATA frame of data that ends the stream. It sets answered just before it
+// writes the response, and then reads frames until the client closes the connection.
 func h2cServer(t *testing.T, contentLength, contentEncoding, data string, answered *atomic.Bool) func(conn net.Conn) {
 	return func(conn net.Conn) {
 		br := bufio.NewReader(conn)
@@ -362,6 +362,11 @@ func h2cServer(t *testing.T, contentLength, contentEncoding, data string, answer
 				}
 			case typ == h2FrameHeaders && !replied:
 				replied = true
+				// Set before the first write: the client can read the
+				// response and return from Do before this goroutine runs
+				// again, so a flag set after the writes can still be false
+				// when the test reads it.
+				answered.Store(true)
 				if err := writeH2Frame(conn, h2FrameHeaders, h2FlagEndHeaders, stream, h2ResponseHeaders(contentLength, contentEncoding)); err != nil {
 					t.Errorf("server: write HEADERS: %v", err)
 					return
@@ -370,7 +375,6 @@ func h2cServer(t *testing.T, contentLength, contentEncoding, data string, answer
 					t.Errorf("server: write DATA: %v", err)
 					return
 				}
-				answered.Store(true)
 			}
 		}
 	}
