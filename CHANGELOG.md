@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-11-20
+
+Fifty-second `v0.x` minor: the reference templates move to their own repository, AQL parsing refuses nesting past 128 levels, AQL lint reads names in any letter case and every archetype a class bracket names, and validation checks codes, quantities and ordinals typed, allocating less. **Breaking:** `openehr/template/generic` is removed, `parse.Parse` and `Emit` refuse deeper nesting, and AQL lint fails an upper-case path attribute.
+
+### Added
+
+- **`CodePhrase.ValidateCode`, `DvQuantity.ValidateQuantity` and `CDvOrdinal.ValidateOrdinal`** in `openehr/template/constraints` check a typed value and return what `Validate` returns for it (REQ-103).
+- **`aql.ErrLimitExceeded`** matches the error for a query `parse.Parse` refuses as nested too deep and for a `CONTAINS` chain `Emit` cannot write (REQ-109, REQ-119).
+- **`parse.ClassExpr.Archetypes`** lists every literal archetype HRID a class bracket names, structured or not; `ClassExpr` and `FromClause` can no longer be compared with `==` (REQ-113).
+
+### Changed
+
+- **Breaking: `parse.Parse`** refuses a query whose parentheses and path-predicate brackets nest more than 128 levels, before parsing it, and `Emit` refuses a `CONTAINS … AND` chain more than 64 levels deep (REQ-109, REQ-119).
+- **Breaking: AQL lint** fails an upper-case letter in a path attribute with the Error `aql_path_attribute_case`, and reads keywords, functions and class names, the `EHR` root included, in any letter case (REQ-109).
+- **AQL lint** reads the archetypes of a class bracket the parser leaves unstructured, such as `[hrid and archetype_node_id=at0001]`, checking them against the template instead of warning `aql_from_archetype` (REQ-109, REQ-113).
+- **Template validation** allocates 42 to 63% fewer objects per walk, reading list items into reused buffers, and reports the same issues (REQ-171).
+- **A long-lived `canxml` stream decoder and a kept compiled template** hold less memory: the decoder gives back a large value's buffer, and the template no longer keeps its source document's text (REQ-056, REQ-111).
+
+### Removed
+
+- **Breaking: `openehr/template/generic`** is removed; its EHR_STATUS and FOLDER templates, unchanged, ship with demographic templates in [Cadasto/openehr-reference-content](https://github.com/Cadasto/openehr-reference-content) (REQ-178 retired).
+
 ## [0.51.0] - 2026-11-18
 
 Fifty-first `v0.x` minor: ID-token verification can trust a named project, validating compositions no longer links the AQL parser, the generic EHR_STATUS and FOLDER templates ship in a package, the instance generator writes representative magnitudes, and the FLAT codec and canonical JSON encode are faster. **Breaking:** the AQL entry points of `openehr/validation` move to `aqlvalidation`, the RM floor reads `is_integral` as a precision of 0, and `rminfo`'s class lists are shared.
