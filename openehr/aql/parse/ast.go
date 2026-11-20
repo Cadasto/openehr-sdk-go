@@ -127,8 +127,9 @@ func boundedSpan(start, end Position) Span {
 // because the linter reasons over the set of bound classes, not their
 // containment shape.
 //
-// A ClassExpr carrying a [ClassExpr.ParsedPredicate] is not safe to compare
-// with `==`; see that field.
+// ClassExpr is not comparable with `==` and cannot be a map key: it carries
+// a slice ([ClassExpr.Archetypes]), and [ClassExpr.ParsedPredicate] can hold
+// one.
 type ClassExpr struct {
 	// RMType is the reference-model class name (e.g. "OBSERVATION",
 	// "COMPOSITION", "EHR"), or "VERSION" for a VERSION class expression.
@@ -144,6 +145,20 @@ type ClassExpr struct {
 	// the emitter renders. Callers must consult ParamArchetype before treating
 	// Archetype as a literal HRID.
 	Archetype string
+	// Archetypes lists each distinct literal archetype HRID the class bracket
+	// names as an operand, in source order: the one HRID of the bare form
+	// `[hrid]` and of the named form `[hrid, 'name']`, and each HRID operand
+	// of an AND / OR junction, such as `[hrid1 or hrid2]` or
+	// `[hrid and name/value='x']`. It is filled whether or not
+	// [ClassExpr.ParsedPredicate] structures the bracket, so a junction left
+	// unstructured, such as `[hrid and archetype_node_id=at0001]`, still lists
+	// its HRID. A `$param` archetype is not listed (see
+	// [ClassExpr.ParamArchetype]), and neither is an HRID in a path operand's
+	// own predicate. It is nil when the bracket names no literal HRID, when
+	// the class has no bracket, and for a VERSION class. Both views fill it.
+	// Like ParsedPredicate it is a read-side derivation: emission renders
+	// Archetype and Predicate and never reads it.
+	Archetypes []string
 	// ParamArchetype is true when the archetype predicate is a $param
 	// placeholder (`[$arch]`) rather than a literal HRID; the
 	// identifiable scope is deferred to bind time. When true, Archetype still carries the
@@ -276,6 +291,8 @@ func (e *extractor) EnterClassExpression(c *gen.ClassExpressionContext) {
 		// REQ-113 § Structured node predicates: the class bracket is the same
 		// production as a path step, so it gets the same typed form.
 		ce.ParsedPredicate = structuredPathPredicate(pp)
+		// REQ-113: every literal HRID the bracket names, structured or not.
+		ce.Archetypes = bracketArchetypes(pp)
 		switch {
 		case pp.ArchetypePredicate() != nil:
 			ap := pp.ArchetypePredicate()
