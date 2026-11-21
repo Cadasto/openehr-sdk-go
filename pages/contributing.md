@@ -53,8 +53,9 @@ ADR settles them.
 ## This documentation site
 
 `make docs-serve` previews the site on `http://127.0.0.1:8000`.
-`make docs-check` runs the strict build plus the output assertions, and is the
-gate CI applies to every pull request. `docs-site.yml` deploys the site from
+`make docs-check` runs the strict build plus the output assertions. CI runs it
+on every pull request that changes the site or a file the check reads, such as
+`mkdocs.yml`, `CHANGELOG.md` or the Makefile. `docs-site.yml` deploys the site from
 `main` once the repository's Pages source is set to GitHub Actions. That setting
 is not enabled yet (as of 2026-09-10).
 

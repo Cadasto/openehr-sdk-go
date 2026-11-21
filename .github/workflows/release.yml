@@ -39,6 +39,7 @@ jobs:
   verify:
     name: Verify and build notes
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
       dry_run: ${{ steps.meta.outputs.dry_run }}
@@ -73,9 +74,11 @@ jobs:
             *) echo "tag '$tag' does not match v<major>.<minor>.<patch>[-pre]"; exit 1 ;;
           esac
           version="${tag#v}"
-          echo "tag=$tag"           >> "$GITHUB_OUTPUT"
-          echo "version=$version"   >> "$GITHUB_OUTPUT"
-          echo "dry_run=$dry_run"   >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "dry_run=$dry_run"
+          } >> "$GITHUB_OUTPUT"
           echo "Resolved tag=$tag version=$version dry_run=$dry_run"
 
       # make ci runs operational-template-schema-check, which needs xmllint
@@ -104,6 +107,7 @@ jobs:
     needs: verify
     if: needs.verify.outputs.dry_run == 'false'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Only this job needs write access — to create the draft release.
     permissions:
       contents: write

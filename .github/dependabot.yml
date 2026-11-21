@@ -1,5 +1,5 @@
-# Weekly dependency update PRs for Go modules and GitHub Actions.
-# See docs/ci.md.
+# One weekly pull request per ecosystem, Go modules and GitHub Actions: each
+# group gathers that week's version updates. See docs/ci.md.
 version: 2
 
 updates:
@@ -8,9 +8,17 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      go-modules:
+        patterns:
+          - "*"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
