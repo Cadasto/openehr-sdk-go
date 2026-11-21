@@ -2,6 +2,20 @@
 #
 # All checks invoke Makefile targets (see docs/ci.md). Do not duplicate
 # go invocations here — extend the Makefile instead.
+#
+# The Changed paths job runs first and decides which jobs follow:
+#  - On a pull request, the Go jobs run when a changed path is code. A
+#    docs-only pull request runs Changed paths alone, whose spec gate still
+#    checks the documents.
+#  - On a push to main, Verify, Test, Test (fused multiply-add) and Lint run
+#    only when the push changes what a cache key hashes. The pull request's
+#    last run already tested its merge result, and main refreshes the caches
+#    that pull requests restore when a key moves.
+#  - Race runs on each push to main that changes code: the race detector
+#    runs on main, not on pull requests.
+#  - workflow_dispatch runs every job. Dispatch the workflow on main to check
+#    main itself, for example after a Go patch release, which moves the Go
+#    cache key without changing a file.
 name: CI
 
 on:
@@ -9,18 +23,124 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# A run on main checks only the paths its push changed, so no push to main
+# cancels another push's run. A new commit on a pull request still cancels
+# the run before it.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.paths.outputs.code }}
+      race: ${{ steps.paths.outputs.race }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Checks the documents on every run, a docs-only pull request's
+      # included. It needs bash, GNU sed, python3 and git, not Go. Verify
+      # runs it too, beside the Go checks.
+      - name: Spec traceability
+        run: make spec-check
+
+      # grep reads the list from a here-string, not a pipe: `grep -q` stops at
+      # the first match, so under pipefail a list longer than the pipe buffer
+      # would fail the writer with SIGPIPE and read as docs-only.
+      - name: Detect code changes
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # Documents a Go test reads: the module README, the quick start, the
+          # examples catalogue, the site's pages and the probe catalogue.
+          kept='^(README\.md|docs/(quick-start|examples)\.md|docs/specifications/conformance\.md|pages/[^/]*\.md)$'
+
+          # Paths that no Go test and no make check of the Go jobs reads. Every
+          # path outside this list is code.
+          docs_only=(
+            'docs/.*' 'pages/.*' 'overrides/.*' 'licenses/.*' '\.claude/.*' '\.codex/.*'
+            '(AGENTS|CHANGELOG|CONTRIBUTING|LICENSING|SECURITY)\.md' 'LICENSE'
+            'mkdocs\.yml' 'sources\.json'
+            'scripts/(sdd-check\.py|spec-[a-z-]+\.(sh|py)|probe-status\.sh|release-notes\.sh)'
+            'scripts/(check_brand_paths|sync_sources)\.py'
+            '\.github/(ISSUE_TEMPLATE/.*|pull_request_template\.md|dependabot\.yml)'
+            '\.github/workflows/(codegen-drift|docs-ci|docs-site|release)\.yml'
+          )
+          docs="^($(IFS='|'; echo "${docs_only[*]}"))\$"
+
+          # What the cache keys hash: setup-go and golangci-lint-action both key
+          # on go.mod, and this file pins the Go line and the actions.
+          keys='^(go\.mod|\.github/workflows/ci\.yml)$'
+
+          # changed DIFF-ARGS...: the changed paths, one per line, a rename as
+          # both of its paths. The godoc test reads the file names in
+          # docs/specifications and docs/adr, not the text, so a document added
+          # or removed there is listed again as names:<path>, which is code.
+          changed() {
+            git diff --name-only --no-renames "$@" || return 1
+            git diff --name-only --no-renames --diff-filter=AD "$@" -- docs/specifications docs/adr | sed 's/^/names:/'
+          }
+
+          # is_code LIST: whether LIST, one path per line, holds code.
+          is_code() {
+            [ -n "$1" ] || return 1
+            grep -qE "$kept" <<<"$1" || grep -qvE "$docs" <<<"$1"
+          }
+
+          emit() {
+            printf 'code=%s\nrace=%s\n' "$1" "$2" | tee -a "$GITHUB_OUTPUT"
+          }
+
+          case "$EVENT" in
+            pull_request) from=$BASE; range=("$BASE...HEAD") ;;
+            push) from=$BEFORE; range=("$BEFORE" "$AFTER") ;;
+            *) emit true true; exit 0 ;;
+          esac
+
+          # A push that creates the branch has an all-zeros before, and a forced
+          # push can leave it outside the clone: then every job runs.
+          if [ -z "${from//0/}" ] || ! files=$(changed "${range[@]}"); then
+            echo "Cannot list the changed paths; every job runs."
+            emit true true
+            exit 0
+          fi
+          echo "::group::Changed paths"
+          printf '%s\n' "$files"
+          echo "::endgroup::"
+
+          code=false
+          race=false
+          if [ "$EVENT" = push ]; then
+            if grep -qE "$keys" <<<"$files"; then code=true; fi
+            if is_code "$files"; then race=true; fi
+          elif is_code "$files"; then
+            code=true
+          fi
+          emit "$code" "$race"
+
   verify:
     name: Verify
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -87,7 +207,10 @@ jobs:
 
   test:
     name: Test
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -103,7 +226,10 @@ jobs:
 
   fused:
     name: Test (fused multiply-add)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -119,7 +245,10 @@ jobs:
 
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -138,8 +267,10 @@ jobs:
 
   race:
     name: Race
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: changes
+    if: needs.changes.outputs.race == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v7
