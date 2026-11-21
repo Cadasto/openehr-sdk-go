@@ -5,6 +5,24 @@ name: Docs site
 on:
   push:
     branches: [main]
+    # What `make docs-check` reads, and this file: a push that changes none of
+    # these leaves the site as it is. Keep the list equal to docs-ci.yml's,
+    # which says why each file is in it.
+    paths:
+      - '.github/workflows/docs-site.yml'
+      - '.gitignore'
+      - 'CHANGELOG.md'
+      - 'Makefile'
+      - 'make/**'
+      - 'README.md'
+      - 'docs/quick-start.md'
+      - 'mkdocs.yml'
+      - 'overrides/**'
+      - 'pages/**'
+      - 'resources/its-rest/MANIFEST.txt'
+      - 'scripts/check_brand_paths.py'
+      - 'scripts/sync_sources.py'
+      - 'sources.json'
   workflow_dispatch:
   # The site embeds the docs-theme brand layer at a pinned commit, so a rebuild
   # is also worthwhile on a schedule — it surfaces a file moved or removed

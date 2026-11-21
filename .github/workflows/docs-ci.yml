@@ -5,6 +5,26 @@ name: Docs CI
 on:
   pull_request:
     branches: [main]
+    # What `make docs-check` reads, and this file. The Makefile reads the
+    # release tag from CHANGELOG.md and the ITS-REST tag from
+    # resources/its-rest/MANIFEST.txt, and checks the `go get` pin in README.md
+    # and docs/quick-start.md; check_brand_paths.py reads .gitignore. Keep the
+    # list equal to docs-site.yml's.
+    paths:
+      - '.github/workflows/docs-ci.yml'
+      - '.gitignore'
+      - 'CHANGELOG.md'
+      - 'Makefile'
+      - 'make/**'
+      - 'README.md'
+      - 'docs/quick-start.md'
+      - 'mkdocs.yml'
+      - 'overrides/**'
+      - 'pages/**'
+      - 'resources/its-rest/MANIFEST.txt'
+      - 'scripts/check_brand_paths.py'
+      - 'scripts/sync_sources.py'
+      - 'sources.json'
   workflow_dispatch:
 
 permissions:
