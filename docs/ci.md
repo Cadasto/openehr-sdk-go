@@ -10,28 +10,41 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 
 | Workflow | File | When it runs |
 |---|---|---|
-| **CI** | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Every pull request; every push to `main` |
+| **CI** | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Every pull request; every push to `main`; `workflow_dispatch`. The changed paths decide which jobs run ([§ Which jobs run](#which-jobs-run)) |
 | **CodeQL** | GitHub [default setup](https://docs.github.com/en/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning) (no in-repo workflow) | Every pull request and every push to `main` (plus GitHub's periodic re-scan), for Go and Actions. Findings appear under **Security → Code scanning** |
 | **Codegen drift** | [`.github/workflows/codegen-drift.yml`](../.github/workflows/codegen-drift.yml) | Mondays 06:00 UTC; `workflow_dispatch` |
 | **Release** | [`.github/workflows/release.yml`](../.github/workflows/release.yml) | Push of a `v*` tag; `workflow_dispatch` dry-run. Process in [releases.md](releases.md) |
-| **Docs CI** | [`.github/workflows/docs-ci.yml`](../.github/workflows/docs-ci.yml) | Every pull request into `main`; `workflow_dispatch`. Runs `make docs-check` |
-| **Docs site** | [`.github/workflows/docs-site.yml`](../.github/workflows/docs-site.yml) | Push to `main`; Mondays 06:00 UTC; `workflow_dispatch`. Builds the MkDocs site and deploys it to GitHub Pages once the repository's Pages source is set to GitHub Actions, which is not enabled yet (as of 2026-09-10) |
+| **Docs CI** | [`.github/workflows/docs-ci.yml`](../.github/workflows/docs-ci.yml) | A pull request into `main` that changes a file `make docs-check` reads; `workflow_dispatch`. Runs `make docs-check`. The workflow lists those files |
+| **Docs site** | [`.github/workflows/docs-site.yml`](../.github/workflows/docs-site.yml) | A push to `main` that changes a file `make docs-check` reads; Mondays 06:00 UTC; `workflow_dispatch`. Builds the MkDocs site and deploys it to GitHub Pages once the repository's Pages source is set to GitHub Actions, which is not enabled yet (as of 2026-09-10) |
 
 ### CI jobs (`ci.yml`)
 
-Jobs run in parallel. All use Go 1.27.x (`actions/setup-go@v7` with module cache).
+**Changed paths** runs first, and the other jobs run in parallel after it. The Go jobs use Go 1.27.x (`actions/setup-go@v7` with module cache).
 
 | Job | Makefile targets | Purpose |
 |---|---|---|
+| **Changed paths** | `spec-check` | Checks the specifications on every run, then lists the changed paths and decides which jobs below run ([§ Which jobs run](#which-jobs-run)) |
 | **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-check`, `aqlgen-check`, `termgen-check`, `vet`, `spec-check`, `bmm-check`, `its-xml-check`, `flat-check`, `corpus-pins-check`, `terminology-check`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-check`, `aqlgen-check` and `termgen-check` |
 | **Test (fused multiply-add)** | `test-fused` | The unit tests again with `GOAMD64=v3`, so the compiler fuses a multiply and an add into one rounding as it always does on arm64 (Apple Silicon). A result whose last bits differ there, such as a seeded random draw, fails here instead of only on a contributor's Mac |
 | **Lint** | (via `golangci-lint-action` v2.15.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` |
-| **Race** | `test-race` | **Push to `main` only**, because `-race` is slower. Catches data races in `typereg` and codecs. The runner has a C compiler, so the race run uses the host `go` |
+| **Race** | `test-race` | Runs on a push to `main` that changes code, and on `workflow_dispatch`. Catches data races in `typereg` and codecs. The runner has a C compiler, so the race run uses the host `go` |
 
-PRs do not run the **Race** job. Merge to `main` triggers it on the post-merge push.
+Pull requests do not run the **Race** job. A merge that changes code runs it on the push to `main`.
 
 CI does not run `operational-template-schema-check`, [PROBE-111](specifications/conformance.md#probe-111--operational-template-corpus-round-trip)'s schema leg, which `make ci` runs. It needs `xmllint`, which the runner lacks, and installing it from the Ubuntu package mirrors failed whole CI runs while those mirrors were unreachable. Run it locally (`make operational-template-schema-check`, or `make ci`) on a change to the canonical XML codec, the operational template types or the corpus OPTs. The **Release** workflow still runs it, through `make ci`.
+
+### Which jobs run
+
+**Changed paths** sorts the changed paths into code and docs-only. A docs-only path is one that no Go test and no `make` check of the Go jobs reads. The patterns are in the **Detect code changes** step of `ci.yml`, and every path outside them is code. Some documents count as code because a Go test reads them: the module README, the quick start, the examples catalogue, the probe catalogue and the site's pages. A document added to or removed from `docs/specifications/` or `docs/adr/` is code as well, because `TestGodocCarriesNoSpecProcessIdentifiers` reads the file names there.
+
+| Event | Verify, Test, Test (fused multiply-add), Lint | Race |
+|---|---|---|
+| Pull request | When a changed path is code | Never |
+| Push to `main` | When the push changes `go.mod` or `ci.yml`, the files the cache keys hash | When the push changes code |
+| `workflow_dispatch` | Always | Always |
+
+A docs-only pull request runs **Changed paths** alone, and its `make spec-check` still checks the documents. A push to `main` runs the Go jobs only to refresh the caches that pull requests restore, because the pull request's last run already tested its merge result. To check `main` itself, dispatch the workflow on `main` (`gh workflow run ci.yml --ref main`). Do that after a Go patch release too: it moves the Go cache key without changing a file. When the changed paths cannot be listed, for example after a forced push, every job runs.
 
 ### CodeQL (default setup)
 
@@ -98,7 +111,7 @@ Run `make help` for the full grouped list. Common targets:
 
 ## Dependency updates
 
-[`.github/dependabot.yml`](../.github/dependabot.yml) opens weekly PRs for `go.mod` and GitHub Actions version bumps.
+[`.github/dependabot.yml`](../.github/dependabot.yml) opens one pull request a week for the Go modules and one for the GitHub Actions. Each groups that week's version updates.
 
 ## Future CI (not yet wired)
 
