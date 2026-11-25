@@ -62,7 +62,7 @@ been run against.
 | [`openehr/client/ehr/itemtags`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/itemtags) | `openehr-item-tag` headers on composition, EHR_STATUS and directory reads and on composition writes (**partial**; the dedicated ITEM_TAG endpoints are deferred) | |
 | [`openehr/client/query`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/query) | Ad-hoc and stored AQL | [`query-execute`](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md#query-execute) |
 | [`openehr/client/definition`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/definition) | Templates and stored queries | [`definition-lifecycle`](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md#definition-lifecycle) |
-| [`openehr/client/demographic`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/demographic) | Demographic API, including PARTY revision history and version reads; `DEVELOPMENT` status inside ITS-REST Release-1.1.0 | |
+| [`openehr/client/demographic`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/demographic) | Demographic API: PARTY CRUD in canonical JSON or canonical XML, revision history and version reads; `DEVELOPMENT` status inside ITS-REST Release-1.1.0 | |
 | [`openehr/client/system`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/system) | Capabilities and version | [`service-auth`](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md#service-auth) |
 | [`openehr/client/admin`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/admin) | ITS-REST admin; `DEVELOPMENT` status inside ITS-REST Release-1.1.0 | |
 

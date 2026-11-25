@@ -1515,12 +1515,15 @@ RM
 
 ITS-REST lets a composition be written and read in four representations, which the pin lists as the `Content-Type` and `Accept` values of the composition operations (`ContentType_LOCATABLE`, `Accept_LOCATABLE`): canonical JSON, canonical XML, FLAT and STRUCTURED.
 The composition leaf **MUST** offer all four on `Save`, `Update` and `Get` through typed per-call options, serialising and decoding with the codecs of [§ REQ-052](#req-052), [§ REQ-056](#req-056) and [§ REQ-053](#req-053), so a caller never builds the request by hand to change format.
+The demographic pin lists the same four on the PARTY operations (`<class>_create`, `<class>_update`, `<class>_get`) and canonical JSON and XML on the `versioned_party` reads (`Accept_canonical`).
+The demographic leaf **MUST** offer canonical JSON and canonical XML on `Create`, `Update`, `Get` and the `versioned_party` reads the same way; FLAT and STRUCTURED are out of scope for a PARTY, since the simplified codec reads and writes a `COMPOSITION` only.
 
 #### Formats
 
 The leaf names the four with `composition.Format`, whose zero value is canonical JSON, the default.
 The media types it sends are `application/json`, `application/xml`, and the canonical simplified types [§ REQ-053](#req-053) names, never a deprecated `.schema`-suffixed one.
 A `Format` outside the four **MUST** fail with `ErrInvalidConfig` before any request is issued.
+The demographic leaf names its two with `demographic.Format`, whose zero value is canonical JSON too, and a `demographic.Format` outside the two **MUST** fail the same way.
 
 #### Writes
 
@@ -1528,6 +1531,8 @@ A `Format` outside the four **MUST** fail with `ErrInvalidConfig` before any req
 FLAT and STRUCTURED serialise against the Web Template given, which **MUST** be non-nil for them; canonical JSON and XML do not consult it.
 A composition the codec cannot serialise **MUST** fail before any request, as a `*composition.EncodeError` that names the format and wraps the codec's error, so a caller tells it apart from a request that went out and failed and from an `ErrInvalidConfig` refusal.
 Everything else a write sends and returns **MUST** be what it is for canonical JSON: `If-Match`, `Prefer`, the audit, lifecycle and item-tag headers, and the version metadata.
+`WithFormat(format)` on the demographic `Create` and `Update` **MUST** serialise the PARTY in that format and send the format's media type as `Content-Type`, and everything else it sends and returns **MUST** be what it is for canonical JSON: `If-Match`, `Prefer`, the audit and lifecycle headers, and the version metadata.
+A PARTY the codec cannot serialise **MUST** fail before any request as a `*demographic.EncodeError` that names the format and wraps the codec's error, in canonical JSON too.
 The request body of a composition write (`POST /ehr/{ehr_id}/composition`, `PUT /ehr/{ehr_id}/composition/{vo_uid}`, and `directory.Save` / `Update` alike) is a bare `COMPOSITION`, and under `Prefer: return=representation` its response body is a bare `COMPOSITION` too, never the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope the RM ships ([PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition)).
 
 - **Template id.**
@@ -1537,11 +1542,13 @@ The request body of a composition write (`POST /ehr/{ehr_id}/composition`, `PUT 
 - **The response.**
   Under `Prefer: return=representation` the write **MUST** send the format's media type as `Accept`, except where *The format query parameters* replace it, and decode the body in that format into the returned composition, under [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure): a body that does not decode is a committed write with an unusable representation, never a failed write.
   Under any other `Prefer` the write **MUST** send `Accept: application/json`, since the `Identifier` body the pin gives `201_COMPOSITION` is JSON and the identifier arm reads it as JSON.
+  The demographic `Create` and `Update` **MUST** follow both rules too, decoding an XML representation as *Reads* below decodes a PARTY.
 
 #### Reads
 
 `Get` takes trailing options.
 With no option, `Get` **MUST** send `Accept: application/json` and decode the body as canonical JSON.
+On the demographic leaf `Get` and the `versioned_party` reads take `WithGetFormat(format)` and `WithRawBody(dst)`, and the rules below bind them as they bind the composition `Get`, with no Web Template or decode options.
 
 - `WithGetFormat(format, webTemplate, decodeOptions...)` **MUST** send the format's media type as `Accept`, except where *The format query parameters* replace it, and a `200` body **MUST** be decoded into the returned composition in that format: canonical XML with no Web Template, FLAT and STRUCTURED against the Web Template when it is non-nil.
   With a nil Web Template a simplified body **MUST NOT** be decoded: the call returns a nil composition, the version metadata and a nil error.
@@ -1549,6 +1556,9 @@ With no option, `Get` **MUST** send `Accept: application/json` and decode the bo
   A nil `dst` **MUST** fail with `ErrInvalidConfig` before any request.
 - The decoder **MUST** be chosen by the format the caller asked for, never by the response's `Content-Type`.
   A body that does not decode **MUST** surface as the typed decode failure of [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) with the version metadata beside it, and an empty body and a `204` keep their outcomes (`ErrInvalidShape`, `ErrDeletedAtTime`) in every format.
+- Canonical XML need not name its root element's class, so the demographic leaf **MUST** decode an XML body as the class the call names: the `Type` of a PARTY read or write, or the `VERSIONED_PARTY`, `REVISION_HISTORY` or `ORIGINAL_VERSION` a `versioned_party` read returns.
+  A root element whose `xsi:type` names another class **MUST** fail as the typed decode failure.
+  The PARTY inside an `ORIGINAL_VERSION` is decoded by the `xsi:type` of its `data` element, as canonical JSON decodes it by `_type`.
 
 #### Simplified decode options
 
@@ -1589,6 +1599,10 @@ The form is outside the pin, so both options are off by default, and their docum
   A STRUCTURED `Get` with `WithGetFormatQuery` and a `version_at_time` sends `Accept: application/json`, `format=STRUCTURED` and `version_at_time`, and decodes the body as STRUCTURED.
   A canonical JSON or XML call with either option carries no `format` parameter.
 - No request the leaf sends carries a `.schema`-suffixed media type.
+- A demographic `Create` or `Update` with `WithFormat(demographic.FormatXML)` under `PreferRepresentation` sends `Content-Type` and `Accept` `application/xml` and returns the PARTY decoded from the XML body.
+  A demographic `Get` and each `versioned_party` read with `WithGetFormat(demographic.FormatXML)` send `Accept: application/xml` and decode the XML body, the version's PARTY by its `xsi:type`.
+  An XML body whose root `xsi:type` names another class than the call's fails as the typed decode failure.
+- A demographic write of a PARTY canonical JSON refuses, such as one holding a NaN magnitude, fails with a `*demographic.EncodeError` and issues no request.
 
 Out of scope: the raw body of a write's response, the other EHR leaves and the contribution envelope's inner payloads ([§ REQ-174](#req-174--versioned-object-reads) keeps the contribution read in canonical JSON), and sending the deprecated `.schema`-suffixed media types.
 
@@ -1639,7 +1653,7 @@ The version-at-time read **MUST** refuse a zero `time.Time` with `ErrInvalidConf
 #### Representation
 
 These reads, the contribution read included, **MUST** request canonical JSON (`Accept: application/json`, the pin's `Accept_canonical`).
-Canonical XML and the simplified formats are out of scope here; the composition leaf's formats are [§ REQ-173](#req-173--composition-representation-formats)'s.
+Canonical XML and the simplified formats are out of scope here; the composition leaf's formats are [§ REQ-173](#req-173--composition-representation-formats)'s, and so are the canonical JSON and canonical XML of the `versioned_party` reads.
 
 #### The `version_at_time` value
 

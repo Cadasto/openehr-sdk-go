@@ -27,6 +27,14 @@
 // [WithTagTargetPath]. A returned tag is an [ehr.StoredItemTag], which names
 // the tagged object and its class.
 //
+// Every call travels in canonical JSON unless an option names canonical
+// XML: [WithFormat] on [Create] and [Update], [WithGetFormat] on [Get] and
+// the versioned_party reads. A canonical XML party is decoded as the class
+// the call names, and the party inside an ORIGINAL_VERSION by the
+// `xsi:type` of its `data` element. [WithRawBody] hands back what a read
+// received. The simplified FLAT and STRUCTURED formats are compositions'
+// only.
+//
 // Maturity: draft. The upstream ITS-REST Demographic API is `x-status:
 // DEVELOPMENT` (the development/unstable companion to the EHR API), so this
 // package's surface may change between SDK minor versions until upstream

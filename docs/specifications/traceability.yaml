@@ -638,6 +638,7 @@ requirements:
       - openehr/aom/aom14/quantity_item_units_xml_test.go
       - openehr/aom/aom14/schema_names_xml_test.go
       - openehr/aom/aom14/symbol_value_xml_test.go
+      - openehr/client/demographic/corpus_xml_test.go
       - openehr/instance/integer_draw_window_test.go
       - openehr/instance/interval_expanded_internal_test.go
       - openehr/instance/ordinal_integer_test.go
@@ -2122,8 +2123,11 @@ requirements:
       - openehr/client/definition/template_test.go
       - openehr/client/demographic/body_read_error_test.go
       - openehr/client/demographic/decode_error_test.go
+      - openehr/client/demographic/format_get_test.go
+      - openehr/client/demographic/format_write_test.go
       - openehr/client/demographic/null_body_test.go
       - openehr/client/demographic/tags_test.go
+      - openehr/client/demographic/versioned_format_test.go
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/composition/body_read_error_test.go
       - openehr/client/ehr/composition/decode_error_test.go
@@ -2445,9 +2449,14 @@ requirements:
     packages: [openehr/client/ehr/composition, testkit/probes/rest]
     probes: [PROBE-108]
     tests:
+      - openehr/client/demographic/format_get_test.go
+      - openehr/client/demographic/format_write_test.go
+      - openehr/client/demographic/versioned_format_test.go
       - openehr/client/ehr/composition/doc_guard_test.go
       - openehr/client/ehr/composition/format_get_test.go
       - openehr/client/ehr/composition/format_write_test.go
+      - testkit/probes/demographic/probe_073_demographic_round_trip.go
+      - testkit/probes/demographic/probes_test.go
       - testkit/probes/rest/probe_108_composition_formats.go
       - testkit/probes/rest/probes_test.go
 
@@ -2460,6 +2469,7 @@ requirements:
     probes: [PROBE-109, PROBE-092]
     tests:
       - openehr/client/demographic/party_test.go
+      - openehr/client/demographic/versioned_format_test.go
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/versioned_test.go

@@ -68,52 +68,96 @@ func (pv *PartyVersion) VersionUID() openehrclient.VersionUID {
 // version-control header (owner, time created, uid). Use [GetRevisionHistory]
 // for the change log and [GetVersion] for version content.
 //
+// Like every versioned_party read, it asks for canonical JSON unless
+// [WithGetFormat] names canonical XML, and [WithRawBody] hands back the body
+// as the server sent it. An empty or null 2xx body, a 204 included, fails
+// with [transport.ErrInvalidShape], and a body that does not decode returns
+// a [*transport.DecodeError], each beside the response metadata.
+//
 // Wire: GET /demographic/versioned_party/{vo_uid}.
-func GetVersionedParty(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID) (*rm.VersionedParty, *openehrclient.VersionMetadata, error) {
+func GetVersionedParty(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID, opts ...GetOption) (*rm.VersionedParty, *openehrclient.VersionMetadata, error) {
 	if voUID == "" {
 		return nil, nil, fmt.Errorf("demographic.GetVersionedParty: %w: empty VersionedObjectID", transport.ErrInvalidConfig)
+	}
+	cfg, err := newGetConfig("demographic.GetVersionedParty", opts)
+	if err != nil {
+		return nil, nil, err
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   versionedBase(voUID),
 		Route:  routeVersioned,
+		Accept: cfg.format.MediaType(),
 	}
-	out, meta, err := transport.Decode[rm.VersionedParty](ctx, c, req)
-	return out, openehrclient.NewVersionMetadata(meta), err
+	return readVersioned[rm.VersionedParty](ctx, c, req, cfg)
 }
 
 // GetRevisionHistory retrieves the REVISION_HISTORY of the PARTY family voUID.
+// The read options and outcomes are those of [GetVersionedParty].
 //
 // Wire: GET /demographic/versioned_party/{vo_uid}/revision_history.
-func GetRevisionHistory(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error) {
+func GetRevisionHistory(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID, opts ...GetOption) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error) {
 	if voUID == "" {
 		return nil, nil, fmt.Errorf("demographic.GetRevisionHistory: %w: empty VersionedObjectID", transport.ErrInvalidConfig)
+	}
+	cfg, err := newGetConfig("demographic.GetRevisionHistory", opts)
+	if err != nil {
+		return nil, nil, err
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   versionedBase(voUID) + "/revision_history",
 		Route:  routeRevisionHistory,
+		Accept: cfg.format.MediaType(),
 	}
-	out, meta, err := transport.Decode[rm.RevisionHistory](ctx, c, req)
-	return out, openehrclient.NewVersionMetadata(meta), err
+	return readVersioned[rm.RevisionHistory](ctx, c, req, cfg)
+}
+
+// readVersioned issues a VERSIONED_PARTY or REVISION_HISTORY read and
+// decodes the body as T in the format cfg names, as [transport.Decode]
+// answers a canonical JSON read: an empty or null 2xx body is
+// [transport.ErrInvalidShape], and a body that does not decode a
+// [*transport.DecodeError] carrying it, each beside the metadata.
+func readVersioned[T any](ctx context.Context, c *transport.Client, req *transport.Request, cfg getConfig) (*T, *openehrclient.VersionMetadata, error) {
+	resp, meta, err := cfg.do(ctx, c, req)
+	if err != nil {
+		return nil, meta, err
+	}
+	if transport.IsNoRepresentationBody(resp.Body) {
+		return nil, meta, fmt.Errorf("demographic: %w: %d response with empty or null body", transport.ErrInvalidShape, resp.StatusCode)
+	}
+	out := new(T)
+	if err := cfg.format.unmarshal(resp.Body, out); err != nil {
+		return nil, meta, &transport.DecodeError{
+			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+		}
+	}
+	return out, meta, nil
 }
 
 // GetVersion retrieves the latest VERSION of the PARTY family voUID. A 2xx
 // response with an empty or null body, a 204 included, fails with
 // [transport.ErrInvalidShape] beside the response metadata, as it does on
-// [GetVersionAtTime] and [GetVersionByID].
+// [GetVersionAtTime] and [GetVersionByID]. The read options are those of
+// [GetVersionedParty]; in canonical XML the PARTY in the version's `data`
+// is decoded by the element's `xsi:type`.
 //
 // Wire: GET /demographic/versioned_party/{vo_uid}/version.
-func GetVersion(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID) (*PartyVersion, *openehrclient.VersionMetadata, error) {
+func GetVersion(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID, opts ...GetOption) (*PartyVersion, *openehrclient.VersionMetadata, error) {
 	if voUID == "" {
 		return nil, nil, fmt.Errorf("demographic.GetVersion: %w: empty VersionedObjectID", transport.ErrInvalidConfig)
+	}
+	cfg, err := newGetConfig("demographic.GetVersion", opts)
+	if err != nil {
+		return nil, nil, err
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   versionedBase(voUID) + "/version",
 		Route:  routeVersion,
+		Accept: cfg.format.MediaType(),
 	}
-	return getVersion(ctx, c, req)
+	return getVersion(ctx, c, req, cfg)
 }
 
 // GetVersionAtTime retrieves the VERSION that was current at t. A zero t
@@ -121,11 +165,11 @@ func GetVersion(ctx context.Context, c *transport.Client, voUID openehrclient.Ve
 // is the read for the latest. A t whose UTC year falls outside 0000-9999
 // fails the same way, since RFC 3339 cannot write it. When the family had no
 // version at t, the server answers 404 and the read fails with
-// [transport.ErrNotFound].
+// [transport.ErrNotFound]. The read options are those of [GetVersion].
 //
 // Wire: GET /demographic/versioned_party/{vo_uid}/version?version_at_time={t},
 // with t sent in UTC with its fraction of a second.
-func GetVersionAtTime(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID, t time.Time) (*PartyVersion, *openehrclient.VersionMetadata, error) {
+func GetVersionAtTime(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID, t time.Time, opts ...GetOption) (*PartyVersion, *openehrclient.VersionMetadata, error) {
 	if voUID == "" {
 		return nil, nil, fmt.Errorf("demographic.GetVersionAtTime: %w: empty VersionedObjectID", transport.ErrInvalidConfig)
 	}
@@ -136,52 +180,80 @@ func GetVersionAtTime(ctx context.Context, c *transport.Client, voUID openehrcli
 	if err != nil {
 		return nil, nil, fmt.Errorf("demographic.GetVersionAtTime: %w", err)
 	}
+	cfg, err := newGetConfig("demographic.GetVersionAtTime", opts)
+	if err != nil {
+		return nil, nil, err
+	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   versionedBase(voUID) + "/version",
 		Route:  routeVersion,
 		Query:  url.Values{"version_at_time": []string{at}},
+		Accept: cfg.format.MediaType(),
 	}
-	return getVersion(ctx, c, req)
+	return getVersion(ctx, c, req, cfg)
 }
 
-// GetVersionByID retrieves a specific VERSION by its version uid.
+// GetVersionByID retrieves a specific VERSION by its version uid. The read
+// options are those of [GetVersion].
 //
 // Wire: GET /demographic/versioned_party/{vo_uid}/version/{version_uid}.
-func GetVersionByID(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID) (*PartyVersion, *openehrclient.VersionMetadata, error) {
+func GetVersionByID(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID, opts ...GetOption) (*PartyVersion, *openehrclient.VersionMetadata, error) {
 	if voUID == "" {
 		return nil, nil, fmt.Errorf("demographic.GetVersionByID: %w: empty VersionedObjectID", transport.ErrInvalidConfig)
 	}
 	if versionUID == "" {
 		return nil, nil, fmt.Errorf("demographic.GetVersionByID: %w: empty VersionUID", transport.ErrInvalidConfig)
 	}
+	cfg, err := newGetConfig("demographic.GetVersionByID", opts)
+	if err != nil {
+		return nil, nil, err
+	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   versionedBase(voUID) + "/version/" + string(versionUID),
 		Route:  routeVersionByID,
+		Accept: cfg.format.MediaType(),
 	}
-	return getVersion(ctx, c, req)
+	return getVersion(ctx, c, req, cfg)
 }
 
 // getVersion issues a version read and decodes the ORIGINAL_VERSION<PARTY>
-// envelope. The envelope's polymorphic `data` is captured raw (the generated
-// OriginalVersion unmarshaller cannot decode into the abstract [rm.Party]
-// interface) and re-decoded by `_type` through the type registry (REQ-040).
-func getVersion(ctx context.Context, c *transport.Client, req *transport.Request) (*PartyVersion, *openehrclient.VersionMetadata, error) {
-	resp, err := c.Do(ctx, req)
+// envelope in the format cfg names. In canonical JSON the envelope's
+// polymorphic `data` is captured raw (the generated OriginalVersion JSON
+// unmarshaller cannot decode into the abstract [rm.Party] interface) and
+// re-decoded by `_type` through the type registry (REQ-040). In canonical
+// XML the generated unmarshaller decodes `data` by its `xsi:type`.
+func getVersion(ctx context.Context, c *transport.Client, req *transport.Request, cfg getConfig) (*PartyVersion, *openehrclient.VersionMetadata, error) {
+	resp, meta, err := cfg.do(ctx, c, req)
 	if err != nil {
-		if resp != nil {
-			return nil, openehrclient.NewVersionMetadata(resp.Metadata), err
-		}
-		return nil, nil, err
+		return nil, meta, err
 	}
-	meta := openehrclient.NewVersionMetadata(resp.Metadata)
 	if transport.IsNoRepresentationBody(resp.Body) {
 		// The pin answers these reads 200 with a VERSION or 404, no version
 		// at the requested time included, so every empty or null 2xx body,
 		// a 204 too, is a wire anomaly. Unlike getParty there is no 204 to
 		// carve out.
 		return nil, meta, fmt.Errorf("demographic: %w: %d response with empty or null body", transport.ErrInvalidShape, resp.StatusCode)
+	}
+	if cfg.format == FormatXML {
+		var env rm.OriginalVersion[rm.Party]
+		if err := unmarshalXML(resp.Body, &env); err != nil {
+			return nil, meta, fmt.Errorf("demographic: ORIGINAL_VERSION envelope: %w", &transport.DecodeError{
+				Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+			})
+		}
+		pv := &PartyVersion{
+			UID:                 env.UID,
+			PrecedingVersionUID: env.PrecedingVersionUID,
+			LifecycleState:      env.LifecycleState,
+			CommitAudit:         env.CommitAudit,
+			Contribution:        env.Contribution,
+		}
+		if env.Data != nil {
+			pv.Party = *env.Data
+		}
+		return pv, meta, nil
 	}
 	var env rm.OriginalVersion[jsontext.Value]
 	if err := json.Unmarshal(resp.Body, &env); err != nil {
@@ -212,22 +284,22 @@ func getVersion(ctx context.Context, c *transport.Client, req *transport.Request
 	return pv, meta, nil
 }
 
-func (r *repository) GetVersionedParty(ctx context.Context, voUID openehrclient.VersionedObjectID) (*rm.VersionedParty, *openehrclient.VersionMetadata, error) {
-	return GetVersionedParty(ctx, r.c, voUID)
+func (r *repository) GetVersionedParty(ctx context.Context, voUID openehrclient.VersionedObjectID, opts ...GetOption) (*rm.VersionedParty, *openehrclient.VersionMetadata, error) {
+	return GetVersionedParty(ctx, r.c, voUID, opts...)
 }
 
-func (r *repository) GetRevisionHistory(ctx context.Context, voUID openehrclient.VersionedObjectID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error) {
-	return GetRevisionHistory(ctx, r.c, voUID)
+func (r *repository) GetRevisionHistory(ctx context.Context, voUID openehrclient.VersionedObjectID, opts ...GetOption) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error) {
+	return GetRevisionHistory(ctx, r.c, voUID, opts...)
 }
 
-func (r *repository) GetVersion(ctx context.Context, voUID openehrclient.VersionedObjectID) (*PartyVersion, *openehrclient.VersionMetadata, error) {
-	return GetVersion(ctx, r.c, voUID)
+func (r *repository) GetVersion(ctx context.Context, voUID openehrclient.VersionedObjectID, opts ...GetOption) (*PartyVersion, *openehrclient.VersionMetadata, error) {
+	return GetVersion(ctx, r.c, voUID, opts...)
 }
 
-func (r *repository) GetVersionAtTime(ctx context.Context, voUID openehrclient.VersionedObjectID, t time.Time) (*PartyVersion, *openehrclient.VersionMetadata, error) {
-	return GetVersionAtTime(ctx, r.c, voUID, t)
+func (r *repository) GetVersionAtTime(ctx context.Context, voUID openehrclient.VersionedObjectID, t time.Time, opts ...GetOption) (*PartyVersion, *openehrclient.VersionMetadata, error) {
+	return GetVersionAtTime(ctx, r.c, voUID, t, opts...)
 }
 
-func (r *repository) GetVersionByID(ctx context.Context, voUID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID) (*PartyVersion, *openehrclient.VersionMetadata, error) {
-	return GetVersionByID(ctx, r.c, voUID, versionUID)
+func (r *repository) GetVersionByID(ctx context.Context, voUID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID, opts ...GetOption) (*PartyVersion, *openehrclient.VersionMetadata, error) {
+	return GetVersionByID(ctx, r.c, voUID, versionUID, opts...)
 }
