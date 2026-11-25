@@ -108,3 +108,62 @@ func TestGetEHRStatusAndDirectoryRefuseBadRefs(t *testing.T) { // REQ-025
 		}
 	}
 }
+
+// TestGetEHRStatusAndDirectoryReadAPointerRef: a non-nil pointer to either
+// Ref type, which composition.Get and ValidateRef accept, reads the same
+// target as the value it points to (REQ-059).
+func TestGetEHRStatusAndDirectoryReadAPointerRef(t *testing.T) { // REQ-059
+	const tagHeader = `key="category",value="final"`
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		w.Header().Set("openehr-item-tag", tagHeader)
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "/directory") {
+			_, _ = w.Write([]byte(`{"_type":"FOLDER","name":{"_type":"DV_TEXT","value":"root"},"archetype_node_id":"openEHR-EHR-FOLDER.generic.v1"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"_type":"EHR_STATUS","name":{"_type":"DV_TEXT","value":"EHR Status"},"archetype_node_id":"openEHR-EHR-EHR_STATUS.generic.v1","subject":{"_type":"PARTY_SELF"},"is_queryable":true,"is_modifiable":true}`))
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	cases := []struct {
+		name     string
+		call     func(ref openehrclient.Ref) (itemtags.Tags, error)
+		ref      openehrclient.Ref
+		wantPath string
+	}{
+		{"GetEHRStatus/*ByVersionUID", func(ref openehrclient.Ref) (itemtags.Tags, error) {
+			tags, _, err := itemtags.GetEHRStatus(t.Context(), c, "ehr-1", ref)
+			return tags, err
+		}, &openehrclient.ByVersionUID{UID: "uid::sys::1"}, "/openehr/v1/ehr/ehr-1/ehr_status/uid::sys::1"},
+		{"GetEHRStatus/*ByVersionedObjectID", func(ref openehrclient.Ref) (itemtags.Tags, error) {
+			tags, _, err := itemtags.GetEHRStatus(t.Context(), c, "ehr-1", ref)
+			return tags, err
+		}, &openehrclient.ByVersionedObjectID{VOID: "uid"}, "/openehr/v1/ehr/ehr-1/ehr_status"},
+		{"GetDirectory/*ByVersionUID", func(ref openehrclient.Ref) (itemtags.Tags, error) {
+			tags, _, err := itemtags.GetDirectory(t.Context(), c, "ehr-1", ref)
+			return tags, err
+		}, &openehrclient.ByVersionUID{UID: "uid::sys::1"}, "/openehr/v1/ehr/ehr-1/directory/uid::sys::1"},
+		{"GetDirectory/*ByVersionedObjectID", func(ref openehrclient.Ref) (itemtags.Tags, error) {
+			tags, _, err := itemtags.GetDirectory(t.Context(), c, "ehr-1", ref)
+			return tags, err
+		}, &openehrclient.ByVersionedObjectID{VOID: "uid"}, "/openehr/v1/ehr/ehr-1/directory"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			paths = nil
+			tags, err := tc.call(tc.ref)
+			if err != nil {
+				t.Fatalf("%s(%#v) err = %v, want nil", tc.name, tc.ref, err)
+			}
+			if len(paths) != 1 || paths[0] != tc.wantPath {
+				t.Errorf("%s(%#v) requested %q, want [%q]", tc.name, tc.ref, paths, tc.wantPath)
+			}
+			if len(tags.Object) != 1 || tags.Object[0].Key != "category" {
+				t.Errorf("%s(%#v) object tags = %#v, want the one category tag", tc.name, tc.ref, tags.Object)
+			}
+		})
+	}
+}

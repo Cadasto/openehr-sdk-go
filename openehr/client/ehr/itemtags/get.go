@@ -60,8 +60,24 @@ func GetDirectory(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ref
 	return tags, meta, err
 }
 
-func getDirectoryMeta(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ref openehrclient.Ref) (*openehrclient.VersionMetadata, error) {
+// refValue returns the Ref a non-nil pointer Ref points to, so a pointer
+// reads the same target as its value, as it does in composition.Get.
+func refValue(ref openehrclient.Ref) openehrclient.Ref {
 	switch r := ref.(type) {
+	case *openehrclient.ByVersionUID:
+		if r != nil {
+			return *r
+		}
+	case *openehrclient.ByVersionedObjectID:
+		if r != nil {
+			return *r
+		}
+	}
+	return ref
+}
+
+func getDirectoryMeta(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ref openehrclient.Ref) (*openehrclient.VersionMetadata, error) {
+	switch r := refValue(ref).(type) {
 	case openehrclient.ByVersionUID:
 		_, meta, err := directory.GetVersioned(ctx, c, ehrID, r.UID)
 		return meta, err
@@ -78,7 +94,7 @@ func getDirectoryMeta(ctx context.Context, c *transport.Client, ehrID ehr.EHRID,
 }
 
 func getEHRStatusMeta(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ref openehrclient.Ref) (*openehrclient.VersionMetadata, error) {
-	switch r := ref.(type) {
+	switch r := refValue(ref).(type) {
 	case openehrclient.ByVersionUID:
 		_, meta, err := ehrstatus.GetVersioned(ctx, c, ehrID, r.UID)
 		return meta, err
