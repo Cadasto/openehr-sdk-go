@@ -15,13 +15,28 @@ import (
 // routeTags is the demographic-wide ITEM_TAG listing.
 const routeTags = "/demographic/tags"
 
+// isNilRef reports whether ref names no target: a nil Ref, or one holding a
+// nil pointer to one of the Ref types, whose methods panic when called.
+func isNilRef(ref openehrclient.Ref) bool {
+	switch r := ref.(type) {
+	case nil:
+		return true
+	case *openehrclient.ByVersionUID:
+		return r == nil
+	case *openehrclient.ByVersionedObjectID:
+		return r == nil
+	default:
+		return false
+	}
+}
+
 // tagsTarget returns the request path and route template of a PARTY's tags
 // resource, refusing a target the tags routes cannot address.
 func tagsTarget(op string, t Type, target openehrclient.Ref) (path, route string, err error) {
 	if !t.valid() {
 		return "", "", fmt.Errorf("%s: %w: invalid PARTY type %q", op, transport.ErrInvalidConfig, t)
 	}
-	if target == nil {
+	if isNilRef(target) {
 		return "", "", fmt.Errorf("%s: %w: nil Ref", op, transport.ErrInvalidConfig)
 	}
 	// REQ-059: the tags routes take no version_at_time, so a Ref that

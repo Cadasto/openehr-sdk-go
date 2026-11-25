@@ -78,7 +78,7 @@ func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref
 	if !t.valid() {
 		return nil, nil, fmt.Errorf("demographic.Get: %w: invalid PARTY type %q", transport.ErrInvalidConfig, t)
 	}
-	if ref == nil {
+	if isNilRef(ref) {
 		return nil, nil, fmt.Errorf("demographic.Get: %w: nil Ref", transport.ErrInvalidConfig)
 	}
 	if err := ref.Validate(); err != nil {

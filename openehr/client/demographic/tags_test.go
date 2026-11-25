@@ -181,8 +181,10 @@ func TestTagCallsRefuseARefThatCarriesATime(t *testing.T) {
 	}
 }
 
-// TestTagCallsRefuseBadTargets: an unknown PARTY type, a nil Ref and a Ref
-// with an empty id fail with ErrInvalidConfig before any request.
+// TestTagCallsRefuseBadTargets: an unknown PARTY type, a nil Ref, a Ref
+// holding a nil pointer and a Ref with an empty id fail with
+// ErrInvalidConfig before any request, never with a panic (REQ-025,
+// idiom.md § No panics).
 func TestTagCallsRefuseBadTargets(t *testing.T) {
 	cases := []struct {
 		name string
@@ -191,6 +193,8 @@ func TestTagCallsRefuseBadTargets(t *testing.T) {
 	}{
 		{"unknown type", demographic.Type("party"), openehrclient.LatestOf(personVOID)},
 		{"nil Ref", demographic.Person, nil},
+		{"nil *ByVersionUID", demographic.Person, (*openehrclient.ByVersionUID)(nil)},
+		{"nil *ByVersionedObjectID", demographic.Person, (*openehrclient.ByVersionedObjectID)(nil)},
 		{"empty versioned-object id", demographic.Person, openehrclient.LatestOf("")},
 		{"empty version uid", demographic.Person, openehrclient.VersionOf("")},
 	}
