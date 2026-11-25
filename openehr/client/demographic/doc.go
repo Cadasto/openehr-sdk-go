@@ -11,7 +11,8 @@
 // first argument, functional options, typed transport errors, and If-Match /
 // ETag optimistic concurrency on writes. Reads decode the bare PARTY body
 // polymorphically by its `_type` discriminator via the type registry,
-// returning the concrete type behind the [rm.Party] interface.
+// returning the concrete type behind the [rm.Party] interface, and refuse a
+// `_type` naming a class other than the one the call names.
 //
 // The read-only `versioned_party` family ([GetVersionedParty],
 // [GetRevisionHistory], and [GetVersion] / [GetVersionAtTime] /
@@ -26,6 +27,14 @@
 // the tags of every party, narrowed by [WithTagKey], [WithTagValue] and
 // [WithTagTargetPath]. A returned tag is an [ehr.StoredItemTag], which names
 // the tagged object and its class.
+//
+// Every call travels in canonical JSON unless an option names canonical
+// XML: [WithFormat] on [Create] and [Update], [WithGetFormat] on [Get] and
+// the versioned_party reads. A canonical XML party is decoded as the class
+// the call names, and the party inside an ORIGINAL_VERSION by the
+// `xsi:type` of its `data` element. [WithRawBody] hands back what a read
+// received. The simplified FLAT and STRUCTURED formats are compositions'
+// only.
 //
 // Maturity: draft. The upstream ITS-REST Demographic API is `x-status:
 // DEVELOPMENT` (the development/unstable companion to the EHR API), so this

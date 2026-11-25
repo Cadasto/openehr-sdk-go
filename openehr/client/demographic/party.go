@@ -9,8 +9,6 @@ import (
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
-	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -67,14 +65,24 @@ func basePath(t Type) string { return "/demographic/" + string(t) }
 // year outside 0000-9999 fails with [transport.ErrInvalidConfig] before any
 // request, since RFC 3339 cannot write it. The returned value is the
 // concrete type ([*rm.Person] etc.) behind the [rm.Party] interface, decoded
-// polymorphically by its `_type` discriminator.
+// polymorphically by its `_type` discriminator; a `_type` naming a class
+// other than t's does not decode.
+//
+// With no option, Get asks for canonical JSON and decodes it.
+// [WithGetFormat] asks for canonical XML instead, and decodes the body as
+// the class t names, whatever `Content-Type` the server labels it with; a
+// root element that names another class, by its `xsi:type` or its name,
+// does not decode.
+// [WithRawBody] hands back the body as the server sent it.
 //
 // Wire: GET /demographic/{type}/{uid_based_id} [?version_at_time=...]. A 204
 // (the party was deleted at the requested time) yields a nil Party and nil
 // error; any other empty-body 2xx is surfaced as [transport.ErrInvalidShape].
 // No version at the requested time is a 404, surfaced as
-// [transport.ErrNotFound].
-func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref) (rm.Party, *openehrclient.VersionMetadata, error) {
+// [transport.ErrNotFound]. A body that does not decode returns a
+// [*transport.DecodeError] beside the version metadata. These outcomes are
+// the same in both formats.
+func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref, opts ...GetOption) (rm.Party, *openehrclient.VersionMetadata, error) {
 	if !t.valid() {
 		return nil, nil, fmt.Errorf("demographic.Get: %w: invalid PARTY type %q", transport.ErrInvalidConfig, t)
 	}
@@ -88,22 +96,28 @@ func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref
 	if seg == "" {
 		return nil, nil, fmt.Errorf("demographic.Get: %w: empty Ref path segment", transport.ErrInvalidConfig)
 	}
+	cfg, err := newGetConfig("demographic.Get", opts)
+	if err != nil {
+		return nil, nil, err
+	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   basePath(t) + "/" + seg,
 		Route:  basePath(t) + "/{uid_based_id}",
+		Accept: cfg.format.MediaType(),
 	}
 	if qk, qv := ref.Query(); qk != "" {
 		req.Query = url.Values{qk: []string{qv}}
 	}
-	return getParty(ctx, c, req)
+	return getParty(ctx, c, req, t, cfg)
 }
 
 // writeConfig is the resolved option set for Create / Update. It embeds
 // the shared [openehrclient.WriteConfig] (Prefer / audit details /
-// lifecycle state); demographic has no options beyond that.
+// lifecycle state) and adds the representation format.
 type writeConfig struct {
 	openehrclient.WriteConfig
+	format Format
 }
 
 // WriteOption mutates the request shape for [Create] and [Update].
@@ -129,7 +143,9 @@ func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
 }
 
 // Create commits a new PARTY. The resource path is derived from party's
-// concrete type ([*rm.Person] → /demographic/person, etc.).
+// concrete type ([*rm.Person] → /demographic/person, etc.). A nil party, or
+// one holding a nil pointer, fails with [transport.ErrInvalidConfig] without
+// issuing a request.
 //
 // Wire: POST /demographic/{type}. The response shape follows the Prefer
 // option: minimal (default) returns no body, the new version's id
@@ -143,8 +159,16 @@ func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
 // interface). After 2xx + PreferRepresentation, an empty or
 // undecodable body is a [*openehrclient.NoRepresentationError]
 // carrying commit metadata.
+//
+// The body is canonical JSON unless [WithFormat] names canonical XML. The
+// format sets how the body is written and how a returned party is decoded,
+// and it sets `Content-Type` and, under PreferRepresentation, `Accept`. The
+// `If-Match` header of [Update], `Prefer`, the audit and lifecycle headers,
+// and the version metadata returned stay what they are for canonical JSON.
+// A party the format's codec cannot serialise fails before any request with
+// an [*EncodeError], which wraps the codec's error.
 func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error) {
-	if party == nil {
+	if party == nil || rm.IsTypedNil(party) {
 		return nil, nil, fmt.Errorf("demographic.Create: %w: nil Party", transport.ErrInvalidConfig)
 	}
 	t, err := resourceType(party)
@@ -157,9 +181,9 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 			o(&cfg)
 		}
 	}
-	body, err := canjson.Marshal(party)
+	fw, err := cfg.resolveFormat("demographic.Create", party, t)
 	if err != nil {
-		return nil, nil, fmt.Errorf("demographic.Create: marshal body: %w", err)
+		return nil, nil, err
 	}
 	auditHeader, err := cfg.ResolveAuditHeader("demographic.Create")
 	if err != nil {
@@ -173,12 +197,14 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 		Method:             http.MethodPost,
 		Path:               basePath(t),
 		Route:              basePath(t),
-		Body:               body,
+		Body:               fw.body,
+		ContentType:        fw.contentType,
+		Accept:             fw.accept,
 		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return openehrclient.WriteResult(ctx, c, req, "demographic", decodeParty)
+	return openehrclient.WriteResult(ctx, c, req, "demographic", fw.decode)
 }
 
 // Update modifies the PARTY family identified by voID, attaching `ifMatch` as
@@ -188,9 +214,10 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 // Wire: PUT /demographic/{type}/{voID} with If-Match. Errors:
 // 412 → [transport.ErrPreconditionFailed]. Status→sentinel mapping is
 // endpoint-agnostic, so a 409 (should the deployment emit one) still maps to
-// [transport.ErrVersionConflict]. Forgetting ifMatch returns
-// [transport.ErrInvalidConfig] without issuing a request. Response shape
-// matches [Create].
+// [transport.ErrVersionConflict]. Forgetting ifMatch, or passing a nil
+// party or one holding a nil pointer, returns [transport.ErrInvalidConfig]
+// without issuing a request. Response shape
+// matches [Create], and the format options apply as they do for [Create].
 func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient.VersionedObjectID, ifMatch string, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error) {
 	if !t.valid() {
 		return nil, nil, fmt.Errorf("demographic.Update: %w: invalid PARTY type %q", transport.ErrInvalidConfig, t)
@@ -201,8 +228,14 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	if ifMatch == "" {
 		return nil, nil, fmt.Errorf("demographic.Update: %w: empty If-Match", transport.ErrInvalidConfig)
 	}
-	if party == nil {
+	if party == nil || rm.IsTypedNil(party) {
 		return nil, nil, fmt.Errorf("demographic.Update: %w: nil Party", transport.ErrInvalidConfig)
+	}
+	// A type outside the five, such as a struct embedding a nil *rm.Person,
+	// passes the nil check above and would panic in the encoder (idiom.md
+	// § No panics); Create refuses it the same way.
+	if _, err := resourceType(party); err != nil {
+		return nil, nil, fmt.Errorf("demographic.Update: %w", err)
 	}
 	cfg := writeConfig{Prefer: transport.PreferMinimal}
 	for _, o := range opts {
@@ -210,9 +243,9 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 			o(&cfg)
 		}
 	}
-	body, err := canjson.Marshal(party)
+	fw, err := cfg.resolveFormat("demographic.Update", party, t)
 	if err != nil {
-		return nil, nil, fmt.Errorf("demographic.Update: marshal body: %w", err)
+		return nil, nil, err
 	}
 	auditHeader, err := cfg.ResolveAuditHeader("demographic.Update")
 	if err != nil {
@@ -226,13 +259,15 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 		Method:             http.MethodPut,
 		Path:               basePath(t) + "/" + string(voID),
 		Route:              basePath(t) + "/{uid_based_id}",
-		Body:               body,
+		Body:               fw.body,
+		ContentType:        fw.contentType,
+		Accept:             fw.accept,
 		IfMatch:            ifMatch,
 		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return openehrclient.WriteResult(ctx, c, req, "demographic", decodeParty)
+	return openehrclient.WriteResult(ctx, c, req, "demographic", fw.decode)
 }
 
 // deleteConfig is the resolved option set for [Delete]. A logical delete is a
@@ -288,19 +323,16 @@ func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehr
 	return openehrclient.DoDelete(ctx, c, req)
 }
 
-// getParty issues a read request and decodes the bare PARTY body
-// polymorphically via the type registry (REQ-040). A 204 (the party was
+// getParty issues a read request and decodes the bare PARTY body in the
+// format cfg names: canonical JSON polymorphically via the type registry
+// (REQ-040), canonical XML as the class t names. A 204 (the party was
 // deleted at the requested time) yields a nil Party; any other empty-body
 // 2xx is a wire anomaly surfaced as [transport.ErrInvalidShape].
-func getParty(ctx context.Context, c *transport.Client, req *transport.Request) (rm.Party, *openehrclient.VersionMetadata, error) {
-	resp, err := c.Do(ctx, req)
+func getParty(ctx context.Context, c *transport.Client, req *transport.Request, t Type, cfg getConfig) (rm.Party, *openehrclient.VersionMetadata, error) {
+	resp, meta, err := cfg.do(ctx, c, req)
 	if err != nil {
-		if resp != nil {
-			return nil, openehrclient.NewVersionMetadata(resp.Metadata), err
-		}
-		return nil, nil, err
+		return nil, meta, err
 	}
-	meta := openehrclient.NewVersionMetadata(resp.Metadata)
 	if transport.IsNoRepresentationBody(resp.Body) {
 		// Only a 204 legitimately carries no version body (the party was
 		// deleted at the requested time; no version at that time is a 404).
@@ -315,7 +347,7 @@ func getParty(ctx context.Context, c *transport.Client, req *transport.Request) 
 		}
 		return nil, meta, fmt.Errorf("demographic: %w: %d response with empty or null body", transport.ErrInvalidShape, resp.StatusCode)
 	}
-	party, err := typereg.DecodeAs[rm.Party](resp.Body)
+	party, err := cfg.format.decodeParty(resp.Body, t)
 	if err != nil {
 		return nil, meta, fmt.Errorf("demographic: PARTY body: %w", &transport.DecodeError{
 			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
@@ -324,30 +356,20 @@ func getParty(ctx context.Context, c *transport.Client, req *transport.Request) 
 	return party, meta, nil
 }
 
-// decodeParty decodes a Prefer=representation write response
-// polymorphically via the type registry (REQ-040).
-func decodeParty(body []byte) (rm.Party, error) {
-	party, err := typereg.DecodeAs[rm.Party](body)
-	if err != nil {
-		return nil, fmt.Errorf("demographic: decode PARTY body: %w", err)
-	}
-	return party, nil
-}
-
 // Repository mirrors the package-level functions as a dependency-injection
 // seam.
 type Repository interface {
-	Get(ctx context.Context, t Type, ref openehrclient.Ref) (rm.Party, *openehrclient.VersionMetadata, error)
+	Get(ctx context.Context, t Type, ref openehrclient.Ref, opts ...GetOption) (rm.Party, *openehrclient.VersionMetadata, error)
 	Create(ctx context.Context, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error)
 	Update(ctx context.Context, t Type, voID openehrclient.VersionedObjectID, ifMatch string, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error)
 	Delete(ctx context.Context, t Type, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
 
 	// Versioned-resource reads.
-	GetVersionedParty(ctx context.Context, voUID openehrclient.VersionedObjectID) (*rm.VersionedParty, *openehrclient.VersionMetadata, error)
-	GetRevisionHistory(ctx context.Context, voUID openehrclient.VersionedObjectID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error)
-	GetVersion(ctx context.Context, voUID openehrclient.VersionedObjectID) (*PartyVersion, *openehrclient.VersionMetadata, error)
-	GetVersionAtTime(ctx context.Context, voUID openehrclient.VersionedObjectID, t time.Time) (*PartyVersion, *openehrclient.VersionMetadata, error)
-	GetVersionByID(ctx context.Context, voUID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID) (*PartyVersion, *openehrclient.VersionMetadata, error)
+	GetVersionedParty(ctx context.Context, voUID openehrclient.VersionedObjectID, opts ...GetOption) (*rm.VersionedParty, *openehrclient.VersionMetadata, error)
+	GetRevisionHistory(ctx context.Context, voUID openehrclient.VersionedObjectID, opts ...GetOption) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error)
+	GetVersion(ctx context.Context, voUID openehrclient.VersionedObjectID, opts ...GetOption) (*PartyVersion, *openehrclient.VersionMetadata, error)
+	GetVersionAtTime(ctx context.Context, voUID openehrclient.VersionedObjectID, t time.Time, opts ...GetOption) (*PartyVersion, *openehrclient.VersionMetadata, error)
+	GetVersionByID(ctx context.Context, voUID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID, opts ...GetOption) (*PartyVersion, *openehrclient.VersionMetadata, error)
 
 	// ITEM_TAG routes.
 	GetTags(ctx context.Context, t Type, target openehrclient.Ref) ([]openehrclient.StoredItemTag, error)
@@ -361,8 +383,8 @@ func NewRepository(c *transport.Client) Repository { return &repository{c: c} }
 
 type repository struct{ c *transport.Client }
 
-func (r *repository) Get(ctx context.Context, t Type, ref openehrclient.Ref) (rm.Party, *openehrclient.VersionMetadata, error) {
-	return Get(ctx, r.c, t, ref)
+func (r *repository) Get(ctx context.Context, t Type, ref openehrclient.Ref, opts ...GetOption) (rm.Party, *openehrclient.VersionMetadata, error) {
+	return Get(ctx, r.c, t, ref, opts...)
 }
 
 func (r *repository) Create(ctx context.Context, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error) {

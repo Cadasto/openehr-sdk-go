@@ -74,9 +74,9 @@ A departure this list does not name is a defect, not an exception, and a new one
 | A contribution deletion built without a payload omits `data`, which the pin's `UpdateVersion` lists as required | [§ REQ-130](#req-130--contribution-builder) *Deletion* | the RM's logical deletion has no `data` |
 | A contribution's commit audit carries `_type: "AUDIT_DETAILS"` by default, where the pin's `Contribution_create` asks a client to send `UPDATE_AUDIT` | [§ REQ-130](#req-130--contribution-builder) *Audit* | in the owning section |
 | A stored-query execution body omits `offset` and `fetch` the caller did not set, which the pin's `Query` schema lists as required | [§ REQ-057](#req-057) *Paging* | the pin gives `fetch` no default |
-| A composition write or read carries the `format` and `templateId` query parameters, which the pin does not define on those operations, when the caller opts in | [§ REQ-173](#req-173--composition-representation-formats) *The format query parameters* | a deployment extension, off by default |
-| A version read of a composition or an EHR_STATUS refuses an `IMPORTED_VERSION` body, which the pin's `UVersionOfComposition` and `UVersionOfEhrStatus` admit | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | imported versions come with the EHR Extract, out of scope |
-| A version read of a composition or an EHR_STATUS accepts an `ORIGINAL_VERSION` without `data`, which the pin's `UMOriginalVersionOfComposition` and `UMOriginalVersionOfEhrStatus` list as required | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | the RM's logical deletion has no `data` |
+| A composition write or read carries the `format` and `templateId` query parameters, which the pin does not define on those operations, when the caller opts in | [§ REQ-173](#req-173--composition-and-party-representation-formats) *The format query parameters* | a deployment extension, off by default |
+| A version read of a composition, an EHR_STATUS or a PARTY refuses an `IMPORTED_VERSION` body, which the pin's `UVersionOfComposition`, `UVersionOfEhrStatus` and `UVersionOfParty` admit | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | imported versions come with the EHR Extract, out of scope |
+| A version read of a composition, an EHR_STATUS or a PARTY accepts an `ORIGINAL_VERSION` without `data`, which the pin's `UMOriginalVersionOfComposition`, `UMOriginalVersionOfEhrStatus` and `UMOriginalVersionOfParty` list as required | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | the RM's logical deletion has no `data` |
 
 #### ITS-REST envelopes
 
@@ -97,7 +97,7 @@ The SDK **MUST** support them via **typed per-call options**, never via raw head
 |---|---|---|---|
 | `openehr-version` | request (writes) | committed VERSION lifecycle state, as `lifecycle_state.code_string="<code>"` | `WithLifecycleState(openehrclient.LifecycleState)` on the affected write |
 | `openehr-audit-details` | request (writes) | commit-time audit envelope: committer, change-type, description, system_id | `WithAuditDetails(*rm.AuditDetails)` on the affected write (composition, directory, EHR_STATUS, demographic) |
-| `openehr-template-id` | request (composition writes) | declares the template id the payload conforms to | `composition.WithTemplateID(string)`; a FLAT or STRUCTURED write sends it by [§ REQ-173](#req-173--composition-representation-formats) |
+| `openehr-template-id` | request (composition writes) | declares the template id the payload conforms to | `composition.WithTemplateID(string)`; a FLAT or STRUCTURED write sends it by [§ REQ-173](#req-173--composition-and-party-representation-formats) |
 | `openehr-uri` | request / response | opaque openEHR resource pointer (selected endpoints) | typed on the affected method |
 | `openehr-item-tag` | request / response | ItemTag operations (REST 1.1.0 new resource) | exposed on `openehr/client/ehr/itemtags/` |
 | `openehr-version-item-tag` | request / response | the ItemTags of the VERSION a write commits or a read returns | `WithVersionItemTags` on the affected write; exposed on `openehr/client/ehr/itemtags/` |
@@ -1511,16 +1511,19 @@ RM
 
 `DV_DATE_TIME` wire formats (REQ-052 / REQ-123) are untouched, and this § grants no SDK-wide zone-less tolerance for `time.Time`: the timestamp rules above reach exactly these two Definition-area catalog fields.
 
-### REQ-173 — Composition representation formats
+### REQ-173 — Composition and party representation formats
 
 ITS-REST lets a composition be written and read in four representations, which the pin lists as the `Content-Type` and `Accept` values of the composition operations (`ContentType_LOCATABLE`, `Accept_LOCATABLE`): canonical JSON, canonical XML, FLAT and STRUCTURED.
 The composition leaf **MUST** offer all four on `Save`, `Update` and `Get` through typed per-call options, serialising and decoding with the codecs of [§ REQ-052](#req-052), [§ REQ-056](#req-056) and [§ REQ-053](#req-053), so a caller never builds the request by hand to change format.
+The demographic pin lists the same four on the PARTY operations (`<class>_create`, `<class>_update`, `<class>_get`) and canonical JSON and XML on the `versioned_party` reads (`Accept_canonical`).
+The demographic leaf **MUST** offer canonical JSON and canonical XML on `Create`, `Update`, `Get` and the `versioned_party` reads the same way; FLAT and STRUCTURED are out of scope for a PARTY, since the simplified codec reads and writes a `COMPOSITION` only.
 
 #### Formats
 
 The leaf names the four with `composition.Format`, whose zero value is canonical JSON, the default.
 The media types it sends are `application/json`, `application/xml`, and the canonical simplified types [§ REQ-053](#req-053) names, never a deprecated `.schema`-suffixed one.
 A `Format` outside the four **MUST** fail with `ErrInvalidConfig` before any request is issued.
+The demographic leaf names its two with `demographic.Format`, whose zero value is canonical JSON too, and a `demographic.Format` outside the two **MUST** fail the same way.
 
 #### Writes
 
@@ -1528,6 +1531,8 @@ A `Format` outside the four **MUST** fail with `ErrInvalidConfig` before any req
 FLAT and STRUCTURED serialise against the Web Template given, which **MUST** be non-nil for them; canonical JSON and XML do not consult it.
 A composition the codec cannot serialise **MUST** fail before any request, as a `*composition.EncodeError` that names the format and wraps the codec's error, so a caller tells it apart from a request that went out and failed and from an `ErrInvalidConfig` refusal.
 Everything else a write sends and returns **MUST** be what it is for canonical JSON: `If-Match`, `Prefer`, the audit, lifecycle and item-tag headers, and the version metadata.
+`WithFormat(format)` on the demographic `Create` and `Update` **MUST** serialise the PARTY in that format and send the format's media type as `Content-Type`, and everything else it sends and returns **MUST** be what it is for canonical JSON: `If-Match`, `Prefer`, the audit and lifecycle headers, and the version metadata.
+A PARTY the codec cannot serialise **MUST** fail before any request as a `*demographic.EncodeError` that names the format and wraps the codec's error, in canonical JSON too.
 The request body of a composition write (`POST /ehr/{ehr_id}/composition`, `PUT /ehr/{ehr_id}/composition/{vo_uid}`, and `directory.Save` / `Update` alike) is a bare `COMPOSITION`, and under `Prefer: return=representation` its response body is a bare `COMPOSITION` too, never the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope the RM ships ([PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition)).
 
 - **Template id.**
@@ -1537,18 +1542,28 @@ The request body of a composition write (`POST /ehr/{ehr_id}/composition`, `PUT 
 - **The response.**
   Under `Prefer: return=representation` the write **MUST** send the format's media type as `Accept`, except where *The format query parameters* replace it, and decode the body in that format into the returned composition, under [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure): a body that does not decode is a committed write with an unusable representation, never a failed write.
   Under any other `Prefer` the write **MUST** send `Accept: application/json`, since the `Identifier` body the pin gives `201_COMPOSITION` is JSON and the identifier arm reads it as JSON.
+  The demographic `Create` and `Update` **MUST** follow both rules too, decoding an XML representation as *Reads* below decodes a PARTY.
 
 #### Reads
 
 `Get` takes trailing options.
 With no option, `Get` **MUST** send `Accept: application/json` and decode the body as canonical JSON.
+On the demographic leaf `Get` and the `versioned_party` reads take `WithGetFormat(format)` and `WithRawBody(dst)`, and the rules below bind them as they bind the composition `Get`, with no Web Template or decode options.
 
 - `WithGetFormat(format, webTemplate, decodeOptions...)` **MUST** send the format's media type as `Accept`, except where *The format query parameters* replace it, and a `200` body **MUST** be decoded into the returned composition in that format: canonical XML with no Web Template, FLAT and STRUCTURED against the Web Template when it is non-nil.
   With a nil Web Template a simplified body **MUST NOT** be decoded: the call returns a nil composition, the version metadata and a nil error.
 - `WithRawBody(dst)` **MUST** copy the response's `Content-Type` value and its body bytes into `dst` on a `200`, before any decode, so a body that does not decode is still in hand; on any other outcome `dst` is left as it was.
   A nil `dst` **MUST** fail with `ErrInvalidConfig` before any request.
 - The decoder **MUST** be chosen by the format the caller asked for, never by the response's `Content-Type`.
-  A body that does not decode **MUST** surface as the typed decode failure of [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) with the version metadata beside it, and an empty body and a `204` keep their outcomes (`ErrInvalidShape`, `ErrDeletedAtTime`) in every format.
+  A body that does not decode **MUST** surface as the typed decode failure of [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) with the version metadata beside it.
+  An empty body and a `204` keep in every format the outcome they have in canonical JSON:
+  - an empty body: `ErrInvalidShape`;
+  - a `204`: `ErrDeletedAtTime` on a composition `Get`, a nil PARTY on a demographic `Get`.
+- The demographic leaf **MUST** decode a body as the class the call names: the `Type` of a PARTY read or write, or the `VERSIONED_PARTY`, `REVISION_HISTORY` or `ORIGINAL_VERSION` a `versioned_party` read returns.
+  A body that names another class **MUST** fail as the typed decode failure, checked before the body is decoded.
+  A body names its class by its `_type`, or in canonical XML by its root element: by the root's `xsi:type`, read as [§ REQ-056](#req-056) reads a discriminator, or, with none, by the element name canonical XML gives a class, such as `organisation` or `imported_version`.
+  A root with no `xsi:type` whose name names no class, such as ITS-XML's `party`, is read as the class the call names.
+  The PARTY inside an `ORIGINAL_VERSION` is decoded by the `xsi:type` of its `data` element, as canonical JSON decodes it by `_type`.
 
 #### Simplified decode options
 
@@ -1589,6 +1604,10 @@ The form is outside the pin, so both options are off by default, and their docum
   A STRUCTURED `Get` with `WithGetFormatQuery` and a `version_at_time` sends `Accept: application/json`, `format=STRUCTURED` and `version_at_time`, and decodes the body as STRUCTURED.
   A canonical JSON or XML call with either option carries no `format` parameter.
 - No request the leaf sends carries a `.schema`-suffixed media type.
+- A demographic `Create` or `Update` with `WithFormat(demographic.FormatXML)` under `PreferRepresentation` sends `Content-Type` and `Accept` `application/xml` and returns the PARTY decoded from the XML body.
+  A demographic `Get` and each `versioned_party` read with `WithGetFormat(demographic.FormatXML)` send `Accept: application/xml` and decode the XML body, the version's PARTY by its `xsi:type`.
+  An XML body whose root `xsi:type` names another class than the call's fails as the typed decode failure, wrapping `typereg.ErrUnknownType` for a namespace-prefixed value such as `ns2:PERSON`; a JSON PARTY whose `_type` does, and an `organisation` root on a person read, fail wrapping `typereg.ErrTypeMismatch`.
+- A demographic write of a PARTY canonical JSON refuses, such as one holding a NaN magnitude, fails with a `*demographic.EncodeError` and issues no request.
 
 Out of scope: the raw body of a write's response, the other EHR leaves and the contribution envelope's inner payloads ([§ REQ-174](#req-174--versioned-object-reads) keeps the contribution read in canonical JSON), and sending the deprecated `.schema`-suffixed media types.
 
@@ -1607,7 +1626,11 @@ Each family has four operations (`versioned_composition_*` and `versioned_ehr_st
 | One version by its id | `…/versioned_composition/{versioned_object_uid}/version/{version_uid}` | `…/versioned_ehr_status/version/{version_uid}` |
 
 An EHR has one EHR_STATUS, so its versioned object is addressed by the `ehr_id` alone.
-The demographic leaf offers the same reads for `VERSIONED_PARTY`; of this §'s rules only *The `version_at_time` value* and the empty-body sentence of *Responses* bind it, the latter because the demographic pin answers each of the four `versioned_party_*` reads `200` with a body or `404`, a version absent at the requested time included (`404_not_found_or_no_version_at_time` in `demographic-validation.openapi.yaml`).
+The demographic leaf offers the same reads for `VERSIONED_PARTY`, and of this §'s rules these bind it:
+
+- *The `version_at_time` value*;
+- the empty-body sentence of *Responses*, because the demographic pin answers each of the four `versioned_party_*` reads `200` with a body or `404`, a version absent at the requested time included (`404_not_found_or_no_version_at_time` in `demographic-validation.openapi.yaml`);
+- the version read's sentences of *Responses*, its `data` decoded as a PARTY, with the two keyed exceptions they name.
 
 An empty path parameter is refused with `ErrInvalidConfig` before any request is issued, a malformed one by [REQ-150](transport.md#req-150--path-parameter-encoding-and-segment-validation), and a `404` is mapped as on every leaf, by [REQ-093](transport.md#req-093--openehr-error-envelope-mapping).
 
@@ -1615,8 +1638,8 @@ An empty path parameter is refused with `ErrInvalidConfig` before any request is
 
 The versioned-object read **MUST** return the `VERSIONED_COMPOSITION` or `VERSIONED_EHR_STATUS`, and the revision-history read the `REVISION_HISTORY`, each decoded as its RM type.
 A version read **MUST** decode the `ORIGINAL_VERSION` envelope and return at least its `uid`, `preceding_version_uid`, `lifecycle_state`, `commit_audit` and `contribution`, and its `data` decoded as a `COMPOSITION` or an `EHR_STATUS`; a version that carries no `data`, the RM's logical deletion, returns no payload and no error.
-The pin's `UMOriginalVersionOfComposition` and `UMOriginalVersionOfEhrStatus` list `data` as required, where the RM keeps it optional to allow logical deletion; reading the RM's form is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative) that lapses when the pin makes `data` optional.
-The pin's version schemas (`UVersionOfComposition`, `UVersionOfEhrStatus`) also admit an `IMPORTED_VERSION`.
+The pin's `UMOriginalVersionOfComposition`, `UMOriginalVersionOfEhrStatus` and `UMOriginalVersionOfParty` list `data` as required, where the RM keeps it optional to allow logical deletion; reading the RM's form is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative) that lapses when the pin makes `data` optional.
+The pin's version schemas (`UVersionOfComposition`, `UVersionOfEhrStatus`, `UVersionOfParty`) also admit an `IMPORTED_VERSION`.
 The SDK reads only `ORIGINAL_VERSION`: a body whose `_type` names anything else **MUST** fail as the typed decode failure of [REQ-151](transport.md#req-151--typed-2xx-decode-failure), never decode to an empty version.
 Refusing the `IMPORTED_VERSION` the pin admits is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative): imported versions come from the EHR Extract exchange, which is out of scope ([scope.md](scope.md#out-of-scope-v1)), and the exception is revisited when that exchange comes into scope.
 An empty or `null` 2xx body on any of these reads **MUST** fail with `ErrInvalidShape`, since the pin defines no successful response without a body for any of them.
@@ -1638,8 +1661,8 @@ The version-at-time read **MUST** refuse a zero `time.Time` with `ErrInvalidConf
 
 #### Representation
 
-These reads, the contribution read included, **MUST** request canonical JSON (`Accept: application/json`, the pin's `Accept_canonical`).
-Canonical XML and the simplified formats are out of scope here; the composition leaf's formats are [§ REQ-173](#req-173--composition-representation-formats)'s.
+These reads, the contribution read included, **MUST** request canonical JSON (`Accept: application/json`, the pin's `Accept_canonical`), the `versioned_party` reads unless `WithGetFormat` names canonical XML.
+Canonical XML and the simplified formats are out of scope here; the composition leaf's formats are [§ REQ-173](#req-173--composition-and-party-representation-formats)'s, and so are the canonical JSON and canonical XML of the `versioned_party` reads.
 
 #### The `version_at_time` value
 
@@ -1682,7 +1705,7 @@ A submission's request body is shaped unlike its response, which is easy to miss
   A submission shaped like the persisted `CONTRIBUTION` is refused, because its `OBJECT_REF`s point at versions that do not exist yet.
   Its commit audit has the shape of the `UPDATE_AUDIT` DTO of SPECITS-95 ([ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)), not of the persisted `AUDIT_DETAILS`; the `_type` it carries is *Audit*'s below.
 
-The SDK **MUST NOT** send the persisted shape on either submission path: a contribution sends a `contribution.Submission`, distinct from `rm.Contribution`, and a composition or directory write sends the bare RM type ([§ REQ-173](#req-173--composition-representation-formats) *Writes*).
+The SDK **MUST NOT** send the persisted shape on either submission path: a contribution sends a `contribution.Submission`, distinct from `rm.Contribution`, and a composition or directory write sends the bare RM type ([§ REQ-173](#req-173--composition-and-party-representation-formats) *Writes*).
 
 #### Change types
 

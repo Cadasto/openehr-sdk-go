@@ -1,0 +1,1 @@
+<group xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" archetype_node_id="openEHR-DEMOGRAPHIC-GROUP.group.v1"><name xsi:type="DV_TEXT"><value>Cardiology Team</value></name><identities archetype_node_id=""><name xsi:type="DV_TEXT"><value>team name</value></name></identities></group>

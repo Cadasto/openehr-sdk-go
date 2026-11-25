@@ -951,14 +951,14 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 
 #### PROBE-073 — Demographic PARTY polymorphic round-trip
 
-- **Title:** A PARTY of each concrete type (PERSON / ORGANISATION / GROUP / AGENT / ROLE) round-trips through create → get → get-version with its `_type` discriminator decoded back into the same concrete type at every hop.
-- **Preconditions:** A server (Sandbox: fake) serving the typed PARTY body for `POST|GET /demographic/{type}[/{uid_based_id}]` and the `ORIGINAL_VERSION<PARTY>` envelope for `GET /demographic/versioned_party/{vo_uid}/version`.
-- **Wire assertion:** Sandbox — `demographic.Create` (Prefer=representation), `demographic.Get`, and `demographic.GetVersion` each decode the response into the same concrete Go type as the input PARTY (REQ-040).
-  The VERSION hop also exercises the `ORIGINAL_VERSION<PARTY>` envelope, whose generic `data` cannot decode into the abstract `rm.Party` interface and is re-decoded by `_type` through the type registry.
-  A body whose `_type` decodes to a different concrete type is non-conformant.
+- **Title:** A PARTY of each concrete type (PERSON / ORGANISATION / GROUP / AGENT / ROLE) round-trips through create → get → get-version, in canonical JSON and in canonical XML, with its discriminator decoded back into the same concrete type at every hop.
+- **Preconditions:** A server (Sandbox: fake) serving the typed PARTY body for `POST|GET /demographic/{type}[/{uid_based_id}]` and the `ORIGINAL_VERSION<PARTY>` envelope for `GET /demographic/versioned_party/{vo_uid}/version`, in the format the request asks for.
+- **Wire assertion:** Sandbox — `demographic.Create` (Prefer=representation), `demographic.Get`, and `demographic.GetVersion` each decode the response into the same concrete Go type as the input PARTY (REQ-040), in canonical JSON and, asked for with the format options of [wire.md § REQ-173](wire.md#req-173--composition-and-party-representation-formats), in canonical XML.
+  The VERSION hop also exercises the `ORIGINAL_VERSION<PARTY>` envelope, whose generic `data` is decoded by its discriminator: in JSON it cannot decode into the abstract `rm.Party` interface and is re-decoded by `_type` through the type registry, and in XML it is decoded by the `data` element's `xsi:type`.
+  A body whose `_type`, or in XML whose root or `data` element's `xsi:type`, names a different concrete type is non-conformant.
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — the Demographic API is Draft upstream (ITS-REST `x-status: DEVELOPMENT`).
-- **Satisfies:** REQ-040, REQ-050.
+- **Satisfies:** REQ-040, REQ-050, REQ-173.
 
 #### PROBE-078 — verb-aware EHR scoping on query execution
 
