@@ -293,7 +293,7 @@ func TestRealUnmarshalJSONLossyLiteral(t *testing.T) {
 	}
 }
 
-// TestRealUnmarshalJSONQuotedDecimalOnly pins the quoted form ADR 0004
+// TestRealUnmarshalJSONQuotedDecimalOnly pins the quoted form ADR 0022
 // admits for a Real (REQ-052): a decimal string. The other spellings
 // strconv.ParseFloat reads are refused as a malformed quoted literal, a
 // *strconv.NumError carrying strconv.ErrSyntax and no typereg.ErrInvalidShape,

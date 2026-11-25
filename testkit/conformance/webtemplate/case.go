@@ -94,7 +94,7 @@ var metaLeaves = map[string]bool{
 // while `|id` / `|id_scheme` / `|id_namespace` / `|type` (the composer's
 // `external_ref`) and its `_identifier:N` and `/relationship` sub-paths are no
 // respelling: no `ctx/` short form carries them. Decode reads them and encode
-// writes them at the same real path (ADR 0029), so they reach the comparison and
+// writes them at the same real path (ADR 0015), so they reach the comparison and
 // the census compares them. Base-matching `composer` once absorbed the
 // external_ref into the hold-out and hid 12 corpus keys the codec then refused
 // (PR #86 review, round 3).

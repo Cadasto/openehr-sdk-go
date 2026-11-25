@@ -44,7 +44,7 @@ Resolved without an ADR: package-level functions are the primary surface; codifi
 
 **Status:** Partially resolved.
 
-[ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) settles the codec and holds its performance budget, with [ADR 0003](../adr/0003-rm-event-polymorphism.md), [ADR 0004](../adr/0004-numeric-wire-tolerance.md) and [ADR 0021](../adr/0021-json-member-order-not-a-contract.md) for the `EVENT` interface, numeric tolerance and member order; codified in [reference-model.md § Type registry (REQ-040)](reference-model.md#type-registry-req-040) and [wire.md § REQ-052](wire.md#req-052).
+[ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) settles the codec and holds its performance budget, which also decides numeric tolerance and member order, with [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4 for the `EVENT` interface; codified in [reference-model.md § Type registry (REQ-040)](reference-model.md#type-registry-req-040) and [wire.md § REQ-052](wire.md#req-052).
 
 **Still open:**
 

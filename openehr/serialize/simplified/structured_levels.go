@@ -371,7 +371,7 @@ func (l memberLevel) judgeLeaf(name string) (memberLevel, bool) {
 // judgeMetadata judges a member of an object at a metadata spelling the Web
 // Template has no node for, as the FLAT decode reads it without the Web
 // Template ([siphonContext]): a longer metadata spelling; below `composer`,
-// whose real path carries the whole composer ([decodeComposer], ADR 0029),
+// whose real path carries the whole composer ([decodeComposer], ADR 0015),
 // the party grammar's sub-paths; and below `context`, which the decode
 // resolves as the EVENT_CONTEXT ([rmattrOwnerAt]), the families an
 // EVENT_CONTEXT carries.

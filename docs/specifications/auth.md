@@ -727,7 +727,7 @@ type ServiceEntry struct {
     ID            string   // canonical identifier (e.g. "org.openehr.rest")
     BaseURL       *url.URL // resolved base URL
     Version       string   // the entry's "version" member, verbatim
-    SpecVersion   string   // the non-canonical "spec_version" member, verbatim (tolerated, ADR 0008)
+    SpecVersion   string   // the non-canonical "spec_version" member, verbatim (tolerated, ADR 0023)
     Description   string   // the entry's "description" member, verbatim
     Documentation string   // the entry's "documentation" member, verbatim
     OpenAPI       string   // the entry's "openapi" member, verbatim
@@ -904,7 +904,7 @@ On every resolution and every refresh, the SDK **MUST**:
   Missing required services **MUST** produce a typed `DiscoveryError` with the missing service IDs enumerated.
 - Verify spec-version compatibility of each required service; a service the caller does not require is not checked.
   The compared value is the service entry's `spec_version`.
-  When the entry advertises none (absent or empty), the compared value is the entry's `version` if the caller has narrowed the accepted set with `WithAcceptedSpecVersions`, and otherwise there is none: the entry **MUST** pass, and its `version` **MUST NOT** be compared: absence is acceptable (ADR 0008), and a Platform advertises its own API version in `version`.
+  When the entry advertises none (absent or empty), the compared value is the entry's `version` if the caller has narrowed the accepted set with `WithAcceptedSpecVersions`, and otherwise there is none: the entry **MUST** pass, and its `version` **MUST NOT** be compared: absence is acceptable (ADR 0023), and a Platform advertises its own API version in `version`.
   The compared value **MUST** match the SDK's pinned target (REQ-050) or, when the caller sets `WithAcceptedSpecVersions`, one of the versions it names; that list replaces the pinned target, so a caller who still accepts the pin names it too.
   A mismatch **MUST** produce a typed `DiscoveryError`.
 - Verify that the document declares the auth endpoints it needs, as the table below says.

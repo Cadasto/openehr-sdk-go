@@ -11,7 +11,7 @@ import (
 )
 
 // TestRealQuotedNumberDecodes asserts the permissive-decode half of
-// ADR 0004: a JSON quoted decimal string is accepted for a `Real`
+// ADR 0022: a JSON quoted decimal string is accepted for a `Real`
 // field. The vendored fixtures (BMI.json) carry quoted magnitudes and
 // the SDK MUST decode them without error.
 func TestRealQuotedNumberDecodes(t *testing.T) { // REQ-052
@@ -25,7 +25,7 @@ func TestRealQuotedNumberDecodes(t *testing.T) { // REQ-052
 	}
 }
 
-// TestRealEncodesAsNumber asserts the strict-encode half of ADR 0004:
+// TestRealEncodesAsNumber asserts the strict-encode half of ADR 0022:
 // regardless of how the value was decoded, encode emits a JSON number.
 // This is the load-bearing guarantee for downstream consumers and
 // openEHR wire conformance.
@@ -63,7 +63,7 @@ func TestIntegerQuotedNumberDecodes(t *testing.T) { // REQ-052
 }
 
 // TestIntegerWholeNumberWithFractionDecodes pins wire.md § Floating-point
-// precision (REQ-052, ADR 0004 as amended): an `Integer` field accepts a
+// precision (REQ-052, ADR 0022 as amended): an `Integer` field accepts a
 // number whose value is a whole number however the literal writes it, with
 // a zero fraction or an exponent, bare or quoted, and reads it as that
 // integer. The reference's test_all_types FLAT writes a DV_PROPORTION

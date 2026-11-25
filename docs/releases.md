@@ -86,7 +86,7 @@ Preview notes locally without side effects: `bash scripts/release-notes.sh X.Y.Z
 
 - [REQ-004](specifications/module-layout.md#req-004--semantic-versioning): semantic versioning
 - [`module-layout.md` § Versioning](specifications/module-layout.md#versioning): bump matrix
-- [ADR 0001](adr/0001-bmm-version-bump-runbook.md): BMM bumps vs codegen
+- [ADR 0002](adr/0002-bmm-codegen-decisions.md#consequences) and [`resources/bmm/README.md` § Updating](../resources/bmm/README.md#updating): BMM bumps vs codegen
 - [`docs/ci.md`](ci.md): quality gate before tag
 - Release tooling: commit [0ee78296](https://github.com/Cadasto/openehr-sdk-go/commit/0ee78296) (the tag-driven release workflow and notes script)
 - Go modules: [version numbering](https://go.dev/doc/modules/version-numbers)

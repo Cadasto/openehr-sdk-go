@@ -126,7 +126,7 @@ func RenderTypeRegFile(plan *Plan) ([]byte, error) {
 }
 
 // codecPolymorphicAbstractGenericNames lists abstract generic BMM
-// classes emitted as marker interfaces for JSON polymorphism (ADR 0003).
+// classes emitted as marker interfaces for JSON polymorphism (ADR 0002 D4).
 // Additional classes (e.g. VERSION) need separate design before widening.
 var codecPolymorphicAbstractGenericNames = map[string]bool{
 	"EVENT": true,
@@ -144,8 +144,9 @@ func codecPolymorphicAbstractGeneric(plan *Plan, pc *PlannedClass) bool {
 // concrete descendants gain the marker method (see renderAbstractClass).
 // Abstract + generic classes without concrete descendants (e.g. some
 // internal generic bases) remain structs. Abstract + generic classes
-// with concrete descendants (EVENT, VERSION, …) become interfaces per
-// ADR 0003 so codec polymorphism works at List<Event> sites.
+// on the codecPolymorphicAbstractGenericNames whitelist (EVENT) become
+// interfaces so codec polymorphism works at List<Event> sites; the others,
+// such as VERSION, stay structs (ADR 0002 D4).
 func renderClass(plan *Plan, pc *PlannedClass) (string, error) {
 	switch cls := pc.Class.(type) {
 	case *bmm.Enumeration:
@@ -739,7 +740,7 @@ func isOwnTypeParameter(owner *bmm.SimpleClass, typeName string) bool {
 
 // genericRootIsInterface reports whether [genericTypeRef] renders gt as a
 // Go interface: the root class is one the codec handles polymorphically
-// (ADR 0003), not a container and not a generic struct.
+// (ADR 0002 D4), not a container and not a generic struct.
 func genericRootIsInterface(plan *Plan, gt *bmm.GenericType) bool {
 	if gt == nil || containerKinds[gt.RootType] {
 		return false

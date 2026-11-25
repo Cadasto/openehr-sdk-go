@@ -101,7 +101,7 @@ The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/spec
 
 - **Building-block independence (REQ-013)**: the openEHR building-block packages and the AQL blocks are usable standalone, with no `transport/` or `auth/` import. The exact package set and each package's import rule are in the table in [`docs/specifications/module-layout.md` § REQ-013](docs/specifications/module-layout.md#req-013--building-block-independence).
 - **No reflection** beyond the exceptions in [idiom.md § API conventions](docs/specifications/idiom.md#api-conventions): `_type` dispatch goes through the type registry, and generics are fine.
-- **Strict-encode / permissive-decode** numerics per [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md).
+- **Strict-encode / permissive-decode** numerics per [ADR 0022](docs/adr/0022-canonical-json-encoding-json-v2.md#numbers).
 - **Comments**: explain WHY, not WHAT; identifiers carry the WHAT. Do NOT cite issue numbers or commit SHAs (those rot). Where REQ-NNN / PROBE-NNN citations go, and how godoc on exported API is written, follow [AGENTS.md § Spec-driven workflow](AGENTS.md#spec-driven-workflow-agents). Godoc states the behaviour a caller needs in plain English, at whatever length that takes.
 - **Test contexts**: in the I/O-bearing test packages (`transport/`, `auth/`, `smart/`, `openehr/client/*`) use `t.Context()` (Go 1.24+) for request-scoped contexts. Because it is cancelled at test cleanup, leaks surface. Don't reintroduce `context.Background()` there; derive timeouts/cancellation from `t.Context()`. Pure-compute test packages are unaffected.
 

@@ -332,7 +332,7 @@ func TestProbe086CoverageFloor(t *testing.T) {
 //
 // The fixture set is checked for completeness first: one case per REQ-140
 // grammar-table row, and one per shape of the composer at its real path
-// (ADR 0029), and the row list is what a reader diffs against the table.
+// (ADR 0015), and the row list is what a reader diffs against the table.
 func TestProbe089(t *testing.T) {
 	target, err := serializeprobes.NewProbe089Target()
 	if err != nil {

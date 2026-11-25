@@ -164,7 +164,7 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 	//
 	// The composition's `composer` is the same datatype and is deliberately *not*
 	// reached here: emitContext writes it, in its ctx/ short form or at its real
-	// path (ADR 0029), and emitNode holds the composition-metadata leaves back by
+	// path (ADR 0015), and emitNode holds the composition-metadata leaves back by
 	// name rather than relying on this arm's absence as it used to.
 	if isPartyLeafType(rmType) {
 		return "", partyRMAttr(out, flatPath, v)

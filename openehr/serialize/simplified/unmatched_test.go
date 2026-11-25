@@ -448,7 +448,7 @@ func TestREQ170MalformedMatchedContentRefusedInEveryMode(t *testing.T) {
 	}
 }
 
-// TestREQ170ComposerRealPathIsMatchedContent — REQ-170 / REQ-053, ADR 0029,
+// TestREQ170ComposerRealPathIsMatchedContent — REQ-170 / REQ-053, ADR 0015,
 // replacing the composer rows the carrier-less table held while the composer's
 // real path had no carrier. The real path now carries the whole composer, so
 // its external_ref, identifier and relationship keys are matched content the
@@ -1427,7 +1427,7 @@ func TestREQ170RawDecorationIgnoresUnmatchedKey(t *testing.T) {
 // class". Such a leaf carries nothing but `|raw`; any other suffix or sub-path
 // is unmatched content. An attribute of its RM class is refused with
 // ErrUnsupportedDatatype as the other carrier-less keys at a leaf are. The
-// composer is not such a leaf: its real path has the party grammar (ADR 0029),
+// composer is not such a leaf: its real path has the party grammar (ADR 0015),
 // under which a suffix or a sub-path outside the grammar is unmatched content
 // too. An unparameterised `DV_INTERVAL` leaf has a sub-path grammar, so the
 // rule does not reach it.
@@ -1980,7 +1980,7 @@ func TestREQ170BareValueAtANodeIsRefused(t *testing.T) {
 //
 // The composer's party sub-structure (`_identifier`, `relationship`) is read
 // whether or not the Web Template carries a composer node: its real path
-// carries the whole composer (ADR 0029), so FLAT and STRUCTURED alike decode it
+// carries the whole composer (ADR 0015), so FLAT and STRUCTURED alike decode it
 // to the same composer, and a member below it that the party grammar does not
 // read is set aside and reported by its member path.
 func TestREQ170StructuredMetadataWithoutANode(t *testing.T) {

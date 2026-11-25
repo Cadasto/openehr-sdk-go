@@ -539,7 +539,7 @@ func TestUnmarshal_REQ052_DecodeErrorKeepsEveryCause(t *testing.T) {
 			path: "/magnitude", value: `"12.3.4"`,
 		},
 		{
-			// ADR 0004 admits a quoted decimal string only: a NaN that
+			// ADR 0022 admits a quoted decimal string only: a NaN that
 			// decoded would fail canjson encode.
 			name: "quoted Real NaN", in: `{"_type":"DV_QUANTITY","magnitude":"NaN","units":"kg"}`, target: func() any { return new(rm.DVQuantity) },
 			is: []error{canjson.ErrInvalidShape, strconv.ErrSyntax}, as: []func(error) bool{isSemantic, isNumError},

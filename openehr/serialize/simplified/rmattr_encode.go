@@ -482,7 +482,7 @@ func objectRefRMAttr(out map[string]any, path string, ref rm.ObjectRefLike) erro
 
 // eventContextRMAttrs writes the EVENT_CONTEXT optionals the underscore grammar
 // carries — `_end_time`, `_location`, `_health_care_facility` and
-// `_participation:N` — under the real `context` segment (ADR 0016; the ITS `ctx/`
+// `_participation:N` — under the real `context` segment (ADR 0015; the ITS `ctx/`
 // sketches for them are deliberately not implemented). `end_time` and `location`
 // are pointers and `health_care_facility` an interface, so nil is genuine absence
 // and there is no zero/absent ambiguity of the kind EVENT_CONTEXT.setting has.

@@ -13,7 +13,7 @@ package simplified
 //   - the ENTRY `subject` in-context leaf (REQ-053, flat_decode.go's party-leaf
 //     siphon) — a party at a Web Template leaf;
 //   - the COMPOSITION `composer` at its real path `<root>/composer` (REQ-053,
-//     ADR 0029), merged with the `ctx/` composer short forms ([decodeComposer]);
+//     ADR 0015), merged with the `ctx/` composer short forms ([decodeComposer]);
 //   - and from Phase C3, FEEDER_AUDIT_DETAILS' `/location`, `/subject` and
 //     `/provider`.
 //
@@ -84,7 +84,7 @@ const partyRefType = "PARTY"
 // reaches it through this grammar, so the party implementation owns it and there
 // is no owner for the router to resolve it against. The composition's composer
 // is one of those positions: [siphonContext] collects its real-path keys and
-// [decodeComposer] reads them (ADR 0029).
+// [decodeComposer] reads them (ADR 0015).
 const partyIdentifierSeg = "_identifier"
 
 // partyProxyTypeSuffix is the PARTY_PROXY subtype discriminator, and
@@ -399,7 +399,7 @@ func putComposerKey(g *rmattrGroup, tail string, val any, key string) {
 // spells no composer. origin names the body key each ctx/ field arrived under.
 //
 // The real path carries the whole composer in the party grammar every other
-// party position uses (REQ-053, ADR 0029): `|id`, `|id_scheme`,
+// party position uses (REQ-053, ADR 0015): `|id`, `|id_scheme`,
 // `|id_namespace` and `|type` its external_ref, `/_identifier:N` its
 // identifiers, `/relationship` a PARTY_RELATED's relationship. Its `|name` is
 // the alias of `ctx/composer_name`, so the name arrives in ci, already

@@ -39,7 +39,7 @@ import (
 // unresolved in rmpath, and what that costs on encode. One reason class is
 // left: deliberate deferral — the value is already carried on another surface
 // (the ctx/ short forms, whose encode-only spelling ADR 0015 made permanent, or
-// for the composer its real path, ADR 0029), so resolving would double-spell it.
+// for the composer its real path, ADR 0015), so resolving would double-spell it.
 //
 // Datatype is not a reason. The codec-gap class — a non-DV_ datatype the
 // encoder dropped whether or not rmpath resolved it — emptied as each leaf type
@@ -50,7 +50,7 @@ var unserialisableIC = map[string]string{
 	"COMPOSITION.language":  "carried by ctx/language on encode; resolving here would double-spell it (the CODE_PHRASE leaf mapping exists since the PROBE-086 ratchet, so the datatype is no longer the reason)",
 	"COMPOSITION.territory": "carried by ctx/territory on encode; resolving here would double-spell it (see COMPOSITION.language)",
 	"COMPOSITION.composer": "carried on encode by ctx/composer_name or ctx/composer_self when one short form " +
-		"carries it whole, or else whole at its real path <root>/composer (ADR 0029); resolving here would " +
+		"carries it whole, or else whole at its real path <root>/composer (ADR 0015); resolving here would " +
 		"double-spell it — no data loss today. Since REQ-140 gave PARTY_PROXY a FLAT spelling, the datatype " +
 		"is no longer the reason: simplified/flat_encode.go holds the composer back from the node walk by " +
 		"name (ctxOnlyLeafPaths)",

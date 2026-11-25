@@ -112,7 +112,7 @@ func TestDecodeReducingKeepsRefusalsOnError(t *testing.T) {
 	// composition context, before it reads a leaf or checks the context, so a
 	// key under `<root>:1/` is refused and removed before the irreducible
 	// error stops the loop. (The composer's external_ref served here until its
-	// real path became its carrier, ADR 0029.)
+	// real path became its carrier, ADR 0015.)
 	refused := target.Root + ":1/no_such_node"
 	irreducible := []struct {
 		name    string

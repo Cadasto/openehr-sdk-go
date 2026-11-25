@@ -64,7 +64,7 @@ Rules the plugin does not know, or that reverse its defaults:
   - User-facing error text, `docs/quick-start.md`, `docs/examples.md` and the site under `pages/` carry no REQ, ADR, STRAND or PROBE id either.
   - Maintainer comments may cite them.
   - `TestGodocCarriesNoSpecProcessIdentifiers` ([`internal/godoc_ids_guard_test.go`](internal/godoc_ids_guard_test.go)) fails on a REQ, ADR or STRAND id in a package comment or the doc comment of an exported identifier in any non-test Go file, `internal/`, `cmd/` and `testkit/probes/` included. Put the citation in a comment go doc does not show, such as one in the function body.
-- No `SDK-GAP` identifier: a gap is worked under a REQ with a PROBE ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
+- No `SDK-GAP` identifier: a gap is worked under a REQ with a PROBE.
 - Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program ([ai-workflow.md § Examples](docs/ai-workflow.md#examples)); a new program fails `TestExampleDirectoryCensus` until `transcripts_test.go` classifies it.
 - Plans go in [`docs/plans/`](docs/plans/), never superpowers' default `docs/superpowers/` tree ([development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd)).
 - **Backlog size.** [`docs/backlog.md`](docs/backlog.md) is kept at about 80 `- ` entries, not the sdd plugin's 40: the session hook's "over the 40" line is informational until the count passes 80.

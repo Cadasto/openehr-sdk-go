@@ -505,7 +505,7 @@ func TestREQ140_IncludedOpenSideNamesItsInvariant(t *testing.T) {
 
 // --- composer at its real path ---------------------------------------------
 
-// TestComposerExtrasWrittenAtRealPath — REQ-053 / REQ-140, ADR 0029 (replacing
+// TestComposerExtrasWrittenAtRealPath — REQ-053 / REQ-140, ADR 0015 (replacing
 // the pin that the composer's `external_ref` and `identifiers` were projected
 // to its name alone). No ctx/ short form carries them, so encode writes the
 // whole composer at its real path, name included, and no ctx/ composer key; a

@@ -137,7 +137,7 @@ Canonical-JSON properties:
 #### Member order
 
 The encoder **SHOULD** emit `_type` as the first member of every encoded concrete RM value, so that a consumer decoding as a stream can select the concrete type before reading the rest of the object.
-Beyond that, the order in which the encoder writes members is unspecified ([ADR 0021](../adr/0021-json-member-order-not-a-contract.md)).
+Beyond that, the order in which the encoder writes members is unspecified ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#member-order)).
 The decoder **MUST** accept members in any order, `_type` included.
 The SDK asserts no order for another implementation's output, and it does not defer to a future openEHR member-order rule.
 Canonical XML keeps its element order ([§ REQ-056](#req-056)).
@@ -155,7 +155,7 @@ Compared with the input, the output matches the input's *expected form*, the inp
   - an empty bound beside its open flag as absent;
   - an empty list an optional attribute holds as absent, such as `mappings`, `LOCATABLE.links` or the base64 `DV_MULTIMEDIA.data` and `integrity_check` (the item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` stay, and so does an empty optional map, which the SDK holds through a pointer: the encoder writes a present one, as § *An absent mandatory member* below says);
   - a `null` mandatory primitive member as the zero the encoder writes for it (the empty string for a `String`, `0` for an `Integer`, `Integer64`, `Real` or `Double` and `false` for a `Boolean`, since a Go value of those types holds no null), except an interval boundary flag, which takes its default as above;
-  - a number, quoted or not, as the literal the encoder writes for its value ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
+  - a number, quoted or not, as the literal the encoder writes for its value ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers)).
 
 Member order is ignored, and any other difference between the output and the expected form is a defect.
 An input that carries such a member, or omits such a flag, therefore re-encodes to a document that differs from it, and the SDK makes no byte-level output promise a consumer can hash, diff or sign against: a consumer that needs a stable digest of an RM value computes it over a canonicalisation of its own choosing.
@@ -337,13 +337,13 @@ The clause is met on both its arms: an out-of-range magnitude (e.g. `1e400`) fai
 - In both codecs a `magnitude` of `18446744073709551616`, `0.10000000000000001`, `0.1000000000000000055511151231257827`, `1.10` or `72.5` decodes to the `float64` nearest the literal.
 - In canonical JSON, `1e400` is refused with its range error, a `*json.SemanticError` reachable with `errors.As`, never as a lossy literal.
 
-A `Real`, `Integer` or `Integer64` value **MUST** be encoded as a JSON number, and decoded from a JSON number or from a quoted decimal string, which reads as the number it spells, since some producers write these values quoted ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
+A `Real`, `Integer` or `Integer64` value **MUST** be encoded as a JSON number, and decoded from a JSON number or from a quoted decimal string, which reads as the number it spells, since some producers write these values quoted ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers)).
 A quoted string that spells no such number is refused with a typed error.
 
 An `Integer` or `Integer64` field **MUST** accept on decode a number whose value is a whole number however the literal writes it, with a zero fraction or an exponent (`1.0`, `1e0`), bare or quoted, and read it as that integer, since JSON gives `1.0` and `1` the same value, and refuse with a typed error, never truncating or rounding, a number with a non-zero fraction or one outside the field's range (32-bit for `Integer`, 64-bit for `Integer64`).
 Some producers write an integral RM value with a fraction (the reference's `test_all_types` FLAT writes a DV_PROPORTION `|type: 1.0`).
 Encode **MUST** write the integer form.
-`rm.Integer` and `rm.Integer64` are the primitives this rule governs; `DV_COUNT.magnitude` is the RM's one `Integer64` attribute, and `Double` keeps its plain decode ([ADR 0004](../adr/0004-numeric-wire-tolerance.md) *Out of scope*).
+`rm.Integer` and `rm.Integer64` are the primitives this rule governs; `DV_COUNT.magnitude` is the RM's one `Integer64` attribute, and `Double` keeps its plain decode ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers) *Out of scope*).
 
 **Acceptance (whole-number decode):**
 
@@ -447,7 +447,7 @@ Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-0
 
 - ISO 8601 dates/times/durations are passed through as element text content; the codec does not parse them at codec layer (REQ-041).
 - Numeric magnitudes use IEEE 754 double-precision, as in canonical JSON, and a `Real` element whose text is a lossy literal ([§ REQ-052 *Floating-point precision*](#floating-point-precision)) is refused as the bullet on primitive elements below says.
-  The quoted decimal strings [ADR 0004](../adr/0004-numeric-wire-tolerance.md) admits are a canonical-JSON tolerance: element text is not quoted, and a quoted number is text that does not spell its type.
+  The quoted decimal strings [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers) admits are a canonical-JSON tolerance: element text is not quoted, and a quoted number is text that does not spell its type.
 - The text of a `Real` element is read in the `xs:double` lexical space, which the `xs:float` of `DV_QUANTITY.magnitude` shares: a decimal number with an optional sign, fraction and exponent (`72.5`, `-1.`, `.5`, `1E-3`), or `INF`, `+INF`, `-INF` or `NaN`, with XML whitespace around it.
   An element with no text carries no value and reads as `0`, as [§ REQ-175](#req-175--missing-members-on-decode) reads an empty primitive element.
   Decode **MUST** refuse any other text, whitespace alone included, such as the hexadecimal form `0x1p-2`, a digit separator (`1_000`), `Inf`, `Infinity` or `nan`, as the bullet on primitive elements below says.
@@ -804,7 +804,7 @@ Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-
 
 - Path segments are **Web Template `id`s** (e.g. `blood_pressure`, `systolic`), joined by `/` and rooted at the template id — never archetype at-codes.
   A duplicate sibling's `id` is `<id>_N` ([clinical-modeling.md § REQ-106 *`id` generation*](clinical-modeling.md#id-generation-adr-0014)), where the reference writes `<id><N+1>` (`blood_pressure2` for `blood_pressure_1`).
-  Decode, FLAT and STRUCTURED, **MUST** read a segment `<id><M>` as the sibling `<id>_<M-1>` ([ADR 0036](../adr/0036-webtemplate-id-divergences.md)) where all of these hold:
+  Decode, FLAT and STRUCTURED, **MUST** read a segment `<id><M>` as the sibling `<id>_<M-1>` ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)) where all of these hold:
   - M is a decimal number of 2 or more with no leading zero;
   - no child of the segment's parent has the `id` `<id><M>`, which otherwise is the child the segment names;
   - the parent has a child `<id>` and a child `<id>_<M-1>`.
@@ -854,7 +854,7 @@ Encode **MUST** write only the `ctx/` form, except a composer it writes at its r
 Where two keys for one field disagree, the codec **MUST** refuse rather than choose: two spellings with different values, a real-path `|terminology` other than the one the table implies (a matching one is discarded), and a `composer_self: true` beside a name, an identifier or a relationship, which PARTY_SELF does not have.
 `openehr` is the only terminology a setting can carry, since EVENT_CONTEXT's `Setting_valid` requires its code to belong to the openEHR `setting` group, as `ISO_639-1` is for a language.
 
-The `ctx/` short forms the *Simplified Formats* spec sketches for the EVENT_CONTEXT optionals (participations, `health_care_facility`, `end_time`, `location`) are not part of this contract: those attributes ride the underscore grammar under the real `context` segment (§ REQ-140, [ADR 0016](../adr/0016-event-context-optionals-underscore-spelling.md)).
+The `ctx/` short forms the *Simplified Formats* spec sketches for the EVENT_CONTEXT optionals (participations, `health_care_facility`, `end_time`, `location`) are not part of this contract: those attributes ride the underscore grammar under the real `context` segment (§ REQ-140, [ADR 0015](../adr/0015-flat-metadata-spelling.md)).
 
 ##### A bare setting
 
@@ -868,7 +868,7 @@ Encode writes the pair.
 ##### The composer
 
 The `ctx/` forms carry part of a composer: `ctx/composer_name` a PARTY_IDENTIFIED that has a name and nothing else, `ctx/composer_self` a PARTY_SELF with no `external_ref`.
-Decode **MUST** read the composer's real path as the carrier of the whole composer, in the party grammar of § REQ-140 ([ADR 0029](../adr/0029-composer-real-path-carrier.md)): `<root>/composer|name`, `|id`, `|id_scheme`, `|id_namespace` and `|type`, the `<root>/composer/_identifier:N` list and, for a PARTY_RELATED, `<root>/composer/relationship`; a `composer_self: true`, in either spelling, beside an `external_ref` reads as a PARTY_SELF carrying that reference.
+Decode **MUST** read the composer's real path as the carrier of the whole composer, in the party grammar of § REQ-140 ([ADR 0015](../adr/0015-flat-metadata-spelling.md)): `<root>/composer|name`, `|id`, `|id_scheme`, `|id_namespace` and `|type`, the `<root>/composer/_identifier:N` list and, for a PARTY_RELATED, `<root>/composer/relationship`; a `composer_self: true`, in either spelling, beside an `external_ref` reads as a PARTY_SELF carrying that reference.
 Encode **MUST** write a composer that one `ctx/` form carries whole in that form, and every other composer whole at its real path with no `ctx/` composer key, a PARTY_SELF that carries an `external_ref` as `<root>/composer_self: true` beside the reference's keys, so one body spells its composer one way.
 
 #### A value its RM class forbids
@@ -896,7 +896,7 @@ A key the decoder does not read is unmatched content whatever its value, and a `
 
 #### A value must fit its attribute
 
-Decode **MUST** refuse a suffix value, required or optional, that the canonical-JSON decode of its RM attribute would refuse ([§ REQ-052](#req-052), [ADR 0004](../adr/0004-numeric-wire-tolerance.md) tolerance included):
+Decode **MUST** refuse a suffix value, required or optional, that the canonical-JSON decode of its RM attribute would refuse ([§ REQ-052](#req-052), [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers) tolerance included):
 
 - a string where the attribute is a number and the string is no decimal;
 - a number or a Boolean where it is a `String`;

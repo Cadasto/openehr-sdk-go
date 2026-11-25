@@ -33,7 +33,7 @@ import (
 // in the interval_event and observation bodies, though the floor stayed at 31;
 // 30 before INSTRUCTION `_wf_definition` gained its DV_PARSABLE carrier, which
 // brought in the instruction body; 26 before the composer's real path became
-// its carrier, ADR 0029, which brought in the four bodies whose composer
+// its carrier, ADR 0015, which brought in the four bodies whose composer
 // carries a reference, identifiers or a relationship; the floor had stayed at
 // 24.)
 const minFlatCorpusBodies = 34
@@ -45,7 +45,7 @@ const minFlatCorpusBodies = 34
 // could not be used: it carries composer party sub-structure
 // (`composer/_identifier:0|assigner`), which the decoder then refused, so this
 // was the largest body that both decoded and re-encoded. The composer's real
-// path now carries it (ADR 0029) and the larger body decodes too; the measured
+// path now carries it (ADR 0015) and the larger body decodes too; the measured
 // body stays this one, so per-body figures stay comparable with the baseline.
 const benchFlatBody = "ehrbase_conformance_Element_feeder_audit"
 

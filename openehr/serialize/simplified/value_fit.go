@@ -11,7 +11,7 @@ package simplified
 // (rminfo), and the value is decoded with the decoder canjson uses for that
 // type ([rm.Real], [rm.Integer], [rm.Integer64], or encoding/json/v2 for the
 // rest). So it admits everything canonical JSON admits, quoted decimals and
-// whole numbers written with a fraction included (ADR 0004, REQ-052
+// whole numbers written with a fraction included (ADR 0022, REQ-052
 // § Floating-point precision), and adds no strictness beyond naming the key.
 
 import (

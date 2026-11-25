@@ -153,7 +153,7 @@ r="$(new_case retired-plans)"
 printf '    plans:\n      - docs/plans/2026-01-01-plan.md\n' >> "$r/docs/specifications/traceability.yaml"
 check retired-plans "$r" fail "key 'plans:' is not part of the index schema"
 r="$(new_case retired-adrs)"
-printf '    adrs: [docs/adr/0001-x.md]\n' >> "$r/docs/specifications/traceability.yaml"
+printf '    adrs: [docs/adr/0002-bmm-codegen-decisions.md]\n' >> "$r/docs/specifications/traceability.yaml"
 check retired-adrs "$r" fail "key 'adrs:' is not part of the index schema"
 
 # 4 — block-form probes citing an uncatalogued probe.

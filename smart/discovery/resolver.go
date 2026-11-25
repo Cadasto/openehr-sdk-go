@@ -887,7 +887,7 @@ func deltaSeconds(arg string) (ttl time.Duration, ok bool) {
 //
 // The canonical openEHR SMART spec defines "services" as a JSON object/hash
 // map keyed by reverse-domain id, each value carrying camelCase "baseUrl".
-// See ADR 0008 for the decision to adopt the canonical map shape and drop
+// See ADR 0023 for the decision to adopt the canonical map shape and drop
 // the non-canonical array form.
 type smartConfigWire struct {
 	Issuer                                     string                      `json:"issuer"`
@@ -1120,7 +1120,7 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 	if len(missing) > 0 {
 		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonMissingService, MissingServices: missing}
 	}
-	// 2. Version match per required service (REQ-072, softened per ADR 0008).
+	// 2. Version match per required service (REQ-072, softened per ADR 0023).
 	// An advertised spec_version is always compared. Without one, the entry
 	// passes unless the caller locked the accepted set via
 	// WithAcceptedSpecVersions; then its canonical version member is

@@ -301,7 +301,7 @@ func refusedContentCases(t *testing.T) []refusedContentCase {
 	}
 }
 
-// REQ-171 § One walk (Admission), § Acceptance; ADR 0027 — content the
+// REQ-171 § One walk (Admission), § Acceptance; ADR 0025 — content the
 // template does not admit draws its one admission finding and nothing from
 // inside: an item that binds to no child, an item bound to a child the
 // template does not allow, whose one finding is that child's occurrences, a

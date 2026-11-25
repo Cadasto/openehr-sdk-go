@@ -681,7 +681,7 @@ Its client scenarios map to SDK coverage as follows:
   The harness respells only the upstream side, only where the Web Template holds the duplicate group, and pins each fixture's respelled keys.
 
   The allow-list holds out **respellings** only: `language`, `territory`, `composer|name`, `composer_self`, `context/start_time` and `context/setting`, which REQ-053 reads and writes as the `ctx/` short forms where upstream writes real paths.
-  The composer's `external_ref` suffixes (`composer|id`, `|id_scheme`, `|id_namespace`) and its party sub-structure (`composer/_identifier:N`, `composer/relationship`) are not respellings: decode reads them and encode writes them at the same real path ([ADR 0029](../adr/0029-composer-real-path-carrier.md)), so the census compares them.
+  The composer's `external_ref` suffixes (`composer|id`, `|id_scheme`, `|id_namespace`) and its party sub-structure (`composer/_identifier:N`, `composer/relationship`) are not respellings: decode reads them and encode writes them at the same real path ([ADR 0015](../adr/0015-flat-metadata-spelling.md)), so the census compares them.
   The harness derives its expected hold-out from the codec's exported alias accessors (`simplified.MetadataAliasSpellings`, `MetadataWitnessSpellings`) and checks both directions, so an alias accepted on decode but missing from the hold-out, and a hold-out with no alias behind it, both fail the harness's own tests.
   The hold-out carries **no waiver**, and a new waiver is a spec decision, not a harness edit.
   Why each spelling is held out, and why the match is suffix-aware, is in [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md) § How the exclusion list is produced.

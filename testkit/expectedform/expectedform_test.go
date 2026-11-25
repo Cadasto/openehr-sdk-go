@@ -694,7 +694,7 @@ func wireEqual(t *testing.T, want string, got []byte) bool {
 
 // TestREQ052_BuildWritesNumbersAsTheEncoderDoes pins that a number held by a
 // numeric attribute, bare or quoted, becomes the literal the encoder writes
-// for its value (ADR 0004), and that a value that is not such a number is
+// for its value (ADR 0022), and that a value that is not such a number is
 // kept as written.
 func TestREQ052_BuildWritesNumbersAsTheEncoderDoes(t *testing.T) {
 	quantity := func(magnitude, precision string) string {
@@ -715,7 +715,7 @@ func TestREQ052_BuildWritesNumbersAsTheEncoderDoes(t *testing.T) {
 // TestREQ052_BuildWritesAWholeNumberAsItsInteger pins that an Integer or
 // Integer64 written as a JSON number whose value is whole, bare or quoted,
 // becomes the integer the encoder writes, however the literal writes it
-// (REQ-052, ADR 0004): 2.0, "2.0" and 20e-1 are all 2. A value with a fraction, a whole
+// (REQ-052, ADR 0022): 2.0, "2.0" and 20e-1 are all 2. A value with a fraction, a whole
 // number outside the attribute's range, and a quoted string that is not a
 // JSON number stay as written. The last group holds strings math/big reads
 // as whole numbers although JSON has no such number, so the expected form

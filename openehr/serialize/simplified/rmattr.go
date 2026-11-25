@@ -76,7 +76,7 @@ type rmattrGroup struct {
 	// the tail. A nil dups refuses such a pair at once.
 	dups *[]tailDup
 	// metadata names the composition-metadata field the group spells (the
-	// composer, ADR 0029), or is empty. Two spellings of one of its keys that
+	// composer, ADR 0015), or is empty. Two spellings of one of its keys that
 	// disagree are then two spellings of that field, refused as every other
 	// metadata field's are (REQ-053), not as a sub-path spelled twice.
 	metadata string
@@ -228,7 +228,7 @@ type rmattrFamily struct {
 // the one party implementation owns it (rmattr_party.go) and no owner exists for
 // the router to judge it against. The composer is the one path that would reach
 // it as a family; [siphonContext] takes the composer's keys before the router
-// sees them (ADR 0029).
+// sees them (ADR 0015).
 //
 // Which *owners* admit a family is not listed here: it is read off the RM
 // itself (rminfo), so `_work_flow_id` is ENTRY-only because only the five ENTRY
@@ -898,7 +898,7 @@ func decodeRMAttrObjectRef(g rmattrGroup, _ string) (any, error) {
 }
 
 // decodeRMAttrEndTime decodes EVENT_CONTEXT's `_end_time` — a bare DV_DATE_TIME
-// value (ADR 0016: the EVENT_CONTEXT optionals ride the underscore grammar
+// value (ADR 0015: the EVENT_CONTEXT optionals ride the underscore grammar
 // under the real `context` segment, not the ITS `ctx/` sketches), which its
 // |value spells too, as at every datatype with a bare value.
 func decodeRMAttrEndTime(g rmattrGroup, _ string) (any, error) {

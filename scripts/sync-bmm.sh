@@ -177,7 +177,7 @@ cmd_sync() {
   done
 
   # Drop schemas no longer in SRC_PATHS: the SDK pins one version per schema
-  # id, so the bump that adds a version removes the old one (ADR 0001).
+  # id, so the bump that adds a version removes the old one (ADR 0002).
   local f keep
   for f in "$DEST"/*.bmm.json; do
     [[ -e "$f" ]] || continue

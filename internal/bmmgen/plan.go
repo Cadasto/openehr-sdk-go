@@ -500,7 +500,7 @@ func walkPackage(p *bmm.Package, path string, into map[string]string) {
 // (e.g. "DV_INTERVAL" → &DVInterval[DVOrdered]{}). Two cases qualify:
 //
 //  1. Descendants of a codec-polymorphic abstract generic ancestor
-//     (e.g. POINT_EVENT / INTERVAL_EVENT under EVENT — ADR 0003).
+//     (e.g. POINT_EVENT / INTERVAL_EVENT under EVENT — ADR 0002 D4).
 //
 //  2. Top-level concrete generics whose `xsi:type` / `_type`
 //     discriminator appears on the wire under a polymorphic parent

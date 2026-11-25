@@ -896,7 +896,7 @@ A path with no positional predicate is a valid AQL path; the AQL grammar has no 
 
 ### RM floor
 
-Every entry point of this REQ, `ValidateComposition`, `Validate` and the typed wrappers of § *Roots beyond COMPOSITION*, **MUST** apply the [REQ-112](#req-112--template-less-reference-model-validation-floor) rules in the walk that applies the template and return their findings in the same `Result` ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md), [ADR 0027](../adr/0027-template-admission-before-rm-rules.md)): on every node the template admits, the nodes it does not constrain included, and on no content it refuses.
+Every entry point of this REQ, `ValidateComposition`, `Validate` and the typed wrappers of § *Roots beyond COMPOSITION*, **MUST** apply the [REQ-112](#req-112--template-less-reference-model-validation-floor) rules in the walk that applies the template and return their findings in the same `Result` ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)): on every node the template admits, the nodes it does not constrain included, and on no content it refuses.
 [§ REQ-171 *One walk*](#one-walk) orders the steps at each node and says which layer reports an attribute both layers find missing or empty, so that absence is one finding; an RM rule's own finding at the same path, such as a code outside its terminology group, is reported beside it.
 No option leaves the RM rules out of these entry points; `ValidateRM` and its typed wrappers are the entries for the RM rules alone.
 
@@ -943,7 +943,7 @@ Global guard codes (`nil_composition`, `nil_template`) return `nil` from `Issue.
 
 ## REQ-171 — Validation engine
 
-Template-driven validation ([§ REQ-102](#req-102--composition-validation)) and the Reference Model floor ([§ REQ-112](#req-112--template-less-reference-model-validation-floor)) run as one engine: one validator value, one walk, the template's admission decided before any RM rule at every node, one finding per defect that names its layer and its rule, and a result that says what it did not check ([ADR 0027](../adr/0027-template-admission-before-rm-rules.md), [ADR 0028](../adr/0028-generated-rm-attribute-access.md)).
+Template-driven validation ([§ REQ-102](#req-102--composition-validation)) and the Reference Model floor ([§ REQ-112](#req-112--template-less-reference-model-validation-floor)) run as one engine: one validator value, one walk, the template's admission decided before any RM rule at every node, one finding per defect that names its layer and its rule, and a result that says what it did not check ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md), [ADR 0028](../adr/0028-generated-rm-attribute-access.md)).
 
 ### Surface
 
@@ -2513,7 +2513,7 @@ The archetyped `ism_transition[atNNNN]` nodes stay beside the merged node.
 
 The node `id` is the FLAT-path segment consumers bind to, so its stability and cross-implementation fidelity are the export's load-bearing property.
 The `id` **MUST** mirror the locked EHRbase reference: a lower-snake sanitisation of the node's default-language display name.
-Two spellings below depart from it, a duplicate sibling's suffix and an interval value alternative's `id` ([ADR 0036](../adr/0036-webtemplate-id-divergences.md)).
+Two spellings below depart from it, a duplicate sibling's suffix and an interval value alternative's `id` ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
 
 For a node that pins a **template-level name**, that name is the display name the `id` derives from — not the archetype's concept term, which is shared by every occurrence of a reused archetype and so cannot distinguish siblings; see [§ REQ-111 § Node names and name predicates](#node-names-and-name-predicates), which owns the naming rule.
 
@@ -2524,14 +2524,14 @@ Where siblings would **still** collide, with no pinned name and one shared displ
 - each later claimant takes the next **free** `<id>_N`, N counting from 1 (`dv_text`, `dv_text_1`, `dv_text_2`);
 - "free" is over the whole sibling list: a sibling whose own name sanitises to `<id>_N` ("Blood Pressure 1" is `blood_pressure_1`) keeps it, before or after the claimants, and the claimant skips to the next N, since renaming onto it would recreate the collision.
 
-This spelling departs from the reference, which writes the second claimant `<id>2`; [ADR 0036](../adr/0036-webtemplate-id-divergences.md) gives the reasons.
+This spelling departs from the reference, which writes the second claimant `<id>2`; [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) gives the reasons.
 How decode reads a body keyed in the reference's spelling is [§ REQ-053](wire.md#req-053)'s.
 Emitting duplicate sibling `id`s is **never** permitted; an export that still cannot make siblings unique **MUST** fail with a typed error rather than emit an ambiguous tree.
 
 The child an ELEMENT gives one of its value alternatives ([§ *Output shape*](#output-shape)) takes the reference's `id` for the alternative's type: the type without its `DV_` prefix, lower-cased, followed by `_value` (`quantity_value`, `coded_text_value`).
 Two alternatives of one type take the numeric suffix (`text_value`, `text_value_1`).
 An interval of a type **MUST** take `interval_of_<type>_value` (`interval_of_date_time_value`), the spelling of the reference's own IPS test Web Template.
-It departs from the reference's code, which writes `interval<dv_date_time>_value` ([ADR 0036](../adr/0036-webtemplate-id-divergences.md)).
+It departs from the reference's code, which writes `interval<dv_date_time>_value` ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
 
 ### `inputs` (core clinical subset)
 

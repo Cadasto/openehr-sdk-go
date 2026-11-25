@@ -41,7 +41,7 @@ func TestIntegerNilReceiverIsRefusedNotPanicked(t *testing.T) {
 }
 
 // TestIntegerWholeNumberLiteralDecodes pins wire.md § Floating-point
-// precision (REQ-052, ADR 0004 as amended) on rm.Integer itself: a number
+// precision (REQ-052, ADR 0022 as amended) on rm.Integer itself: a number
 // whose value is a whole number decodes as that integer however the literal
 // writes it, with a zero fraction or an exponent, bare or quoted. The int32
 // bounds are accepted in every form, and the integer forms decode as before.
@@ -184,7 +184,7 @@ func TestIntegerRefusesFractionOrOutOfRange(t *testing.T) { // REQ-052
 }
 
 // TestIntegerQuotedLiteralGrammar pins which quoted literals rm.Integer reads,
-// so its doc comment cannot drift from the code (REQ-052, ADR 0004). A quoted
+// so its doc comment cannot drift from the code (REQ-052, ADR 0022). A quoted
 // literal is read first as a decimal integer by strconv.ParseInt, which allows
 // a leading sign and leading zeros, so "+1", "01" and "007" decode. Only when
 // that fails is it read as a JSON number whose value is whole, and the JSON

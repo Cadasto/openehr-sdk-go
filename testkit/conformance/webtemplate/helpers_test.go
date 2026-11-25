@@ -567,7 +567,7 @@ const corpusRoot = "conformance-ehrbase.de.v0"
 // `composer|id`/`|id_scheme`/`|id_namespace` — 12 corpus keys of the composer's
 // `external_ref`, held out as if they were respellings, while SKIPPED.md,
 // ADR 0015 and the codec's own doc comments all said they were refused and
-// visible in the census (PR #86 review, round 3). Since ADR 0029 decode reads
+// visible in the census (PR #86 review, round 3). Since ADR 0015 decode reads
 // those keys and encode writes them at the same real path, so the census
 // compares them; holding them out would hide a difference there instead. The suite carried exactly one
 // named waiver — `context/setting`, a real encode-side drop while `ctx/setting`
@@ -730,7 +730,7 @@ func TestIsCompositionMeta(t *testing.T) {
 		// The composer hold-out is suffix-aware: `|name` is respelled as
 		// `ctx/composer_name`, but the composer's external_ref and party
 		// sub-structure are no respelling: decode reads them and encode writes
-		// them at the same real path (ADR 0029, conformance.md § PROBE-086), so
+		// them at the same real path (ADR 0015, conformance.md § PROBE-086), so
 		// the census compares them. Base-matching `composer` once absorbed the
 		// external_ref and hid 12 corpus keys (PR #86 review).
 		{root + "/composer|id", false},
@@ -907,7 +907,7 @@ func TestRealCodecRefusal(t *testing.T) {
 		// carry is read and refused (REQ-053): the codec names the key itself,
 		// so the harness removes that key and not the accepted `language|code`
 		// alias beside it. (The composer's external_ref served here until its
-		// real path became its carrier, ADR 0029.)
+		// real path became its carrier, ADR 0015.)
 		body := maps.Clone(leaf)
 		key := target.Root + "/language|preferred_term"
 		maps.Copy(body, map[string]any{
@@ -949,7 +949,7 @@ func TestRealCodecRefusal(t *testing.T) {
 		// with the allowlist's "unexpected bare value" wording: the harness
 		// removes that one key, not the `|x_note` sibling sharing the base.
 		// The corpus template has no such leaf since the composer gained the
-		// party grammar (ADR 0029), so a DV_STATE leaf stands in.
+		// party grammar (ADR 0015), so a DV_STATE leaf stands in.
 		target := &Target{Root: "root", Web: &wt.WebTemplate{Tree: &wt.Node{
 			ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
 			Children: []*wt.Node{{

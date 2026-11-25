@@ -108,7 +108,7 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 	// REQ-140 — the root COMPOSITION's own underscore attributes (it is a
 	// LOCATABLE the node walk never visits, because the walk starts at its
 	// children), its own name, and the EVENT_CONTEXT optionals under the real
-	// `context` segment (ADR 0016). The context prefix is spelled here rather than taken
+	// `context` segment (ADR 0015). The context prefix is spelled here rather than taken
 	// from a Web Template node because those attributes are RM-optional and a
 	// template need not constrain `context` at all — decode resolves the same
 	// prefix the same way (rmattrOwnerAt).
@@ -157,7 +157,7 @@ func emitContext(out map[string]any, comp *rm.Composition, rootID string) error 
 	return nil
 }
 
-// emitComposer writes the composition's composer (REQ-053, ADR 0029), so that
+// emitComposer writes the composition's composer (REQ-053, ADR 0015), so that
 // one body spells it one way.
 //
 // A composer one ctx/ short form carries whole is written in that form, as it
@@ -252,7 +252,7 @@ func emitContextSetting(out map[string]any, s rm.DVCodedText) error {
 // the node walk would spell a single value under two keys. Four of them are
 // ctx/-only (ADR 0015; decode still accepts both spellings — see
 // metadataAliases). The composer is written by [emitComposer], in its ctx/
-// short form or at its real path (ADR 0029), whether or not the Web Template
+// short form or at its real path (ADR 0015), whether or not the Web Template
 // carries a composer node, so the node walk never writes it either.
 //
 // The rule is asserted here rather than left to fall out of a gap elsewhere.
