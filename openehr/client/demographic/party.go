@@ -141,7 +141,9 @@ func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
 }
 
 // Create commits a new PARTY. The resource path is derived from party's
-// concrete type ([*rm.Person] → /demographic/person, etc.).
+// concrete type ([*rm.Person] → /demographic/person, etc.). A nil party, or
+// one holding a nil pointer, fails with [transport.ErrInvalidConfig] without
+// issuing a request.
 //
 // Wire: POST /demographic/{type}. The response shape follows the Prefer
 // option: minimal (default) returns no body, the new version's id
@@ -164,7 +166,7 @@ func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
 // A party the format's codec cannot serialise fails before any request with
 // an [*EncodeError], which wraps the codec's error.
 func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error) {
-	if party == nil {
+	if party == nil || rm.IsTypedNil(party) {
 		return nil, nil, fmt.Errorf("demographic.Create: %w: nil Party", transport.ErrInvalidConfig)
 	}
 	t, err := resourceType(party)
@@ -210,8 +212,9 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 // Wire: PUT /demographic/{type}/{voID} with If-Match. Errors:
 // 412 → [transport.ErrPreconditionFailed]. Status→sentinel mapping is
 // endpoint-agnostic, so a 409 (should the deployment emit one) still maps to
-// [transport.ErrVersionConflict]. Forgetting ifMatch returns
-// [transport.ErrInvalidConfig] without issuing a request. Response shape
+// [transport.ErrVersionConflict]. Forgetting ifMatch, or passing a nil
+// party or one holding a nil pointer, returns [transport.ErrInvalidConfig]
+// without issuing a request. Response shape
 // matches [Create], and the format options apply as they do for [Create].
 func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient.VersionedObjectID, ifMatch string, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error) {
 	if !t.valid() {
@@ -223,7 +226,7 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	if ifMatch == "" {
 		return nil, nil, fmt.Errorf("demographic.Update: %w: empty If-Match", transport.ErrInvalidConfig)
 	}
-	if party == nil {
+	if party == nil || rm.IsTypedNil(party) {
 		return nil, nil, fmt.Errorf("demographic.Update: %w: nil Party", transport.ErrInvalidConfig)
 	}
 	cfg := writeConfig{Prefer: transport.PreferMinimal}

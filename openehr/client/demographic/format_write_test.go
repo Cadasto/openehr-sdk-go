@@ -394,6 +394,42 @@ func TestWriteFormatRefusals(t *testing.T) {
 	}
 }
 
+// TestWriteTypedNilPartyRefused pins that Create and Update refuse a PARTY
+// holding a nil pointer, in both formats, with ErrInvalidConfig and no
+// request: the XML encoder would panic on it, and the JSON one would send a
+// null body.
+func TestWriteTypedNilPartyRefused(t *testing.T) {
+	parties := []struct {
+		typ   demographic.Type
+		party rm.Party
+	}{
+		{demographic.Person, (*rm.Person)(nil)},
+		{demographic.Organisation, (*rm.Organisation)(nil)},
+		{demographic.Group, (*rm.Group)(nil)},
+		{demographic.Agent, (*rm.Agent)(nil)},
+		{demographic.Role, (*rm.Role)(nil)},
+	}
+	for _, op := range partyWriteOps {
+		for _, f := range []demographic.Format{demographic.FormatJSON, demographic.FormatXML} {
+			for _, p := range parties {
+				t.Run(op.name+"/"+f.String()+"/"+string(p.typ), func(t *testing.T) {
+					rec := newRecorder(t, http.StatusCreated, "", nil)
+					out, meta, err := op.do(t.Context(), newClient(t, rec.srv), p.typ, p.party, demographic.WithFormat(f))
+					if !errors.Is(err, transport.ErrInvalidConfig) {
+						t.Errorf("%s(%T(nil), %v) error = %v, want ErrInvalidConfig", op.name, p.party, f, err)
+					}
+					if out != nil || meta != nil {
+						t.Errorf("%s(%T(nil), %v) returned (%v, %v), want nil, nil", op.name, p.party, f, out, meta)
+					}
+					if n := rec.count(); n != 0 {
+						t.Errorf("server saw %d requests, want 0", n)
+					}
+				})
+			}
+		}
+	}
+}
+
 // TestWriteSerialiseFailureIsEncodeError pins REQ-173: a party the codec
 // cannot serialise fails the write before any request, as an *EncodeError
 // that names the format and wraps the codec's error, never as
