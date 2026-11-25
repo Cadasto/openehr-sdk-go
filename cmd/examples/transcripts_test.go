@@ -62,6 +62,7 @@ var transcripts = []transcript{
 	{program: "compile-build-validate", section: "compile-build-validate"},
 	{program: "composition-crud", section: "composition-crud"},
 	{program: "definition-lifecycle", section: "definition-lifecycle"},
+	{program: "demographic-crud", section: "demographic-crud"},
 	{program: "ehr_create", section: "ehr_create"},
 	{program: "lint-aql", section: "lint-aql"},
 	{program: "opt-parse", section: "opt-parse"},

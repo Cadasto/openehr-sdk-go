@@ -6,7 +6,7 @@ kind: guide
 
 If you are new to the SDK, run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline. The REST ones run against a fake backend in the same process, so none needs a clinical data repository (CDR). [REST client](#rest-client) says which use an `httptest` server on a loopback address and which use a `sandbox` backend that opens no listener at all.
 
-The 21 runnable programs under [`cmd/examples/`](../cmd/examples/) cover the major offline clinical-modeling and AQL workflows. They also cover REST calls for EHRs, compositions, AQL queries, templates and contributions, and two ways to authenticate: a SMART launch for an app with a signed-in user, and client credentials for a service with no user. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
+The 22 runnable programs under [`cmd/examples/`](../cmd/examples/) cover the major offline clinical-modeling and AQL workflows. They also cover REST calls for EHRs, compositions, demographic parties, AQL queries, templates and contributions, and two ways to authenticate: a SMART launch for an app with a signed-in user, and client credentials for a service with no user. They are **reference shapes**. Production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note. If you are here to build something, read that part.
 
 Each entry says what the program shows, which packages it uses, how to run it, and what the output means. A program finds its bundled fixtures from anywhere in a clone, and a file path you pass it resolves from the working directory. Build them all with `make build` (or `go build ./cmd/examples/...`).
 
@@ -40,6 +40,7 @@ The Packages column lists the SDK packages each program imports, by short name (
 | [contribution-build](#contribution-build) | Optional fake (`-commit`) | `client/ehr/contribution`, `client`, `client/ehr`, `canjson`, `rm`, `discovery`, `transport` | Multi-version `Contribution_create` assembly, optionally committed |
 | [definition-lifecycle](#definition-lifecycle) | Fake (`sandbox`) | `client/definition`, `aom14`, `templatecompile`, `discovery`, `transport`, `sandbox` | Upload, list, download and compile a template; the server's copy vs the local compiled handle |
 | [composition-crud](#composition-crud) | Fake (`sandbox`) | `client/ehr/composition`, `client`, `client/ehr`, `rm`, `rmpath`, `canjson`, `discovery`, `transport`, `sandbox` | Save, read, update; a stale `If-Match` refused with 412 |
+| [demographic-crud](#demographic-crud) | Fake (`sandbox`) | `client/demographic`, `client`, `rm`, `canjson`, `canxml`, `discovery`, `transport`, `sandbox` | PERSON create, read in JSON and XML, update; item tags; an earlier version read back |
 | [query-execute](#query-execute) | Fake (`sandbox`) | `aql`, `client/query`, `rm`, `typereg`, `discovery`, `transport`, `sandbox` | Execute bound AQL, decode a RESULT_SET cell into a typed value, classify a refusal |
 | [smart-launch](#smart-launch) | Fake (`httptest`) | `auth/smart`, `auth`, `discovery` | Standalone PKCE launch; **state + verifier persistence** across the redirect |
 | [service-auth](#service-auth) | Fake (`sandbox`) | `auth/clientcreds`, `auth`, `client/system`, `discovery`, `transport`, `sandbox` | OAuth 2.0 client credentials for a backend service; the cached token reused |
@@ -630,7 +631,7 @@ Every FLAT key is a path of Web Template ids, with an optional `|suffix` naming 
 
 ## REST client
 
-The REST and auth examples run against a fake backend in the same process, built one of two ways. `ehr_create`, `contribution-build` (under `-commit`) and `smart-launch` start an `httptest` server on a loopback address. `definition-lifecycle`, `composition-crud`, `query-execute` and `service-auth` build their fake on the public [`sandbox`](../sandbox/doc.go) package instead: a `sandbox.Backend` is an `http.RoundTripper`, plugged into the `*http.Client` as its transport, so no listener is opened and the host in the base URL is never dialled. These four keep the fake in its own file (`fake_cdr.go` or `fake_server.go`), and only that file imports `sandbox`. Either way, the rest of the program wires the SDK as it would for a real server. To point it at one, inject your own `*http.Client` and put your deployment's base URL in the service catalog.
+The REST and auth examples run against a fake backend in the same process, built one of two ways. `ehr_create`, `contribution-build` (under `-commit`) and `smart-launch` start an `httptest` server on a loopback address. `definition-lifecycle`, `composition-crud`, `demographic-crud`, `query-execute` and `service-auth` build their fake on the public [`sandbox`](../sandbox/doc.go) package instead: a `sandbox.Backend` is an `http.RoundTripper`, plugged into the `*http.Client` as its transport, so no listener is opened and the host in the base URL is never dialled. These five keep the fake in its own file (`fake_cdr.go` or `fake_server.go`), and only that file imports `sandbox`. Either way, the rest of the program wires the SDK as it would for a real server. To point it at one, inject your own `*http.Client` and put your deployment's base URL in the service catalog.
 
 ### ehr_create
 
@@ -776,6 +777,46 @@ The fake answers as the pinned ITS-REST contract describes. A create answers `20
 
 ---
 
+### demographic-crud
+
+**Purpose:** Create, read and update a PERSON through the Demographic REST client, tag it, and read an earlier version back. The program creates a first version, reads it in canonical JSON and then in canonical XML, and changes the family name in an update that carries the version uid it read in `If-Match`. It then sets two item tags on the versioned party and finds one by its key. Last, it reads version 1 from the `versioned_party` routes. A fake demographic server built on `sandbox` answers the six routes the program calls and keeps every version in memory. The Demographic API is marked `DEVELOPMENT` in ITS-REST Release-1.1.0, so this client may change between minor releases.
+
+```bash
+go run ./cmd/examples/demographic-crud
+```
+
+**Packages:** `openehr/client/demographic`, `openehr/client`, `openehr/rm`, `smart/discovery`, `transport`, `sandbox` (`openehr/serialize/canjson` and `openehr/serialize/canxml` are used by the fake only)
+
+**Sample output:**
+
+```text
+create: VersionUID=3e5d7a9c-4b1f-4e2a-8c6d-0f9b8a7e6d5c::sandbox.local::1
+  Location=https://sandbox.local/openehr/v1/demographic/person/3e5d7a9c-4b1f-4e2a-8c6d-0f9b8a7e6d5c::sandbox.local::1
+get JSON: family name Doe, VersionUID=3e5d7a9c-4b1f-4e2a-8c6d-0f9b8a7e6d5c::sandbox.local::1
+get XML: family name Doe, Content-Type=application/xml
+update: family name Smith, VersionUID=3e5d7a9c-4b1f-4e2a-8c6d-0f9b8a7e6d5c::sandbox.local::2
+set tags: 2 stored
+list tags with key verified: verified=passport on PERSON /identities[openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v0]
+version 1: family name Doe, change type creation
+OK: PERSON created, read in JSON and XML, updated, tagged, and version 1 read back, against an in-process fake server
+```
+
+The PERSON is built in code after the CKM archetypes `openEHR-DEMOGRAPHIC-PERSON.person.v0` and `openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v0`, cut down to one name identity. `demographic.Create` takes the route from the value's type, so a `*rm.Person` goes to `POST /demographic/person`. Each read names the class it expects, here `demographic.Person`, and returns an `rm.Party` that holds a `*rm.Person`. The first read asks for the latest version with `client.LatestOf`. The second asks for that one version with `client.VersionOf`, in canonical XML through `demographic.WithGetFormat(demographic.FormatXML)`. `demographic.WithRawBody` keeps the `Content-Type` and the body as the server sent them. The program reaches the family name through the Go fields, because `rmpath` does not walk a PARTY yet.
+
+`demographic.SetTags` on `client.LatestOf(voID)` tags the versioned party, so the tags stay with it as new versions arrive; `client.VersionOf(uid)` would tag one version. The call replaces the whole list and commits no new version. One tag marks the whole PERSON, and the other marks only the name identity, through its `TargetPath`. With `demographic.WithTagsPrefer(transport.PreferRepresentation)` the server returns the stored list, where each `client.StoredItemTag` names its target and its owner. `demographic.ListTags` searches the tags of every party, and `WithTagKey` narrows the search. `demographic.GetVersionByID` returns a `demographic.PartyVersion`: the party as it was in that version, with its commit audit and lifecycle state.
+
+The fake answers as the pinned ITS-REST contract describes. A create answers `201 Created` and an update `204 No Content`, each with the new version uid in `ETag` and its URL in `Location`. A tags write answers `204` unless `Prefer` asks for the list. Of the three tag filters, the fake reads `tag_key` only.
+
+**What to copy into your app:**
+
+1. Pass the concrete party to `demographic.Create` (`*rm.Person`, `*rm.Organisation`, `*rm.Group`, `*rm.Agent` or `*rm.Role`), and take the version uid from the returned metadata. The returned party is an interface, so test it with `client.HasResource`, not `== nil`.
+2. Read with `demographic.Get` and the `demographic.Type` you expect; a body that names another class does not decode. For canonical XML, pass `demographic.WithGetFormat` on a read and `demographic.WithFormat` on a write. A raw body kept with `WithRawBody` is personal data, so keep it out of logs.
+3. Update with the version uid you last read as `If-Match`, and handle `transport.ErrPreconditionFailed` as [composition-crud](#composition-crud) shows.
+4. `SetTags` replaces the whole list. To change one tag, read the list with `demographic.GetTags`, edit it (`StoredItemTag.ItemTag` gives the part a write sends), and write it back.
+5. For history, use the `versioned_party` reads: `GetVersionByID`, `GetVersion`, `GetVersionAtTime`, `GetRevisionHistory` and `GetVersionedParty`.
+
+---
+
 ### query-execute
 
 **Purpose:** Execute an AQL query and read its result, picking up where [aql-build](#aql-build) stops. The program builds the query with `aql.Builder` and binds the caller's data with `Bind`, so the values travel in `query_parameters` and the text carries only the `$ehr_id` and `$min_temp` placeholders. It sends the query with `query.Execute`, prints the RESULT_SET columns and rows, turns the RM-valued temperature cell into a typed `rm.DVQuantity`, and then classifies a query the server refuses. A fake CDR built on `sandbox` answers `POST /query/aql` with two fixed readings. It is stricter than a real CDR: it answers 400 unless the EHR id and the threshold arrive as parameters and the text holds only their placeholders.
@@ -908,7 +949,7 @@ Without the variables the program falls back to two marked placeholders, `exampl
 11. service-auth           ← client credentials for a backend service
 ```
 
-Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf constraints), `validate-composition` (in-memory RM construction), `contribution-build` (batched atomic writes).
+Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf constraints), `validate-composition` (in-memory RM construction), `contribution-build` (batched atomic writes), `demographic-crud` (parties and item tags).
 
 ---
 

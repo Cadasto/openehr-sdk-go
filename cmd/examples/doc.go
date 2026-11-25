@@ -43,6 +43,9 @@
 //     Definition REST client, compile it, and ask for an example composition
 //   - composition-crud: save, read and update a COMPOSITION through the REST
 //     client, and handle the 412 a stale If-Match meets
+//   - demographic-crud: create, read and update a PERSON through the
+//     Demographic REST client, in canonical JSON and XML, tag it, and read
+//     an earlier version back
 //   - query-execute: execute AQL with bound parameters, decode a RESULT_SET
 //     cell into a typed value, and classify a refused query
 //   - smart-launch: a standalone SMART-on-openEHR PKCE launch, with the
