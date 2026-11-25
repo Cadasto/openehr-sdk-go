@@ -71,3 +71,49 @@ func TestRefValidate(t *testing.T) {
 		t.Errorf("LatestAtTime(year 10000) Query() = %q, %q, want \"version_at_time\", \"\"", k, v)
 	}
 }
+
+// TestValidateRef: a Ref that names no target, a nil Ref, a nil pointer to
+// either Ref type or an empty id, fails with ErrInvalidConfig and never
+// panics; otherwise ValidateRef reports what the Ref's own Validate reports
+// (REQ-025, idiom.md § No panics).
+func TestValidateRef(t *testing.T) { // REQ-025
+	year10000 := time.Date(9999, 12, 31, 23, 59, 59, 0, time.FixedZone("", -5*3600))
+	normal := time.Date(2026, 5, 17, 10, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name string
+		ref  openehrclient.Ref
+		want error
+	}{
+		{name: "nil Ref", ref: nil, want: transport.ErrInvalidConfig},
+		{name: "nil *ByVersionUID", ref: (*openehrclient.ByVersionUID)(nil), want: transport.ErrInvalidConfig},
+		{name: "nil *ByVersionedObjectID", ref: (*openehrclient.ByVersionedObjectID)(nil), want: transport.ErrInvalidConfig},
+		{name: "empty versioned-object id", ref: openehrclient.LatestOf(""), want: transport.ErrInvalidConfig},
+		{name: "empty version uid", ref: openehrclient.VersionOf(""), want: transport.ErrInvalidConfig},
+		{name: "empty id behind a pointer", ref: &openehrclient.ByVersionUID{}, want: transport.ErrInvalidConfig},
+		{name: "UTC year 10000", ref: openehrclient.LatestAtTime("voID", year10000), want: transport.ErrInvalidConfig},
+		{name: "LatestOf", ref: openehrclient.LatestOf("voID")},
+		{name: "LatestAtTime", ref: openehrclient.LatestAtTime("voID", normal)},
+		{name: "VersionOf", ref: openehrclient.VersionOf("uid::s::1")},
+		{name: "*ByVersionUID", ref: &openehrclient.ByVersionUID{UID: "uid::s::1"}},
+		{name: "*ByVersionedObjectID", ref: &openehrclient.ByVersionedObjectID{VOID: "voID"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("ValidateRef(%s) panicked: %v", tc.name, r)
+				}
+			}()
+			err := openehrclient.ValidateRef(tc.ref)
+			if tc.want == nil {
+				if err != nil {
+					t.Errorf("ValidateRef(%s) = %v, want nil", tc.name, err)
+				}
+				return
+			}
+			if !errors.Is(err, tc.want) {
+				t.Errorf("ValidateRef(%s) = %v, want an error wrapping %v", tc.name, err, tc.want)
+			}
+		})
+	}
+}

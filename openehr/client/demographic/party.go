@@ -59,11 +59,12 @@ func resourceType(p rm.Party) (Type, error) {
 func basePath(t Type) string { return "/demographic/" + string(t) }
 
 // Get retrieves a PARTY of the given type. The Ref selects the target:
-// [openehrclient.LatestOf](voID) for the latest version of a versioned-object family,
-// [openehrclient.LatestAtTime](voID, t) for the as-of-time variant, or
-// [openehrclient.VersionOf](uid) for a specific version. A Ref whose time has a UTC
-// year outside 0000-9999 fails with [transport.ErrInvalidConfig] before any
-// request, since RFC 3339 cannot write it. The returned value is the
+// [openehrclient.LatestOf](voID) for the latest version of a
+// versioned-object family, [openehrclient.LatestAtTime](voID, t) for the
+// as-of-time variant, or [openehrclient.VersionOf](uid) for a specific
+// version. A Ref that [openehrclient.ValidateRef] refuses, such as a nil
+// Ref, an empty id or a time whose UTC year falls outside 0000-9999, fails
+// with [transport.ErrInvalidConfig] before any request. The returned value is the
 // concrete type ([*rm.Person] etc.) behind the [rm.Party] interface, decoded
 // polymorphically by its `_type` discriminator; a `_type` naming a class
 // other than t's does not decode.
@@ -86,16 +87,10 @@ func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref
 	if !t.valid() {
 		return nil, nil, fmt.Errorf("demographic.Get: %w: invalid PARTY type %q", transport.ErrInvalidConfig, t)
 	}
-	if isNilRef(ref) {
-		return nil, nil, fmt.Errorf("demographic.Get: %w: nil Ref", transport.ErrInvalidConfig)
-	}
-	if err := ref.Validate(); err != nil {
+	if err := openehrclient.ValidateRef(ref); err != nil {
 		return nil, nil, fmt.Errorf("demographic.Get: %w", err)
 	}
 	seg := ref.PathSegment()
-	if seg == "" {
-		return nil, nil, fmt.Errorf("demographic.Get: %w: empty Ref path segment", transport.ErrInvalidConfig)
-	}
 	cfg, err := newGetConfig("demographic.Get", opts)
 	if err != nil {
 		return nil, nil, err

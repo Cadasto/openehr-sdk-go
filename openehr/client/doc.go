@@ -11,10 +11,11 @@
 //
 // The shared surface names a versioned resource and its versions
 // ([VersionedObjectID], [VersionUID]), the target of a versioned read
-// ([Ref], built with [LatestOf], [LatestAtTime] or [VersionOf]), the
-// metadata a versioned read or write returns ([VersionMetadata]), the
-// write options and result handling every versioned write shares ([WriteConfig], [WriteResult], [DoDelete]),
-// and the openEHR request headers ([MarshalAuditDetails],
+// ([Ref], built with [LatestOf], [LatestAtTime] or [VersionOf] and checked
+// with [ValidateRef]), the metadata a versioned read or write returns
+// ([VersionMetadata]), the write options and result handling every
+// versioned write shares ([WriteConfig], [WriteResult], [DoDelete]), and
+// the openEHR request headers ([MarshalAuditDetails],
 // [FormatLifecycleStateHeader], [FormatItemTagHeader],
 // [FormatVersionAtTime]).
 //

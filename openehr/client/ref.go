@@ -1,6 +1,11 @@
 package client
 
-import "time"
+import (
+	"fmt"
+	"time"
+
+	"github.com/cadasto/openehr-sdk-go/transport"
+)
 
 // Ref identifies the target of a versioned-resource GET. The two
 // concrete implementations are [ByVersionedObjectID] (returns the
@@ -24,8 +29,8 @@ type Ref interface {
 	Query() (key, value string)
 	// Validate reports whether the Ref can be sent. A time whose UTC year
 	// falls outside 0000-9999, which RFC 3339 cannot write, fails with
-	// [transport.ErrInvalidConfig]. The SDK's reads call it before any
-	// request.
+	// [transport.ErrInvalidConfig]. The SDK's reads call it, through
+	// [ValidateRef], before any request.
 	Validate() error
 }
 
@@ -105,3 +110,28 @@ func LatestAtTime(voID VersionedObjectID, t time.Time) Ref {
 
 // VersionOf returns a Ref addressing one specific VersionUID.
 func VersionOf(uid VersionUID) Ref { return ByVersionUID{UID: uid} }
+
+// ValidateRef reports whether r names a target a read can send. It fails
+// with an error wrapping [transport.ErrInvalidConfig] when r is nil, holds
+// a nil *[ByVersionUID] or *[ByVersionedObjectID], or has an empty
+// [Ref.PathSegment], and otherwise returns what r.Validate returns. It
+// never panics. Every read in the SDK that takes a Ref calls it before
+// any request.
+func ValidateRef(r Ref) error {
+	switch v := r.(type) {
+	case nil:
+		return fmt.Errorf("%w: nil Ref", transport.ErrInvalidConfig)
+	case *ByVersionUID:
+		if v == nil {
+			return fmt.Errorf("%w: nil Ref", transport.ErrInvalidConfig)
+		}
+	case *ByVersionedObjectID:
+		if v == nil {
+			return fmt.Errorf("%w: nil Ref", transport.ErrInvalidConfig)
+		}
+	}
+	if r.PathSegment() == "" {
+		return fmt.Errorf("%w: empty Ref path segment", transport.ErrInvalidConfig)
+	}
+	return r.Validate()
+}
