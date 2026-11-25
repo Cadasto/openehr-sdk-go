@@ -75,8 +75,8 @@ A departure this list does not name is a defect, not an exception, and a new one
 | A contribution's commit audit carries `_type: "AUDIT_DETAILS"` by default, where the pin's `Contribution_create` asks a client to send `UPDATE_AUDIT` | [§ REQ-130](#req-130--contribution-builder) *Audit* | in the owning section |
 | A stored-query execution body omits `offset` and `fetch` the caller did not set, which the pin's `Query` schema lists as required | [§ REQ-057](#req-057) *Paging* | the pin gives `fetch` no default |
 | A composition write or read carries the `format` and `templateId` query parameters, which the pin does not define on those operations, when the caller opts in | [§ REQ-173](#req-173--composition-representation-formats) *The format query parameters* | a deployment extension, off by default |
-| A version read of a composition or an EHR_STATUS refuses an `IMPORTED_VERSION` body, which the pin's `UVersionOfComposition` and `UVersionOfEhrStatus` admit | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | imported versions come with the EHR Extract, out of scope |
-| A version read of a composition or an EHR_STATUS accepts an `ORIGINAL_VERSION` without `data`, which the pin's `UMOriginalVersionOfComposition` and `UMOriginalVersionOfEhrStatus` list as required | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | the RM's logical deletion has no `data` |
+| A version read of a composition, an EHR_STATUS or a PARTY refuses an `IMPORTED_VERSION` body, which the pin's `UVersionOfComposition`, `UVersionOfEhrStatus` and `UVersionOfParty` admit | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | imported versions come with the EHR Extract, out of scope |
+| A version read of a composition, an EHR_STATUS or a PARTY accepts an `ORIGINAL_VERSION` without `data`, which the pin's `UMOriginalVersionOfComposition`, `UMOriginalVersionOfEhrStatus` and `UMOriginalVersionOfParty` list as required | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | the RM's logical deletion has no `data` |
 
 #### ITS-REST envelopes
 
@@ -1557,7 +1557,7 @@ On the demographic leaf `Get` and the `versioned_party` reads take `WithGetForma
 - The decoder **MUST** be chosen by the format the caller asked for, never by the response's `Content-Type`.
   A body that does not decode **MUST** surface as the typed decode failure of [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) with the version metadata beside it, and an empty body and a `204` keep their outcomes (`ErrInvalidShape`, `ErrDeletedAtTime`) in every format.
 - Canonical XML need not name its root element's class, so the demographic leaf **MUST** decode an XML body as the class the call names: the `Type` of a PARTY read or write, or the `VERSIONED_PARTY`, `REVISION_HISTORY` or `ORIGINAL_VERSION` a `versioned_party` read returns.
-  A root element whose `xsi:type` names another class **MUST** fail as the typed decode failure.
+  A root element whose `xsi:type`, read as [§ REQ-056](#req-056) reads a discriminator, names another class **MUST** fail as the typed decode failure.
   The PARTY inside an `ORIGINAL_VERSION` is decoded by the `xsi:type` of its `data` element, as canonical JSON decodes it by `_type`.
 
 #### Simplified decode options
@@ -1601,7 +1601,7 @@ The form is outside the pin, so both options are off by default, and their docum
 - No request the leaf sends carries a `.schema`-suffixed media type.
 - A demographic `Create` or `Update` with `WithFormat(demographic.FormatXML)` under `PreferRepresentation` sends `Content-Type` and `Accept` `application/xml` and returns the PARTY decoded from the XML body.
   A demographic `Get` and each `versioned_party` read with `WithGetFormat(demographic.FormatXML)` send `Accept: application/xml` and decode the XML body, the version's PARTY by its `xsi:type`.
-  An XML body whose root `xsi:type` names another class than the call's fails as the typed decode failure.
+  An XML body whose root `xsi:type` names another class than the call's fails as the typed decode failure, wrapping `typereg.ErrUnknownType` for a namespace-prefixed value such as `ns2:PERSON`.
 - A demographic write of a PARTY canonical JSON refuses, such as one holding a NaN magnitude, fails with a `*demographic.EncodeError` and issues no request.
 
 Out of scope: the raw body of a write's response, the other EHR leaves and the contribution envelope's inner payloads ([§ REQ-174](#req-174--versioned-object-reads) keeps the contribution read in canonical JSON), and sending the deprecated `.schema`-suffixed media types.
@@ -1621,7 +1621,11 @@ Each family has four operations (`versioned_composition_*` and `versioned_ehr_st
 | One version by its id | `…/versioned_composition/{versioned_object_uid}/version/{version_uid}` | `…/versioned_ehr_status/version/{version_uid}` |
 
 An EHR has one EHR_STATUS, so its versioned object is addressed by the `ehr_id` alone.
-The demographic leaf offers the same reads for `VERSIONED_PARTY`; of this §'s rules only *The `version_at_time` value* and the empty-body sentence of *Responses* bind it, the latter because the demographic pin answers each of the four `versioned_party_*` reads `200` with a body or `404`, a version absent at the requested time included (`404_not_found_or_no_version_at_time` in `demographic-validation.openapi.yaml`).
+The demographic leaf offers the same reads for `VERSIONED_PARTY`, and of this §'s rules these bind it:
+
+- *The `version_at_time` value*;
+- the empty-body sentence of *Responses*, because the demographic pin answers each of the four `versioned_party_*` reads `200` with a body or `404`, a version absent at the requested time included (`404_not_found_or_no_version_at_time` in `demographic-validation.openapi.yaml`);
+- the version read's sentences of *Responses*, its `data` decoded as a PARTY, with the two keyed exceptions they name.
 
 An empty path parameter is refused with `ErrInvalidConfig` before any request is issued, a malformed one by [REQ-150](transport.md#req-150--path-parameter-encoding-and-segment-validation), and a `404` is mapped as on every leaf, by [REQ-093](transport.md#req-093--openehr-error-envelope-mapping).
 
@@ -1629,8 +1633,8 @@ An empty path parameter is refused with `ErrInvalidConfig` before any request is
 
 The versioned-object read **MUST** return the `VERSIONED_COMPOSITION` or `VERSIONED_EHR_STATUS`, and the revision-history read the `REVISION_HISTORY`, each decoded as its RM type.
 A version read **MUST** decode the `ORIGINAL_VERSION` envelope and return at least its `uid`, `preceding_version_uid`, `lifecycle_state`, `commit_audit` and `contribution`, and its `data` decoded as a `COMPOSITION` or an `EHR_STATUS`; a version that carries no `data`, the RM's logical deletion, returns no payload and no error.
-The pin's `UMOriginalVersionOfComposition` and `UMOriginalVersionOfEhrStatus` list `data` as required, where the RM keeps it optional to allow logical deletion; reading the RM's form is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative) that lapses when the pin makes `data` optional.
-The pin's version schemas (`UVersionOfComposition`, `UVersionOfEhrStatus`) also admit an `IMPORTED_VERSION`.
+The pin's `UMOriginalVersionOfComposition`, `UMOriginalVersionOfEhrStatus` and `UMOriginalVersionOfParty` list `data` as required, where the RM keeps it optional to allow logical deletion; reading the RM's form is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative) that lapses when the pin makes `data` optional.
+The pin's version schemas (`UVersionOfComposition`, `UVersionOfEhrStatus`, `UVersionOfParty`) also admit an `IMPORTED_VERSION`.
 The SDK reads only `ORIGINAL_VERSION`: a body whose `_type` names anything else **MUST** fail as the typed decode failure of [REQ-151](transport.md#req-151--typed-2xx-decode-failure), never decode to an empty version.
 Refusing the `IMPORTED_VERSION` the pin admits is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative): imported versions come from the EHR Extract exchange, which is out of scope ([scope.md](scope.md#out-of-scope-v1)), and the exception is revisited when that exchange comes into scope.
 An empty or `null` 2xx body on any of these reads **MUST** fail with `ErrInvalidShape`, since the pin defines no successful response without a body for any of them.
