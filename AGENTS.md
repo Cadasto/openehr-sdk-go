@@ -10,9 +10,13 @@ Go `1.27.x`, module floor `1.27.0` ([releases.md § Minimum Go version](docs/rel
 
 ## Source of truth
 
-The normative spec lives **in this repo** under [`docs/specifications/`](docs/specifications/) — self-contained; implementing or reviewing the SDK needs no external sources. Conventions (RFC-2119 keywords, status headers, identifiers, traceability): [`docs/specifications/README.md`](docs/specifications/README.md).
+The normative spec lives **in this repo** under [`docs/specifications/`](docs/specifications/), self-contained: implementing or reviewing the SDK needs no external sources. Its conventions (RFC-2119 keywords, status headers, identifiers, traceability) are in [`docs/specifications/README.md`](docs/specifications/README.md).
 
-`docs/specifications/` carries the RFC-2119 statements code, plans, and tests are measured against; `docs/architecture.md` carries the design narrative. **The specs record the contract; the maintainer's instruction outranks them.** When a request contradicts a sentence, name the sentence once, do the work and amend it in the same change. Without the maintainer, anything that disagrees with the specs is a finding and the specs win. No specification here is marked *implementation-aligned*, the sdd plugin's mode in which code leads and the spec is reconciled in the same PR. A `draft` section binds once it merges. Never silently resolve an open [research strand](docs/specifications/research-strands.md) in code — surface the decision or land an [ADR](docs/adr/).
+- `docs/specifications/` carries the RFC-2119 statements that code, plans and tests are measured against; [`docs/architecture.md`](docs/architecture.md) carries the design narrative.
+- **The specs record the contract; the maintainer's instruction outranks them.** When a request contradicts a sentence, name the sentence once, do the work and amend it in the same change.
+- Without the maintainer, anything that disagrees with the specs is a finding, and the specs win.
+- A `draft` section binds once it merges. No specification here is marked *implementation-aligned*, the sdd plugin's mode in which code leads and the spec is reconciled in the same PR.
+- Never silently resolve an open [research strand](docs/specifications/research-strands.md) in code: surface the decision or land an [ADR](docs/adr/).
 
 ## Where to look
 
@@ -29,9 +33,21 @@ The specialised docs are **canonical**: defer to them rather than restating.
 | orchestrate agents, brief a worker or review a branch | [ai-workflow.md](docs/ai-workflow.md) |
 | pick up open work | [roadmap.md](docs/roadmap.md), and [backlog.md](docs/backlog.md) for leads to verify before acting |
 | run the gate | [ci.md](docs/ci.md) |
+| edit the Makefile or a script | § Tooling & workflow (portability), then [ci.md](docs/ci.md) |
+| commit, push or open a pull request | § Git and pull requests |
 | cut a release or edit the CHANGELOG | [releases.md](docs/releases.md) |
 | check a spec convention (keywords, kinds, identifiers, editing rules) | [specifications/README.md](docs/specifications/README.md) |
 | contribute without an agent | [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [LICENSING.md](LICENSING.md) |
+
+## Before you hand back
+
+Check every change against this list before reporting it done:
+
+1. **The gate passes:** `make ci`, or the Docker-free subset in § Tooling & workflow. Say which platform it ran on (macOS arm64, Debian or WSL amd64, or CI): a check on one does not cover the others.
+2. **The spec indexes are current:** after a test's `REQ-NNN` citations change, `make spec-generate` has run and what it wrote is committed; `make spec-check` passes.
+3. **SDK users see no process ids,** and **a changed example ships with its docs** (both in § Spec-driven workflow).
+4. **A changed Makefile or script still runs** on GNU Make 3.81, under `dash`, and on bash 3.2 (§ Tooling & workflow).
+5. **Commits follow § Git and pull requests,** and `CHANGELOG.md` is untouched unless you are cutting a release or were asked to.
 
 ## Spec-driven workflow (agents)
 
@@ -42,12 +58,17 @@ Without either flag the bundle prints the whole section, which runs to about 80 
 Rules the plugin does not know, or that reverse its defaults:
 
 - Normative text lives once, in its canonical topic spec. `traceability.yaml` is a pure index, and `REQ.md` and each map row's `tests:` list are generated from the tests' REQ citations ([development-process.md § The ladder](docs/development-process.md#the-ladder-full-lane)).
-- **What SDK users read carries no process.** What pkg.go.dev shows (package docs, doc comments on exported identifiers, the values of exported variables and constants, examples, README files) carries no spec-process identifiers (REQ, ADR, STRAND, plan or spec paths) and no RFC-2119 capitals; a probe's own `PROBE-NNN` and public openEHR specification citations are fine. User-facing error text, `docs/quick-start.md`, `docs/examples.md` and the site under `pages/` carry no REQ, ADR, STRAND or PROBE id either. Maintainer comments may cite them. `TestGodocCarriesNoSpecProcessIdentifiers` ([`internal/godoc_ids_guard_test.go`](internal/godoc_ids_guard_test.go)) fails on a REQ, ADR or STRAND id in a package comment or the doc comment of an exported identifier in any non-test Go file, `internal/`, `cmd/` and `testkit/probes/` included; put the citation in a comment go doc does not show, such as one in the function body.
+- **Amend in place.** A change edits the sentence that already holds its topic and adds no paragraph, note or new document beside it. A new ADR records only a decision no ADR or spec section covers; an accepted ADR's stale part is rewritten, with one `**Amended:**` line ([adr/README.md § Status](docs/adr/README.md#status)).
+- **What SDK users read carries no process.**
+  - What pkg.go.dev shows (package docs, doc comments on exported identifiers, the values of exported variables and constants, examples, README files) carries no spec-process identifiers (REQ, ADR, STRAND, plan or spec paths) and no RFC-2119 capitals; a probe's own `PROBE-NNN` and public openEHR specification citations are fine.
+  - User-facing error text, `docs/quick-start.md`, `docs/examples.md` and the site under `pages/` carry no REQ, ADR, STRAND or PROBE id either.
+  - Maintainer comments may cite them.
+  - `TestGodocCarriesNoSpecProcessIdentifiers` ([`internal/godoc_ids_guard_test.go`](internal/godoc_ids_guard_test.go)) fails on a REQ, ADR or STRAND id in a package comment or the doc comment of an exported identifier in any non-test Go file, `internal/`, `cmd/` and `testkit/probes/` included. Put the citation in a comment go doc does not show, such as one in the function body.
 - No `SDK-GAP` identifier: a gap is worked under a REQ with a PROBE ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
-- Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program ([ai-workflow.md § Examples](docs/ai-workflow.md#examples)). Tests in `cmd/examples/` hold the outputs shown in `docs/examples.md`, the README and `pages/examples.md` to real runs, and a new program fails `TestExampleDirectoryCensus` until it is classified in `transcripts_test.go`.
+- Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program ([ai-workflow.md § Examples](docs/ai-workflow.md#examples)); a new program fails `TestExampleDirectoryCensus` until `transcripts_test.go` classifies it.
 - Plans go in [`docs/plans/`](docs/plans/), never superpowers' default `docs/superpowers/` tree ([development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd)).
-- **Backlog size.** [`docs/backlog.md`](docs/backlog.md) is kept at about 80 entries, the `- ` lines the sdd plugin's session-start hook counts, which outranks the 40 built into that hook and its `/sdd-triage --backlog` consolidation: the hook's line "over the 40 it should hold" is informational until its count passes 80.
-- **Retiring a requirement.** Its entry moves to [retired-requirements.md](docs/specifications/retired-requirements.md) and the map row's `canonical` points there ([specifications/README.md § Editing rules](docs/specifications/README.md#editing-rules)). This outranks the sdd plugin's default, which `/sdd-specify` otherwise follows, of keeping the section in its topic spec.
+- **Backlog size.** [`docs/backlog.md`](docs/backlog.md) is kept at about 80 `- ` entries, not the sdd plugin's 40: the session hook's "over the 40" line is informational until the count passes 80.
+- **Retiring a requirement** moves its entry to [retired-requirements.md](docs/specifications/retired-requirements.md) and points the map row's `canonical` there ([specifications/README.md § Editing rules](docs/specifications/README.md#editing-rules)), not the sdd plugin's default of keeping the section in its topic spec.
 - **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 450 words; quote only the output that proves a claim. A specification sentence over about 60 words that a change touches is split in that change: a chain of conditions becomes a list of condition and behaviour, or a small table, saying no more and no less than before.
 
 ## Module layout & boundaries
@@ -65,11 +86,22 @@ Full taxonomy and the package tree are in [module-layout.md](docs/specifications
 Go rules live in [`idiom.md`](docs/specifications/idiom.md) (normative) and the go-coding plugin, whose skills are loaded before writing or reviewing Go as [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor) says. Where the plugin's general advice differs, this repository's rule wins:
 
 - **I/O surface:** `context.Context` first, all network I/O through the caller's `*http.Client`, functional options on every constructor, and no reflection beyond [idiom.md § API conventions](docs/specifications/idiom.md#api-conventions).
+- **No panics:** library code never panics on wire or caller input; it returns an error or fails closed. Only a `Must`-prefixed function may panic, beside a non-panicking alternative ([idiom.md § No panics](docs/specifications/idiom.md#no-panics)).
 - **JSON:** non-test code decodes RM and AOM 1.4 values with `encoding/json/v2` (or `canjson`), never v1 (REQ-052); `internal/v1_rm_decode_guard_test.go` scans for it.
 - **Tests:** stdlib `testing` and [`testkit/`](testkit/) helpers only, no assertion libraries; behaviour tests for a public surface go in the external `_test` package.
-- **Commits:** [Conventional Commits](https://www.conventionalcommits.org/), scoped to the touched area (`auth`, `rm`, `transport`, `client/ehr`, `docs`, `build`, …); AI-assisted commits end with an `Assisted-by:` trailer ([CONTRIBUTING § AI-assisted contributions](CONTRIBUTING.md#ai-assisted-contributions)).
+- **Commits** follow § Git and pull requests.
 
 **CHANGELOG.md** — update only on request or when cutting a release, and read the format rule in [releases.md § CHANGELOG](docs/releases.md#changelog) first: one single-sentence bullet per artefact class, no `### Fixed`.
+
+## Git and pull requests
+
+- **Branches:** start each change on a branch from an up-to-date `origin/main`, named after its Conventional Commit type (`feat/…`, `fix/…`, `docs/…`). When `main` moves, rebase onto it; never merge it in.
+- **Commits:** [Conventional Commits](https://www.conventionalcommits.org/), scoped to the touched area (`auth`, `rm`, `transport`, `client/ehr`, `docs`, `build`, …), staging files by path. AI-assisted commits end with an `Assisted-by:` trailer ([CONTRIBUTING § AI-assisted contributions](CONTRIBUTING.md#ai-assisted-contributions)).
+- **Pull requests:** open every PR as a draft; `/sdd-close` marks it ready when it pushes the close-out. The body follows [`.github/pull_request_template.md`](.github/pull_request_template.md): about 450 words, its Summary ending with the `Lane:` line ([development-process.md § The PR body](docs/development-process.md#the-pr-body)).
+- **The maintainer merges.** An agent never merges or closes a pull request and never deletes a remote branch.
+- **In anything posted to GitHub,** write a pull request or issue as a link, never a bare `#N`, which GitHub links to whatever has that number.
+- **Worktrees** go under the gitignored `.worktrees/`. After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed path.
+- **Release cut** follows [releases.md § Tag checklist](docs/releases.md#tag-checklist) and commits straight to `main`, no branch or PR. The same commit moves the `go get …@vX.Y.Z` pin in `README.md`, `docs/quick-start.md`, `pages/install.md` and `pages/index.md`; `make docs-check` fails until all four match the newest `## [X.Y.Z]` heading in `CHANGELOG.md`.
 
 ## Tooling & workflow
 
@@ -93,22 +125,24 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 - A non-test file that imports `reflect` fails `TestREQ024ReflectOnlyForReviewedUses` until it is added to the reviewed list in [`internal/reflect_guard_test.go`](internal/reflect_guard_test.go), for a use [idiom.md § API conventions](docs/specifications/idiom.md#api-conventions) allows, such as a typed-nil check.
 - **`make ci` cannot complete without Docker:** `test` → `aqlgen-check` → `build-antlr` always needs it; everything else falls back to Docker only when a host tool is missing or unsuitable (routing in [ci.md](docs/ci.md)).
   Without Docker, run `fmt-check`, `vet`, `spec-check`, `flat-check`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
-- Worktrees go under the gitignored `.worktrees/`. After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed `.worktrees/` path.
+- **Portability.** The Makefile and scripts run on macOS (GNU Make 3.81 as `/usr/bin/make`, bash 3.2, BSD `sed` and `xargs`) and on Linux, where make recipes run under `dash`.
+  - POSIX sh in recipes and no Make 4 features (`$(file …)`, `!=`, `.ONESHELL`); a literal `#` inside `$(shell …)` breaks 3.81, so use `$(HASH)`.
+  - A bash 4 feature (`declare -A`, `mapfile`) sits behind a `BASH_VERSINFO` check that names the fix, as in `scripts/spec-check.sh`; `sed`, `xargs` and `grep` use only options BSD and GNU share.
+  - `make spec-check` needs Python 3.11 or later. `make doctor` shows the make, bash, sed and `python3` in use, and `make test-fused` reproduces arm64's fused multiply-add on amd64.
 - **Public docs never name downstream consuming projects.** Describe what a consumer needs, not who the consumer is.
-- **Release cut** follows [releases.md § Tag checklist](docs/releases.md#tag-checklist) and commits straight to `main`, no branch or PR. The same commit moves the `go get …@vX.Y.Z` pin in `README.md`, `docs/quick-start.md`, `pages/install.md` and `pages/index.md`; `make docs-check` fails until all four match the newest `## [X.Y.Z]` heading in `CHANGELOG.md`.
 
 **Runtime dependencies** are deliberately minimal and reviewed — adding one is a decision, not a convenience. The current set, each confined to the package it serves, is in [architecture.md § Dependencies](docs/architecture.md#dependencies).
 
 **Agent tooling:**
 
-- **Code intelligence:** for Go symbol questions run `gopls` in the shell from the checkout or worktree being changed, and ask codebase-memory-mcp only about `main` ([ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor)).
-- **Claude Code hook:** after a **Write** or **Edit** on a `*.go` file, [`.claude/settings.json`](.claude/settings.json) runs [`.claude/hooks/goformat-on-save.sh`](.claude/hooks/goformat-on-save.sh) (gofumpt + goimports on that file; `gofmt -s` fallback; no-op without a formatter; skips `*_gen.go`). `make fmt` is the full-tree pass.
-- **Plugins:** `.claude/settings.json` enables go-coding, sdd, superpowers, gopls-lsp, pr-review-toolkit, feature-dev and claude-md-management; look there before assuming a skill is missing.
+- **Code intelligence:** for Go symbol questions run `gopls` in the shell from the checkout or worktree being changed. codebase-memory-mcp, when installed, answers questions about `main` only ([ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor)).
+- **Claude Code hook:** [`.claude/settings.json`](.claude/settings.json) runs [`.claude/hooks/goformat-on-save.sh`](.claude/hooks/goformat-on-save.sh) (gofumpt and goimports, skipping `*_gen.go`) on each `*.go` file a **Write** or **Edit** touches; `make fmt` is the full-tree pass.
+- **Plugins:** `.claude/settings.json` enables go-coding, sdd, superpowers, gopls-lsp, pr-review-toolkit, feature-dev and claude-md-management; look there before assuming a skill is missing. The openehr-assistant plugin and codebase-memory-mcp are per-user installs that the repository does not enable.
 - **Local config:** personal permission grants go in the gitignored `.claude/settings.local.json`; never add a `permissions` block to the checked-in `.claude/settings.json`.
 
 ## openEHR knowledge
 
-The openehr-assistant plugin and its MCP tools answer RM paths, class definitions, terminology codes and ITS-JSON shapes: look them up rather than guess ([ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills)). This repository's pinned contracts outrank a general answer:
+The openehr-assistant plugin, where installed, and its MCP tools answer RM paths, class definitions, terminology codes and ITS-JSON shapes: look them up rather than guess ([ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills)). This repository's pinned contracts outrank a general answer, and are the source to read when the plugin is absent:
 
 - **Wire semantics:** the conformance probe suite ([conformance.md](docs/specifications/conformance.md)).
 - **REST:** the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) for every path, body, header and status code.
@@ -118,8 +152,8 @@ The openehr-assistant plugin and its MCP tools answer RM paths, class definition
 
 ## Do not touch (yet)
 
-- Promoting a new numbered ADR without naming the REQs it amends in its header (the map lists no ADRs); `make spec-generate` then writes the index in [`docs/adr/README.md`](docs/adr/README.md).
-- `internal/bmmgen` and `internal/bmmdiff` — generator tooling, not public API; structural changes need rationale in [architecture.md](docs/architecture.md) and [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
-- Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
-- The `go.mod` `go` directive — the minor line's `.0` patch, never the toolchain patch you happen to run ([releases.md § Minimum Go version](docs/releases.md#minimum-go-version)): a mid-line floor makes every consumer and CI image on an earlier patch fetch a new toolchain, breaking air-gapped builds. Dev-image pins ([Dockerfile](Dockerfile)) move independently.
 - Published REQ-NNN / PROBE-NNN / STRAND-NN identifiers ([REQ.md § Numbering policy](docs/specifications/REQ.md#numbering-policy)).
+- Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
+- The `go.mod` `go` directive — the minor line's `.0` patch, never the toolchain patch you happen to run ([releases.md § Minimum Go version](docs/releases.md#minimum-go-version) says why). Dev-image pins ([Dockerfile](Dockerfile)) move independently.
+- `internal/bmmgen` and `internal/bmmdiff` — generator tooling, not public API; structural changes need rationale in [architecture.md](docs/architecture.md) and [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
+- A numbered ADR whose header does not name the REQs it amends: the map lists no ADRs, so the header is how `make spec-context` finds it, and `make spec-generate` writes the index in [`docs/adr/README.md`](docs/adr/README.md) from it.

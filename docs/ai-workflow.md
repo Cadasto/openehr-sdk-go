@@ -33,7 +33,7 @@ The public disclosure that this project is built with AI assistance is in the [R
 
 Pair with the gopls-lsp plugin for code intelligence (defs/refs/rename/vulncheck). The plugin is there so you run the deterministic tool instead of working a rule out by hand. The LSP tool sees only the session's starting folder, so from a worktree run `gopls` in the shell instead: `cd .worktrees/<branch> && gopls references <file>:<line>:<col>` (also `definition` and `implementation`).
 
-The codebase-memory-mcp knowledge graph (or the `codebase-memory` skill) indexes the main checkout, not `.worktrees/`, so use it for structural questions about `main`: the architecture overview (`get_architecture`), hotspots, files that change together, and the callers of a distinctive name (`search_graph`, `trace_path`, `get_code_snippet`). It matches calls by bare name, so a common name such as `Run` or `Write` gives false callers. On a branch, `gopls` answers symbol questions. Run `index_repository` once if the project isn't indexed yet.
+The codebase-memory-mcp knowledge graph is optional: a per-user install the repository does not configure. Where it is installed, it indexes the main checkout, not `.worktrees/`, so ask it structural questions about `main` only: the architecture (`get_architecture`), hotspots, files that change together, and the callers of a distinctive name (`search_graph`, `trace_path`). It matches calls by bare name, so a common name such as `Run` gives false callers; on a branch, and for exact answers, use `gopls`.
 
 ## openEHR ground truth (MCP / skills)
 

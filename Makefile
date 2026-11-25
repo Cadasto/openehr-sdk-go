@@ -1,6 +1,6 @@
 # openehr-sdk-go — host-first Go toolchain, Docker fallback for CI parity.
 #
-# Policy in AGENTS.md > Tooling policy. Single entry point — extend here,
+# Policy in AGENTS.md § Tooling & workflow. Single entry point — extend here,
 # don't add ad-hoc scripts.
 #
 # Fast path  : host Go 1.27.x (recommended for daily development).
