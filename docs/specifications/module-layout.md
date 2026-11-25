@@ -173,7 +173,7 @@ testkit/  -. helpers for .-→ all of the above
 
 ## REQ-013 — Building-block independence
 
-Each building block in the table below **MUST** be importable and useful without an authenticated client: no package in its import closure, the packages of this module it imports directly or indirectly, is `transport/`, `auth/` or `openehr/client/*`.
+Each building block in the table below **MUST** be importable and useful without an authenticated client: no package in its import closure, the packages of this module it imports directly or indirectly, is `transport/`, `auth/`, `openehr/client` or `openehr/client/*`.
 
 The table is the one home of each block's own import rule beside that closure rule.
 A closure rule holds for the block and every package of this module it imports, directly or indirectly.
