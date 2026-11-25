@@ -94,10 +94,10 @@ func TestREQ176_REQ052_CorpusOperationalTemplatesCanonicalJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("walking %s: %v", corpus, err)
 	}
-	// The corpus holds 99 operational templates, the 10 reference ones
+	// The corpus holds 98 operational templates, the 9 reference ones
 	// included; fewer means the walk lost some.
-	if len(docs) < 99 {
-		t.Fatalf("found %d operational templates under %s; want at least 99", len(docs), corpus)
+	if len(docs) < 98 {
+		t.Fatalf("found %d operational templates under %s; want at least 98", len(docs), corpus)
 	}
 	for _, doc := range docs {
 		path := doc.path

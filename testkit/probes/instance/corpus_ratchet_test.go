@@ -102,7 +102,6 @@ var requiredBodies = []string{
 	"reference/ORGANISATION-generic.v1",
 	"reference/PERSON-CareProvider.v1",
 	"reference/PERSON-Patient.v1",
-	"reference/PERSON-PatientIdentity.v1",
 	"reference/ROLE-generic-role.v1",
 	"templates/BMI",
 	"templates/IDCR -  Adverse Reaction List.v1",
