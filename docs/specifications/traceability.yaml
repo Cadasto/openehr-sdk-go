@@ -129,6 +129,7 @@ requirements:
       - openehr/client/query/nilwiredereference_internal_test.go
       - openehr/client/ref_test.go
       - openehr/client/resource_test.go
+      - openehr/client/write_test.go
       - openehr/rm/character_test.go
       - openehr/rm/integer64_test.go
       - openehr/rm/integer_test.go
