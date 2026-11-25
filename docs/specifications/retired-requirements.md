@@ -149,11 +149,11 @@ Its rules are now [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111
 
 ## REQ-117 — AQL expression-catalogue completion
 
-Its rules moved to [aql.md § REQ-113](aql.md#req-113--execution-oriented-parsed-aql-ast) (the read-side catalogue and its residual), [aql.md § REQ-109](aql.md#req-109--aql-static-lint) (alias resolution in the lint) and [aql.md § REQ-163](aql.md#req-055--aql-builder) (the builder's containment algebra and in-text paging).
+Its rules moved to [aql.md § REQ-113](aql.md#req-113--execution-oriented-parsed-aql-ast) (the read-side catalogue and its residual), [aql.md § REQ-109](aql.md#req-109--aql-static-lint) (alias resolution in the lint) and [aql.md § REQ-055](aql.md#req-055--aql-builder) (the builder's containment algebra and in-text paging).
 
 ## REQ-118 — Deprecated `SELECT TOP` clause and literal source text
 
-Its rules moved to [aql.md § REQ-113](aql.md#req-113--execution-oriented-parsed-aql-ast) (the `TOP` carrier and literal source text), [aql.md § REQ-163](aql.md#req-055--aql-builder) (the builder's `TOP` and the row-bound channels) and [aql.md § REQ-109](aql.md#req-109--aql-static-lint) (the `TOP` lint codes).
+Its rules moved to [aql.md § REQ-113](aql.md#req-113--execution-oriented-parsed-aql-ast) (the `TOP` carrier and literal source text), [aql.md § REQ-055](aql.md#req-055--aql-builder) (the builder's `TOP` and the row-bound channels) and [aql.md § REQ-109](aql.md#req-109--aql-static-lint) (the `TOP` lint codes).
 
 ## REQ-122 — Version-control derived helpers
 
