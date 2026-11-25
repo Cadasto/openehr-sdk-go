@@ -2443,8 +2443,8 @@ requirements:
       - testkit/probes/validation/probes_test.go
 
   - id: REQ-173
-    title: Composition representation formats
-    canonical: docs/specifications/wire.md#req-173--composition-representation-formats
+    title: Composition and party representation formats
+    canonical: docs/specifications/wire.md#req-173--composition-and-party-representation-formats
     status: draft
     implementation: landed
     packages: [openehr/client/ehr/composition, testkit/probes/rest, openehr/client/demographic, testkit/probes/demographic]

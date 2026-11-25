@@ -89,7 +89,7 @@ To change a title, a canonical link, the spec stability or the implementation st
 | REQ-169 | Interval boundary flag defaults | [wire.md](wire.md#req-169--interval-boundary-flag-defaults) | draft | landed |
 | REQ-170 | Unmatched content on decode | [wire.md](wire.md#req-170--unmatched-content-on-decode) | draft | landed |
 | REQ-171 | Validation engine | [clinical-modeling.md](clinical-modeling.md#req-171--validation-engine) | draft | landed |
-| REQ-173 | Composition representation formats | [wire.md](wire.md#req-173--composition-representation-formats) | draft | landed |
+| REQ-173 | Composition and party representation formats | [wire.md](wire.md#req-173--composition-and-party-representation-formats) | draft | landed |
 | REQ-174 | Versioned-object reads | [wire.md](wire.md#req-174--versioned-object-reads) | draft | landed |
 | REQ-175 | Missing members on decode | [wire.md](wire.md#req-175--missing-members-on-decode) | draft | landed |
 | REQ-176 | ADL 1.4 operational template model | [clinical-modeling.md](clinical-modeling.md#req-176--adl-14-operational-template-model) | draft | landed |
