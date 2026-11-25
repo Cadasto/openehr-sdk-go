@@ -1,6 +1,6 @@
 # openehr-sdk-go — host-first Go toolchain, Docker fallback for CI parity.
 #
-# Policy in AGENTS.md > Tooling policy. Single entry point — extend here,
+# Policy in AGENTS.md § Tooling & workflow. Single entry point — extend here,
 # don't add ad-hoc scripts.
 #
 # Fast path  : host Go 1.27.x (recommended for daily development).
@@ -106,7 +106,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 
 ##@ Setup
 
-doctor: ## Show host Go, Docker, make, bash, GNU sed, the active toolchain and the pins
+doctor: ## Show host Go, Docker, make, bash, GNU sed, python3, the active toolchain and the pins
 	@echo "host go         : $$(command -v go || echo 'not installed')"
 	@echo "host go version : $$(go version 2>/dev/null || echo 'n/a')"
 	@echo "docker          : $$(command -v docker || echo 'not installed')"
@@ -118,6 +118,9 @@ doctor: ## Show host Go, Docker, make, bash, GNU sed, the active toolchain and t
 	 echo "bash            : $${v:-not installed}$$h"
 	@s="$$(command -v gsed 2>/dev/null || { sed --version 2>/dev/null | grep -q 'GNU sed' && command -v sed; })"; \
 	 echo "GNU sed         : $${s:-not found  <- make spec-check needs it (macOS: brew install gnu-sed)}"
+	@v="$$(python3 -c 'import sys; print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null)"; \
+	 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null && h= || h='  <- make spec-check needs 3.11 or later (macOS: brew install python)'; \
+	 echo "python3         : $${v:-not installed} $$(command -v python3 2>/dev/null)$$h"
 	@echo "pinned          : LINT_IMAGE=$(LINT_IMAGE)  ANTLR_VERSION=$(ANTLR_VERSION)  MKDOCS_IMAGE=$(MKDOCS_IMAGE)"
 
 go-version: ## Print the Go version of the active toolchain

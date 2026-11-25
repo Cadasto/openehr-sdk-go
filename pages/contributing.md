@@ -56,8 +56,7 @@ ADR settles them.
 `make docs-check` runs the strict build plus the output assertions. CI runs it
 on every pull request that changes the site or a file the check reads, such as
 `mkdocs.yml`, `CHANGELOG.md` or the Makefile. `docs-site.yml` deploys the site from
-`main` once the repository's Pages source is set to GitHub Actions. That setting
-is not enabled yet (as of 2026-09-10).
+`main` to GitHub Pages.
 
 ```bash
 make docs-serve

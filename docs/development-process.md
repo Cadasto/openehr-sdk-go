@@ -30,7 +30,8 @@ A full-lane change climbs, in one PR: the REQ and its acceptance, its spec secti
 For a new capability the spec leads (spec-first).
 
 - The registry in [REQ.md](specifications/REQ.md) is generated (`make spec-generate`); `make spec-check` fails when it is stale. Edit its source, never the table.
-- Each `traceability.yaml` row's `tests:` list is generated too: `make spec-generate` writes the sorted list of test files that cite the row's REQ, and `make spec-check` fails when a list is stale. A test file is a `*_test.go` file or a probe implementation under `testkit/probes/`; it cites `REQ-NNN` when that token appears with no letter, digit or underscore right before or after it, so a hyphen or a dot is a boundary and `pre-REQ-161` counts. So cite the REQ in the test that pins it, and never edit the list by hand.
+- Each `traceability.yaml` row's `tests:` list is generated too: `make spec-generate` writes the sorted list of test files that cite the row's REQ, and `make spec-check` fails when a list is stale. Cite the REQ in the test that pins it, and never edit the list by hand.
+- A test file is a `*_test.go` file or a probe implementation under `testkit/probes/`. It cites `REQ-NNN` when that token has no letter, digit or underscore right before or after it, so a hyphen or a dot is a boundary and `pre-REQ-161` counts.
 - A plan in [`plans/`](plans/) is optional, for work that spans several PRs: a working note outside this ladder that no gate or reviewer reads, deleted once its work is served ([plans/README.md](plans/README.md)).
 
 ### Definition of Ready

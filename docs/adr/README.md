@@ -8,6 +8,15 @@ Closed architecture decisions for `openehr-sdk-go`. Each ADR is a numbered Markd
 
 Open decisions (those that would be ADRs once resolved) live in this repo as **research strands** — [`docs/specifications/research-strands.md`](../specifications/research-strands.md). When a strand is resolved, an ADR lands here, and the index's *Resolves / amends* column names the strand.
 
+## Status
+
+An ADR's status runs `proposed`, `accepted`, then `superseded by ADR-NNNN` or `deprecated`.
+An accepted ADR is amended in place: its stale part is rewritten to the current state, and one `**Amended:** <date>: <what changed>` bullet sits beside its **Status:** line, updated by each later amendment.
+It is `superseded` only when another ADR takes over its whole decision, and `deprecated` when the decision is withdrawn with nothing in its place.
+A new ADR records only a decision no ADR or specification section covers; the **Amends:** lines of earlier ADRs, such as [ADR 0029](0029-composer-real-path-carrier.md)'s, predate this rule.
+
+## Index
+
 <!-- sdd:generated adr-index -->
 
 | ID | Title | Status | Date | Resolves / amends |

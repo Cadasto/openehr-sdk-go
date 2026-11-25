@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """sdd-check — the shared drift gate for a spec-driven repository.
 
-One file, standard library only, Python 3.9 or newer. The contract this file
+One file, standard library only, Python 3.11 or newer. The contract this file
 implements is `references/sdd-check.md` (families, report format, exit codes) and
 `references/traceability-schema.md` (the descriptor keys, the record fields, the
 generated-block markers).
@@ -9,8 +9,17 @@ generated-block markers).
 Exit codes: 0 ran with no errors, 1 ran with at least one error, 2 could not configure
 itself or verified nothing: the descriptor is missing, unparseable, wrong-shape, or names a
 path outside the repository; the command line is invalid; ``context`` was given an id with
-no record; or a ``check`` run in which no family ran.
+no record; a ``check`` run in which no family ran; or Python is older than 3.11.
 """
+
+import sys
+
+# The floor comes first, so an older Python prints one line instead of a traceback. The whole
+# file must still parse on Python 3.9 to reach it: no syntax newer than 3.9 anywhere.
+if sys.version_info < (3, 11):
+    sys.stderr.write("sdd-check needs Python 3.11 or newer; this is Python %d.%d.%d (%s).\n"
+                     % (sys.version_info[0], sys.version_info[1], sys.version_info[2], sys.executable or "python3"))
+    sys.exit(2)
 
 import collections
 import dataclasses
@@ -21,7 +30,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import tarfile
 import tempfile
 import urllib.parse
@@ -32,7 +40,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 # Constants
 # ---------------------------------------------------------------------------
 
-__version__ = "0.18.0"
+__version__ = "0.19.0"
 
 #: Every family, in report order.
 FAMILIES = (

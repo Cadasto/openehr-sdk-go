@@ -15,7 +15,7 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 | **Codegen drift** | [`.github/workflows/codegen-drift.yml`](../.github/workflows/codegen-drift.yml) | Mondays 06:00 UTC; `workflow_dispatch` |
 | **Release** | [`.github/workflows/release.yml`](../.github/workflows/release.yml) | Push of a `v*` tag; `workflow_dispatch` dry-run. Process in [releases.md](releases.md) |
 | **Docs CI** | [`.github/workflows/docs-ci.yml`](../.github/workflows/docs-ci.yml) | A pull request into `main` that changes a file `make docs-check` reads; `workflow_dispatch`. Runs `make docs-check`. The workflow lists those files |
-| **Docs site** | [`.github/workflows/docs-site.yml`](../.github/workflows/docs-site.yml) | A push to `main` that changes a file `make docs-check` reads; Mondays 06:00 UTC; `workflow_dispatch`. Builds the MkDocs site and deploys it to GitHub Pages once the repository's Pages source is set to GitHub Actions, which is not enabled yet (as of 2026-09-10) |
+| **Docs site** | [`.github/workflows/docs-site.yml`](../.github/workflows/docs-site.yml) | A push to `main` that changes a file `make docs-check` reads; Mondays 06:00 UTC; `workflow_dispatch`. Builds the MkDocs site and deploys it to GitHub Pages, at <https://cadasto.github.io/openehr-sdk-go/> |
 
 ### CI jobs (`ci.yml`)
 
@@ -27,7 +27,7 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 | **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-check`, `aqlgen-check`, `termgen-check`, `vet`, `spec-check`, `bmm-check`, `its-xml-check`, `flat-check`, `corpus-pins-check`, `terminology-check`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-check`, `aqlgen-check` and `termgen-check` |
 | **Test (fused multiply-add)** | `test-fused` | The unit tests again with `GOAMD64=v3`, so the compiler fuses a multiply and an add into one rounding as it always does on arm64 (Apple Silicon). A result whose last bits differ there, such as a seeded random draw, fails here instead of only on a contributor's Mac |
-| **Lint** | (via `golangci-lint-action` v2.15.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` |
+| **Lint** | (via `golangci-lint-action@v9` running golangci-lint v2.15.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` |
 | **Race** | `test-race` | Runs on a push to `main` that changes code, and on `workflow_dispatch`. Catches data races in `typereg` and codecs. The runner has a C compiler, so the race run uses the host `go` |
 
 Pull requests do not run the **Race** job. A merge that changes code runs it on the push to `main`.
@@ -101,7 +101,7 @@ Run `make help` for the full grouped list. Common targets:
 | Test | `make cdr-crosscheck` | Opt-in, and `make ci` does not run it: cross-checks the SDK's generated documents and the CDRs' own template examples against live CDRs ([§ REQ-082 *The CDR cross-check tool*](specifications/conformance.md#the-cdr-cross-check-tool)). Reads `OPENEHR_XC_TEMPLATES` (a directory of OPTs), `OPENEHR_LIVE_EHRBASE` and `OPENEHR_LIVE_FERROEHR` with their `_BASIC` credentials, and `OPENEHR_LIVE_ALLOW_MUTATING`. Without `OPENEHR_XC_TEMPLATES` it prints that it skipped and exits 0; with templates but no CDR, or without `OPENEHR_LIVE_ALLOW_MUTATING`, it generates and validates offline and skips the CDR stages. `-only REGEXP` in `ARGS` checks only the templates whose id matches, and the summary of such a run says it was filtered. Writes to a directory outside the repository that no other run has claimed (`-out` in `ARGS`, or `OPENEHR_XC_OUT`; by default a new one under the system temp directory), each record as it completes, so an interrupted run keeps them and writes a partial summary |
 | Lint | `make lint` | `golangci-lint` on host if the binary was built with Go 1.27, else Docker (`LINT_IMAGE`) |
 
-**Policy:** extend the [Makefile](../Makefile), not ad-hoc shell in workflows. CI and contributors share the same entry points ([AGENTS.md](../AGENTS.md) Tooling policy).
+**Policy:** extend the [Makefile](../Makefile), not ad-hoc shell in workflows. CI and contributors share the same entry points ([AGENTS.md § Tooling & workflow](../AGENTS.md#tooling--workflow)).
 
 ### Lint configuration
 
@@ -123,6 +123,6 @@ Run `make help` for the full grouped list. Common targets:
 ## See also
 
 - [docs/releases.md](releases.md): version policy, tag checklist, `v1.0.0` gate
-- [docs/ai-workflow.md](ai-workflow.md): agent pre-merge checklist
+- [docs/ai-workflow.md § The loop](ai-workflow.md#the-loop), and [AGENTS.md § Before you hand back](../AGENTS.md#before-you-hand-back): what an agent checks before a change is done
 - [resources/README.md](../resources/README.md): BMM pin and update procedure
 - [docs/specifications/conformance.md](../docs/specifications/conformance.md): PROBE-NNN definitions (tests run via `make test` today)
