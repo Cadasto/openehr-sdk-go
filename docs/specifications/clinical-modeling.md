@@ -2406,7 +2406,7 @@ Two entry points:
 - **Path-first API** — `Set(path string, v any) error` looks up the compiled node via `Compiled.NodeAt(path)` and routes the assignment through the parent attribute.
   Typed helpers `SetText`, `SetQuantity`, `SetCodedText` wrap the most common DV shapes.
   A path is a canonical OPT path as the compile step produces it, predicate-bracketed segments included where the OPT pins archetype roots or at-codes, and a positional `[@N]` segment for the Nth list child that has neither and no slot predicate.
-- **Type enforcement** — `Set` **MUST** accept a value:
+- **Type enforcement** — `Set` **MUST NOT** refuse with `ErrTypeMismatch` a value:
   - whose type the binding tiers of [§ REQ-102](#req-102--composition-validation) *Structural — alternatives* bind to a node the template allows at the path, one whose occurrences are not 0..0:
     - the node `Compiled.NodeAt(path)` returns;
     - or another alternative the OPT lists at the same path under the same attribute (the tiers bind by the type alone, to the first node of the first tier that admits it; the trial within a tier is the validator's);
