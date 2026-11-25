@@ -747,7 +747,7 @@ func TestMetadataTerminologyWitnessChecked(t *testing.T) {
 	}
 }
 
-// TestMetadataComposerRealPathCarriesTheRest — REQ-053, ADR 0029 (replacing
+// TestMetadataComposerRealPathCarriesTheRest — REQ-053, ADR 0015 (replacing
 // the ADR 0015 pin that refused these keys). The composer's external_ref
 // suffixes are not aliased onto ctx/, since no short form carries them, yet
 // they are not dropped either: the composer's real path carries them, and they
@@ -794,7 +794,7 @@ func TestMetadataComposerRealPathCarriesTheRest(t *testing.T) {
 	})
 }
 
-// TestComposerPartySubStructureDecoded — REQ-140 / REQ-053, ADR 0029
+// TestComposerPartySubStructureDecoded — REQ-140 / REQ-053, ADR 0015
 // (replacing the ADR 0015 pin that refused these keys). The party grammar
 // reaches the composer's `_identifier:N` list and a PARTY_RELATED's
 // `/relationship` as it does at every other party position; the corpus writes

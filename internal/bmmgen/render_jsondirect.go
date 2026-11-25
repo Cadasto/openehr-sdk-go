@@ -12,7 +12,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
-// The direct canonical-JSON encoder (ADR 0002 D8, § Encode writes each member
+// The direct canonical-JSON encoder (ADR 0022 § Encode writes each member
 // itself). A generated MarshalJSONTo writes `{`, `_type` and each member of
 // its class itself, as tokens on the encoder, unless the encoder carries an
 // option under which json/v2 would write a member otherwise

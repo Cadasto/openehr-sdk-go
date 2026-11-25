@@ -471,7 +471,7 @@ func firstObservation(t *testing.T, comp *rm.Composition) *rm.Observation {
 
 // --- context/_end_time, context/_location -------------------------------
 
-// TestRMAttrEventContextRoundTrip — REQ-140 / ADR 0016. The EVENT_CONTEXT
+// TestRMAttrEventContextRoundTrip — REQ-140 / ADR 0015. The EVENT_CONTEXT
 // optionals ride the underscore grammar under the real `context` segment, not
 // the ITS `ctx/` sketches. `_end_time` is a bare DV_DATE_TIME value,
 // `_location` a bare String.
@@ -492,7 +492,7 @@ func TestRMAttrEventContextRoundTrip(t *testing.T) {
 	}
 }
 
-// TestRMAttrEventContextWithoutTemplateNode — REQ-140 / ADR 0016. The
+// TestRMAttrEventContextWithoutTemplateNode — REQ-140 / ADR 0015. The
 // EVENT_CONTEXT optionals are RM-optional attributes a template need not
 // constrain, so `<root>/context/_*` must resolve its owner whether or not the
 // Web Template carries a `context` node. The corpus template does; this pins

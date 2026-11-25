@@ -182,7 +182,7 @@ func adhocQueryValues(q aql.Query, cfg executeConfig) (url.Values, error) {
 // and fetch when the caller set them, plus the form/explode
 // query_parameters.
 func storedQueryValues(params map[string]any, cfg executeConfig) (url.Values, error) {
-	// REQ-057, ADR 0026: an unset field stays off the wire, so the server
+	// REQ-057 Paging: an unset field stays off the wire, so the server
 	// applies its own default; an explicit 0 is sent. offset without fetch
 	// goes out as asked: refusing it is the server's call, not the SDK's.
 	v := url.Values{}
@@ -237,7 +237,7 @@ func queryParamString(val any) (string, error) {
 	return string(b), nil
 }
 
-// applyEHRScope scopes execution to one EHR per REQ-055 using the
+// applyEHRScope scopes execution to one EHR per REQ-057 using the
 // verb-appropriate mechanism from the openEHR ITS-REST OAS:
 //
 //   - GET — the `ehr_id` query parameter (declared on the GET operations).
@@ -245,7 +245,7 @@ func queryParamString(val any) (string, error) {
 //     the POST operations declare no `ehr_id` query parameter and the
 //     request bodies carry no `ehr_id` field — header is the only path).
 //
-// REQ-055 finding A: prior to this split the SDK always set the query
+// REQ-057 finding A: prior to this split the SDK always set the query
 // parameter, so a strict-spec server that scopes POST execution only via
 // the header would silently run population-wide. The header path closes
 // that gap by default; an explicit option is reserved for a future plan.
@@ -299,7 +299,7 @@ func storedBody(params map[string]any, cfg executeConfig) map[string]any {
 	// So offset and fetch are sent only when the caller set them (an
 	// explicit 0 included), and an unset one is left to the server's
 	// default. Leaving them out departs from the schema: REQ-057 states the
-	// rule, REQ-050 keys the exception and ADR 0026 decides it.
+	// rule, REQ-050 keys the exception and REQ-057 Paging gives its reason.
 	// query_parameters is always sent, as {} when there are none.
 	body := map[string]any{}
 	if cfg.offsetSet {

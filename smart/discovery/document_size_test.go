@@ -44,7 +44,7 @@ func stuffedToSize(t *testing.T, doc string, size int) string {
 // that its JSON ended early. The reasons stay those an unparsable document
 // of each kind gets: ReasonParseError for the SMART configuration and
 // ReasonFetchFailed for the OpenID configuration.
-func TestREQ072_DocumentOverTheCapIsRefusedForItsSize(t *testing.T) { // REQ-072, REQ-073
+func TestREQ072_DocumentOverTheCapIsRefusedForItsSize(t *testing.T) { // REQ-072
 	tests := []struct {
 		name       string
 		smart      func(t *testing.T, origin string) string

@@ -1,16 +1,16 @@
 package aql
 
-// projection_verify.go — REQ-163 § `Build()` verifies what it emitted.
+// projection_verify.go — REQ-055 § `Build()` verifies what it emitted.
 //
 // `Col` splices its argument into the projection list verbatim, so SELECT is a
 // clause the builder writes text into that it did not itself shape. Two failure
-// modes follow and they are opposite in direction, which is why REQ-163 settles
+// modes follow and they are opposite in direction, which is why REQ-055 settles
 // them with two rules rather than one:
 //
 //   - Text that re-parses as ONE projected item and introduces no clause-level
 //     flag the builder did not record — a function call, an aliased item, a path
 //     — is LEGACY and stays tolerated. Refusing it would be a behaviour break
-//     for no correctness gain (REQ-163 § rule 1, and [Col]'s own doc).
+//     for no correctness gain (REQ-055 § rule 1, and [Col]'s own doc).
 //   - Text that SPLITS the item list, spills out of SELECT into another clause,
 //     or introduces a clause-level flag is the SILENT mode: it emits valid AQL
 //     asking a different question, invisible to every round-trip, golden and
@@ -33,7 +33,7 @@ package aql
 //
 // # The mechanism
 //
-// REQ-163 § rule 2 fixes the DECISION and leaves the mechanism to the
+// REQ-055 § rule 2 fixes the DECISION and leaves the mechanism to the
 // implementing phase, under one constraint: openehr/aql cannot call
 // openehr/aql/parse, because parse imports aql and the call would be an import
 // CYCLE rather than a layering choice (imports_test.go pins the arrow).
@@ -48,7 +48,7 @@ package aql
 // would stop reading the projection the builder wrote.
 //
 // The literal re-parse stays the REFERENCE procedure, in the tests, where
-// importing parse is legal. Over the committed CORPUS — the REQ-163 projection
+// importing parse is legal. Over the committed CORPUS — the REQ-055 projection
 // rows in containment_roundtrip_test.go and the accept rows in
 // projection_test.go — every accepted query is built, emitted, parsed and
 // re-emitted to IDENTITY, and each refusal shape is confronted with the parser
@@ -60,7 +60,7 @@ package aql
 // Diagnostics stay value-free: a refusal names the COORDINATE — the item index,
 // the clause, and where a keyword is at fault its spelling from the SDK's own
 // fixed vocabulary — and never reproduces the offending projection text
-// (REQ-163 § `Build()` verifies the projection it emitted).
+// (REQ-055 § `Build()` verifies the projection it emitted).
 
 import (
 	"fmt"
@@ -88,7 +88,7 @@ type selectShape struct {
 	// five rows where the recorded `TOP 5` asks for the first. Nothing
 	// downstream can see the difference — the emitted query re-parses and
 	// re-emits byte-identically — so an unrecorded direction is the
-	// silent-substitution mode exactly (REQ-163 § `Col` stays lenient,
+	// silent-substitution mode exactly (REQ-055 § `Col` stays lenient,
 	// and `Build()` verifies what it emitted, which makes the clause-level FLAGS
 	// part of the compared structure).
 	topDir string
@@ -169,7 +169,7 @@ func (a *ast) selectClause() (string, recordedProjection, error) {
 	}
 	var sb strings.Builder
 	// Grammar order: `SELECT DISTINCT? top? selectExpr …`, so the flag precedes
-	// the deprecated TOP clause (REQ-163 § Canonical spellings).
+	// the deprecated TOP clause (REQ-055 § Canonical spellings).
 	//
 	// The TOP operand is rendered AS RECORDED here, before validatePaging runs
 	// later in build — a negative count, an unknown direction and the
@@ -202,7 +202,7 @@ func (a *ast) selectClause() (string, recordedProjection, error) {
 	return sb.String(), rec, nil
 }
 
-// verifySelectClause is REQ-163 § rule 2: the emitted clause is read back once
+// verifySelectClause is REQ-055 § rule 2: the emitted clause is read back once
 // and its REDUCED structure compared against what the builder recorded. A
 // disagreement means the wire text asks a different question, so it is refused
 // with an error wrapping [ErrInvalidQuery].
@@ -265,7 +265,7 @@ func compareSelectShape(got derivedProjection, rec recordedProjection) error {
 	// Aliases are compared only where the BUILDER fixed one: where the `AS`
 	// boundary falls inside a legacy [Col]'s verbatim text is not part of the
 	// recorded structure, which is what keeps `Col("COUNT(x) AS n")` tolerated
-	// (REQ-163 § rule 1).
+	// (REQ-055 § rule 1).
 	if len(got.shape.aliases) != len(rec.items) {
 		// The reduced bare-star form is the ONE legitimate length disagreement:
 		// it carries its projection in the flag, so there are no alias slots to
@@ -297,7 +297,7 @@ func compareSelectShape(got derivedProjection, rec recordedProjection) error {
 // coordinate names the item a byte offset falls in, or the clause when it falls
 // in none (the DISTINCT / TOP prefix, or a separator the emitter wrote). It
 // reproduces no projection text — the coordinate is the whole diagnostic
-// (REQ-163 § `Build()` verifies the projection it emitted).
+// (REQ-055 § `Build()` verifies the projection it emitted).
 func (r recordedProjection) coordinate(pos int) string {
 	for i, it := range r.items {
 		if pos >= it.start && pos < it.end {
@@ -484,7 +484,7 @@ func deriveSelectShape(clause string) derivedProjection {
 
 	// The reduction: a SOLE unaliased star item and the bare `SELECT *` flag
 	// are one encoding, so the star form carries ZERO items — which is how the
-	// text re-parses, and the spelling REQ-163 § Canonical spellings calls
+	// text re-parses, and the spelling REQ-055 § Canonical spellings calls
 	// canonical.
 	//
 	// It runs on the COMMENT-STRIPPED text, and that order is what keeps the
@@ -675,7 +675,7 @@ func scanProjection(text string) projectionScan {
 				// reach the parser, and the projection either side of it reads
 				// back as the projection the builder recorded. The lexer skips a
 				// comment, so this is WHITESPACE with a body — recorded for the
-				// derivation to strip, not refused (REQ-163 § rule 2 refuses
+				// derivation to strip, not refused (REQ-055 § rule 2 refuses
 				// nothing that does not change the structure).
 				sc.comments = append(sc.comments, commentSpan{start: i, end: i + n})
 			}

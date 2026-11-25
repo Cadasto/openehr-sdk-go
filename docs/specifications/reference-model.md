@@ -7,7 +7,6 @@ kind: specification
 **Status:** Draft
 
 Rules for representing the openEHR Reference Model (RM) and the other BMM-derived models in Go: the shape of the generated types, the openEHR terminology vocabulary (REQ-034) and the type registry (REQ-040); the pinned BMM sources, the loader and the generator's mapping (REQ-041, REQ-045, REQ-048); and the RM's behavioural functions (REQ-120, REQ-121, REQ-123).
-The retired REQ-030 to REQ-033 are [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go); the retired REQ-042, REQ-043, REQ-044, REQ-046 and REQ-047 are part of REQ-041, the retired REQ-049 is part of REQ-048, and the retired REQ-122 is part of REQ-120.
 
 The RM types in `openehr/rm/` are **generated** from the SDK-authored RM root over the pinned BMM schemas in [`../resources/bmm/`](../../resources/bmm); the rules below state the *shape* the generator emits.
 Generator semantics (mapping rules per P_BMM construct, primitive types, file conventions) are [§ BMM sources and the generator](#bmm-sources-and-the-generator).
@@ -21,7 +20,7 @@ The generator's output rule is [ADR 0002](../adr/0002-bmm-codegen-decisions.md) 
 - **Concrete structs.** Every concrete RM class is a concrete Go struct (`Composition`, `Observation`, `DVQuantity`, …).
   There is no runtime base struct that types inherit from, no single RM struct with a `Type` discriminator field, and no `interface{}`-typed payload with a `Kind` enum.
 - **Flattened ancestors.** An abstract non-generic ancestor's properties are flattened into every concrete descendant: the generated `Composition` carries `Name`, `ArchetypeNodeID`, `UID` and the other `LOCATABLE` fields as its own.
-  Only concrete ancestors and whitelisted abstract-generic ancestors (such as `EVENT`, [ADR 0003](../adr/0003-rm-event-polymorphism.md)) appear as embedded structs.
+  Concrete ancestors and abstract generic ancestors appear as embedded structs (`ObjectRef` in `PartyRef`, `Version[T]` in `OriginalVersion[T]`), with one exception: `EVENT` is a marker interface that `PointEvent` and `IntervalEvent` implement with its fields flattened into them, so a `HISTORY.events` member decodes polymorphically ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4).
 - **Marker interfaces for abstract categories.** An abstract RM category (`DATA_VALUE`, `ITEM_STRUCTURE`, `ENTRY`, …) is a Go interface with an unexported marker method (`isDataValue()`), which keeps a type outside the package from satisfying it by accident; a concrete type satisfies it through its method set, with no registration.
 - **The type registry for `_type`.** The `_type` discriminator maps onto a concrete Go type only through the type registry ([§ Type registry (REQ-040)](#type-registry-req-040)): no tag-magic dispatch on a peeked `_type`, and no generic "RM node" that holds any kind of RM value indistinguishably.
 
@@ -319,7 +318,7 @@ A `P_BMM_CONTAINER_PROPERTY` field (`[]T`) carries `omitzero` when its cardinali
 The item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` are the exception: they carry `omitzero`, and [wire.md § An absent mandatory member](wire.md#an-absent-mandatory-member) says how they are written and why `[]` is RM-valid for them.
 Every other optional container keeps `omitempty`; one an invariant keeps non-empty, as `Mappings_valid` keeps `DV_TEXT.mappings`, could not take the exception, since `[]` would be RM-invalid.
 A `P_BMM_GENERIC_PROPERTY` over `Hash` or `List` follows the single-property rule: a mandatory one is `map[string]V` or `[]T` with `omitzero`, and an optional one is `*map[string]V` or `*[]T` with `omitzero`.
-Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-the-streaming-json-marshaler-pair) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md).
+Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0022 § Omit options](../adr/0022-canonical-json-encoding-json-v2.md#omit-options).
 
 The generated `DVQuantity`, its doc comments left out, shows the rules: its abstract ancestors' fields (`Accuracy`, `MagnitudeStatus`, `NormalRange`, …) flattened in with no embedded ancestor, mandatory properties by value, optional single properties as pointers with `omitzero`, and an optional list with `omitempty`:
 
@@ -383,9 +382,9 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | BMM primitive | Go type | Notes |
 |---|---|---|
 | `Boolean` | `bool` | |
-| `Integer` | `rm.Integer` (underlying `int32`) | Pinned to 32-bit per the BMM spec. Emitted as the defined type `rm.Integer` so the codec can attach the wire-tolerance rule from [ADR 0004](../adr/0004-numeric-wire-tolerance.md). |
-| `Integer64` | `rm.Integer64` (underlying `int64`) | Emitted as the defined type `rm.Integer64` so the codec can attach the same wire-tolerance rule as `Integer` ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)). `DV_COUNT.magnitude` is the RM's one `Integer64` attribute. |
-| `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [ADR 0004](../adr/0004-numeric-wire-tolerance.md). |
+| `Integer` | `rm.Integer` (underlying `int32`) | Pinned to 32-bit per the BMM spec. Emitted as the defined type `rm.Integer` so the codec can attach the wire-tolerance rule from [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers). |
+| `Integer64` | `rm.Integer64` (underlying `int64`) | Emitted as the defined type `rm.Integer64` so the codec can attach the same wire-tolerance rule as `Integer` ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers)). `DV_COUNT.magnitude` is the RM's one `Integer64` attribute. |
+| `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers). |
 | `Double` | `float64` | Same as `Real`, no codec tolerance attached. |
 | `Character` | `rm.Character` | canonical JSON single-character **string**, not a number; hand-written named type, like `Integer`/`Real` |
 | `String` | `string` | |
@@ -471,7 +470,7 @@ When no form's schema descends from the schema of every other form, the load fai
 
 The SDK **MUST** expose the pinned Reference Model's **class graph** — not only the per-class attribute shape it already answers — as a **compiled-in** introspection surface, so that a consumer reasoning about the RM rather than about one template (AQL class-expression expansion and `CONTAINS` conformance, polymorphic slot fit, validation walkers, BMM-faithful re-serialisation and schema diffing) does not have to re-reduce the pinned BMM for itself.
 
-The surface is generated from the **primary** RM BMM file by the generator of [REQ-041](#req-041--pinned-bmm-sources), and it loads, parses and resolves no BMM schema at runtime ([ADR 0005](../adr/0005-compiled-template-foundation.md) C1).
+The surface is generated from the **primary** RM BMM file by the generator of [REQ-041](#req-041--pinned-bmm-sources), and it loads, parses and resolves no BMM schema at runtime ([ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md) decision 2).
 Its package, `openehr/rm/rminfo`, keeps to the import rule [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence) gives it.
 
 #### The class universe

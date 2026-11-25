@@ -234,7 +234,7 @@ Wire-equivalence is the only check on encoded JSON a probe in this catalog makes
 - **Effect:** mutating (the revoked grant).
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox).
-- **Satisfies:** REQ-167.
+- **Satisfies:** REQ-063.
 
 #### Launch-mode coverage
 
@@ -322,10 +322,10 @@ Its client scenarios map to SDK coverage as follows:
 - **Preconditions:** Reference deployment that validates AQL against templates.
 - **Wire assertion:** The typed builders cannot emit syntactically invalid AQL (structural guarantee).
   Execution of a query referencing a non-existent path returns the backend's AQL error envelope; the SDK maps it to `*query.AQLError`, which satisfies `errors.Is(err, aql.ErrPathResolution)`.
-  A **501** response maps to `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)` and never `aql.ErrPathResolution`: the capability gap is read from the status alone, with an envelope or bare, never from message text (REQ-055).
+  A **501** response maps to `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)` and never `aql.ErrPathResolution`: the capability gap is read from the status alone, with an envelope or bare, never from message text (REQ-057).
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — against synthesised backend responses: a path-resolution envelope, and a 501 capability gap with an envelope and bare.
-- **Satisfies:** REQ-055.
+- **Satisfies:** REQ-057.
 
 #### PROBE-028 — AQL lint stability
 
@@ -374,15 +374,15 @@ Its client scenarios map to SDK coverage as follows:
 
 #### PROBE-088 — AQL builder containment and paging stability
 
-- **Title:** The builder's negated containment (`NOT CONTAINS`), sibling containment junctions (`AND`/`OR`, parenthesised by precedence), opt-in in-text `LIMIT`/`OFFSET`, the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause, and the write-side carriers of [REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) emit byte-stable canonical AQL, and a builder program using none of them emits what it emitted before they existed.
+- **Title:** The builder's negated containment (`NOT CONTAINS`), sibling containment junctions (`AND`/`OR`, parenthesised by precedence), opt-in in-text `LIMIT`/`OFFSET`, the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause, and the write-side carriers of [REQ-055](aql.md#req-055--aql-builder) emit byte-stable canonical AQL, and a builder program using none of them emits what it emitted before they existed.
   The write-side carriers are the `VERSION` predicate bracket, the class-position standing comparison, and the typed projection: `DISTINCT`, `AS`, aggregates, function calls, literals, star.
 - **Preconditions:** Committed goldens covering the constructs: one per `versionPredicate` alternative; one per standing-predicate operand kind the write side can express (`pathPredicateOperand`'s `primitive`, `objectPath` and `PARAMETER` alternatives; its `ID_CODE` and `AT_CODE` alternatives have no `aql.Value` shape, so the builder cannot reach them); REQ-161's suppression shape; and one per `columnExpr` alternative plus the clause-level flags; beside the unchanged PROBE-020 golden.
 - **Wire assertion:** In-repo golden comparison (no backend): built query strings match the committed goldens byte for byte, and each golden re-parses and re-emits unchanged, which ties the write-side canonical form to PROBE-087.
-  Each build-time refusal of [§ REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) (a second row-bound channel, a `TOP` beside a row limit or with a negative count, a `SELECT` that does not read back as the projection the builder recorded, a typed construction the grammar does not admit where it renders) has a row that expects an error and no emission.
+  Each build-time refusal of [§ REQ-055](aql.md#req-055--aql-builder) (a second row-bound channel, a `TOP` beside a row limit or with a negative count, a `SELECT` that does not read back as the projection the builder recorded, a typed construction the grammar does not admit where it renders) has a row that expects an error and no emission.
   The check is over the class of refusal rather than a fixed count of rows, so a shape added to either class extends it without amending this entry.
 - **Modes:** In-repo (golden comparison of the SDK's own output; no backend).
 - **Status:** Implemented (inline).
-- **Satisfies:** REQ-163.
+- **Satisfies:** REQ-055.
 
 #### PROBE-090 — AQL emission round-trip closure
 
@@ -443,12 +443,12 @@ Its client scenarios map to SDK coverage as follows:
 - **Wire assertion:** In-repo property, three arms.
   **(a) Per-code corpus:** for each REQ-161 code, at least one corpus query yields it with the specified severity at the span of the offending construct, and at least one near-miss query stays silent.
   The unknown-class suppression rule (an unknown operand suppresses the pair checks), the archetype-mismatch suppression (a literal archetype predicate whose declared class or HRID type segment is unknown yields `aql_unknown_rm_class` only, never `aql_archetype_class_mismatch`) and the `aql_fanout_row_grain` conservative firing rule are each pinned by their own negative case.
-  **(b) Additivity guard:** every query of the pre-REQ-161 corpus that carried no REQ-161 defect yields an unchanged issue-code multiset; corpus queries that genuinely carry a newly-checked defect are re-baselined deliberately, recorded here.
+  **(b) Additivity guard:** every query of the PROBE-028 lint corpus that carries no REQ-161 defect yields an unchanged issue-code multiset; a corpus query that carries a newly checked defect is re-baselined deliberately and recorded here.
   **(c) Read/write parity** ([§ REQ-161 § Builder adapter](aql.md#builder-adapter)): for corpus queries the builder can express, the verification's code multiset equals the containment-code subset of `lint.LintString` over the emitted text.
   The class-position `VERSION` predicate, the class-position standing comparison and the typed projection are builder constructs, so the corpus carries them through the same comparison; what stays unspellable is the FROM root's own bracket in every spelling (archetype, standing or version), since the write-side FROM clause carries an RM type and an alias and nothing else.
 - **Modes:** In-repo (unit-level; no backend).
-- **Status:** Implemented (inline) — PROBE-028's three fixtures gain none of the REQ-161 codes this probe pins, so arm (b) needed no re-baseline.
-- **Satisfies:** REQ-160, REQ-161, REQ-163.
+- **Status:** Implemented (inline) — PROBE-028's three fixtures gain none of the REQ-161 codes this probe pins.
+- **Satisfies:** REQ-160, REQ-161, REQ-055.
 
 #### PROBE-099 — AQL path-shape lint corpus
 
@@ -467,7 +467,7 @@ Its client scenarios map to SDK coverage as follows:
 - **Title:** Every FROM/CONTAINS variant a vendored FROM-family combination corpus recorded as engine-accepted parsed under the SDK grammar profile and raised no Error-severity containment code.
 - **Modes:** In-repo (no longer run).
 - **Status:** Deprecated — superseded by [PROBE-107](#probe-107--upstream-aql-suite-admissibility-corpus), which holds every answered query to no Error-severity lint issue at all; the identifier is retained and not reused.
-- **Satisfies:** none (formerly REQ-160).
+- **Satisfies:** none.
 
 #### PROBE-107 — Upstream AQL suite admissibility corpus
 
@@ -681,7 +681,7 @@ Its client scenarios map to SDK coverage as follows:
   The harness respells only the upstream side, only where the Web Template holds the duplicate group, and pins each fixture's respelled keys.
 
   The allow-list holds out **respellings** only: `language`, `territory`, `composer|name`, `composer_self`, `context/start_time` and `context/setting`, which REQ-053 reads and writes as the `ctx/` short forms where upstream writes real paths.
-  The composer's `external_ref` suffixes (`composer|id`, `|id_scheme`, `|id_namespace`) and its party sub-structure (`composer/_identifier:N`, `composer/relationship`) are not respellings: decode reads them and encode writes them at the same real path ([ADR 0029](../adr/0029-composer-real-path-carrier.md)), so the census compares them.
+  The composer's `external_ref` suffixes (`composer|id`, `|id_scheme`, `|id_namespace`) and its party sub-structure (`composer/_identifier:N`, `composer/relationship`) are not respellings: decode reads them and encode writes them at the same real path ([ADR 0015](../adr/0015-flat-metadata-spelling.md)), so the census compares them.
   The harness derives its expected hold-out from the codec's exported alias accessors (`simplified.MetadataAliasSpellings`, `MetadataWitnessSpellings`) and checks both directions, so an alias accepted on decode but missing from the hold-out, and a hold-out with no alias behind it, both fail the harness's own tests.
   The hold-out carries **no waiver**, and a new waiver is a spec decision, not a harness edit.
   Why each spelling is held out, and why the match is suffix-aware, is in [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md) § How the exclusion list is produced.
@@ -915,7 +915,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 #### PROBE-069 — `Idempotency-Key` header round-trip
 
 - **Modes:** Sandbox.
-- **Status:** Deprecated — its requirement, REQ-097, is retired and the SDK no longer sends `Idempotency-Key`; the identifier is retained and not reused.
+- **Status:** Deprecated — the SDK sends no `Idempotency-Key`; the identifier is retained and not reused.
 
 #### PROBE-070 — Admin `DeleteEHR` round-trip
 
@@ -941,13 +941,13 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 
 - **Title:** `POST /ehr/{ehr_id}/contribution` request body is the ITS-REST `Contribution_create` shape — `{audit, versions: [ORIGINAL_VERSION<T>|IMPORTED_VERSION<T> with inline data]}`, bar a deletion built without a payload — not the persisted `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`.
 - **Preconditions:** Existing EHR; at least one resource payload (`Composition` / `EHRStatus` / `Folder` / `EHRAccess`) to commit.
-- **Wire assertion:** Captured request body has `versions[i]._type ∈ {"ORIGINAL_VERSION","IMPORTED_VERSION"}` and carries the resource payload inline under `data`, except an `ORIGINAL_VERSION` with change type `523` built without a payload ([§ REQ-130](wire.md#req-130--contribution-builder) *Deletion*, keyed by [ADR 0024](../adr/0024-contribution-deletion-without-data.md)), which carries no `data` member; a `"data":null` fails on every version.
+- **Wire assertion:** Captured request body has `versions[i]._type ∈ {"ORIGINAL_VERSION","IMPORTED_VERSION"}` and carries the resource payload inline under `data`, except an `ORIGINAL_VERSION` with change type `523` built without a payload ([§ REQ-130](wire.md#req-130--contribution-builder) *Deletion*), which carries no `data` member; a `"data":null` fails on every version.
   A request body whose `versions[]` contains `{"_type":"OBJECT_REF", ...}` is non-conformant per the ITS-REST OpenAPI `Contribution_create` schema (the persisted `OBJECT_REF` shape returns at read time only).
   **Commit-audit shape (SPECITS-95 / ITS-REST PR 131):** the batch `audit` and each `versions[i].commit_audit` omit the server-assigned `time_committed` and carry a `DV_CODED_TEXT`-shaped `change_type` (nested `defining_code`), not the erroneous flat `TERMINOLOGY_CODE`.
   The SDK emits `_type:"AUDIT_DETAILS"` by default, a form the pin asks servers to accept; `UPDATE_AUDIT`, the form the pin asks clients to send, is a caller-selected alternative.
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox).
-- **Satisfies:** REQ-050.
+- **Satisfies:** REQ-130.
 
 #### PROBE-073 — Demographic PARTY polymorphic round-trip
 
@@ -968,7 +968,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
   A backend that only honours the header would run a query lacking it population-wide — the assertion catches an SDK regression that scopes POST via the query parameter instead.
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox).
-- **Satisfies:** REQ-055.
+- **Satisfies:** REQ-057.
 
 #### PROBE-079 — `PutStoredQuery` recovers `{name, version}` from `Location`
 

@@ -74,7 +74,7 @@ func (s *Source) Revoke(ctx context.Context) error {
 	s.session++
 	s.setTokensLocked(auth.Token{}, "")
 	// The exchange still running belongs to the session just ended. Drop it
-	// so a later Token does not wait out its HTTP call (REQ-167, REQ-063).
+	// so a later Token does not wait out its HTTP call (REQ-063).
 	// That exchange clears inflight only when the stored one is still
 	// itself, so a newer exchange is left in place.
 	s.inflight = nil

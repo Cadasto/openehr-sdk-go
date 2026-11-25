@@ -370,7 +370,7 @@ func TestREQ053IndexedMetadataWitness(t *testing.T) {
 // TestREQ053IndexedMetadataRefusalsHold: the refusals the unindexed spelling
 // meets apply to the indexed one as well. A suffix the ctx/ form cannot carry on
 // a leaf it owns is refused; at the composer's real path, which carries the
-// whole composer (ADR 0029), the party grammar's refusals hold, and the indexed
+// whole composer (ADR 0015), the party grammar's refusals hold, and the indexed
 // external_ref decodes as the unindexed one does.
 func TestREQ053IndexedMetadataRefusalsHold(t *testing.T) {
 	wt, compiled := corpusTarget(t)

@@ -3,7 +3,7 @@ package validation_test
 // rmfloor_chained_test.go: REQ-102 § RM floor, REQ-112 — every
 // template-driven entry point applies the RM rules in its walk and returns
 // their findings in the same Result, on the nodes the OPT models and on
-// those it does not (ADR 0025, ADR 0027). These tests inject a defect only
+// those it does not (ADR 0025). These tests inject a defect only
 // the RM rules report and fail if the rules are not part of the
 // template-driven result. They replace the STRAND-14 pin, which held the
 // opposite while the strand was open.

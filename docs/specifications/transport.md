@@ -7,8 +7,6 @@ kind: specification
 **Status:** Draft
 
 Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages.
-Covers REQ-090 through REQ-094, REQ-098, REQ-150 (path-parameter segment validation), REQ-151 (typed 2xx failures), REQ-166 (Bearer challenge on 401 and 403) and REQ-066 (caller attribution).
-REQ-096, REQ-097 and REQ-172 are retired.
 
 openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.md](wire.md).
 Service catalog resolution lives in [auth.md](auth.md).
@@ -84,7 +82,7 @@ A `PUT`, a `DELETE`, and a `POST` under `RetryNonIdempotent`, each with its 2xx 
 ## REQ-092 — TLS posture
 
 The SDK does not allocate its own `*http.Client` (REQ-021), so TLS configuration is the consumer's responsibility.
-The discovery resolver's refusal of plaintext URLs, its `WithAllowInsecure()` opt-out and the warnings it logs for plaintext URLs are [auth.md § REQ-073](auth.md#req-073--discovery-trust-posture)'s.
+The discovery resolver's refusal of plaintext URLs, its `WithAllowInsecure()` opt-out and the warnings it logs for plaintext URLs are [auth.md § REQ-072](auth.md#trust-posture) *Trust posture*'s.
 
 The SDK **MUST NOT** silently override or relax the consumer's `*http.Client` TLS config.
 
@@ -240,11 +238,20 @@ Out of scope:
 
 ---
 
-## REQ-150 — Path-parameter segment validation
+## REQ-150 — Path-parameter encoding and segment validation
 
-`REQ-050` makes the transport the single canonical path *encoder*.
-This requirement makes it the single path-*segment validator* as well.
+The transport is the one place that encodes a request path and the one place that validates its segments.
 Encoding without validation leaves every caller owning a class of request-URI mutation that the type system cannot see.
+
+### Encoding
+
+A request path **MUST** conform to the OAS path template: each path parameter is percent-encoded exactly once on the wire.
+`transport.Request.Path` is a decoded path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out, so a leaf client (`openehr/client/*`) puts the raw, decoded id into `Request.Path` and does not escape it first with `url.PathEscape`.
+A pre-escaped parameter is encoded twice (a template id `Referral Request.v1` becomes `%20`, then `%2520`), which a strict server unescapes to a literal `%20` and answers `404`.
+Which characters a segment may hold is *Segment validation* below, which ignores `url.URL.RawPath`, so an encoded spelling cannot carry a separator past the validator.
+Decoding a server-supplied value, such as the `Location` header with `url.PathUnescape`, is unaffected: the rule is about forming the request path, not reading a response.
+
+### Segment validation
 
 Before issuing an HTTP request, the transport **MUST** validate the decoded `Request.Path` (not the service base URL).
 The path is split on `/`; the leading empty segment of an absolute path is ignored.
@@ -415,7 +422,7 @@ type BearerChallenge struct {
 ### Re-authentication retry
 
 `transport.WithReauthOn401(r auth.Reauther)` installs an opt-in retry for a wire `401`; without it, a `401` returns `transport.ErrUnauthorized` after one upstream call.
-It backs up the proactive renewal of a token source ([auth.md § REQ-063](auth.md#req-063--token-refresh)), for a token that expires between that check and the wire round trip.
+It backs up the proactive renewal of a token source ([auth.md § REQ-063](auth.md#req-063--token-refresh-and-revocation)), for a token that expires between that check and the wire round trip.
 [auth.md § Forced refresh](auth.md#forced-refresh) specifies `auth.Reauther`, `auth.ReautherFunc` and the providers that implement them.
 
 When a `401` arrives:

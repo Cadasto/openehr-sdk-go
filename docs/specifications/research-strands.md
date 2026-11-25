@@ -44,7 +44,7 @@ Resolved without an ADR: package-level functions are the primary surface; codifi
 
 **Status:** Partially resolved.
 
-[ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) settles the codec and holds its performance budget, with [ADR 0003](../adr/0003-rm-event-polymorphism.md), [ADR 0004](../adr/0004-numeric-wire-tolerance.md) and [ADR 0021](../adr/0021-json-member-order-not-a-contract.md) for the `EVENT` interface, numeric tolerance and member order; codified in [reference-model.md § Type registry (REQ-040)](reference-model.md#type-registry-req-040) and [wire.md § REQ-052](wire.md#req-052).
+[ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) settles the codec and holds its performance budget, which also decides numeric tolerance and member order, with [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4 for the `EVENT` interface; codified in [reference-model.md § Type registry (REQ-040)](reference-model.md#type-registry-req-040) and [wire.md § REQ-052](wire.md#req-052).
 
 **Still open:**
 
@@ -122,7 +122,7 @@ Premature resolution is worse than no resolution.
 
 ## STRAND-09 — ITS-REST conformance follow-ups
 
-Resolved by the REST probes PROBE-062, PROBE-102, PROBE-103 and PROBE-104, and by [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md) for the stored-query paging fields; codified in [conformance.md](conformance.md) and [wire.md § REQ-057](wire.md#req-057) *Paging*.
+Resolved by the REST probes PROBE-062, PROBE-102, PROBE-103 and PROBE-104, and by [wire.md § REQ-057](wire.md#req-057) *Paging* for the stored-query paging fields; codified in [conformance.md](conformance.md).
 
 ---
 
@@ -311,4 +311,4 @@ Resolved by [ADR 0035](../adr/0035-compile-step-reads-operational-template-model
 | [STRAND-14](#strand-14) | Template-driven validation and the RM floor | Resolved | REQ-102, REQ-112 |
 | [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Partially resolved | REQ-040, REQ-052, REQ-112, REQ-170, REQ-175 |
 | [STRAND-16](#strand-16--validator-policy-beyond-the-limits) | Validator policy beyond the limits | Open | REQ-102, REQ-171 |
-| [STRAND-17](#strand-17--the-opt-parser-and-the-generated-operational-template-model) | The OPT parser and the generated OPT model | Resolved | REQ-013, REQ-100, REQ-103, REQ-107, REQ-108, REQ-111, REQ-176 |
+| [STRAND-17](#strand-17--the-opt-parser-and-the-generated-operational-template-model) | The OPT parser and the generated OPT model | Resolved | REQ-013, REQ-103, REQ-107, REQ-108, REQ-111, REQ-176 |

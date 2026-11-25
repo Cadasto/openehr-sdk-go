@@ -64,11 +64,11 @@ Rules the plugin does not know, or that reverse its defaults:
   - User-facing error text, `docs/quick-start.md`, `docs/examples.md` and the site under `pages/` carry no REQ, ADR, STRAND or PROBE id either.
   - Maintainer comments may cite them.
   - `TestGodocCarriesNoSpecProcessIdentifiers` ([`internal/godoc_ids_guard_test.go`](internal/godoc_ids_guard_test.go)) fails on a REQ, ADR or STRAND id in a package comment or the doc comment of an exported identifier in any non-test Go file, `internal/`, `cmd/` and `testkit/probes/` included. Put the citation in a comment go doc does not show, such as one in the function body.
-- No `SDK-GAP` identifier: a gap is worked under a REQ with a PROBE ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
+- No `SDK-GAP` identifier: a gap is worked under a REQ with a PROBE.
 - Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program ([ai-workflow.md § Examples](docs/ai-workflow.md#examples)); a new program fails `TestExampleDirectoryCensus` until `transcripts_test.go` classifies it.
 - Plans go in [`docs/plans/`](docs/plans/), never superpowers' default `docs/superpowers/` tree ([development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd)).
 - **Backlog size.** [`docs/backlog.md`](docs/backlog.md) is kept at about 80 `- ` entries, not the sdd plugin's 40: the session hook's "over the 40" line is informational until the count passes 80.
-- **Retiring a requirement** moves its entry to [retired-requirements.md](docs/specifications/retired-requirements.md) and points the map row's `canonical` there ([specifications/README.md § Editing rules](docs/specifications/README.md#editing-rules)), not the sdd plugin's default of keeping the section in its topic spec.
+- **Retiring a requirement** moves its entry to [retired-requirements.md](docs/specifications/retired-requirements.md) and deletes its `traceability.yaml` row ([specifications/README.md § Editing rules](docs/specifications/README.md#editing-rules)), not the sdd plugin's default of keeping the section and a `retired` row. That page is the only place a retired number appears, and `make spec-check` refuses a row that reuses one; a test that cited it is re-cited to the requirement that took its rule.
 - **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 450 words; quote only the output that proves a claim. A specification sentence over about 60 words that a change touches is split in that change: a chain of conditions becomes a list of condition and behaviour, or a small table, saying no more and no less than before.
 
 ## Module layout & boundaries
@@ -114,7 +114,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | One package, fast loop | `go test ./openehr/serialize/canjson/... -run TestName -count=1`; skips the codegen checks `make test` runs first, so `make ci` stays the gate |
 | Spec gate | `make spec-check` prints the verdict; `make sdd-check` prints every warning |
 | Regenerate spec indexes | `make spec-generate`: the map's `tests:` lists, the REQ.md registry and the ADR index |
-| Spec context bundle | `make spec-context REQ=NNN OUTLINE=1`, then `RULE=<name>` (§ Spec-driven workflow) |
+| Spec context bundle | `make spec-context REQ=NNN OUTLINE=1`, then `RULE=<name>` (§ Spec-driven workflow); `PROBE=NNN` prints one probe's catalog entry |
 | Keyword diff against a base | `make spec-kwdiff BASE=<ref>`; `CHECK=1` fails when a file's keyword counts change |
 
 **Gotchas worth the reading:**

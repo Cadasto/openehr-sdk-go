@@ -1,6 +1,6 @@
 package definition_test
 
-// path_encoding_test.go — REQ-050. The transport is the single canonical path
+// path_encoding_test.go — REQ-150. The transport is the single canonical path
 // encoder (Request.Path is a decoded path), so a definition client MUST
 // interpolate the RAW id and let the transport percent-encode it exactly once.
 // Pre-escaping with url.PathEscape double-encodes any id with an encodable
@@ -54,7 +54,7 @@ func assertSingleEncoded(t *testing.T, op, decoded, escaped string) {
 }
 
 // TestTemplateReadPathSingleEncoded holds both template reads to the
-// single-encode contract (REQ-050, REQ-177). The deprecated GetTemplate has
+// single-encode contract (REQ-150, REQ-177). The deprecated GetTemplate has
 // no row: it sends what GetOperationalTemplate sends, which
 // TestGetTemplateIsOperationalTemplateAlias pins.
 func TestTemplateReadPathSingleEncoded(t *testing.T) {
@@ -100,7 +100,7 @@ func TestExampleCompositionPathSingleEncoded(t *testing.T) {
 	}
 }
 
-// TestTemplateSpacedIDRoundTrip is the REQ-050 acceptance case: upload a
+// TestTemplateSpacedIDRoundTrip is the REQ-150 acceptance case: upload a
 // template whose id contains a space, then read it back by that id with
 // GetOperationalTemplate and receive 200 with the body. A double-encoded GET
 // requests a literal "Referral%20Request.v1" id, which the store never

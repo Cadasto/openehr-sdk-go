@@ -72,14 +72,14 @@ func probe088Goldens(t *testing.T) map[string]string {
 	return goldens
 }
 
-// PROBE-088 — builder containment algebra, in-text paging, and (since REQ-163)
+// PROBE-088 — builder containment algebra, in-text paging, and (since REQ-055)
 // the version-predicate, standing-predicate and typed-projection carriers. Each
 // construct emits its committed golden, both builder styles agree, the
 // PROBE-020 golden is unchanged, and combining the two paging channels — or
 // emitting a SELECT that does not read back as the recorded projection — is a
 // build-time error.
 //
-// REQ-163: PROBE-088's goldens include the deprecated SELECT TOP clause, so
+// REQ-055: PROBE-088's goldens include the deprecated SELECT TOP clause, so
 // the builder's TOP emission is held byte for byte.
 func TestProbe088BuilderContainmentAndPaging(t *testing.T) {
 	r, err := aqlprobes.Probe088BuilderContainmentAndPaging(probe088Goldens(t), goldenWire(t))
@@ -110,8 +110,8 @@ func TestProbe088DetectsGoldenDrift(t *testing.T) {
 }
 
 // TestProbe088DetectsProbe020Drift locks the semver contract from the other
-// side: a rewritten PROBE-020 golden fails PROBE-088 even though every REQ-163
-// construct still matches (wire.md § REQ-055 — canonicalisation is semver).
+// side: a rewritten PROBE-020 golden fails PROBE-088 even though every REQ-055
+// construct still matches (aql.md § REQ-055 — canonicalisation is semver).
 func TestProbe088DetectsProbe020Drift(t *testing.T) {
 	r, err := aqlprobes.Probe088BuilderContainmentAndPaging(probe088Goldens(t),
 		"SELECT o FROM EHR e CONTAINS OBSERVATION o")
@@ -124,7 +124,7 @@ func TestProbe088DetectsProbe020Drift(t *testing.T) {
 }
 
 // TestProbe020GoldenIsBytePinned asserts the committed PROBE-020 golden file
-// equals the literal pinned in the probe package — the REQ-163 additions are
+// equals the literal pinned in the probe package — the REQ-055 additions are
 // semver-minor, so the base canonical form MUST be untouched.
 func TestProbe020GoldenIsBytePinned(t *testing.T) {
 	if got := goldenWire(t); got != aqlprobes.Probe020CanonicalQuery {
@@ -135,12 +135,12 @@ func TestProbe020GoldenIsBytePinned(t *testing.T) {
 // TestProbe088GoldensRoundTripThroughParse ties PROBE-088 to PROBE-087: every
 // committed golden MUST parse with no catalogue gap (no aql.ErrIncompleteAST)
 // and re-emit to the same bytes, so the builder's canonical form and the
-// parser's are provably the same form (REQ-163).
+// parser's are provably the same form (REQ-055).
 //
-// Since REQ-163 the goldens include that REQ's three write-side carriers — the
+// Since REQ-055 the goldens include that REQ's three write-side carriers — the
 // VERSION predicate bracket, the class-position standing comparison and the
 // typed projection — so this is also where their byte-IDENTITY duty is met on the
-// committed files (REQ-163 § Read-side mirror duty); the corpus grows with
+// committed files (REQ-055 § Read-side mirror duty); the corpus grows with
 // [aqlprobes.Probe088Constructs], so a new construct is picked up here for free.
 func TestProbe088GoldensRoundTripThroughParse(t *testing.T) {
 	for name, golden := range probe088Goldens(t) {
@@ -291,16 +291,16 @@ func TestProbe028DetectsCodeDrift(t *testing.T) {
 // aql_version_no_predicate on the read side), it is only the write-side
 // finding that has no counterpart.
 //
-// What arm (c) can express WIDENED at REQ-163: the class-position version
+// What arm (c) can express WIDENED at REQ-055: the class-position version
 // predicate, the class-position standing comparison and the typed projection
-// are builder constructs now, so the REQ-163 rows at the end of
+// are builder constructs now, so the REQ-055 rows at the end of
 // probe097ParityCases carry those brackets through the same parity comparison
 // — a bracket either side read differently would show up as a code the other
 // does not report. What stays out of reach is the FROM ROOT: openehr/aql's FROM
 // clause carries an RM type and an alias and nothing else, so a root archetype
 // predicate (openehr/aql/verify.go's own doc comment records this), a root
 // standing predicate (REQ-055 rule 6 keeps the WHERE spelling deliberately) and
-// a root version predicate are all unspellable, before REQ-163 and after it.
+// a root version predicate are all unspellable, before REQ-055 and after it.
 // That is why arm (a)'s archetype-mismatch rows below are spelled in CONTAINS
 // position throughout: that is the one spelling both arm (a) and arm (c) can
 // share, rather than two different queries pinning the same code.
@@ -646,9 +646,9 @@ func probe097ParityCases() []aqlprobes.ParityCase {
 				Contains(aql.Archetype("EVALUATION", "ev", "openEHR-EHR-FOOTYPE.x.v1"))
 		}},
 
-		// --- REQ-163: the rows that were builder-inexpressible ----------------
+		// --- REQ-055: the rows that were builder-inexpressible ----------------
 		//
-		// Each carries a construct no builder program could spell before REQ-163,
+		// Each carries a construct no builder program could spell before REQ-055,
 		// through the same parity comparison as the rows above. The point is not
 		// a new code — these shapes are containment-clean or carry a code the
 		// corpus already covers — but that the new brackets and the new
@@ -669,7 +669,7 @@ func probe097ParityCases() []aqlprobes.ParityCase {
 			// It is also accurate — this is arm (a)'s
 			// "near miss: VERSIONED_OBJECT operand referenced", now reachable
 			// from the builder.
-			Name: "near miss: VERSIONED_OBJECT referenced by a standing predicate (REQ-163)", Build: func() *aql.Builder {
+			Name: "near miss: VERSIONED_OBJECT referenced by a standing predicate (REQ-055)", Build: func() *aql.Builder {
 				return aql.NewBuilder().Select(aql.Col("c/uid/value")).
 					FromEHR("e", aql.Param("ehr_id")).
 					Contains(aql.Class("VERSIONED_COMPOSITION", "vo").
@@ -687,7 +687,7 @@ func probe097ParityCases() []aqlprobes.ParityCase {
 			// Clean, so it carries the "near miss:" prefix for the reason the
 			// row above records — and it is arm (a)'s
 			// "near miss: explicit version tier" in CONTAINS position.
-			Name: "near miss: explicit version tier in CONTAINS position (REQ-163)", Build: func() *aql.Builder {
+			Name: "near miss: explicit version tier in CONTAINS position (REQ-055)", Build: func() *aql.Builder {
 				return aql.NewBuilder().Select(aql.Col("c/uid/value")).
 					FromEHR("e", aql.Param("ehr_id")).
 					Contains(aql.Version("v", aql.LatestVersion()).
@@ -698,7 +698,7 @@ func probe097ParityCases() []aqlprobes.ParityCase {
 			// A standing predicate on a node whose PAIR is impossible: the
 			// bracket must not hide the finding from either side. Mirrors the
 			// "impossible containment" row above, with the new bracket added.
-			Name: "REQ-163: a standing predicate on an impossible pair", Build: func() *aql.Builder {
+			Name: "REQ-055: a standing predicate on an impossible pair", Build: func() *aql.Builder {
 				return aql.NewBuilder().Select(aql.Col("o")).From("OBSERVATION", "o").
 					Contains(aql.Class("COMPOSITION", "c").
 						Predicated("name/value", aql.OpEq, aql.String("Vital signs")))
@@ -706,10 +706,10 @@ func probe097ParityCases() []aqlprobes.ParityCase {
 		},
 		{
 			// The typed projection over an unknown class: SELECT is the clause
-			// REQ-163 rewrote, and the containment verdicts must be indifferent
+			// REQ-055 rewrote, and the containment verdicts must be indifferent
 			// to it. DISTINCT and an aggregate together, so the clause-level flag
 			// rides along.
-			Name: "REQ-163: a typed projection over an unknown class", Build: func() *aql.Builder {
+			Name: "REQ-055: a typed projection over an unknown class", Build: func() *aql.Builder {
 				return aql.NewBuilder().Select(aql.CountStar().As("n")).Distinct().
 					From("COMPOSITION", "c").
 					Contains(aql.Class("FOO_BAR", "f"))

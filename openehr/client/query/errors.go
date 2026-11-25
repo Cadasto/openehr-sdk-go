@@ -41,7 +41,7 @@ type AQLError struct {
 	// resolution failure (PROBE-021).
 	pathResolution bool
 	// capability marks a backend error classified as a capability gap: the
-	// query is valid AQL, this deployment does not implement it (REQ-055,
+	// query is valid AQL, this deployment does not implement it (REQ-057,
 	// PROBE-021). Set from HTTP 501 alone; never from message text.
 	capability bool
 }
@@ -105,7 +105,7 @@ func mapQueryError(err error) error {
 	if !ok || we == nil {
 		return err
 	}
-	// REQ-055: 501 is a capability gap — the query is valid AQL, this
+	// REQ-057: 501 is a capability gap — the query is valid AQL, this
 	// deployment does not implement it. The status alone is the signal (with
 	// or without an envelope), and a capability gap is never also a path
 	// resolution failure, which is bad AQL and arrives as 400.

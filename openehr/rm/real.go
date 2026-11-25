@@ -253,7 +253,7 @@ var errLossyLiteral = errors.New("rm.Real: literal cannot be held in a float64 a
 var errLossyShape = typereg.ClassifyShape(errLossyLiteral)
 
 // parseDecimal parses a decimal Real literal: the content of a quoted JSON
-// literal, which ADR 0004 admits as a decimal string only, and a number in
+// literal, which ADR 0022 admits as a decimal string only, and a number in
 // canonical-XML element text, where the xs:double lexical space is decimal
 // apart from its special values. It refuses the other spellings
 // strconv.ParseFloat reads (hexadecimal, Inf, Infinity, NaN, and an

@@ -36,14 +36,14 @@ func documentWithTokenEndpoint(issuer, tokenEndpoint string) string {
 }
 
 // TestREQ071_FreshCacheHitPassesTheCallingResolversChecks pins REQ-071 with
-// REQ-072 and REQ-073: one Cache serves a lenient Resolver and a strict one.
+// REQ-072: one Cache serves a lenient Resolver and a strict one.
 // The lenient Resolver fetches and caches a catalog the strict one's checks
 // refuse; the strict Resolver's Resolve, on the fresh hit, returns the
 // DiscoveryError a new document would produce, to the same text, sends no
 // request, and leaves the entry cached, so the lenient Resolver still gets
 // the cached catalog without a new fetch. A 304 renewal of that catalog by
 // the strict Resolver's Refresh yields the same error text as well.
-func TestREQ071_FreshCacheHitPassesTheCallingResolversChecks(t *testing.T) { // REQ-071, REQ-072, REQ-073
+func TestREQ071_FreshCacheHitPassesTheCallingResolversChecks(t *testing.T) { // REQ-071, REQ-072
 	t.Parallel()
 	const extraService = "org.example.extra"
 	quiet := discovery.WithLogger(slog.New(slog.DiscardHandler))
@@ -300,7 +300,7 @@ func (m cachedMembers) catalog(t *testing.T, origin, baseURL, etag string) *disc
 }
 
 // TestREQ071_CachedCatalogPassesTheParsersURLChecks pins REQ-071 with REQ-072
-// and REQ-073 for a catalog that reached the Cache without this Resolver's
+// and REQ-072 for a catalog that reached the Cache without this Resolver's
 // parser, as from a file-backed or distributed Cache. Each catalog carries a
 // URL member a new document is refused for: an auth endpoint with a scheme
 // other than http or https or without a host, an issuer with a query or a
@@ -312,7 +312,7 @@ func (m cachedMembers) catalog(t *testing.T, origin, baseURL, etag string) *disc
 // members, each path names the one the parser checks first: the auth
 // endpoints in document order, then the service base URLs by id, then the
 // issuer. A well-formed catalog is still returned on a fresh hit.
-func TestREQ071_CachedCatalogPassesTheParsersURLChecks(t *testing.T) { // REQ-071, REQ-072, REQ-073
+func TestREQ071_CachedCatalogPassesTheParsersURLChecks(t *testing.T) { // REQ-071, REQ-072
 	t.Parallel()
 	const (
 		etag         = `"v1"`
@@ -591,11 +591,11 @@ func TestREQ071_CachedCatalogForAnotherBaseURLIsAMiss(t *testing.T) { // REQ-071
 	}
 }
 
-// TestREQ073_PlaintextServiceWarningOnFetchAndRenewalOnly pins REQ-073's
+// TestREQ072_PlaintextServiceWarningOnFetchAndRenewalOnly pins REQ-072's
 // opening: the plaintext services[].base_url warning is logged when the
 // document is fetched and when a cached catalog is renewed on a 304, and not
 // on a fresh cache hit, which would repeat it without news.
-func TestREQ073_PlaintextServiceWarningOnFetchAndRenewalOnly(t *testing.T) { // REQ-073
+func TestREQ072_PlaintextServiceWarningOnFetchAndRenewalOnly(t *testing.T) { // REQ-072
 	t.Parallel()
 	const etag = `"v1"`
 	members := cachedMembers{

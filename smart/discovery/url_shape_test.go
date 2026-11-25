@@ -22,12 +22,12 @@ func documentWith(serviceBaseURL string, members map[string]string) string {
 	return mustJSON(doc)
 }
 
-// TestResolveRefusesPortWithoutHost pins REQ-072 and REQ-073: a URL whose
+// TestResolveRefusesPortWithoutHost pins REQ-072: a URL whose
 // authority has a port but no host name, such as https://:8443/x, has no
 // host. It is ReasonMalformedURL wherever the resolver reads a URL: the base
 // URL passed to Resolve, the declared issuer (with the OpenID check on and
 // off), an auth endpoint and a service baseUrl. Nothing is fetched from it.
-func TestResolveRefusesPortWithoutHost(t *testing.T) { // REQ-072, REQ-073
+func TestResolveRefusesPortWithoutHost(t *testing.T) { // REQ-072
 	const (
 		hostless   = "https://:8443"
 		apiBaseURL = "https://api.example.com/openehr/v1"
@@ -92,11 +92,11 @@ func TestResolveRefusesPortWithoutHost(t *testing.T) { // REQ-072, REQ-073
 	}
 }
 
-// TestResolveAcceptsOnlyHTTPSchemes pins REQ-073: an auth endpoint or a
+// TestResolveAcceptsOnlyHTTPSchemes pins REQ-072: an auth endpoint or a
 // declared issuer may use https, or http under WithAllowInsecure; any other
 // scheme is ReasonMalformedURL, with or without WithAllowInsecure, and http
 // without it is ReasonInsecureURL.
-func TestResolveAcceptsOnlyHTTPSchemes(t *testing.T) { // REQ-073
+func TestResolveAcceptsOnlyHTTPSchemes(t *testing.T) { // REQ-072
 	const apiBaseURL = "https://api.example.com/openehr/v1"
 	allowInsecure := []discovery.Option{discovery.WithAllowInsecure()}
 	tests := []struct {

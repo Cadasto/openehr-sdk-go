@@ -78,7 +78,7 @@ Until 2026-10 the pins were audited by hand against [`openEHR/BMM-publisher`](ht
 
 ## Updating
 
-A BMM version bump is deliberate, and [ADR 0001](../../docs/adr/0001-bmm-version-bump-runbook.md) records why it takes this shape: one pull request per bump, the new file added and the old one removed in the same commit, and one version per schema id.
+A BMM version bump is deliberate, and [ADR 0002](../../docs/adr/0002-bmm-codegen-decisions.md#d11--a-bmm-version-bump-is-one-pull-request) records why it takes this shape: one pull request per bump, the new file added and the old one removed in the same commit, and one version per schema id.
 The impact on the SDK's version is decided under [`module-layout.md` § Versioning](../../docs/specifications/module-layout.md#versioning), not here.
 
 1. **Stage the new file beside the old.**

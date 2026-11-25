@@ -27,7 +27,7 @@ type storedWireRequest struct {
 	body   []byte
 }
 
-// TestREQ057_StoredPagingOnlyWhenSet pins § REQ-057 *Paging* (ADR 0026):
+// TestREQ057_StoredPagingOnlyWhenSet pins § REQ-057 *Paging*:
 // stored-query execution sends offset and fetch only when the caller sets
 // them, sends an explicit 0, and sends offset without fetch as asked rather
 // than refusing it. The POST body always carries query_parameters, as an

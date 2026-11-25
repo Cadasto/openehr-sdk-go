@@ -203,7 +203,7 @@ func TestEncodeSkipsEmptyRepeatInstances(t *testing.T) {
 	}
 }
 
-// TestEncodePartyRelatedComposerAtRealPath — REQ-053, ADR 0029 (replacing
+// TestEncodePartyRelatedComposerAtRealPath — REQ-053, ADR 0015 (replacing
 // the pin that refused a PARTY_RELATED composer). No ctx/ short form carries a
 // PARTY_RELATED, so encode writes it whole at the composer's real path, its
 // name and its `/relationship`, with no ctx/ composer key, and decode reads it
@@ -252,7 +252,7 @@ func TestEncodePartyRelatedComposerAtRealPath(t *testing.T) {
 	}
 }
 
-// TestEncodeComposerShapesRefused — REQ-053, ADR 0029. Encode refuses a
+// TestEncodeComposerShapesRefused — REQ-053, ADR 0015. Encode refuses a
 // composer PARTY_IDENTIFIED with an empty name (RM invariant `Name_valid`) or
 // with no name, external_ref or identifiers (`Basic_validity`), a
 // PARTY_RELATED carrying a relationship and nothing else, and a PARTY_RELATED

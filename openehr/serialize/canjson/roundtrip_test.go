@@ -38,7 +38,7 @@ func fixtureFactory(t *testing.T, rel fixtures.CompositionJSONRel) func() any {
 // types and a composition shape without history. See
 // [TestRoundTripFixtures] below for the broader fixture-wide round
 // trip (composition fixtures with history; polymorphic event dispatch
-// settled in docs/adr/0003-rm-event-polymorphism.md).
+// settled in docs/adr/0002-bmm-codegen-decisions.md).
 //
 // A and B straddle the second encode and MUST be equal by typed deep
 // comparison; b1 and b2 MUST be wire-equivalent as a secondary check.

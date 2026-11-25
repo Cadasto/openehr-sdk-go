@@ -219,7 +219,7 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 		"SELECT e/time_created AS score FROM EHR e ORDER BY score DESC",
 		"SELECT o/data[at0001]/value/magnitude AS score FROM EHR e CONTAINS OBSERVATION o ORDER BY score ASC",
 
-		// REQ-163: canonical `TOP` forms — upper-cased keywords, direction
+		// REQ-055: canonical `TOP` forms — upper-cased keywords, direction
 		// present only when written, emitted between DISTINCT and the
 		// projection list.
 		"SELECT TOP 5 c/uid/value FROM COMPOSITION c",

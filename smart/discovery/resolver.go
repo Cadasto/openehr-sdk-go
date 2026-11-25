@@ -637,7 +637,7 @@ func (r *Resolver) documentURL(baseURL string) (*url.URL, error) {
 // since it needs a request. The document path is not compared: the cache
 // keys entries by base URL alone (the REQ-071 known gap).
 //
-// REQ-071, REQ-072, REQ-073: a failure is the DiscoveryError a new document
+// REQ-071, REQ-072: a failure is the DiscoveryError a new document
 // would get, and the caller leaves the entry cached, because it says
 // nothing new about the Platform.
 func (r *Resolver) checkFreshHit(baseURL string, cat *ServiceCatalog) error {
@@ -887,7 +887,7 @@ func deltaSeconds(arg string) (ttl time.Duration, ok bool) {
 //
 // The canonical openEHR SMART spec defines "services" as a JSON object/hash
 // map keyed by reverse-domain id, each value carrying camelCase "baseUrl".
-// See ADR 0008 for the decision to adopt the canonical map shape and drop
+// See ADR 0023 for the decision to adopt the canonical map shape and drop
 // the non-canonical array form.
 type smartConfigWire struct {
 	Issuer                                     string                      `json:"issuer"`
@@ -1120,7 +1120,7 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 	if len(missing) > 0 {
 		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonMissingService, MissingServices: missing}
 	}
-	// 2. Version match per required service (REQ-072, softened per ADR 0008).
+	// 2. Version match per required service (REQ-072, softened per ADR 0023).
 	// An advertised spec_version is always compared. Without one, the entry
 	// passes unless the caller locked the accepted set via
 	// WithAcceptedSpecVersions; then its canonical version member is
@@ -1260,7 +1260,7 @@ func (r *Resolver) warnPlaintextDocument(baseURL string, req *http.Request, resp
 // the issuer when the document declares none, and the base URL's own check
 // covers it.
 //
-// REQ-071, REQ-072, REQ-073.
+// REQ-071, REQ-072.
 func (r *Resolver) checkURLs(baseURL string, cat *ServiceCatalog) error {
 	for _, m := range authMembers {
 		u := *m.endpoint(&cat.Auth)

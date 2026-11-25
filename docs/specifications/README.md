@@ -123,7 +123,7 @@ Identifiers are stable once published ([REQ.md § Numbering policy](REQ.md#numbe
 | [idiom.md](idiom.md) | Idiomatic Go surface — `context.Context`, `*http.Client` injection, errors and no-panic, concurrency (REQ-020, REQ-021, REQ-025, REQ-026), and the informative API conventions (options, surface shape, generics without reflection, naming) |
 | [reference-model.md](reference-model.md) | openEHR Reference Model in Go — the shape of the generated types, the terminology vocabulary (REQ-034), the type registry (REQ-040), the pinned BMM sources and generator (REQ-041), the BMM loader (REQ-045), RM meta-model introspection (REQ-048), and the RM behavioural functions (REQ-120, REQ-121, REQ-123) |
 | [transport.md](transport.md) | Transport layer — OTel hooks, retry, TLS posture, error-envelope mapping, `Prefer` negotiation, the request observer, path-segment validation, typed 2xx failures, bearer challenges, caller attribution |
-| [auth.md](auth.md) | `auth.TokenSource` contract, the SMART-on-openEHR provider flow and the other providers, and service discovery (REQ-070 to REQ-073) |
+| [auth.md](auth.md) | `auth.TokenSource` contract, the SMART-on-openEHR provider flow and the other providers, and service discovery (REQ-070 to REQ-072) |
 | [wire.md](wire.md) | openEHR REST 1.1.0 pin and its OpenAPI files, the openEHR headers, canonical JSON / XML, FLAT / STRUCTURED, AQL wire, the REST leaf operations and the Admin client |
 | [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — the operational template model, the compiled template and its paths, primitive constraints, validation, the instance generator and composition builder, the Web Template export |
 | [aql.md](aql.md) | AQL above the wire boundary — the parsed query tree, canonical emission, the builder's write-side parity, the static lint, the containment relation and the semantic lint |
@@ -140,7 +140,7 @@ Identifiers are stable once published ([REQ.md § Numbering policy](REQ.md#numbe
 - A status transition (`Draft` → `Stable`) is recorded where that status lives: a requirement's in its [`traceability.yaml`](traceability.yaml) `status:`, a spec file's in its [Status header](#status-header).
   The PR that makes it names it in its body, and the CHANGELOG follows the rule in [AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions).
 - Removing a normative statement from a `Stable` spec goes through a documented cycle: mark it `Status: Deprecated` first, then remove it in the next major version.
-  A `Draft` spec has no such cycle ([§ Status header](#status-header)): a retired requirement moves its entry to [retired-requirements.md](retired-requirements.md), which points to where its rule went, and its identifier is never reused.
+  A `Draft` spec has no such cycle ([§ Status header](#status-header)): a retired requirement moves its entry to [retired-requirements.md](retired-requirements.md), which points to where its rule went, and its row leaves [`traceability.yaml`](traceability.yaml); its identifier is never reused.
 - **Where a keyword goes.** An RFC 2119 keyword binds only behaviour a caller can observe and would break on: the public API, wire and file formats, the error contract, the refusals a caller sees, and security invariants.
   A default or a recommended path is a `SHOULD`, with its reason in the same sentence.
   How the code does it — algorithms, visit and precedence orders, internal structure, dependency choices, examples — is prose with no keyword, so the code can change it without an amendment.

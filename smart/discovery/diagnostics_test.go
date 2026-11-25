@@ -36,12 +36,12 @@ func (h *fieldRecorder) Handle(_ context.Context, r slog.Record) error {
 func (h *fieldRecorder) WithAttrs([]slog.Attr) slog.Handler { return h }
 func (h *fieldRecorder) WithGroup(string) slog.Handler      { return h }
 
-// TestResolveWarnsOnEveryPlaintextAuthEndpoint pins REQ-073: under
+// TestResolveWarnsOnEveryPlaintextAuthEndpoint pins REQ-072: under
 // WithAllowInsecure a plaintext auth endpoint is accepted with a warning,
 // and that holds for every endpoint the catalog carries, the optional
 // introspection, revocation and management endpoints included. A plaintext
 // service baseUrl is warned the same way.
-func TestResolveWarnsOnEveryPlaintextAuthEndpoint(t *testing.T) { // REQ-073
+func TestResolveWarnsOnEveryPlaintextAuthEndpoint(t *testing.T) { // REQ-072
 	endpoints := []string{
 		"authorization_endpoint",
 		"token_endpoint",

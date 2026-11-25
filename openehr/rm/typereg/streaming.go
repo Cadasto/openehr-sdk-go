@@ -945,7 +945,7 @@ func peekType(raw jsontext.Value, opts ...json.Options) (string, error) {
 // the name, the colon and the value), and its value is a JSON string of plain
 // ASCII with no backslash escape, so its bytes are the string a decode would
 // produce (an escape, or an invalid UTF-8 byte a caller allows, decodes to
-// something else). ADR 0021 makes _type first a SHOULD, so this is the shape
+// something else). ADR 0022 makes _type first a SHOULD, so this is the shape
 // canonical-JSON encoders write and most slots carry.
 //
 // ok is false for any other shape, and also whenever opts could make the full

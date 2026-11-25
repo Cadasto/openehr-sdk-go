@@ -1,7 +1,7 @@
 package aql_test
 
 // containment_roundtrip_test.go is the equivalence pin between the two
-// canonicalisers of REQ-163's containment algebra and of its three
+// canonicalisers of REQ-055's containment algebra and of its three
 // write-side carriers: the builder's (openehr/aql, this package's
 // subject) and the parser's (openehr/aql/parse). openehr/aql cannot import
 // openehr/aql/parse — the dependency runs the other way — so the paren,
@@ -15,11 +15,11 @@ package aql_test
 // (aql.ErrIncompleteAST), and an ungrammatical emission as a syntax error.
 // The external test package (aql_test) is what makes the parse import legal.
 //
-// For REQ-163 the bar is stated as IDENTITY rather than re-parseability, and
+// For REQ-055 the bar is stated as IDENTITY rather than re-parseability, and
 // this file is where that MUST is discharged: the read side re-emits a class or
 // VERSION bracket verbatim and upper-cases a projected function name, so any
 // builder spelling but the canonical one comes back different.
-// REQ-163 · PROBE-088
+// REQ-055 · PROBE-088
 
 import (
 	"errors"
@@ -30,7 +30,7 @@ import (
 )
 
 // builderRoundTripCases are the builder programs whose output must survive a
-// parse → emit round trip byte-for-byte. Every construct the REQ-163 builder
+// parse → emit round trip byte-for-byte. Every construct the REQ-055 builder
 // API adds appears here.
 func builderRoundTripCases() []struct {
 	name  string
@@ -159,7 +159,7 @@ func builderRoundTripCases() []struct {
 			return sel().OrderBy("e/time_created/value", aql.Descending).
 				LimitInline(10).OffsetInline(20).Build()
 		}},
-		// REQ-163 — the version-predicate carrier. Identity, not mere
+		// REQ-055 — the version-predicate carrier. Identity, not mere
 		// re-parseability, is the bar: the read side re-emits a VERSION bracket
 		// VERBATIM, so any spelling but the canonical one would come back
 		// different and the two sides would disagree about the canonical form
@@ -191,7 +191,7 @@ func builderRoundTripCases() []struct {
 				aql.Class("COMPOSITION", "c"),
 			)).Build()
 		}},
-		// REQ-163 — the standing-predicate carrier. Same bar and same reason as
+		// REQ-055 — the standing-predicate carrier. Same bar and same reason as
 		// the version bracket above: the read side re-emits a class bracket
 		// VERBATIM, so any spelling but the canonical one comes back different
 		// and the two sides disagree about the canonical form of a construct
@@ -212,7 +212,7 @@ func builderRoundTripCases() []struct {
 			// `pathPredicateOperand`'s `objectPath` alternative: the operand is
 			// another relative path rather than a literal or a parameter. It is
 			// the row that would fail an operand guard narrowed past the
-			// production (REQ-163 § Acceptance's ACCEPT direction).
+			// production (REQ-055 § Acceptance's ACCEPT direction).
 			return sel().Contains(aql.Class("COMPOSITION", "c").
 				Predicated("context/end_time/value", aql.OpEq, aql.Path("context/start_time/value"))).Build()
 		}},
@@ -237,7 +237,7 @@ func builderRoundTripCases() []struct {
 				aql.Class("OBSERVATION", "o"),
 			)).Build()
 		}},
-		// REQ-163 — the typed projection. Identity is the bar for the same
+		// REQ-055 — the typed projection. Identity is the bar for the same
 		// reason as the two brackets above, sharpened: the extractor
 		// UPPER-CASES every projected function name while the emitter renders
 		// the name as carried, so a lower-case builder spelling comes back
@@ -312,7 +312,7 @@ func builderRoundTripCases() []struct {
 				Contains(aql.Class("COMPOSITION", "c")).
 				OrderBy("c/name/value", aql.Ascending).Build()
 		}},
-		// REQ-163 — all THREE carriers in one query. Each is covered above on its
+		// REQ-055 — all THREE carriers in one query. Each is covered above on its
 		// own, and identity across the three together is a separate claim: the
 		// version bracket, the standing bracket and the typed projection are
 		// rendered by three different writers into one string, and the
@@ -364,7 +364,7 @@ func builderRoundTripCases() []struct {
 	}
 }
 
-// TestBuilderOutputRoundTripsThroughParse is the REQ-163 definition-of-done
+// TestBuilderOutputRoundTripsThroughParse is the REQ-055 definition-of-done
 // tie-in: every builder output parses with an EMPTY catalogue-gap diagnostic
 // (no aql.ErrIncompleteAST) and re-emits to the same bytes.
 // PROBE-088

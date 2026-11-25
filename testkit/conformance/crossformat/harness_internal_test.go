@@ -328,7 +328,7 @@ func refusedAfterRemoval(t *testing.T, sets []fixtures.CrossFormatSet) (fixtures
 // hold-out on both FLAT sides: a ctx/ short form on one side and the real-path
 // spelling on the other are not a difference, while the composer's
 // external_ref and party sub-structure, which no ctx/ form carries and both
-// sides write at the composer's real path (ADR 0029), still are. Values
+// sides write at the composer's real path (ADR 0015), still are. Values
 // compare by their JSON text, so 1 and 1.0 differ.
 func TestProbe105CompareFlatHoldsMetadataOutOnBothSides(t *testing.T) {
 	const root = "r"

@@ -189,7 +189,7 @@ var parityCases = []struct {
 			Contains(aql.Class("VERSION", "v").Contains(aql.Class("COMPOSITION", "c")))
 	}},
 	{
-		// REQ-163's motivating shape, and the REQ-161 § Builder adapter row the
+		// REQ-055's motivating shape, and the REQ-161 § Builder adapter row the
 		// standing-predicate carrier owes: the class-position predicate is not
 		// an archetype predicate, so BOTH adapters must stay silent about it —
 		// a write side that fed the bracket text to the archetype check would

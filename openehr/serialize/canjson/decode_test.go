@@ -181,7 +181,7 @@ var shapeErrorInputs = []struct {
 	// forbidden to displace is still reachable — the "classification
 	// costs no diagnostic" half of the clause. The two in-type rows fail
 	// on different causes because rm.Real accepts quoted decimals
-	// (ADR 0004): a quoted non-number fails in strconv, an out-of-range
+	// (ADR 0022): a quoted non-number fails in strconv, an out-of-range
 	// JSON number fails in encoding/json/v2 (a *json.SemanticError).
 	assertCause func(t *testing.T, err error)
 }{
@@ -355,7 +355,7 @@ func TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications(t *testing.T)
 	// streaming codec resolves through the registered DataValue hook. The wire
 	// selects DV_QUANTITY there and gives its `units` a number where the
 	// contract wants a string; a quoted *magnitude* would be tolerated instead
-	// (ADR 0004 numeric wire tolerance), so it cannot drive this case. The
+	// (ADR 0022 numeric wire tolerance), so it cannot drive this case. The
 	// hook's DecodeError names the slot on its Path and does not strip the
 	// ErrInvalidShape the concrete DV_QUANTITY funnel raised beneath it.
 	const in = `{"_type":"ELEMENT","archetype_node_id":"at0","name":{"_type":"DV_TEXT","value":"n"},` +

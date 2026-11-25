@@ -36,7 +36,7 @@ Out-of-scope items are not gaps — they are deliberate boundaries with named ha
 |---|---|
 | FHIR resources, FHIR query, FHIR façade clients | A sibling Cadasto FHIR SDK proposal — not this module. |
 | openEHR EHR Extract (RM `ehr_extract` package) | Deferred — no v1 consumer. BMM definitions remain in `resources/bmm/openehr_rm_1.2.0.bmm.json`; generator skips this package. Wire in when a consumer needs the extract exchange surface. |
-| ITS-REST `IMPORTED_VERSION` bodies on the composition and EHR_STATUS version reads | Deferred with the EHR Extract, the exchange that creates imported versions: the version reads refuse them as a typed decode failure ([wire.md § REQ-174](wire.md#req-174--versioned-object-reads), [ADR 0031](../adr/0031-version-reads-refuse-imported-version.md)). |
+| ITS-REST `IMPORTED_VERSION` bodies on the composition and EHR_STATUS version reads | Deferred with the EHR Extract, the exchange that creates imported versions: the version reads refuse them as a typed decode failure ([wire.md § REQ-174](wire.md#req-174--versioned-object-reads)). |
 | AOM 2 / ADL 2 / OPT-2 | Deferred — `openehr_am_2.4.0.bmm.json` kept in `resources/bmm/` but not generated. AOM 1.4 covers v1's archetype/template parsing needs. |
 | openEHR LANG types as generated code | Deferred — `openehr_lang_1.1.0.bmm.json` kept as reference. The BMM meta-classes used by `openehr/bmm/` are hand-written against the P_BMM persistence shape for v1; auto-generating them is a future option. |
 | openEHR TERM service interface | Deferred — `openehr_term_3.1.0.bmm.json` kept in `resources/bmm/`. No v1 consumer requires a typed terminology-service interface; consumers integrate with a deployment-specific terminology backend directly. |
@@ -47,7 +47,10 @@ Out-of-scope items are not gaps — they are deliberate boundaries with named ha
 | Webhooks client | Not provided. |
 | Extraction of Cadasto-platform extras (`cadasto/…`) into a separate Go module | Conditional later step driven by STRAND-08. v1 keeps everything together; the cut line ([module-layout.md § Boundary rules](module-layout.md#boundary-rules)) ensures extraction would be mechanical. |
 | Code generation from a shared contract source (OpenAPI-generated wire DTOs) | Not pursued (STRAND-02, cancelled). The SDK is hand-written; openEHR wire conformance is the probe suite. |
+| Operational templates shipped with the SDK | The generic EHR_STATUS and FOLDER templates, and demographic ones, are maintained in the [openehr-reference-content](https://github.com/Cadasto/openehr-reference-content) repository, from which a program downloads or imports them; the SDK vendors them only as test fixtures under `testkit/corpus/reference/` ([testkit/corpus/README.md](../../testkit/corpus/README.md)). |
+| Parity with another openEHR SDK | Not checked. Wire output is checked against the openEHR specification by the [probe catalog](conformance.md#probe-catalog), and the Go surface follows [idiom.md § Surface shape](idiom.md#surface-shape). |
 | Template-specific generated structs (e.g. a typed Go struct for a vital-signs OPT) | Belongs in the consuming project; the generic OPT-driven builder lives in `openehr/composition`. |
+| Streaming response bodies, range requests and partial reads; multipart uploads beyond what openEHR REST 1.1.0 requires | Not provided: the SDK reads complete responses into memory. |
 | Connection-pooling, transport-level TLS, proxy config | Owned by the consumer's injected `*http.Client` (REQ-021); SDK does not allocate transports. |
 | Multi-tenant routing, per-tenant credential storage | A consumer concern. The SDK exposes per-call auth via `TokenSource`; storage and selection of credentials is application-side. |
 

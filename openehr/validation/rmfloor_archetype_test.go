@@ -25,7 +25,7 @@ import (
 
 // TestValidateRM_ArchetypeRootClassesMatchSharedList checks that the floor
 // reports the archetype-root rule by class on exactly the classes of the
-// shared closed list (REQ-112, ADR 0001), which internal/rmroots pins to the
+// shared closed list (REQ-112), which internal/rmroots pins to the
 // vendored BMM's Is_archetype_root declarations. It runs the floor over
 // every registered LOCATABLE concrete: a zero value, whose archetype_node_id
 // is empty and so no archetype id, must report `is_archetype_root` at

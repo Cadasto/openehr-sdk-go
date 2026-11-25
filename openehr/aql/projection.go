@@ -1,6 +1,6 @@
 package aql
 
-// projection.go — REQ-163 § The typed projection model. The write side of the
+// projection.go — REQ-055 § The typed projection model. The write side of the
 // SELECT clause:
 //
 //	selectClause : SELECT DISTINCT? top? selectExpr (SYM_COMMA selectExpr)*
@@ -52,7 +52,7 @@ type SelectField struct {
 	// alias is the AS alias, and aliasSet records that the CALLER asked for
 	// one. The two are distinct because an alias the builder never recorded is
 	// not compared against the emitted text: a legacy [Col] carrying its own
-	// `AS` is tolerated (REQ-163 § `Col` stays lenient, rule 1) while a typed
+	// `AS` is tolerated (REQ-055 § `Col` stays lenient, rule 1) while a typed
 	// item's alias is part of the structure Build verifies.
 	alias    string
 	aliasSet bool
@@ -110,7 +110,7 @@ const (
 )
 
 // rawColumn is the legacy [Col] carrier: text spliced into the projection list
-// as written. Its leniency is deliberate (REQ-163 § `Col` stays lenient); what
+// as written. Its leniency is deliberate (REQ-055 § `Col` stays lenient); what
 // bounds it is the after-emission verification in projection_verify.go, which
 // refuses text that changes the projection's recorded STRUCTURE.
 type rawColumn struct{ text string }
@@ -234,7 +234,7 @@ func (f funcColumn) aggregateCall() (string, bool) {
 // carried it, `*` with no padding for `COUNT(*)`, and one space after each
 // argument comma (REQ-055 rule 5).
 //
-// The name is upper-cased because IDENTITY is the bar (REQ-163 § Read-side
+// The name is upper-cased because IDENTITY is the bar (REQ-055 § Read-side
 // mirror duty): the extractor upper-cases every projected name while the
 // emitter renders the name as carried, so a lower-case builder spelling comes
 // back upper-cased and the round trip is not identity.
@@ -550,7 +550,7 @@ type renderedItem struct {
 	// makes it part of the compared structure. It is false for a legacy [Col]
 	// with no [SelectField.As] call: where the `AS` boundary falls inside
 	// verbatim text is not something the builder recorded, so there is nothing
-	// for the emitted text to disagree with (REQ-163 § `Col` stays lenient).
+	// for the emitted text to disagree with (REQ-055 § `Col` stays lenient).
 	aliasRecorded bool
 	// start and end bound the item in the emitted clause text, so a refusal
 	// can name the item a defect falls in without quoting any of it.
@@ -563,7 +563,7 @@ type renderedItem struct {
 // Every refusal it returns carries the ITEM INDEX, including the ones the
 // operand raises for itself — a shape error, a name the grammar cannot lex, an
 // argument that escapes its slot. The coordinate is the whole diagnostic here
-// (REQ-163 § `Build()` verifies the projection it emitted): the text may not be quoted, so
+// (REQ-055 § `Build()` verifies the projection it emitted): the text may not be quoted, so
 // a caller with a ten-item projection has nothing else to locate the defect by.
 func (f SelectField) render(idx int) (renderedItem, error) {
 	if f.expr == nil {

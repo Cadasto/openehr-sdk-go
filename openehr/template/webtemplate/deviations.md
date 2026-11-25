@@ -12,8 +12,7 @@ Conformance is **structural, not byte-exact**. PROBE-075 (`TestStructuralParity`
 `id`, `rmType`, `nodeId`, `aqlPath`, `min`/`max`, and each input's `suffix`/`type`
 extended with coded/ordinal list values and ordinals, a careflow step's
 `currentStates`, `listOpen`, `terminology`, temporal validation patterns, and
-numeric validation ranges — against **three** vendored references since REQ-116
-Phase 4: `constrain_test` **104/104** (exact, node and input), `Corona_Anamnese`
+numeric validation ranges — against **three** vendored references: `constrain_test` **104/104** (exact, node and input), `Corona_Anamnese`
 **230/230** and `GECCO_Diagnose` **34/34** (exact structurally; their documented
 input, `min` and `rmType` deltas are pinned by count below). A fourth, the
 reference's `test_all_types` golden, is compared on two subtrees: its ACTION
@@ -45,7 +44,7 @@ in this builder's spelling (§ Duplicate sibling ids).
   EVENT_CONTEXT, the ENTRY types, the EVENT variants (INTERVAL_EVENT adds
   `math_function` / `width`), INSTRUCTION (`narrative` / `expiry_time`), ACTIVITY
   (`timing` / `action_archetype_id`) and ACTION (`time`) — the INSTRUCTION/ACTIVITY
-  sets landed with REQ-116 Phase 4, measured on the corona golden, and ACTION's
+  sets are measured on the corona golden, and ACTION's
   `time` matches the `test_all_types` golden. Every ACTION also gets one in-context
   `ism_transition` node with no `nodeId`, in one of two shapes:
   - **Merged**, where the walk emits archetyped `ism_transition[atNNNN]` nodes, one
@@ -94,7 +93,7 @@ in this builder's spelling (§ Duplicate sibling ids).
   document-language term, so no per-language override options are offered — they
   would relabel text without retranslating it; the reference's exact language
   packaging may differ.
-- **Sibling `id` disambiguation** — **RESOLVED** by REQ-116 (Phases 3–4). Kept here
+- **Sibling `id` disambiguation** — **RESOLVED** (REQ-111). Kept here
   because the mechanism is the reference contract three other entries refer to, and
   because two of its early readings were wrong in ways worth not repeating.
 
@@ -146,7 +145,7 @@ in this builder's spelling (§ Duplicate sibling ids).
   absence of collision, is why PROBE-075 holds 104/104 without implementing any of this.
   Both path builders emit the predicates (Phase 3) and `idOf` prefers the pinned
   name (Phase 4), so all four layers are closed: read + expose the OPT node name
-  (REQ-116), carry it through the compiled tree (REQ-111), emit name predicates in
+  and carry it through the compiled tree (REQ-111), emit name predicates in
   AQL paths (consumed by REQ-102 validation and REQ-053 FLAT paths), and derive `id`
   from it (REQ-106). Because the trigger is the pinned name, the path change reached
   **every** vendored OPT that pins one — 9 of the 58, i.e. 7 beyond the two oracles,
@@ -347,8 +346,8 @@ in this builder's spelling (§ Duplicate sibling ids).
 
 ## Scope
 
-- **Archetype-reuse-under-slot templates** (e.g. `corona_anamnese`) — exportable as of
-  REQ-116: `templatecompile` admits shared-path subtrees, the name predicate separates
+- **Archetype-reuse-under-slot templates** (e.g. `corona_anamnese`) — exportable:
+  `templatecompile` admits shared-path subtrees, the name predicate separates
   the reused siblings' paths, and the pinned name gives each a distinct web `id`. See
   § Sibling `id` disambiguation above for the verified mechanism.
 - **Multiple value alternatives** — emitted as the reference does (§ ELEMENT value

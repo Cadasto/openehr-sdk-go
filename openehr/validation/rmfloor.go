@@ -4,7 +4,7 @@ package validation
 // its entries and its rules. The one walk (engine.go, REQ-171) applies the
 // rules, with no template at ValidateRM and its typed wrappers, and inside
 // the walk that binds the template at the REQ-102/110 entries (ADR 0025,
-// ADR 0027). The rules here report into [findings]:
+// ADR 0025). The rules here report into [findings]:
 //
 //   - RM-mandatory attribute absences (checkMandatory, which the walk calls
 //     for each mandatory attribute it reads absent or empty), and an item of

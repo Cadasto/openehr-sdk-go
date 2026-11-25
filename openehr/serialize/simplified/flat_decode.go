@@ -623,7 +623,7 @@ func unmappedReads(rmType, suffix string) bool {
 // them: `composer|id` / `|id_scheme` / `|id_namespace` / `|type` (its
 // external_ref), `composer/_identifier:N` and `composer/relationship`. They
 // carry the rest of the composer at its real path, read by the party grammar
-// beside the name the alias gives (ADR 0029, [decodeComposer]), and the
+// beside the name the alias gives (ADR 0015, [decodeComposer]), and the
 // PROBE-086 census compares them (docs/specifications/conformance.md
 // § PROBE-086).
 var metadataAliases = map[string]string{
@@ -659,7 +659,7 @@ var metadataAliasTerminology = map[string]string{
 // not have is unmatched content and is never placed.
 //
 // `composer` is absent: its real path carries the whole composer in the party
-// grammar (ADR 0029), so [siphonContext] reads its keys rather than refusing
+// grammar (ADR 0015), so [siphonContext] reads its keys rather than refusing
 // them. Every base here is held out of the PROBE-086 census by the harness
 // (`IsCompositionMeta`), so refusing extra suffixes early moves no count.
 var contextMetaOwnedBases = map[string]bool{
@@ -805,7 +805,7 @@ func overIndexedMetadataSeg(rel string) flatSeg {
 }
 
 // composerSeg is the FLAT id of the composer's real path below the template
-// root, which carries the whole composer in the party grammar (ADR 0029).
+// root, which carries the whole composer in the party grammar (ADR 0015).
 const composerSeg = "composer"
 
 // composerTail returns the tail of rel, an unindexed root-relative spelling,
@@ -985,7 +985,7 @@ func MetadataWitnessSpellings() []string {
 // Every other key at the composer's real path (`<root>/composer|id`,
 // `<root>/composer/_identifier:0|id`, …) goes to composer, one party group
 // whose unmatched keys go to sink: the real path carries the whole composer
-// (ADR 0029), and [decodeComposer] reads the group beside the ctx/ composer
+// (ADR 0015), and [decodeComposer] reads the group beside the ctx/ composer
 // fields once they are parsed. Two spellings of one composer key, with and
 // without the `:0` of the root or the composer segment, are one key: they must
 // agree, and a null one is absent ([putComposerKey]).
@@ -1137,7 +1137,7 @@ func siphonContext(flat map[string]any, keys []string, rootID string, sink *unma
 				ErrUnsupportedDatatype, key, metadataOwnedBaseCtx[base])
 		}
 		// The composer's real path carries the whole composer in the party
-		// grammar REQ-140 gives every other party position (ADR 0029): its
+		// grammar REQ-140 gives every other party position (ADR 0015): its
 		// `external_ref` suffixes, its `_identifier:N` list and a PARTY_RELATED's
 		// `/relationship`. Its `|name` is the alias above. The keys are read
 		// whether or not the Web Template carries a composer node, as the
@@ -2554,7 +2554,7 @@ func compositeLeafGroups(content map[string]any, keys []contentKey, wt *webtempl
 // nested `/subject` is inside its tails, not at a Web Template node — and one
 // addressing a composition-metadata leaf [emitContext] writes is the composer,
 // whose keys [siphonContext] has already taken, whether or not the Web
-// Template carries its node (ADR 0029).
+// Template carries its node (ADR 0015).
 func splitCompositeLeafKey(wt *webtemplate.WebTemplate, key string, pk parsedKey) (base, family string, index int, tail string, ok bool) {
 	node := wt.Tree
 	if len(pk.segs) == 0 || pk.segs[0].id != node.ID {
@@ -2728,7 +2728,7 @@ func compositeLeafValue(g rmattrGroup, leaf *webtemplate.Node, deferred bool) (m
 // Three shapes of owner, in the order they are tested:
 //
 //   - `<root>/context` is the composition's EVENT_CONTEXT, resolved *without*
-//     consulting the Web Template. ADR 0016 puts the EVENT_CONTEXT optionals
+//     consulting the Web Template. ADR 0015 puts the EVENT_CONTEXT optionals
 //     under the real `context` segment, and they are RM-optional attributes a
 //     template need not constrain at all — so a template carrying no `context`
 //     node must behave exactly like one that does (the PROBE-086 corpus

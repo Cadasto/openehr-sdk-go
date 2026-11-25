@@ -1,7 +1,7 @@
 package simplified_test
 
 // REQ-053 / REQ-140 — the composer rides its real path when the ctx/ short
-// forms cannot carry it whole (ADR 0029).
+// forms cannot carry it whole (ADR 0015).
 
 import (
 	"encoding/json"
@@ -154,7 +154,7 @@ const (
 	composerRefHier    = `{"_type":"PARTY_REF","id":{"_type":"HIER_OBJECT_ID","value":"9f2c"},"namespace":"demographic","type":"PARTY"}`
 )
 
-// TestREQ053ComposerRealPathDecodes — REQ-053 / REQ-140, ADR 0029. The
+// TestREQ053ComposerRealPathDecodes — REQ-053 / REQ-140, ADR 0015. The
 // composer's real path carries the whole composer in the party grammar: its
 // external_ref (scheme present ⇒ GENERIC_ID, an absent `|type` ⇒ PARTY), its
 // `_identifier:N` list and a PARTY_RELATED's `/relationship`. The name from
@@ -325,7 +325,7 @@ func TestREQ053ComposerRealPathDecodes(t *testing.T) {
 	}
 }
 
-// TestREQ053ComposerRealPathRefusals — REQ-053 / REQ-140, ADR 0029. The
+// TestREQ053ComposerRealPathRefusals — REQ-053 / REQ-140, ADR 0015. The
 // composer's real path is under the party grammar's refusals and the
 // metadata rules: a `composer_self: true` beside an identifier or a
 // relationship (PARTY_SELF has neither), two spellings of one key that
@@ -518,7 +518,7 @@ func TestREQ053ComposerRealPathUnmatched(t *testing.T) {
 	}
 }
 
-// TestREQ053ComposerRealPathIsOneSegment — REQ-053, ADR 0029. The composer's
+// TestREQ053ComposerRealPathIsOneSegment — REQ-053, ADR 0015. The composer's
 // real path is the `composer` segment itself, followed by a suffix or a
 // sub-path. A Web Template node whose FLAT id only starts with "composer" is
 // content like any other node: strict decode reads its keys at their own path
@@ -664,7 +664,7 @@ func TestREQ053EmptyComposerNameRefused(t *testing.T) {
 	}
 }
 
-// TestREQ053ComposerEncodeSpellings — REQ-053, ADR 0029. Encode writes a
+// TestREQ053ComposerEncodeSpellings — REQ-053, ADR 0015. Encode writes a
 // composer one ctx/ short form carries whole in that form, and every other
 // composer whole at its real path with no ctx/ composer key, so one body spells
 // its composer one way: the composer keys of the output are exactly the ones

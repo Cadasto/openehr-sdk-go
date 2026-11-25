@@ -177,7 +177,7 @@ cmd_sync() {
   done
 
   # Drop schemas no longer in SRC_PATHS: the SDK pins one version per schema
-  # id, so the bump that adds a version removes the old one (ADR 0001).
+  # id, so the bump that adds a version removes the old one (ADR 0002).
   local f keep
   for f in "$DEST"/*.bmm.json; do
     [[ -e "$f" ]] || continue
@@ -236,7 +236,7 @@ cmd_sync() {
     echo "  go test ./internal/bmmgen -run RootSchemas -count=1"
   fi
 
-  # Keep the generated code in step with the pin (REQ-042).
+  # Keep the generated code in step with the pin (REQ-041).
   if [[ "${BMM_SKIP_GEN:-}" == "1" ]]; then
     echo "(BMM_SKIP_GEN=1 — skipped 'make codegen')"
     return 0

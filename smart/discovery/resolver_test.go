@@ -315,11 +315,11 @@ func TestNotModifiedRevalidatesForEachResolver(t *testing.T) { // REQ-072
 	}
 }
 
-// TestNotModifiedRefusesPlaintextForAStrictResolver pins REQ-073 on a 304
+// TestNotModifiedRefusesPlaintextForAStrictResolver pins REQ-072 on a 304
 // renewal: a Resolver built without WithAllowInsecure refuses a plaintext
 // auth endpoint in a catalog that a Resolver built with it cached, as it
 // would refuse the same document on a 200.
-func TestNotModifiedRefusesPlaintextForAStrictResolver(t *testing.T) { // REQ-073
+func TestNotModifiedRefusesPlaintextForAStrictResolver(t *testing.T) { // REQ-072
 	cases := []struct {
 		name   string
 		member string // a plaintext member added to the document
@@ -469,7 +469,7 @@ func TestStaleCatalog(t *testing.T) {
 	}
 }
 
-// REQ-073: a declared issuer that differs from the base URL is no longer
+// REQ-072: a declared issuer that differs from the base URL is no longer
 // refused for differing; it is refused with ReasonIssuerMismatch when the
 // issuer's own OpenID configuration names another issuer.
 func TestResolveIssuerMismatch(t *testing.T) {
@@ -505,7 +505,7 @@ func TestResolveIssuerMismatch(t *testing.T) {
 	}
 }
 
-// REQ-070, REQ-073: a declared issuer equal to the base URL resolves without
+// REQ-070, REQ-072: a declared issuer equal to the base URL resolves without
 // an OpenID configuration check, and both catalog values carry that URL.
 func TestResolveIssuerMatch(t *testing.T) {
 	// Start an unstarted server so we know srv.URL before building the body.
@@ -544,7 +544,7 @@ func TestResolveIssuerMatch(t *testing.T) {
 // (no WithAllowInsecure). The issuer itself is served over TLS so the
 // issuer-level check does not interfere.
 //
-// REQ-073: a plaintext auth endpoint is rejected with ReasonInsecureURL
+// REQ-072: a plaintext auth endpoint is rejected with ReasonInsecureURL
 // unless WithAllowInsecure is set.
 func TestResolveInsecureEndpointRejectedStrict(t *testing.T) {
 	body := `{

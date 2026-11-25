@@ -9,7 +9,7 @@ date: 2026-06-15
 # ADR 0007 — AQL parser: ANTLR + SDK grammar profile
 
 - **Status:** Accepted, 2026-06-15.
-- **Tracks:** REQ-109 AQL static lint. Related: [ADR 0001](0001-bmm-version-bump-runbook.md) (version-bump runbook spirit, reused for grammar rebases).
+- **Tracks:** REQ-109 AQL static lint. Related: [ADR 0002](0002-bmm-codegen-decisions.md) (its BMM version-bump rule, whose spirit grammar rebases reuse).
 
 ## Context
 
@@ -36,7 +36,7 @@ The lint is a pre-flight aid, not a conformance gate: **lint-clean does not impl
 
 - The SDK gains its first non-OpenTelemetry runtime dependency (`antlr4-go/antlr/v4`, pure Go). Documented in [architecture.md § Dependencies](../architecture.md#dependencies).
 - `vet` excludes `openehr/aql/parse/gen` — ANTLR's Go output has unreachable code after panics (inherent, not a defect); golangci-lint already skips generated files.
-- Spec fidelity and a clean rebase path are retained: a QUERY release bump re-imports `baseline/`, re-applies or drops each `SDK-AQL-NNN`, and re-runs `make aqlgen-check` (the ADR 0001 runbook spirit).
+- Spec fidelity and a clean rebase path are retained: a QUERY release bump re-imports `baseline/`, re-applies or drops each `SDK-AQL-NNN`, and re-runs `make aqlgen-check` (the spirit of ADR 0002's BMM version-bump rule).
 - The Java toolchain runs only in Docker: it never enters `go build` or `go test`, and `make test` reaches it through the `antlr` image.
 - If a future need arises to drop the codegen container entirely, a pure-Go parser (participle) remains a documented fallback in the plan — at the cost of hand-maintaining the grammar.
 

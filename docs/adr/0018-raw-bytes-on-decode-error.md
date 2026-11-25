@@ -10,7 +10,7 @@ date: 2026-08-30
 
 - **Status:** Accepted, 2026-08-30.
 - **Introduces:** [REQ-151](../specifications/transport.md#req-151--typed-2xx-decode-failure) (the typed 2xx decode failure and its `Body` field). **Amends:** —
-- **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (the "no strict-mode knob in v1" posture this decision follows); [REQ-093](../specifications/transport.md#req-093--openehr-error-envelope-mapping) (the PHI-safe error-surface discipline, the `WithRawErrorBodies` opt-in this decision deliberately does *not* extend, and the `WithMaxResponseBody` cap it relies on); [REQ-052](../specifications/wire.md#req-052) (the encode-only refusal sentinel, decided in § REQ-052, not here); [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (cross-reference only: REQ-094 owns `ehr.Create`'s empty/null-body arm, a typed `NoRepresentationError`, while this ADR's primitive types only the decode-failure arm).
+- **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (its "no strict-number knob" posture, which this decision follows); [REQ-093](../specifications/transport.md#req-093--openehr-error-envelope-mapping) (the PHI-safe error-surface discipline, the `WithRawErrorBodies` opt-in this decision deliberately does *not* extend, and the `WithMaxResponseBody` cap it relies on); [REQ-052](../specifications/wire.md#req-052) (the encode-only refusal sentinel, decided in § REQ-052, not here); [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (cross-reference only: REQ-094 owns `ehr.Create`'s empty/null-body arm, a typed `NoRepresentationError`, while this ADR's primitive types only the decode-failure arm).
 
 ## Context
 
@@ -118,7 +118,7 @@ is no opt-in knob, and `WithRawErrorBodies` does not gate it.**
 - **A new opt-in `transport.WithRawDecodeBodies`.** Keeps the two questions separate and leaves
   the choice with the consumer. **Rejected:** off by default it has the same defect as the
   option above; on by default it is a knob nobody needs to touch — a no-op switch whose only
-  effect is to make the contract conditional and the documentation longer. ADR 0004 set the
+  effect is to make the contract conditional and the documentation longer. ADR 0022 set the
   precedent directly: the SDK declined a strict-decode mode in v1 rather than ship a second
   wire-strictness knob, on the grounds that the default should simply be right. The same
   reasoning applies here, and the default that is right is the one that returns the caller's own

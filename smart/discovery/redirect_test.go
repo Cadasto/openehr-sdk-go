@@ -25,12 +25,12 @@ func countingServer(t *testing.T, body func(origin string) string) (*httptest.Se
 	return srv, &hits
 }
 
-// TestResolveRefusesRedirectDowngrade pins REQ-073: while fetching the SMART
+// TestResolveRefusesRedirectDowngrade pins REQ-072: while fetching the SMART
 // configuration or the issuer's OpenID configuration, a resolver without
 // WithAllowInsecure does not follow a redirect to a URL that is not https;
 // it reports ReasonInsecureURL and never contacts the redirect target. With
 // WithAllowInsecure the redirect is followed.
-func TestResolveRefusesRedirectDowngrade(t *testing.T) { // REQ-073
+func TestResolveRefusesRedirectDowngrade(t *testing.T) { // REQ-072
 	tests := []struct {
 		name string
 		// redirected is the path the https server answers with a 302.
@@ -158,12 +158,12 @@ func redirectingPlatform(t *testing.T, smartRedirectsTo string) *httptest.Server
 	return srv
 }
 
-// TestResolveKeepsClientRedirectPolicy pins REQ-073: apart from refusing a
+// TestResolveKeepsClientRedirectPolicy pins REQ-072: apart from refusing a
 // downgrade, the injected client's own redirect policy applies. An
 // https-to-https redirect is followed; a caller's CheckRedirect is consulted
 // and its refusal stands; without one, the standard limit of 10 redirects
 // holds. The caller's client is never modified.
-func TestResolveKeepsClientRedirectPolicy(t *testing.T) { // REQ-073
+func TestResolveKeepsClientRedirectPolicy(t *testing.T) { // REQ-072
 	t.Run("https to https is followed", func(t *testing.T) {
 		srv := redirectingPlatform(t, "/moved/smart")
 		client := srv.Client()

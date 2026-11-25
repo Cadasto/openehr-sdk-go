@@ -44,7 +44,7 @@ func Probe002OpenEHRRestService(ctx context.Context, fixtureBody []byte) (Result
 		r.Detail = fmt.Sprintf("org.openehr.rest base_url is not a parseable absolute URL: %v", entry.BaseURL)
 		return r, nil
 	}
-	// An absent spec_version is accepted (REQ-072, ADR 0008).
+	// An absent spec_version is accepted (REQ-072, ADR 0023).
 	r.Status = "pass"
 	r.Detail = fmt.Sprintf("org.openehr.rest advertised: base_url=%s spec_version=%q", entry.BaseURL, entry.SpecVersion)
 	return r, nil

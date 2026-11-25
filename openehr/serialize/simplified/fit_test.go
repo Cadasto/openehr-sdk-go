@@ -2,7 +2,7 @@ package simplified
 
 // REQ-053 — "A value must fit its attribute": decode refuses a suffix value,
 // required or optional, bare value included, that the canonical-JSON decode of
-// its RM attribute would refuse (REQ-052, ADR 0004 tolerance included), with
+// its RM attribute would refuse (REQ-052, ADR 0022 tolerance included), with
 // an error that wraps ErrUnsupportedDatatype and names the FLAT key, never a
 // canonical-JSON error naming a path the caller did not write. The check adds
 // no strictness of its own: what canonical JSON admits, it admits.
@@ -148,7 +148,7 @@ func TestREQ053FitNamesTheBareKeyAnEmptySuffixSpells(t *testing.T) {
 // TestREQ053FitAdmitsWhatCanonicalJSONAdmits — REQ-053: the check adds no
 // strictness beyond naming the key. A whole number written with a fraction
 // fits an Integer (REQ-052 § Floating-point precision), a quoted decimal fits
-// a Real or an Integer (ADR 0004), and each decodes to the value it spells.
+// a Real or an Integer (ADR 0022), and each decodes to the value it spells.
 func TestREQ053FitAdmitsWhatCanonicalJSONAdmits(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for name, tc := range map[string]fitCase{
