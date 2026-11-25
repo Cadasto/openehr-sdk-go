@@ -358,17 +358,17 @@ check tests-list-emptied "$r" ok
 # 35 - a row without a tests: key gains one, after its last line, when a test
 #      starts citing its REQ.
 r="$(new_case tests-gained)"
-printf '\n### REQ-998 Beta\n\nNormative fixture text.\n' >> "$r/docs/specifications/topic.md"
-printf '\n  - id: REQ-998\n    title: Beta\n    canonical: docs/specifications/topic.md#req-998-beta\n    status: stable\n    implementation: planned\n' \
+printf '\n### REQ-999 Beta\n\nNormative fixture text.\n' >> "$r/docs/specifications/topic.md"
+printf '\n  - id: REQ-999\n    title: Beta\n    canonical: docs/specifications/topic.md#req-999-beta\n    status: stable\n    implementation: planned\n' \
   >> "$r/docs/specifications/traceability.yaml"
 bash "$r/scripts/spec-gen.sh" >/dev/null
 check tests-gained-before "$r" ok
-printf 'package good\n\n// REQ-998: a first citing test.\n' > "$r/pkg/good/beta_test.go"
-check tests-gained-stale "$r" fail "pkg/good/beta_test.go cites REQ-998 but is not listed"
+printf 'package good\n\n// REQ-999: a first citing test.\n' > "$r/pkg/good/beta_test.go"
+check tests-gained-stale "$r" fail "pkg/good/beta_test.go cites REQ-999 but is not listed"
 bash "$r/scripts/spec-gen.sh" >/dev/null
-_row="$(awk '/^  - id: REQ-998$/{f=1} f' "$r/docs/specifications/traceability.yaml" | tail -2 | paste -sd'|' -)"
+_row="$(awk '/^  - id: REQ-999$/{f=1} f' "$r/docs/specifications/traceability.yaml" | tail -2 | paste -sd'|' -)"
 [[ "$_row" == "    tests:|      - pkg/good/beta_test.go" ]] \
-  || { echo "spec-check-selftest: FAIL tests-gained: REQ-998 row ends '${_row}'" >&2; fail=1; }
+  || { echo "spec-check-selftest: FAIL tests-gained: REQ-999 row ends '${_row}'" >&2; fail=1; }
 check tests-gained "$r" ok
 
 # 36 - a retired requirement has no map row: `retired` and the old word
