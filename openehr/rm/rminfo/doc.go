@@ -7,18 +7,21 @@
 //
 // The attribute questions are on the [Lookup] interface; the class-graph
 // questions are on the optional [Hierarchy] capability interface, which
-// [Default] implements and consumers reach by type assertion. Why a name is
-// not in the class universe is answered by the optional [AbsenceReporter],
+// [Default] implements and consumers reach by type assertion. An attribute's
+// type with the generic parameters its declaration binds
+// ("DV_INTERVAL<DV_DATE>" where [Lookup.AttributeRMType] answers
+// "DV_INTERVAL") is answered by the optional [BoundTypeReporter], and why a
+// name is not in the class universe by the optional [AbsenceReporter], both
 // reached the same way.
 //
 // The data is generated from the pinned BMM schemas under resources/bmm/
 // and lives in two generated tables: lookup_gen.go for the class
 // universe, absence_gen.go for the declared names outside it. The
-// hand-written surface is the [Lookup], [Hierarchy], [AttributeLister]
-// and [AbsenceReporter] interfaces, the [ClassMeta] and [AttrMeta] data
-// types, and the [Default], [New] and [NewWithAbsence] accessors. There
-// is no runtime BMM dependency: the generated tables are plain Go
-// literals. Two hand-written answers sit beside them: [IsNonStorableAttr],
+// hand-written surface is the [Lookup], [Hierarchy], [AttributeLister],
+// [BoundTypeReporter] and [AbsenceReporter] interfaces, the [ClassMeta]
+// and [AttrMeta] data types, and the [Default], [New] and
+// [NewWithAbsence] accessors. There is no runtime BMM dependency: the
+// generated tables are plain Go literals. Two hand-written answers sit beside them: [IsNonStorableAttr],
 // the attributes no serialization carries, and [NonEmptyLists], the lists
 // an RM invariant keeps from being present and empty, which the
 // template-driven generator and the validator share.

@@ -229,7 +229,8 @@ func TestRenderRMInfoEmitsHierarchyFields(t *testing.T) {
 		{"DATA_VALUE", `Abstract: +true,`},
 		{"PATHABLE", `Abstract: +true,`},
 		{"LOCATABLE", `Parents: +\[\]string\{"PATHABLE"\},`},
-		{"LOCATABLE", `"name": +\{TypeName: "DV_TEXT", Required: true, Container: false, DeclaredIn: "LOCATABLE"\},`},
+		{"LOCATABLE", `"name": +\{TypeName: "DV_TEXT", BoundTypeName: "DV_TEXT", Required: true, Container: false, DeclaredIn: "LOCATABLE"\},`},
+		{"PARTY_RELATIONSHIP", `"time_validity": +\{TypeName: "DV_INTERVAL", BoundTypeName: "DV_INTERVAL<DV_DATE>", Required: false, Container: false, DeclaredIn: "PARTY_RELATIONSHIP"\},`},
 	} {
 		entry := classEntry(t, src, tc.class)
 		if !regexp.MustCompile(tc.want).MatchString(entry) {

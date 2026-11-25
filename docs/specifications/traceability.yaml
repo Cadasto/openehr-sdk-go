@@ -292,10 +292,12 @@ requirements:
       - internal/bmmgen/primitive_ancestor_census_test.go
       - internal/bmmgen/render_rminfo_absence_test.go
       - internal/bmmgen/render_rminfo_hierarchy_test.go
+      - internal/bmmgen/render_rminfo_test.go
       - openehr/rm/rminfo/absence_test.go
       - openehr/rm/rminfo/export_test.go
       - openehr/rm/rminfo/hierarchy_test.go
       - openehr/rm/rminfo/imports_test.go
+      - openehr/rm/rminfo/lookup_test.go
       - openehr/rm/rminfo/probe_094_test.go
       - openehr/rm/rminfo/probe_098_test.go
 

@@ -512,6 +512,8 @@ For a class in the universe, the surface **MUST** answer:
 - **Conformance** — whether one class is, or descends from, another.
 - **Concrete descendants** — every class the BMM does not mark abstract that naming this class denotes: itself when not abstract, plus every non-abstract strict descendant, deterministically ordered.
 - **Attribute declaration site** — for an attribute the class carries, the class whose BMM declaration supplied it.
+- **Bound attribute type** — for an attribute the class carries, its type with the generic parameters its BMM declaration binds, spelled as BMM's `type_name` and ITS-JSON spell a generic instantiation (`DV_INTERVAL<DV_DATE>`, `Hash<String,TRANSLATION_DETAILS>`), and for a container its element (`REFERENCE_RANGE<DV_QUANTITY>`).
+  A type that binds no parameter, or leaves one open as a formal parameter of the declaring class (`EVENT<T>` on `HISTORY.events`), answers the bare class, which the attribute lookup keeps answering for every attribute.
 
 #### The flattened attribute tables stay flattened
 
@@ -614,7 +616,7 @@ A name reporting an absence reason **MUST** report not-known on every `Lookup` a
 - Its class-graph questions sit on an **optional capability interface** discovered by assertion, rather than on the existing attribute-lookup interface, so an external implementer of that interface does not break ([module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)), following the precedent already set for attribute enumeration.
   Each question is reachable through the same seam that admits synthetic model data, so the negative space above is testable without the pinned RM.
 
-**Acceptance:** the compiled-in answers equal an independent reduction of the pinned BMM (class universe, abstractness, immediate parents, transitive ancestors, per-attribute declaring class) — the equivalence [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) asserts.
+**Acceptance:** the compiled-in answers equal an independent reduction of the pinned BMM (class universe, abstractness, immediate parents, transitive ancestors, per-attribute declaring class and bound type) — the equivalence [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) asserts.
 `ENTRY` reports abstract and expands to exactly the concrete entry classes; a concrete class expands to itself; a dead-end abstract class expands to nothing while still reporting as known.
 `LOCATABLE`-inherited attributes report `LOCATABLE` (or the redefining descendant) as their declaration site while the flattened lookup keeps answering unchanged.
 A name outside the universe is distinguishable from every in-universe answer on every question.
@@ -625,7 +627,7 @@ Hand-editing a generated hierarchy field fails the drift check.
 
 - runtime BMM loading (ruled out above, not deferred);
 - AOM/AM class hierarchies;
-- generic-parameter resolution beyond the root-type reduction the attribute tables already apply;
+- resolving a generic parameter a declaration leaves open (`T`) against the path a caller came through: the bound attribute type keeps only what the declaration itself binds;
 - selecting among multiple pinned schemas at run time;
 - deriving *instantiability* beyond the BMM's own abstractness flag (an RM invariant that forbids a value is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this surface's);
 - shipping any excluded model (the exclusions are pinned intent — PROBE-094 — and the absence reasons make them legible, not reversible);

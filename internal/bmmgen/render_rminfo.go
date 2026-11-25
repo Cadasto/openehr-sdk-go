@@ -6,6 +6,7 @@ import (
 	"go/format"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
@@ -18,7 +19,9 @@ import (
 //
 // Per class it emits both layers rminfo answers over:
 //   - the inheritance-FLATTENED attribute set, plus the `DeclaredIn`
-//     site the fold would otherwise erase;
+//     site the fold would otherwise erase, and each attribute's type both
+//     bare (`TypeName`) and with the generic parameters its declaration
+//     binds (`BoundTypeName`, [boundTypeName]);
 //   - the class-graph facts, `Abstract` and `Parents`, the latter
 //     filtered to the universe so the emitted graph stays closed.
 //
@@ -90,8 +93,8 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 		slices.Sort(innerNames)
 		for _, n := range innerNames {
 			a := e.attrs[n]
-			fmt.Fprintf(&body, "\t\t\t%q: {TypeName: %q, Required: %t, Container: %t, DeclaredIn: %q},\n",
-				n, a.typeName, a.required, a.container, a.declaredIn)
+			fmt.Fprintf(&body, "\t\t\t%q: {TypeName: %q, BoundTypeName: %q, Required: %t, Container: %t, DeclaredIn: %q},\n",
+				n, a.typeName, a.boundTypeName, a.required, a.container, a.declaredIn)
 		}
 		body.WriteString("\t\t},\n")
 		body.WriteString("\t\tAttrOrder: []string{")
@@ -153,9 +156,13 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 // directly to keep the import direction one-way (rminfo does NOT
 // depend on bmmgen).
 type rmAttr struct {
-	typeName  string
-	required  bool
-	container bool
+	typeName string
+	// boundTypeName is typeName with the generic parameters the BMM
+	// declaration binds (REQ-048), from [boundTypeName]. Both are read off
+	// the same type reference, so they never name different classes.
+	boundTypeName string
+	required      bool
+	container     bool
 	// declaredIn is the class whose BMM declaration this attribute came
 	// from, recorded by the fold in [effectiveProperties] rather than
 	// re-derived afterwards (REQ-048): a second, independent walk could
@@ -247,9 +254,10 @@ func effectiveProperties(plan *Plan, className string) (map[string]rmAttr, []str
 			visit(anc)
 		}
 		props, propOrder := classProperties(pc.Class)
+		formal := classFormalParameters(pc.Class)
 		for _, propName := range propOrder {
 			prop := props[propName]
-			attr, ok := propToAttr(prop)
+			attr, ok := propToAttr(prop, formal)
 			if !ok {
 				continue
 			}
@@ -389,61 +397,65 @@ func classProperties(c bmm.Class) (map[string]bmm.Property, []string) {
 // Returns ok=false for properties we cannot translate (typeless
 // generic-parameter open properties without a concrete bound).
 //
+// formal holds the formal generic parameters of the class declaring p
+// ([classFormalParameters]); a type that leaves one of them open keeps its
+// bare name as its bound type ([boundTypeName]).
+//
 // IsMandatory is exposed via Go struct embedding (propertyCommon
 // is embedded in each concrete Property variant), so the field
 // access on the concrete type compiles even though the Property
 // interface does not declare it.
-func propToAttr(p bmm.Property) (rmAttr, bool) {
+func propToAttr(p bmm.Property, formal map[string]*bmm.GenericParameterDef) (rmAttr, bool) {
 	switch v := p.(type) {
 	case *bmm.SingleProperty:
 		return rmAttr{
-			typeName:  v.TypeName,
-			required:  v.IsMandatory,
-			container: false,
+			typeName:      v.TypeName,
+			boundTypeName: v.TypeName,
+			required:      v.IsMandatory,
+			container:     false,
 		}, true
 	case *bmm.SinglePropertyOpen:
 		return rmAttr{
-			typeName:  v.TypeName,
-			required:  v.IsMandatory,
-			container: false,
+			typeName:      v.TypeName,
+			boundTypeName: v.TypeName,
+			required:      v.IsMandatory,
+			container:     false,
 		}, true
 	case *bmm.ContainerProperty:
+		elem := containerElement(v.TypeDef)
 		return rmAttr{
-			typeName:  containerInnerType(v.TypeDef),
-			required:  containerRequired(v.Cardinality, v.IsMandatory),
-			container: true,
+			typeName:      rootTypeName(elem),
+			boundTypeName: boundTypeName(elem, formal),
+			required:      containerRequired(v.Cardinality, v.IsMandatory),
+			container:     true,
 		}, true
 	case *bmm.GenericProperty:
 		return rmAttr{
-			typeName:  genericRootType(v.TypeDef),
-			required:  v.IsMandatory,
-			container: false,
+			typeName:      rootTypeName(v.TypeDef),
+			boundTypeName: boundTypeName(v.TypeDef, formal),
+			required:      v.IsMandatory,
+			container:     false,
 		}, true
 	default:
 		return rmAttr{}, false
 	}
 }
 
-// containerInnerType extracts the BMM type name of a container
-// property's element. Falls back to a sentinel "Any" when the type
-// definition is malformed (should not occur on the pinned BMM).
-func containerInnerType(td *bmm.ContainerType) string {
-	if td == nil || td.TypeDef == nil {
-		return "Any"
+// containerElement returns the element type of a container property's
+// type definition. Nested containers are rare in the openEHR BMM; it
+// unwraps them to the innermost element, so downstream consumers see a
+// concrete RM class name when they descend. A missing definition gives
+// nil, which [rootTypeName] reports as "Any" (should not occur on the
+// pinned BMM).
+func containerElement(td *bmm.ContainerType) bmm.Type {
+	for td != nil {
+		inner, nested := td.TypeDef.(*bmm.ContainerType)
+		if !nested {
+			return td.TypeDef
+		}
+		td = inner
 	}
-	switch inner := td.TypeDef.(type) {
-	case *bmm.SimpleType:
-		return inner.TypeName
-	case *bmm.GenericType:
-		return inner.RootType
-	case *bmm.ContainerType:
-		// Nested containers are rare in the openEHR BMM; report the
-		// innermost element type so downstream consumers see a
-		// concrete RM class name when they descend.
-		return containerInnerType(inner)
-	default:
-		return "Any"
-	}
+	return nil
 }
 
 // containerRequired reports whether a container property is required.
@@ -460,19 +472,105 @@ func containerRequired(card *bmm.Cardinality, mandatory bool) bool {
 	return false
 }
 
-// genericRootType returns the BMM root type name for a GenericType.
-// Used by GenericProperty to expose the outer class name (e.g.
-// "INTERVAL" for an INTERVAL[DV_QUANTITY] property).
-func genericRootType(td bmm.Type) string {
-	if td == nil {
-		return "Any"
-	}
+// rootTypeName returns the class name a BMM type reference reduces to: a
+// generic type's root_type (e.g. "DV_INTERVAL" for DV_INTERVAL<DV_DATE>),
+// a simple type's name, and "Any" for a missing or unknown reference.
+func rootTypeName(td bmm.Type) string {
+	// A nil pointer in a non-nil interface is as missing as a nil interface:
+	// GenericProperty passes its *GenericType here unconverted.
 	switch t := td.(type) {
 	case *bmm.GenericType:
-		return t.RootType
+		if t != nil {
+			return t.RootType
+		}
 	case *bmm.SimpleType:
-		return t.TypeName
+		if t != nil {
+			return t.TypeName
+		}
+	}
+	return "Any"
+}
+
+// boundTypeName spells a BMM type reference with the generic parameters it
+// binds (REQ-048), the way BMM's type_name does and ITS-JSON spells a generic
+// instantiation: the root, then the parameters in angle brackets,
+// comma-separated with no space ("DV_INTERVAL<DV_DATE>",
+// "Hash<String,TRANSLATION_DETAILS>"). A parameter that is itself generic, or
+// a container, is spelled the same way, nested.
+//
+// A reference that leaves any parameter open, at any depth, keeps its bare
+// [rootTypeName]. Open means a formal parameter of the class declaring the
+// property, passed as formal, such as HISTORY's T in its events'
+// List<EVENT<T>>: spelling it would hand a caller a name that only the path
+// it came through can resolve.
+//
+// Parameters keep their declaration order. The keyed generic_parameter_defs
+// form carries none the loader keeps, so its parameters are ordered by name:
+// that is the formal order of Hash<K,V>, the one root the pinned schemas use
+// the keyed form for, and it keeps the answer deterministic.
+func boundTypeName(t bmm.Type, formal map[string]*bmm.GenericParameterDef) string {
+	if spelled, closed := spellBoundType(t, formal); closed {
+		return spelled
+	}
+	return rootTypeName(t)
+}
+
+// spellBoundType spells t with every generic parameter it binds, and reports
+// closed=false when one of them, at any depth, is a name in formal, or when
+// a reference is missing or of an unknown kind.
+func spellBoundType(t bmm.Type, formal map[string]*bmm.GenericParameterDef) (spelled string, closed bool) {
+	switch v := t.(type) {
+	case *bmm.SimpleType:
+		if v == nil {
+			return "", false
+		}
+		_, open := formal[v.TypeName]
+		return v.TypeName, !open
+	case *bmm.ContainerType:
+		if v == nil {
+			return "", false
+		}
+		elem, closed := spellBoundType(v.TypeDef, formal)
+		if !closed {
+			return "", false
+		}
+		return v.ContainerType + "<" + elem + ">", true
+	case *bmm.GenericType:
+		if v == nil {
+			return "", false
+		}
+		params := v.GenericParameters
+		if len(params) == 0 && len(v.GenericParameterDefs) > 0 {
+			params = make([]bmm.Type, 0, len(v.GenericParameterDefs))
+			for _, name := range slices.Sorted(maps.Keys(v.GenericParameterDefs)) {
+				params = append(params, v.GenericParameterDefs[name])
+			}
+		}
+		if len(params) == 0 {
+			return v.RootType, true
+		}
+		names := make([]string, len(params))
+		for i, p := range params {
+			name, closed := spellBoundType(p, formal)
+			if !closed {
+				return "", false
+			}
+			names[i] = name
+		}
+		return v.RootType + "<" + strings.Join(names, ",") + ">", true
+	}
+	return "", false
+}
+
+// classFormalParameters returns the formal generic parameters a class
+// declares, keyed by name (HISTORY's T); nil for a class that declares none.
+func classFormalParameters(c bmm.Class) map[string]*bmm.GenericParameterDef {
+	switch cls := c.(type) {
+	case *bmm.SimpleClass:
+		return cls.GenericParameterDefs
+	case *bmm.Interface:
+		return cls.GenericParameterDefs
 	default:
-		return "Any"
+		return nil
 	}
 }
