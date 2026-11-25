@@ -324,7 +324,8 @@ func TestIntervalMarshalJSONOpenSideArms(t *testing.T) {
 // (REQ-052, REQ-056): the generated canonical XML marshaller of an
 // interval-shaped class wraps the `lower` element in the guard that reads the
 // lower open flag, and the `upper` element in the one that reads the upper
-// flag.
+// flag. The guarded code starts by asking whether the bound holds a class
+// value, which it writes with its `xsi:type`.
 func TestIntervalMarshalXMLOpenSideGuards(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
@@ -345,8 +346,8 @@ func TestIntervalMarshalXMLOpenSideGuards(t *testing.T) {
 	}
 	src := string(body)
 	for _, tc := range []struct{ name, re string }{
-		{"lower", `\tif !omitIntervalBound\([pi]\.LowerUnbounded, [pi]\.Lower\) \{\n\t\tif err := _e\.EncodeElement\(&[pi]\.Lower, `},
-		{"upper", `\tif !omitIntervalBound\([pi]\.UpperUnbounded, [pi]\.Upper\) \{\n\t\tif err := _e\.EncodeElement\(&[pi]\.Upper, `},
+		{"lower", `\tif !omitIntervalBound\([pi]\.LowerUnbounded, [pi]\.Lower\) \{\n\t\tif _c, _ok := any\(&[pi]\.Lower\)\.\(canxml\.BMMNamer\); _ok \{\n`},
+		{"upper", `\tif !omitIntervalBound\([pi]\.UpperUnbounded, [pi]\.Upper\) \{\n\t\tif _c, _ok := any\(&[pi]\.Upper\)\.\(canxml\.BMMNamer\); _ok \{\n`},
 	} {
 		// Interval, Point_interval and Proper_interval each carry one.
 		if got := len(regexp.MustCompile(tc.re).FindAllString(src, -1)); got != 3 {

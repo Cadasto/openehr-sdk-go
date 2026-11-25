@@ -39,7 +39,9 @@ import (
 //     built without the schemas, as a test may build one, keeps the
 //     generator's property order. Nil-pointer optionals and empty
 //     containers are omitted. Polymorphic descendants receive
-//     `xsi:type` via [canxml.EncodePoly]. A member whose element the
+//     `xsi:type` via [canxml.EncodePoly], and so does a class value in a
+//     member typed by an open generic parameter, whatever the
+//     instantiation ([marshalXMLOpenParam]). A member whose element the
 //     target's root schemas give a choice of shapes writes the shape it
 //     holds, with no `xsi:type` ([marshalXMLChoice]).
 //
@@ -285,6 +287,11 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 			// Should already be caught by polymorphicProperty; defensive.
 			return marshalXMLPolySingle(recv, goField, elemName), nil
 		}
+		if isOpenParam(ef.Owner, p.TypeName) {
+			// Typed by the owner's generic parameter (ORIGINAL_VERSION.data),
+			// held as `*T` when optional.
+			return marshalXMLOpenParam(recv, goField, elemName, !p.IsMandatory), nil
+		}
 		if p.IsMandatory {
 			if isClass {
 				return marshalXMLStructMandatory(recv, goField, elemName), nil
@@ -306,13 +313,9 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 			// nil-interface case at runtime.
 			return marshalXMLPolyOpen(recv, goField, elemName), nil
 		}
-		// Open generic param bound to a concrete primitive or struct.
-		// We don't know the concrete type at codegen time; emit a
-		// generic call that defers to encoding/xml at runtime.
-		if p.IsMandatory {
-			return marshalXMLGenericMandatory(recv, goField, elemName), nil
-		}
-		return marshalXMLGenericOptional(recv, goField, elemName), nil
+		// Open generic parameter with no abstract bound (BASE Interval's
+		// bounds), declared at the field as `T`, mandatory or not.
+		return marshalXMLOpenParam(recv, goField, elemName, false), nil
 
 	case *bmm.ContainerProperty:
 		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
@@ -469,19 +472,34 @@ func marshalXMLPrimitiveSlice(recv, field, elem string) string {
 		recv, field, elem)
 }
 
-func marshalXMLGenericMandatory(recv, field, elem string) string {
-	// Pass the field address so pointer-receiver MarshalXML on the
-	// concrete T (e.g. *DVQuantity for DVInterval[T]) dispatches
-	// correctly. encoding/xml only calls pointer-receiver methods on
-	// addressable values; a by-value field copy in EncodeElement is
-	// NOT addressable and falls back to reflection, which emits the
-	// Go field names (PascalCase) instead of our snake_case wire form.
-	return fmt.Sprintf("\tif err := _e.EncodeElement(&%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)
-}
-
-func marshalXMLGenericOptional(recv, field, elem string) string {
-	// Open generic parameter — declared at the field as `T` (no
-	// pointer indirection). Take the address so pointer-receiver
-	// MarshalXML on T dispatches; see [marshalXMLGenericMandatory].
-	return fmt.Sprintf("\tif err := _e.EncodeElement(&%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)
+// marshalXMLOpenParam emits the encoding of a member typed by an open generic
+// parameter that is not polymorphic by its bound: ORIGINAL_VERSION's `data`,
+// held as `*T` (pointer true), and BASE Interval's bounds, held as `T`. What
+// the member holds is known only at run time, so the emitted code chooses
+// there. A class value, one whose pointer or value names its BMM class (T a
+// class, a pointer to one, or an interface holding one), is written through
+// canxml.EncodePoly with its `xsi:type`, whatever the instantiation, as the
+// ITS-XML schema leaves the element's type open (`xs:anyType`). Anything
+// else, a primitive, goes to encoding/xml through a pointer, so a
+// pointer-receiver MarshalXML or MarshalText on T is called, and is written
+// as its text with no `xsi:type`. A nil member writes nothing either way.
+func marshalXMLOpenParam(recv, field, elem string, pointer bool) string {
+	start := fmt.Sprintf("xml.StartElement{Name: xml.Name{Local: %q}}", elem)
+	ptr, val, indent := "&"+recv+"."+field, recv+"."+field, "\t"
+	var b strings.Builder
+	if pointer {
+		ptr, val, indent = recv+"."+field, "*"+recv+"."+field, "\t\t"
+		fmt.Fprintf(&b, "\tif %s != nil {\n", ptr)
+	}
+	encodePoly := fmt.Sprintf("%s\tif err := canxml.EncodePoly(_e, %q, _c); err != nil {\n%s\t\treturn err\n%s\t}\n", indent, elem, indent, indent)
+	fmt.Fprintf(&b, "%sif _c, _ok := any(%s).(canxml.BMMNamer); _ok {\n", indent, ptr)
+	b.WriteString(encodePoly)
+	fmt.Fprintf(&b, "%s} else if _c, _ok = any(%s).(canxml.BMMNamer); _ok {\n", indent, val)
+	b.WriteString(encodePoly)
+	fmt.Fprintf(&b, "%s} else if err := _e.EncodeElement(%s, %s); err != nil {\n", indent, ptr, start)
+	fmt.Fprintf(&b, "%s\treturn err\n%s}\n", indent, indent)
+	if pointer {
+		b.WriteString("\t}\n")
+	}
+	return b.String()
 }
