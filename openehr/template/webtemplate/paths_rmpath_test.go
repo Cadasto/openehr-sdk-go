@@ -74,16 +74,15 @@ var nonCompositionRoots = map[string]string{
 	"Address.v2.opt":    "ADDRESS",
 	"TestPerson.v2.opt": "PERSON",
 	// The reference templates of testkit/corpus/reference.
-	"generic_ehr_status.v1.opt":     "EHR_STATUS",
-	"generic_folder.v1.opt":         "FOLDER",
-	"AGENT-generic-agent.v1.opt":    "AGENT",
-	"GROUP-CareTeam.v1.opt":         "GROUP",
-	"GROUP-generic.v1.opt":          "GROUP",
-	"ORGANISATION-generic.v1.opt":   "ORGANISATION",
-	"PERSON-CareProvider.v1.opt":    "PERSON",
-	"PERSON-Patient.v1.opt":         "PERSON",
-	"PERSON-PatientIdentity.v1.opt": "PERSON",
-	"ROLE-generic-role.v1.opt":      "ROLE",
+	"generic_ehr_status.v1.opt":   "EHR_STATUS",
+	"generic_folder.v1.opt":       "FOLDER",
+	"AGENT-generic-agent.v1.opt":  "AGENT",
+	"GROUP-CareTeam.v1.opt":       "GROUP",
+	"GROUP-generic.v1.opt":        "GROUP",
+	"ORGANISATION-generic.v1.opt": "ORGANISATION",
+	"PERSON-CareProvider.v1.opt":  "PERSON",
+	"PERSON-Patient.v1.opt":       "PERSON",
+	"ROLE-generic-role.v1.opt":    "ROLE",
 }
 
 // refusedOPTs are the vendored OPTs a build step refuses, each with the step

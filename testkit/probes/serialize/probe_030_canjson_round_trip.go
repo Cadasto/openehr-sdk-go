@@ -391,7 +391,7 @@ var probe030SkipFloor = map[string][]string{
 	"rm/ehr_status_valid_ehr_can_not_be_modifyable.json": {
 		"is_archetype_root /archetype_details",
 	},
-	// The seventeen folder_* samples (EHRbase Robot integration tests): each
+	// The nineteen folder_* samples (EHRbase Robot integration tests): each
 	// FOLDER whose archetype_node_id is an archetype id, the root and every
 	// sub-folder alike, has no archetype_details.
 	"rm/folder_empty_directory.json": {
@@ -410,6 +410,12 @@ var probe030SkipFloor = map[string][]string{
 		"is_archetype_root /archetype_details",
 	},
 	"rm/folder_empty_directory_with_details_items.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/folder_folder_with_existing_composition_root_directory.json": {
+		"is_archetype_root /archetype_details",
+	},
+	"rm/folder_folder_with_existing_composition_root_directory_and_details.json": {
 		"is_archetype_root /archetype_details",
 	},
 	"rm/folder_folder_with_one_item_in_root.json": {
