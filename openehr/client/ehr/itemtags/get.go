@@ -30,13 +30,10 @@ func GetComposition(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, r
 	return tags, meta, err
 }
 
-// GetEHRStatus reads ITEM_TAG headers from an EHR_STATUS GET. A Ref that
-// [openehrclient.ValidateRef] refuses fails with [transport.ErrInvalidConfig]
-// before any request.
+// GetEHRStatus reads ITEM_TAG headers from an EHR_STATUS GET. A nil Ref, or
+// one holding a nil pointer, fails with [transport.ErrInvalidConfig] before
+// any request.
 func GetEHRStatus(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ref openehrclient.Ref) (Tags, *openehrclient.VersionMetadata, error) {
-	if err := openehrclient.ValidateRef(ref); err != nil {
-		return Tags{}, nil, fmt.Errorf("itemtags.GetEHRStatus: %w", err)
-	}
 	meta, err := getEHRStatusMeta(ctx, c, ehrID, ref)
 	if err != nil {
 		return Tags{}, meta, err
@@ -45,13 +42,10 @@ func GetEHRStatus(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ref
 	return tags, meta, err
 }
 
-// GetDirectory reads ITEM_TAG headers from a Directory GET. A Ref that
-// [openehrclient.ValidateRef] refuses fails with [transport.ErrInvalidConfig]
-// before any request.
+// GetDirectory reads ITEM_TAG headers from a Directory GET. A nil Ref, or
+// one holding a nil pointer, fails with [transport.ErrInvalidConfig] before
+// any request.
 func GetDirectory(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ref openehrclient.Ref) (Tags, *openehrclient.VersionMetadata, error) {
-	if err := openehrclient.ValidateRef(ref); err != nil {
-		return Tags{}, nil, fmt.Errorf("itemtags.GetDirectory: %w", err)
-	}
 	meta, err := getDirectoryMeta(ctx, c, ehrID, ref)
 	if err != nil {
 		return Tags{}, meta, err

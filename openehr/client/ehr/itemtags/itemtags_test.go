@@ -55,9 +55,9 @@ func TestGetCompositionTags(t *testing.T) {
 }
 
 // TestGetEHRStatusAndDirectoryRefuseBadRefs: a nil Ref, a nil pointer to
-// either Ref type and an empty id fail with ErrInvalidConfig, under the
-// name of the call, before any request, and never panic (REQ-025,
-// idiom.md § No panics).
+// either Ref type and an empty version uid fail with ErrInvalidConfig
+// before any request, and never panic (REQ-025, idiom.md § No panics). A
+// nil Ref and a nil pointer are refused under the package's own name.
 func TestGetEHRStatusAndDirectoryRefuseBadRefs(t *testing.T) { // REQ-025
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -81,14 +81,14 @@ func TestGetEHRStatusAndDirectoryRefuseBadRefs(t *testing.T) { // REQ-025
 		}},
 	}
 	refs := []struct {
-		name string
-		ref  openehrclient.Ref
+		name       string
+		ref        openehrclient.Ref
+		wantPrefix string
 	}{
-		{"nil Ref", nil},
-		{"nil *ByVersionUID", (*openehrclient.ByVersionUID)(nil)},
-		{"nil *ByVersionedObjectID", (*openehrclient.ByVersionedObjectID)(nil)},
-		{"empty versioned-object id", openehrclient.LatestOf("")},
-		{"empty version uid", openehrclient.VersionOf("")},
+		{name: "nil Ref", ref: nil, wantPrefix: "itemtags: "},
+		{name: "nil *ByVersionUID", ref: (*openehrclient.ByVersionUID)(nil), wantPrefix: "itemtags: "},
+		{name: "nil *ByVersionedObjectID", ref: (*openehrclient.ByVersionedObjectID)(nil), wantPrefix: "itemtags: "},
+		{name: "empty version uid", ref: openehrclient.VersionOf("")},
 	}
 	for _, call := range calls {
 		for _, bad := range refs {
@@ -98,14 +98,65 @@ func TestGetEHRStatusAndDirectoryRefuseBadRefs(t *testing.T) { // REQ-025
 				if !errors.Is(err, transport.ErrInvalidConfig) {
 					t.Fatalf("%s(%s) err = %v, want ErrInvalidConfig", call.op, bad.name, err)
 				}
-				if !strings.HasPrefix(err.Error(), call.op+": ") {
-					t.Errorf("%s(%s) err = %q, want it to start with %q", call.op, bad.name, err, call.op+": ")
+				if !strings.HasPrefix(err.Error(), bad.wantPrefix) {
+					t.Errorf("%s(%s) err = %q, want it to start with %q", call.op, bad.name, err, bad.wantPrefix)
 				}
 				if n := hits.Load() - before; n != 0 {
 					t.Errorf("%s(%s) sent %d requests, want none", call.op, bad.name, n)
 				}
 			})
 		}
+	}
+}
+
+// TestGetEHRStatusAndDirectoryLatestWithEmptyID: neither read puts the
+// versioned-object id on the wire, so LatestOf("") reads the latest version
+// as it always has: one GET of the latest route, with no version_at_time.
+func TestGetEHRStatusAndDirectoryLatestWithEmptyID(t *testing.T) {
+	var reqs []*http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqs = append(reqs, r.Clone(r.Context()))
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "/directory") {
+			_, _ = w.Write([]byte(`{"_type":"FOLDER","name":{"_type":"DV_TEXT","value":"root"},"archetype_node_id":"openEHR-EHR-FOLDER.generic.v1"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"_type":"EHR_STATUS","name":{"_type":"DV_TEXT","value":"EHR Status"},"archetype_node_id":"openEHR-EHR-EHR_STATUS.generic.v1","subject":{"_type":"PARTY_SELF"},"is_queryable":true,"is_modifiable":true}`))
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	cases := []struct {
+		name     string
+		call     func(ref openehrclient.Ref) error
+		wantPath string
+	}{
+		{"GetEHRStatus", func(ref openehrclient.Ref) error {
+			_, _, err := itemtags.GetEHRStatus(t.Context(), c, "ehr-1", ref)
+			return err
+		}, "/openehr/v1/ehr/ehr-1/ehr_status"},
+		{"GetDirectory", func(ref openehrclient.Ref) error {
+			_, _, err := itemtags.GetDirectory(t.Context(), c, "ehr-1", ref)
+			return err
+		}, "/openehr/v1/ehr/ehr-1/directory"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reqs = nil
+			if err := tc.call(openehrclient.LatestOf("")); err != nil {
+				t.Fatalf("%s(LatestOf(\"\")) err = %v, want nil", tc.name, err)
+			}
+			if len(reqs) != 1 {
+				t.Fatalf("%s(LatestOf(\"\")) sent %d requests, want 1", tc.name, len(reqs))
+			}
+			got := reqs[0]
+			if got.Method != http.MethodGet || got.URL.Path != tc.wantPath {
+				t.Errorf("%s(LatestOf(\"\")) sent %s %s, want GET %s", tc.name, got.Method, got.URL.Path, tc.wantPath)
+			}
+			if got.URL.Query().Has("version_at_time") {
+				t.Errorf("%s(LatestOf(\"\")) sent query %q, want no version_at_time", tc.name, got.URL.RawQuery)
+			}
+		})
 	}
 }
 
