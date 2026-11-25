@@ -138,8 +138,8 @@ build-antlr: ## Build the ANTLR codegen image (maintainers; network)
 build: ## Compile all packages
 	@$(GO) build ./...
 
-clean: ## Remove bin/, coverage files and *.out files
-	@rm -rf bin/ coverage.* *.out
+clean: ## Remove bin/, coverage files, *.out and *.test files
+	@rm -rf bin/ coverage.* *.out *.test
 
 ##@ Code
 
