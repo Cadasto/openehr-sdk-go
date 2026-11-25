@@ -378,12 +378,16 @@ What a BMM bump that adds a subtype owes the codec is step 10 of [`resources/bmm
 The SDK **MUST** provide a canonical XML codec, symmetric to the canonical JSON codec.
 Like that codec, it resolves types through the type registry (REQ-040) and does not depend on `transport/` (REQ-013).
 
+#### Surface, element names and namespaces
+
 Canonical XML applies to the same RM surface as canonical JSON: Composition, EHR_STATUS, Directory, Contribution, demographic resources, and the `Interval<T>` fields of the AOM 1.4 types; [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) adds the ADL 1.4 operational template.
 Polymorphic discrimination uses the `xsi:type` attribute (XML Schema Instance namespace), not the JSON `_type` property.
 Element names **MUST** be snake_case BMM names (same as canonical JSON keys), including the elements of an AOM 1.4 constraint interval (`occurrences`, `existence`, `cardinality.interval`, …), which the SDK holds as the abstract BASE `Interval<T>`.
 Decode **SHOULD** also read the Go-field spelling SDK v0.28.0 and earlier wrote for that abstract interval (`Lower`, `LowerIncluded`, `LowerUnbounded`, `Upper`, `UpperIncluded`, `UpperUnbounded`); the encoder **MUST NOT** write it, and no other class is tolerant.
 The codec **MUST** carry its namespace declarations: the SDK writes the default namespace `http://schemas.openehr.org/v1`, and `xmlns:xsi` when `xsi:type` is present.
 The vendored ITS-XML schemas ([`resources/its-xml/`](../../resources/its-xml/README.md)) declare `targetNamespace` `http://schemas.openehr.org/v2`, and the generator reads only the XML binding from them, such as child-element order, never their namespace, so a validator run against them refuses SDK output on its namespace before it checks that order.
+
+#### Element order
 
 Canonical ordering for XML is its own deterministic profile, set out in the bullets below.
 Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-052)), element order is part of an XML document's identity, so the encoder **MUST** emit in the fixed order below:
@@ -396,6 +400,9 @@ Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-0
   Decode accepts child elements in any order.
 - `xsi:type` is the **first attribute** on every encoded concrete RM value where a polymorphic site is being resolved; the encoder emits it on every concrete value boundary (deterministic profile), the decoder requires it at polymorphic sites.
   `canxml.WithRelaxedTypeDispatch` is accepted for parity with canonical JSON's option but does not relax this yet: a polymorphic site with no discriminator fails with `typereg.ErrMissingType` whatever the option.
+
+#### Value encodings
+
 - An interval element that omits a boundary flag decodes by [§ REQ-169](#req-169--interval-boundary-flag-defaults).
   The ITS-XML schema (`BaseTypes.xsd`, type `Interval`) makes `lower_included` and `upper_included` optional (`minOccurs="0"`) and the two `*_unbounded` flags mandatory, so a schema-valid document may leave the included flags out.
 - Content the decode does not read is unmatched content, as [§ REQ-170](#req-170--unmatched-content-on-decode) defines it and says how it is treated.
@@ -406,6 +413,9 @@ Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-0
   On decode, XML whitespace inside the text is ignored, an empty element reads as absent, and text that is not base64 is refused as the bullet on primitive elements below says.
 - The AOM 1.4 `ARCHETYPE.original_language` is written in the `CODE_PHRASE` shape the AOM 1.4 schema gives it, `terminology_id` holding a `value` child: the shape of the RM `common.resource` form of `AUTHORED_RESOURCE`, which [clinical-modeling.md § REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) binds the model to.
   Decode also reads a `terminology_id` given as plain text.
+
+#### Absent, empty and nil elements
+
 - Nil-pointer optional fields and empty containers with `cardinality.lower == 0` **MUST** be emitted as **ABSENT** (no element).
   Both ABSENT and an empty self-closing element are accepted on decode.
   That acceptance covers optionals and containers only, and not a member typed by a generic parameter bound to an interface, which needs its `xsi:type` even when empty (above).
@@ -426,9 +436,15 @@ Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-0
 - Given `canxml.WithStringText`, decode **MUST** read a member of a string type, `String` or an ISO 8601 type, whose element is not nilled, as the text it carries, an empty or whitespace-only text included, as canonical JSON decodes the same string.
   Such a member is no missing member for § REQ-175's missing-member option, and its sent-without-a-value option still reports it as empty.
   A `Character` reads its text as sent in every mode, so the option leaves it as it is: one space is a value, and an empty element fails as the primitive failures below say.
+
+#### Duplicate attributes
+
 - An element that carries one attribute twice, by its name as written or as the namespaces in scope resolve it, a namespace declaration included, is not well-formed XML.
   Decode **MUST** refuse it in every mode, wherever the decode reads the element or skips it as unmatched content, with an error that wraps `canxml.ErrInvalidShape` and `canxml.ErrNotWellFormed`, names the element and the attribute and carries none of their values.
   An element inside a primitive element's text is unmatched content that a decode given none of `canxml.WithUnmatched`, `canxml.WithStrict`, `canxml.WithMissing`, `canxml.WithPresence`, `canxml.WithStringText` and a positive `canxml.WithMaxDepth` reads past without looking at it, so such a decode may accept a repeated attribute there; a decode given one of them refuses it.
+
+#### Dates and numbers
+
 - ISO 8601 dates/times/durations are passed through as element text content; the codec does not parse them at codec layer (REQ-041).
 - Numeric magnitudes use IEEE 754 double-precision, as in canonical JSON, and a `Real` element whose text is a lossy literal ([§ REQ-052 *Floating-point precision*](#floating-point-precision)) is refused as the bullet on primitive elements below says.
   The quoted decimal strings [ADR 0004](../adr/0004-numeric-wire-tolerance.md) admits are a canonical-JSON tolerance: element text is not quoted, and a quoted number is text that does not spell its type.
@@ -436,6 +452,9 @@ Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-0
   An element with no text carries no value and reads as `0`, as [§ REQ-175](#req-175--missing-members-on-decode) reads an empty primitive element.
   Decode **MUST** refuse any other text, whitespace alone included, such as the hexadecimal form `0x1p-2`, a digit separator (`1_000`), `Inf`, `Infinity` or `nan`, as the bullet on primitive elements below says.
   The encoder **MUST** write an infinity as `INF` or `-INF` and a not-a-number as `NaN`, and writes a finite value as the shortest decimal that reads back as the same `float64`.
+
+#### Well-formed documents
+
 - A document holds one root element.
   In every mode, `canxml.Unmarshal` **MUST** refuse what is not well-formed XML around it:
   - before the root, anything other than the XML declaration, whitespace, comments, processing instructions and one document type declaration, such as text other than whitespace, an end element or a second `<!DOCTYPE>`;
@@ -464,6 +483,9 @@ Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-0
   A UTF-8 byte order mark at the very start of the data is the document's encoding signature, not content before the root.
   `canxml.Decoder` decodes one value per call, skips what precedes it as `encoding/xml` does, and leaves what follows to the next call.
   Inside the value, a `canxml.Decoder` given `canxml.WithUnmatched`, `canxml.WithStrict`, `canxml.WithMissing`, `canxml.WithPresence`, `canxml.WithStringText` or a positive `canxml.WithMaxDepth` refuses a processing instruction whose target is `xml`, and a markup declaration, with an error that wraps `canxml.ErrInvalidShape` and `canxml.ErrNotWellFormed`; one given none of them may read past either.
+
+#### Primitive failures and type discriminators
+
 - The text of a primitive element may fail to decode as its type, inside a polymorphic slot or not, such as a `Boolean`, `Integer`, `Integer64` or `Real` the text does not spell, a lossy `Real`, a `Character` that is not one character, or an Octet list that is not base64.
   Such text **MUST** fail the decode with a `*canxml.DecodeError` whose `Inner` wraps `canxml.ErrInvalidShape`, not `canxml.ErrNotWellFormed`, and keeps the conversion's own error, such as a `*strconv.NumError`, reachable through unwrapping.
   The error's text is value-free as [§ REQ-052](#req-052) *Value-free decode errors* says.
@@ -899,59 +921,8 @@ The codecs **MUST**:
   The `rm_version` value is not: the reference writes a fixed `1.0.4`, while `rm_version` records the RM release an object was built against, so the SDK writes its own.
   Encode writes nothing for `archetype_details` ([§ REQ-140](#req-140--underscore-prefixed-rm-attributes) names it among the attributes out of scope).
   Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
-- Take from the compiled template, when decode is given one (`simplified.WithTemplate`), what the formats do not carry and the template determines, and, where the template leaves a coded node name open, the one the generator writes.
+- Take from the compiled template, when decode is given one (`simplified.WithTemplate`), what the formats do not carry and the template determines, and, where the template leaves a coded node name open, the one the generator writes, as *What the compiled template supplies* below sets out.
   Registered in the package [deviations register](../../openehr/serialize/simplified/deviations.md).
-  - The first such fact is a folded structure's concrete subtype: the formats fold every `ITEM_STRUCTURE` away, and `ITEM_TREE` and `ITEM_LIST` both hold `items`, so the path cannot tell them apart.
-    A decoded `ITEM_STRUCTURE` takes the subtype the compiled template gives the node at its path, where that subtype is an `ITEM_STRUCTURE` declaring the attribute the path goes on through.
-    Where the template gives no single answer (no node there, or alternatives that disagree), and in a decode without the template, the subtype is inferred from the path.
-  - The second is a required structure with no member, for which the formats have no key.
-    Decode rebuilds the structure at a single-valued attribute where all of these hold:
-    - a node decode rebuilds lacks the attribute, which the template's existence, or the RM, requires of it;
-    - the children the template allows there agree on one concrete `ITEM_STRUCTURE` subtype and node id;
-    - that structure holds no member the template or the RM requires ([§ REQ-102](clinical-modeling.md#req-102--composition-validation) *An existence lower bound alone asks for no member*).
-
-    It rebuilds the structure as the generator writes it: the template's subtype, node id and name, and no member, its list present and empty where the generator writes it so.
-    It builds no parent node, member or data value, no structure for a slot or an archetype root, and none where the template nodes that share the parent's path disagree on it.
-    Where the template asks the structure for a member, the body lacks data, and no structure is rebuilt.
-  - The third is a coded node name, for which the formats have no key below the root.
-    Decode gives a rebuilt node, in place of the `DV_TEXT` name from the archetype terminology, the `DV_CODED_TEXT` name the generator writes there under `ExampleFill`, where the template constrains the node's name both of these ways:
-    - as a `DV_CODED_TEXT`, through one child or through alternatives that agree on the name;
-    - with its `defining_code` constrained through one `C_CODE_PHRASE`, or one `C_CODE_REFERENCE` read as the code phrase it carries, or left unconstrained.
-
-    The name's code is the phrase's first listed code, else the placeholder `at0000` in the terminology the phrase, or the reference set's `terminology:` URI, names, else in `local` ([clinical-modeling.md § REQ-107 *Placeholders*](clinical-modeling.md#placeholders)).
-    A `defining_code` left unconstrained, with no attribute, no child, or one child that constrains nothing, gives the placeholder `at0000` in `local`, as the generator writes it.
-    The name's text is the code's term text where the `C_STRING` on the name's value admits it, read as the generator reads it: the first alternative the template allows there; the placeholder names no term.
-    Where that `C_STRING` rejects the term text of a code outside `openehr`, the first listed code whose term text it admits takes the code's place, with that text, as [clinical-modeling.md § REQ-107 *The text of a coded value*](clinical-modeling.md#the-text-of-a-coded-value) has it for a coded `name`.
-    Otherwise the text is the one the generator writes under that `C_STRING`, or `example` where none constrains the value.
-    A name whose alternatives disagree, or whose `defining_code` has alternatives or constrains the code other than through a code phrase, comes back as `DV_TEXT`.
-  - The fourth is an ordinal's terminology.
-    The formats carry the code and the ordinal value of a `DV_ORDINAL`, a leaf or a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, and its symbol's terminology only as an optional `|terminology`, which decode reads as written.
-    Without one, decode without the template rebuilds the symbol in `local`, as the reference does.
-    Where the `C_DV_ORDINAL` pairs the template has at that position for that code and value agree on one terminology, decode gives a symbol without `|terminology` that terminology, and **MUST** refuse a `|terminology` that names another, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
-    A `|raw` value keeps its own, and a `DV_SCALE` symbol takes its `|terminology`, else `local`, since the compiled template holds no pairs for it.
-    Encode writes a `local` symbol without its terminology, so one the template codes in another terminology at that code and value, a value the template refuses, comes back in the template's terminology: that round trip changes it.
-  - The fifth is what a coded value leaves out, which the *Simplified Formats* spec lets a client omit where the template defines it.
-    A `DV_CODED_TEXT` leaf, the `|code` substitution at a `DV_TEXT` leaf included, with no `|terminology` takes the terminology its `defining_code` constraint names, where the alternatives at its path agree on one.
-    A `C_CODE_REFERENCE` whose code phrase names no terminology names the one its `terminology:` URI names ([clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection)); the openEHR specifications do not say which terminology such a URI names, so this reading is the SDK's.
-    With no `|value` it takes its code's term text, read as for a coded node name, where that constraint lists the code and the coded text is in its terminology.
-    A `DV_ORDINAL` leaf, and each bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, with no `|ordinal` or no `|value` takes the ordinal value, and the code's term text in the pair's terminology, that the `C_DV_ORDINAL` pairs at its position give its code, where they give it one value.
-    What the body gives is kept as written.
-    A `|terminology` the template does not determine is a missing required suffix ([§ REQ-170](#req-170--unmatched-content-on-decode)), except at an ISM transition, whose current state, transition and careflow step take theirs from the rules below; a `|value` or `|ordinal` it does not determine stays one, except a careflow step's, which the rules below also give.
-    Decode without the template and a `DV_SCALE` complete nothing.
-  - The sixth is the composition's category.
-    A body that spells no `category` takes the code the template's COMPOSITION `category` constraint fixes, a `C_CODE_PHRASE` of the `openehr` terminology listing exactly one code, with that code's openEHR rubric as its text; where the template fixes none, it takes `433|event`.
-    A category the body spells is kept as written.
-  - The seventh is an in-context ACTIVITY's `action_archetype_id`, which the RM requires and a body can leave out.
-    An ACTIVITY the body gives none takes the value the generator writes on the template node it stands for, the one at its path with the names the template pins, read from the first `C_STRING` that node allows on that attribute:
-    - the RM default `/.*/`, where that `C_STRING` lists no string and admits it, as one with neither a list nor a pattern does, or the template allows none there;
-    - otherwise a value the `C_STRING` accepts, a list member or a match of its pattern;
-    - none, where the `C_STRING` accepts no value the generator builds.
-
-    An ACTIVITY that pins no name thus takes its own node's value beside a sibling of its node id that pins one.
-    An id the body gives is kept as written.
-  - A body whose start time is absent in every spelling (an empty or `null` value is absent) takes `t` from `simplified.WithDefaultTime(t)`, in UTC and to the second, as if its `ctx/time` held it (context `start_time` and setting, ACTION time, HISTORY origin), except that on a `431|persistent` composition it builds no `EVENT_CONTEXT`.
-    The zero `t` leaves the option off.
-  - A HISTORY whose `history_origin` the body leaves out (*Attributes with no Web Template node*, below) takes the earliest time its own events carry, compared as instants, else the start time, given or defaulted; an EVENT the body gives no time takes its HISTORY's origin.
 - Read a Web Template node's `rmType` as the BMM type name it spells, in both directions: white space around the name and around its generic parameters carries no meaning (` DV_INTERVAL< DV_QUANTITY >` is `DV_INTERVAL<DV_QUANTITY>`, not structure), and a name that is not a well-formed BMM type name is classified as written.
 - Decode an ACTION's ISM transition spelled under one of the Web Template's archetyped `ism_transition[atNNNN]` nodes, one per careflow step, and write none there: encode writes every transition at the in-context node (next item).
   At such a node decode:
@@ -974,6 +945,62 @@ The codecs **MUST**:
 - Report a missing or mismatched Web Template / OPT as a typed error when conversion cannot proceed without it.
 
 A key the Web Template does not resolve, an unknown suffix and an unknown `ctx/` field are unmatched content, as [§ REQ-170](#req-170--unmatched-content-on-decode) defines it and says how it is treated.
+
+##### What the compiled template supplies
+
+Decode given a compiled template takes these from it:
+
+- The first such fact is a folded structure's concrete subtype: the formats fold every `ITEM_STRUCTURE` away, and `ITEM_TREE` and `ITEM_LIST` both hold `items`, so the path cannot tell them apart.
+  A decoded `ITEM_STRUCTURE` takes the subtype the compiled template gives the node at its path, where that subtype is an `ITEM_STRUCTURE` declaring the attribute the path goes on through.
+  Where the template gives no single answer (no node there, or alternatives that disagree), and in a decode without the template, the subtype is inferred from the path.
+- The second is a required structure with no member, for which the formats have no key.
+  Decode rebuilds the structure at a single-valued attribute where all of these hold:
+  - a node decode rebuilds lacks the attribute, which the template's existence, or the RM, requires of it;
+  - the children the template allows there agree on one concrete `ITEM_STRUCTURE` subtype and node id;
+  - that structure holds no member the template or the RM requires ([§ REQ-102](clinical-modeling.md#req-102--composition-validation) *An existence lower bound alone asks for no member*).
+
+  It rebuilds the structure as the generator writes it: the template's subtype, node id and name, and no member, its list present and empty where the generator writes it so.
+  It builds no parent node, member or data value, no structure for a slot or an archetype root, and none where the template nodes that share the parent's path disagree on it.
+  Where the template asks the structure for a member, the body lacks data, and no structure is rebuilt.
+- The third is a coded node name, for which the formats have no key below the root.
+  Decode gives a rebuilt node, in place of the `DV_TEXT` name from the archetype terminology, the `DV_CODED_TEXT` name the generator writes there under `ExampleFill`, where the template constrains the node's name both of these ways:
+  - as a `DV_CODED_TEXT`, through one child or through alternatives that agree on the name;
+  - with its `defining_code` constrained through one `C_CODE_PHRASE`, or one `C_CODE_REFERENCE` read as the code phrase it carries, or left unconstrained.
+
+  The name's code is the phrase's first listed code, else the placeholder `at0000` in the terminology the phrase, or the reference set's `terminology:` URI, names, else in `local` ([clinical-modeling.md § REQ-107 *Placeholders*](clinical-modeling.md#placeholders)).
+  A `defining_code` left unconstrained, with no attribute, no child, or one child that constrains nothing, gives the placeholder `at0000` in `local`, as the generator writes it.
+  The name's text is the code's term text where the `C_STRING` on the name's value admits it, read as the generator reads it: the first alternative the template allows there; the placeholder names no term.
+  Where that `C_STRING` rejects the term text of a code outside `openehr`, the first listed code whose term text it admits takes the code's place, with that text, as [clinical-modeling.md § REQ-107 *The text of a coded value*](clinical-modeling.md#the-text-of-a-coded-value) has it for a coded `name`.
+  Otherwise the text is the one the generator writes under that `C_STRING`, or `example` where none constrains the value.
+  A name whose alternatives disagree, or whose `defining_code` has alternatives or constrains the code other than through a code phrase, comes back as `DV_TEXT`.
+- The fourth is an ordinal's terminology.
+  The formats carry the code and the ordinal value of a `DV_ORDINAL`, a leaf or a bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, and its symbol's terminology only as an optional `|terminology`, which decode reads as written.
+  Without one, decode without the template rebuilds the symbol in `local`, as the reference does.
+  Where the `C_DV_ORDINAL` pairs the template has at that position for that code and value agree on one terminology, decode gives a symbol without `|terminology` that terminology, and **MUST** refuse a `|terminology` that names another, wrapping `simplified.ErrUnsupportedDatatype` and naming the key.
+  A `|raw` value keeps its own, and a `DV_SCALE` symbol takes its `|terminology`, else `local`, since the compiled template holds no pairs for it.
+  Encode writes a `local` symbol without its terminology, so one the template codes in another terminology at that code and value, a value the template refuses, comes back in the template's terminology: that round trip changes it.
+- The fifth is what a coded value leaves out, which the *Simplified Formats* spec lets a client omit where the template defines it.
+  A `DV_CODED_TEXT` leaf, the `|code` substitution at a `DV_TEXT` leaf included, with no `|terminology` takes the terminology its `defining_code` constraint names, where the alternatives at its path agree on one.
+  A `C_CODE_REFERENCE` whose code phrase names no terminology names the one its `terminology:` URI names ([clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection)); the openEHR specifications do not say which terminology such a URI names, so this reading is the SDK's.
+  With no `|value` it takes its code's term text, read as for a coded node name, where that constraint lists the code and the coded text is in its terminology.
+  A `DV_ORDINAL` leaf, and each bound of a `DV_INTERVAL<DV_ORDINAL>` leaf, with no `|ordinal` or no `|value` takes the ordinal value, and the code's term text in the pair's terminology, that the `C_DV_ORDINAL` pairs at its position give its code, where they give it one value.
+  What the body gives is kept as written.
+  A `|terminology` the template does not determine is a missing required suffix ([§ REQ-170](#req-170--unmatched-content-on-decode)), except at an ISM transition, whose current state, transition and careflow step take theirs from the rules below; a `|value` or `|ordinal` it does not determine stays one, except a careflow step's, which the rules below also give.
+  Decode without the template and a `DV_SCALE` complete nothing.
+- The sixth is the composition's category.
+  A body that spells no `category` takes the code the template's COMPOSITION `category` constraint fixes, a `C_CODE_PHRASE` of the `openehr` terminology listing exactly one code, with that code's openEHR rubric as its text; where the template fixes none, it takes `433|event`.
+  A category the body spells is kept as written.
+- The seventh is an in-context ACTIVITY's `action_archetype_id`, which the RM requires and a body can leave out.
+  An ACTIVITY the body gives none takes the value the generator writes on the template node it stands for, the one at its path with the names the template pins, read from the first `C_STRING` that node allows on that attribute:
+  - the RM default `/.*/`, where that `C_STRING` lists no string and admits it, as one with neither a list nor a pattern does, or the template allows none there;
+  - otherwise a value the `C_STRING` accepts, a list member or a match of its pattern;
+  - none, where the `C_STRING` accepts no value the generator builds.
+
+  An ACTIVITY that pins no name thus takes its own node's value beside a sibling of its node id that pins one.
+  An id the body gives is kept as written.
+- A body whose start time is absent in every spelling (an empty or `null` value is absent) takes `t` from `simplified.WithDefaultTime(t)`, in UTC and to the second, as if its `ctx/time` held it (context `start_time` and setting, ACTION time, HISTORY origin), except that on a `431|persistent` composition it builds no `EVENT_CONTEXT`.
+  The zero `t` leaves the option off.
+- A HISTORY whose `history_origin` the body leaves out (*Attributes with no Web Template node*, below) takes the earliest time its own events carry, compared as instants, else the start time, given or defaulted; an EVENT the body gives no time takes its HISTORY's origin.
 
 #### Media types
 
