@@ -1,12 +1,12 @@
-package ehr
+package client
 
 import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
 // VersionMetadata is the typed response metadata every
-// versioned-resource GET in `openehr/client/ehr/*` returns alongside the
-// decoded body. It embeds the transport-level metadata (ETag,
+// versioned-resource read and write in the resource clients returns
+// alongside the decoded body. It embeds the transport-level metadata (ETag,
 // Location, LastModified, openehr-* response headers) and adds the
 // parsed VersionUID extracted from the response.
 //
@@ -37,9 +37,8 @@ type VersionMetadata struct {
 // Returns nil if m itself is nil so caller error paths propagate
 // naturally.
 //
-// Exported so sub-leaf packages (`openehr/client/ehr/composition`,
-// `.../ehrstatus`, `.../directory`) can adopt the same parsing rule
-// without duplicating logic.
+// Exported so the resource clients (composition, directory, ehrstatus,
+// demographic) share the same parsing rule without duplicating logic.
 func NewVersionMetadata(m *transport.Metadata) *VersionMetadata {
 	if m == nil {
 		return nil
@@ -68,15 +67,4 @@ func firstVersionUID(m *transport.Metadata) VersionUID {
 		}
 	}
 	return ""
-}
-
-// newEHRMetadata builds the metadata of an EHR root response.
-// VersionUID is the ehr_id from Location when the response carries
-// one, and empty when it does not. The ETag is not read: it names
-// the ehr_id, not a version.
-func newEHRMetadata(m *transport.Metadata) *VersionMetadata {
-	if m == nil {
-		return nil
-	}
-	return &VersionMetadata{Metadata: m, VersionUID: extractVersionUIDFromLocation(m.Location)}
 }

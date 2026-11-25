@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
@@ -83,7 +84,7 @@ func replayCompositionUpdate(ctx context.Context, c *transport.Client) error {
 		}
 	}
 
-	_, latest, err := composition.Get(ctx, c, ehrID, ehr.LatestOf(voID))
+	_, latest, err := composition.Get(ctx, c, ehrID, openehrclient.LatestOf(voID))
 	if err != nil {
 		return fmt.Errorf("PROBE-071 read latest: %w", err)
 	}

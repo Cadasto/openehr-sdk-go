@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -15,52 +15,32 @@ import (
 // routeTags is the demographic-wide ITEM_TAG listing.
 const routeTags = "/demographic/tags"
 
-// isNilRef reports whether ref names no target: a nil Ref, or one holding a
-// nil pointer to one of the Ref types, whose methods panic when called.
-func isNilRef(ref openehrclient.Ref) bool {
-	switch r := ref.(type) {
-	case nil:
-		return true
-	case *openehrclient.ByVersionUID:
-		return r == nil
-	case *openehrclient.ByVersionedObjectID:
-		return r == nil
-	default:
-		return false
-	}
-}
-
 // tagsTarget returns the request path and route template of a PARTY's tags
 // resource, refusing a target the tags routes cannot address.
 func tagsTarget(op string, t Type, target openehrclient.Ref) (path, route string, err error) {
 	if !t.valid() {
 		return "", "", fmt.Errorf("%s: %w: invalid PARTY type %q", op, transport.ErrInvalidConfig, t)
 	}
-	if isNilRef(target) {
-		return "", "", fmt.Errorf("%s: %w: nil Ref", op, transport.ErrInvalidConfig)
+	if err := openehrclient.ValidateRef(target); err != nil {
+		return "", "", fmt.Errorf("%s: %w", op, err)
 	}
 	// REQ-059: the tags routes take no version_at_time, so a Ref that
 	// carries a time is refused rather than sent without it.
 	if k, _ := target.Query(); k != "" {
 		return "", "", fmt.Errorf("%s: %w: the tags routes take no version time", op, transport.ErrInvalidConfig)
 	}
-	if err := target.Validate(); err != nil {
-		return "", "", fmt.Errorf("%s: %w", op, err)
-	}
 	seg := target.PathSegment()
-	if seg == "" {
-		return "", "", fmt.Errorf("%s: %w: empty Ref path segment", op, transport.ErrInvalidConfig)
-	}
 	// The uid goes into Path raw; the transport encodes it once (REQ-150).
 	return basePath(t) + "/" + seg + "/tags", basePath(t) + "/{uid_based_id}/tags", nil
 }
 
 // GetTags retrieves the ITEM_TAGs attached to a PARTY of the given type. The
-// Ref names the target: [ehr.VersionOf](uid) for one version, or
-// [ehr.LatestOf](voID) for the versioned party itself. A Ref that carries a
-// time ([ehr.LatestAtTime]) fails with [transport.ErrInvalidConfig] before any
-// request, since the tags routes take none. A target with no tags returns an
-// empty list.
+// Ref names the target: [openehrclient.VersionOf](uid) for one version, or
+// [openehrclient.LatestOf](voID) for the versioned party itself. A Ref that
+// [openehrclient.ValidateRef] refuses, or one that carries a time
+// ([openehrclient.LatestAtTime]), fails with [transport.ErrInvalidConfig]
+// before any request, since the tags routes take none. A target with no
+// tags returns an empty list.
 //
 // Wire: GET /demographic/{type}/{uid_based_id}/tags. An unknown uid is a 404,
 // surfaced as [transport.ErrNotFound]. A 2xx with an empty body fails with

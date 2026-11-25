@@ -13,7 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -114,7 +115,7 @@ var probe108Arms = []probe108Arm{
 // captured returns the requests the backend received; the probe reads the
 // requests each call adds, and fails when any of them carries a
 // `.schema`-suffixed media type in its Content-Type or Accept header.
-func Probe108CompositionFormats(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID openehrclient.EHRID, wt *webtemplate.WebTemplate, comp *rm.Composition) (Result, error) { // PROBE-108 (REQ-173)
+func Probe108CompositionFormats(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID ehr.EHRID, wt *webtemplate.WebTemplate, comp *rm.Composition) (Result, error) { // PROBE-108 (REQ-173)
 	r := Result{Probe: "PROBE-108"}
 	if c == nil || ehrID == "" || wt == nil || comp == nil {
 		return r, errors.New("PROBE-108: missing required inputs (client/ehr/webTemplate/comp)")
@@ -165,7 +166,7 @@ func Probe108CompositionFormats(ctx context.Context, c *transport.Client, captur
 // probe108Write saves comp in the arm's format and checks the request and the
 // representation. It returns the version uid the write named, or the probe
 // detail of the first fault.
-func probe108Write(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID openehrclient.EHRID, comp *rm.Composition, wt *webtemplate.WebTemplate, arm probe108Arm, writePath string, want map[string]string) (openehrclient.VersionUID, string) {
+func probe108Write(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID ehr.EHRID, comp *rm.Composition, wt *webtemplate.WebTemplate, arm probe108Arm, writePath string, want map[string]string) (openehrclient.VersionUID, string) {
 	opts := []composition.WriteOption{
 		composition.WithPrefer(transport.PreferRepresentation),
 		composition.WithFormat(arm.format, arm.webTemplate(wt)),
@@ -239,7 +240,7 @@ func probe108Write(ctx context.Context, c *transport.Client, captured func() []*
 // query parameter when the arm names its format that way, and checks the
 // request and the composition decoded from the 200 body. It returns the probe
 // detail of the first fault, or "".
-func probe108Read(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID openehrclient.EHRID, uid openehrclient.VersionUID, wt *webtemplate.WebTemplate, arm probe108Arm, readPath string, want map[string]string) string {
+func probe108Read(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID ehr.EHRID, uid openehrclient.VersionUID, wt *webtemplate.WebTemplate, arm probe108Arm, readPath string, want map[string]string) string {
 	opts := []composition.GetOption{composition.WithGetFormat(arm.format, arm.webTemplate(wt))}
 	if arm.formatQuery {
 		opts = append(opts, composition.WithGetFormatQuery())

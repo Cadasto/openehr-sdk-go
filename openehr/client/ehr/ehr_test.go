@@ -10,9 +10,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -117,74 +117,6 @@ func wantCommitMetadata(t *testing.T, label string, meta *openehrclient.VersionM
 	}
 }
 
-// TestNewVersionMetadataReadsALaterWellFormedETag pins REQ-054 when a
-// response carries more than one ETag. The first value stays on
-// Metadata.ETag. VersionUID is the first well-formed version id among
-// those values, so the earlier of two well-formed ids wins, and the
-// Location tail only when none of them is.
-func TestNewVersionMetadataReadsALaterWellFormedETag(t *testing.T) { // REQ-054
-	const (
-		opaque       = "33a64df551425fcc55e4d42a148795d9f25f89d4"
-		wellFormed   = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2"
-		laterWell    = "22222222-2222-4222-8222-222222222222::cdr.example::3"
-		locationTail = "11111111-1111-4111-8111-111111111111::cdr.example::1"
-	)
-	location := "/ehr/e/composition/" + locationTail
-	tests := []struct {
-		name  string
-		etags []string
-		want  openehrclient.VersionUID
-	}{
-		{
-			name:  "opaque first and a later well-formed ETag",
-			etags: []string{opaque, wellFormed},
-			want:  wellFormed,
-		},
-		{
-			name:  "two well-formed ETags",
-			etags: []string{wellFormed, laterWell},
-			want:  wellFormed,
-		},
-		{
-			name:  "only an opaque ETag",
-			etags: []string{opaque},
-			want:  locationTail,
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				for _, etag := range tc.etags {
-					w.Header().Add("ETag", `"`+etag+`"`)
-				}
-				w.Header().Set("Location", location)
-				w.WriteHeader(http.StatusNoContent)
-			}))
-			t.Cleanup(srv.Close)
-			c := newClient(t, srv)
-			resp, err := c.Do(t.Context(), &transport.Request{
-				Method: http.MethodGet,
-				Path:   "/etag",
-				Route:  "/etag",
-			})
-			if err != nil {
-				t.Fatalf("Do: %v", err)
-			}
-			meta := openehrclient.NewVersionMetadata(resp.Metadata)
-			if meta == nil {
-				t.Fatal("NewVersionMetadata returned nil")
-			}
-			if meta.VersionUID != tc.want {
-				t.Errorf("NewVersionMetadata(ETags=%q, Location=%q).VersionUID = %q, want %q",
-					tc.etags, location, meta.VersionUID, tc.want)
-			}
-			if meta.ETag != tc.etags[0] {
-				t.Errorf("Metadata.ETag = %q, want the first ETag %q", meta.ETag, tc.etags[0])
-			}
-		})
-	}
-}
-
 func TestGet(t *testing.T) {
 	var captured *http.Request
 	body := readFixture(t, "ehr", "ehr.json")
@@ -195,7 +127,7 @@ func TestGet(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, meta, err := openehrclient.Get(t.Context(), newClient(t, srv), ehrIDFixture)
+	got, meta, err := ehr.Get(t.Context(), newClient(t, srv), ehrIDFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +157,7 @@ func TestGetEmpty2xxBodyStaysErrInvalidShape(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	_, _, err := openehrclient.Get(t.Context(), newClient(t, srv), ehrIDFixture)
+	_, _, err := ehr.Get(t.Context(), newClient(t, srv), ehrIDFixture)
 	if !errors.Is(err, transport.ErrInvalidShape) {
 		t.Fatalf("err = %v, want transport.ErrInvalidShape", err)
 	}
@@ -235,7 +167,7 @@ func TestGetEmpty2xxBodyStaysErrInvalidShape(t *testing.T) {
 }
 
 func TestGetRejectsEmptyID(t *testing.T) {
-	_, _, err := openehrclient.Get(t.Context(), nil, "")
+	_, _, err := ehr.Get(t.Context(), nil, "")
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
@@ -249,7 +181,7 @@ func TestExistsTrue(t *testing.T) {
 		w.WriteHeader(200)
 	}))
 	defer srv.Close()
-	exists, err := openehrclient.Exists(t.Context(), newClient(t, srv), ehrIDFixture)
+	exists, err := ehr.Exists(t.Context(), newClient(t, srv), ehrIDFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +195,7 @@ func TestExistsFalseOn404(t *testing.T) {
 		w.WriteHeader(404)
 	}))
 	defer srv.Close()
-	exists, err := openehrclient.Exists(t.Context(), newClient(t, srv), ehrIDFixture)
+	exists, err := ehr.Exists(t.Context(), newClient(t, srv), ehrIDFixture)
 	if err != nil {
 		t.Errorf("404 must fold into exists=false, got err: %v", err)
 	}
@@ -277,7 +209,7 @@ func TestExistsBubblesNon404Errors(t *testing.T) {
 		w.WriteHeader(403)
 	}))
 	defer srv.Close()
-	exists, err := openehrclient.Exists(t.Context(), newClient(t, srv), ehrIDFixture)
+	exists, err := ehr.Exists(t.Context(), newClient(t, srv), ehrIDFixture)
 	if !errors.Is(err, transport.ErrForbidden) {
 		t.Errorf("expected ErrForbidden bubbled, got %v", err)
 	}
@@ -294,7 +226,7 @@ func TestGetBySubject(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
-	got, _, err := openehrclient.GetBySubject(t.Context(), newClient(t, srv), "demographic", "patient-123")
+	got, _, err := ehr.GetBySubject(t.Context(), newClient(t, srv), "demographic", "patient-123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,24 +242,6 @@ func TestGetBySubject(t *testing.T) {
 	}
 }
 
-func TestVersionUIDParsing(t *testing.T) {
-	v := openehrclient.VersionUID("aaa::cdr.example::3")
-	if got := v.VersionedObjectID(); got != "aaa" {
-		t.Errorf("VersionedObjectID = %q", got)
-	}
-	if got := v.CreatingSystemID(); got != "cdr.example" {
-		t.Errorf("CreatingSystemID = %q", got)
-	}
-	if got := v.VersionNumber(); got != "3" {
-		t.Errorf("VersionNumber = %q", got)
-	}
-	// Malformed.
-	v2 := openehrclient.VersionUID("not-a-version")
-	if v2.VersionedObjectID() != "" || v2.CreatingSystemID() != "" || v2.VersionNumber() != "" {
-		t.Error("malformed VersionUID should return empty segments")
-	}
-}
-
 func TestCreateServerAssigned(t *testing.T) {
 	var captured *http.Request
 	body := readFixture(t, "ehr", "ehr.json")
@@ -338,7 +252,7 @@ func TestCreateServerAssigned(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
-	got, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+	got, meta, err := ehr.Create(t.Context(), newClient(t, srv))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,19 +284,19 @@ func TestEHRRootVersionUIDIsTheEHRID(t *testing.T) {
 		call   func(ctx context.Context, c *transport.Client) (*openehrclient.VersionMetadata, error)
 	}{
 		{name: "Create", status: http.StatusCreated, call: func(ctx context.Context, c *transport.Client) (*openehrclient.VersionMetadata, error) {
-			_, meta, err := openehrclient.Create(ctx, c)
+			_, meta, err := ehr.Create(ctx, c)
 			return meta, err
 		}},
 		{name: "Create conflict", status: http.StatusConflict, call: func(ctx context.Context, c *transport.Client) (*openehrclient.VersionMetadata, error) {
-			_, meta, err := openehrclient.Create(ctx, c)
+			_, meta, err := ehr.Create(ctx, c)
 			return meta, err
 		}},
 		{name: "Get", status: http.StatusOK, call: func(ctx context.Context, c *transport.Client) (*openehrclient.VersionMetadata, error) {
-			_, meta, err := openehrclient.Get(ctx, c, ehrIDFixture)
+			_, meta, err := ehr.Get(ctx, c, ehrIDFixture)
 			return meta, err
 		}},
 		{name: "GetBySubject", status: http.StatusOK, call: func(ctx context.Context, c *transport.Client) (*openehrclient.VersionMetadata, error) {
-			_, meta, err := openehrclient.GetBySubject(ctx, c, "demographic", "patient-123")
+			_, meta, err := ehr.GetBySubject(ctx, c, "demographic", "patient-123")
 			return meta, err
 		}},
 	}
@@ -429,8 +343,8 @@ func TestCreateClientSupplied(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
-	_, _, err := openehrclient.Create(t.Context(), newClient(t, srv),
-		openehrclient.WithEHRID(ehrIDFixture),
+	_, _, err := ehr.Create(t.Context(), newClient(t, srv),
+		ehr.WithEHRID(ehrIDFixture),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -456,13 +370,13 @@ func TestCreateClientSupplied(t *testing.T) {
 func TestCreateEmpty2xxBody(t *testing.T) {
 	t.Run("empty_body", func(t *testing.T) {
 		srv := createCommitMetadataServer(t, "")
-		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		out, meta, err := ehr.Create(t.Context(), newClient(t, srv))
 		wantCreateNoRepresentation(t, out, meta, err)
 	})
 
 	t.Run("null_body", func(t *testing.T) {
 		srv := createCommitMetadataServer(t, "null")
-		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		out, meta, err := ehr.Create(t.Context(), newClient(t, srv))
 		wantCreateNoRepresentation(t, out, meta, err)
 	})
 
@@ -472,14 +386,14 @@ func TestCreateEmpty2xxBody(t *testing.T) {
 	// case for WriteResult).
 	t.Run("whitespace_body", func(t *testing.T) {
 		srv := createCommitMetadataServer(t, " \n\t")
-		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		out, meta, err := ehr.Create(t.Context(), newClient(t, srv))
 		wantCreateNoRepresentation(t, out, meta, err)
 	})
 
 	t.Run("garbage_body", func(t *testing.T) {
 		const garbage = `}{ not json`
 		srv := createCommitMetadataServer(t, garbage)
-		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		out, meta, err := ehr.Create(t.Context(), newClient(t, srv))
 		de, ok := errors.AsType[*transport.DecodeError](err)
 		if !ok {
 			t.Fatalf("garbage body: err = %v, want *transport.DecodeError (REQ-151, unchanged)", err)
@@ -525,8 +439,8 @@ func TestCreateEmpty2xxBody(t *testing.T) {
 	t.Run("garbage_body_with_ehr_id", func(t *testing.T) {
 		const garbage = `}{ not json`
 		srv := createCommitMetadataServer(t, garbage)
-		out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv),
-			openehrclient.WithEHRID(ehrIDFixture),
+		out, meta, err := ehr.Create(t.Context(), newClient(t, srv),
+			ehr.WithEHRID(ehrIDFixture),
 		)
 		de, ok := errors.AsType[*transport.DecodeError](err)
 		if !ok {
@@ -556,7 +470,7 @@ func TestCreateEmpty2xxBody(t *testing.T) {
 			_, _ = w.Write(body)
 		}))
 		defer srv.Close()
-		out, _, err := openehrclient.Create(t.Context(), newClient(t, srv))
+		out, _, err := ehr.Create(t.Context(), newClient(t, srv))
 		if err != nil {
 			t.Fatalf("valid body: unexpected err = %v", err)
 		}
@@ -580,7 +494,7 @@ func TestCreateWireErrorNotNoRepresentation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	out, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
+	out, meta, err := ehr.Create(t.Context(), newClient(t, srv))
 
 	if _, ok := errors.AsType[*transport.WireError](err); !ok {
 		t.Fatalf("409 err = %v, want *transport.WireError", err)
@@ -602,69 +516,6 @@ func TestCreateWireErrorNotNoRepresentation(t *testing.T) {
 	}
 }
 
-func TestRefConstruction(t *testing.T) {
-	if r := openehrclient.LatestOf("voID"); r.PathSegment() != "voID" {
-		t.Errorf("LatestOf PathSegment = %q", r.PathSegment())
-	}
-	if r := openehrclient.VersionOf("uid::s::1"); r.PathSegment() != "uid::s::1" {
-		t.Errorf("VersionOf PathSegment = %q", r.PathSegment())
-	}
-	at, err := time.Parse(time.RFC3339, "2026-05-17T10:00:00Z")
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := openehrclient.LatestAtTime("voID", at)
-	k, v := r.Query()
-	if k != "version_at_time" {
-		t.Errorf("LatestAtTime Query key = %q, want version_at_time", k)
-	}
-	if v != "2026-05-17T10:00:00Z" {
-		t.Errorf("LatestAtTime Query value = %q", v)
-	}
-}
-
-// REQ-174: a Ref that carries a sub-second time sends version_at_time
-// in UTC with its fraction of a second.
-func TestLatestAtTimeQueryKeepsFraction(t *testing.T) {
-	at := time.Date(2015, 1, 20, 19, 30, 22, 765_000_000, time.FixedZone("", 3600))
-	k, v := openehrclient.LatestAtTime("voID", at).Query()
-	if k != "version_at_time" {
-		t.Errorf("LatestAtTime Query key = %q, want version_at_time", k)
-	}
-	if want := "2015-01-20T18:30:22.765Z"; v != want {
-		t.Errorf("LatestAtTime Query value = %q, want %q", v, want)
-	}
-}
-
-// REQ-174: a Ref whose time has a UTC year outside 0000-9999 fails
-// Validate with ErrInvalidConfig, and its Query carries no value; every
-// other Ref validates.
-func TestRefValidate(t *testing.T) {
-	// 31 December 9999 at -05:00 is the year 10000 in UTC.
-	year10000 := time.Date(9999, 12, 31, 23, 59, 59, 0, time.FixedZone("", -5*3600))
-	normal := time.Date(2026, 5, 17, 10, 0, 0, 0, time.UTC)
-	cases := []struct {
-		name string
-		ref  openehrclient.Ref
-		want error
-	}{
-		{name: "LatestAtTime/UTC year 10000", ref: openehrclient.LatestAtTime("voID", year10000), want: transport.ErrInvalidConfig},
-		{name: "LatestOf", ref: openehrclient.LatestOf("voID")},
-		{name: "LatestAtTime/2026", ref: openehrclient.LatestAtTime("voID", normal)},
-		{name: "VersionOf", ref: openehrclient.VersionOf("uid::s::1")},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if err := tc.ref.Validate(); !errors.Is(err, tc.want) {
-				t.Errorf("%s Validate() = %v, want %v", tc.name, err, tc.want)
-			}
-		})
-	}
-	if k, v := openehrclient.LatestAtTime("voID", year10000).Query(); k != "version_at_time" || v != "" {
-		t.Errorf("LatestAtTime(year 10000) Query() = %q, %q, want \"version_at_time\", \"\"", k, v)
-	}
-}
-
 // TestNilClientLeavesDoNotPanic pins the consequence of the REQ-025
 // guard in transport.Do: every exported leaf takes a *transport.Client
 // and calls c.Do, so a nil client used to crash inside the transport.
@@ -672,14 +523,14 @@ func TestRefValidate(t *testing.T) {
 // EHR-package entry points; the guard is central, so one arm per
 // distinct call shape is enough to hold it.
 func TestNilClientLeavesDoNotPanic(t *testing.T) {
-	const id openehrclient.EHRID = "8849182c-82ad-4088-a07f-48ead4180515"
+	const id ehr.EHRID = "8849182c-82ad-4088-a07f-48ead4180515"
 	cases := []struct {
 		name string
 		call func() error
 	}{
-		{"Exists", func() error { _, err := openehrclient.Exists(t.Context(), nil, id); return err }},
-		{"Get", func() error { _, _, err := openehrclient.Get(t.Context(), nil, id); return err }},
-		{"Create", func() error { _, _, err := openehrclient.Create(t.Context(), nil); return err }},
+		{"Exists", func() error { _, err := ehr.Exists(t.Context(), nil, id); return err }},
+		{"Get", func() error { _, _, err := ehr.Get(t.Context(), nil, id); return err }},
+		{"Create", func() error { _, _, err := ehr.Create(t.Context(), nil); return err }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -218,7 +218,7 @@ func ExampleWithGetFormat() {
 	}
 
 	var raw composition.Raw
-	comp, meta, err := composition.Get(context.Background(), client, ehrID, ehr.LatestOf(voID),
+	comp, meta, err := composition.Get(context.Background(), client, ehrID, openehrclient.LatestOf(voID),
 		composition.WithGetFormat(composition.FormatXML, nil),
 		composition.WithRawBody(&raw))
 	if err != nil {

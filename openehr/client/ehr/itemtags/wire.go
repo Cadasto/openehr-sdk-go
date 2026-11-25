@@ -1,16 +1,16 @@
 package itemtags
 
-import "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+import openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 
-// Tag is an ITEM_TAG wire value. Alias of [ehr.ItemTag].
-type Tag = ehr.ItemTag
+// Tag is an ITEM_TAG wire value. Alias of [openehrclient.ItemTag].
+type Tag = openehrclient.ItemTag
 
 // FormatHeader encodes tags into the ITS-REST header shape.
 func FormatHeader(tags []Tag) (string, error) {
-	return ehr.FormatItemTagHeader(tags)
+	return openehrclient.FormatItemTagHeader(tags)
 }
 
 // ParseHeader decodes an ITS-REST item-tag header value.
 func ParseHeader(header string) ([]Tag, error) {
-	return ehr.ParseItemTagHeader(header)
+	return openehrclient.ParseItemTagHeader(header)
 }

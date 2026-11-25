@@ -9,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-const ehrIDFixture openehrclient.EHRID = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
+const ehrIDFixture ehr.EHRID = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
 
 func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	t.Helper()

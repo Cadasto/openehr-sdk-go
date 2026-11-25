@@ -9,6 +9,7 @@ import (
 	"strings"
 	"uuid"
 
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
@@ -94,7 +95,7 @@ func captureCompositionMinimal(ctx context.Context, c *transport.Client) error {
 	if meta == nil || meta.VersionUID == "" {
 		return errors.New("save composition returned no version uid")
 	}
-	if _, _, err := composition.Get(ctx, c, ehr.EHRID(rec.EHRID.Value), ehr.VersionOf(meta.VersionUID)); err != nil {
+	if _, _, err := composition.Get(ctx, c, ehr.EHRID(rec.EHRID.Value), openehrclient.VersionOf(meta.VersionUID)); err != nil {
 		return fmt.Errorf("get composition: %w", err)
 	}
 	return nil
@@ -134,7 +135,7 @@ func captureCompositionUpdate(ctx context.Context, c *transport.Client) error {
 	}
 	voID := saved.VersionUID.VersionedObjectID()
 
-	_, latest, err := composition.Get(ctx, c, ehrID, ehr.LatestOf(voID))
+	_, latest, err := composition.Get(ctx, c, ehrID, openehrclient.LatestOf(voID))
 	if err != nil {
 		return fmt.Errorf("get latest composition: %w", err)
 	}
@@ -152,7 +153,7 @@ func captureCompositionUpdate(ctx context.Context, c *transport.Client) error {
 		return fmt.Errorf("update with a stale If-Match: want a 412 refusal: %w", err)
 	}
 
-	_, latest, err = composition.Get(ctx, c, ehrID, ehr.LatestOf(voID))
+	_, latest, err = composition.Get(ctx, c, ehrID, openehrclient.LatestOf(voID))
 	if err != nil {
 		return fmt.Errorf("get latest composition again: %w", err)
 	}

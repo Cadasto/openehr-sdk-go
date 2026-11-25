@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -17,7 +18,7 @@ import (
 // Wire: GET /ehr/{ehr_id}. Returns the decoded *rm.EHR plus the
 // response metadata (ETag/Location captured even though the EHR root
 // is not versioned per-write).
-func Get(ctx context.Context, c *transport.Client, id EHRID) (*rm.EHR, *VersionMetadata, error) {
+func Get(ctx context.Context, c *transport.Client, id EHRID) (*rm.EHR, *client.VersionMetadata, error) {
 	if id == "" {
 		return nil, nil, fmt.Errorf("ehr.Get: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -59,7 +60,7 @@ func Exists(ctx context.Context, c *transport.Client, id EHRID) (bool, error) {
 //
 // Wire: GET /ehr?subject_id=...&subject_namespace=...
 // Returns ErrNotFound on a 404 (no EHR matches the subject).
-func GetBySubject(ctx context.Context, c *transport.Client, subjectNamespace, subjectID string) (*rm.EHR, *VersionMetadata, error) {
+func GetBySubject(ctx context.Context, c *transport.Client, subjectNamespace, subjectID string) (*rm.EHR, *client.VersionMetadata, error) {
 	if subjectNamespace == "" || subjectID == "" {
 		return nil, nil, fmt.Errorf("ehr.GetBySubject: %w: namespace and id are required", transport.ErrInvalidConfig)
 	}
@@ -113,17 +114,17 @@ func WithInitialStatus(s *rm.EHRStatus) CreateOption {
 // type:
 //
 //   - An empty, whitespace-only, or JSON-null body committed the EHR but
-//     carries no usable representation: a [*NoRepresentationError].
+//     carries no usable representation: a [*client.NoRepresentationError].
 //     [errors.Is](err, [transport.ErrInvalidShape]) still
 //     holds through its Unwrap, so callers keyed on that sentinel are
 //     unaffected.
 //   - A body that is present but does not decode: a
 //     [*transport.DecodeError] carrying the raw response bytes.
 //
-// The returned *VersionMetadata is populated on both; it is what proves
+// The returned *client.VersionMetadata is populated on both; it is what proves
 // the EHR was committed. A non-2xx response stays a
 // [*transport.WireError].
-func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm.EHR, *VersionMetadata, error) {
+func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm.EHR, *client.VersionMetadata, error) {
 	cfg := createConfig{}
 	for _, o := range opts {
 		if o != nil {
@@ -173,7 +174,7 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 	// *NoRepresentationError; the present-but-undecodable body below is
 	// REQ-151's *transport.DecodeError.
 	if transport.IsNoRepresentationBody(resp.Body) {
-		return nil, meta, &NoRepresentationError{
+		return nil, meta, &client.NoRepresentationError{
 			Meta:  meta,
 			Cause: fmt.Errorf("ehr.Create: %w: 2xx with no representation body", transport.ErrInvalidShape),
 		}
@@ -204,10 +205,10 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 // bound to a single *transport.Client. Useful as a dependency-injection
 // seam.
 type Repository interface {
-	Get(ctx context.Context, id EHRID) (*rm.EHR, *VersionMetadata, error)
+	Get(ctx context.Context, id EHRID) (*rm.EHR, *client.VersionMetadata, error)
 	Exists(ctx context.Context, id EHRID) (bool, error)
-	GetBySubject(ctx context.Context, subjectNamespace, subjectID string) (*rm.EHR, *VersionMetadata, error)
-	Create(ctx context.Context, opts ...CreateOption) (*rm.EHR, *VersionMetadata, error)
+	GetBySubject(ctx context.Context, subjectNamespace, subjectID string) (*rm.EHR, *client.VersionMetadata, error)
+	Create(ctx context.Context, opts ...CreateOption) (*rm.EHR, *client.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -215,7 +216,7 @@ func NewRepository(c *transport.Client) Repository { return &repository{c: c} }
 
 type repository struct{ c *transport.Client }
 
-func (r *repository) Get(ctx context.Context, id EHRID) (*rm.EHR, *VersionMetadata, error) {
+func (r *repository) Get(ctx context.Context, id EHRID) (*rm.EHR, *client.VersionMetadata, error) {
 	return Get(ctx, r.c, id)
 }
 
@@ -223,10 +224,24 @@ func (r *repository) Exists(ctx context.Context, id EHRID) (bool, error) {
 	return Exists(ctx, r.c, id)
 }
 
-func (r *repository) GetBySubject(ctx context.Context, ns, id string) (*rm.EHR, *VersionMetadata, error) {
+func (r *repository) GetBySubject(ctx context.Context, ns, id string) (*rm.EHR, *client.VersionMetadata, error) {
 	return GetBySubject(ctx, r.c, ns, id)
 }
 
-func (r *repository) Create(ctx context.Context, opts ...CreateOption) (*rm.EHR, *VersionMetadata, error) {
+func (r *repository) Create(ctx context.Context, opts ...CreateOption) (*rm.EHR, *client.VersionMetadata, error) {
 	return Create(ctx, r.c, opts...)
+}
+
+// newEHRMetadata builds the metadata of an EHR root response.
+// VersionUID is the ehr_id from Location when the response carries
+// one, and empty when it does not. The ETag is not read: it names
+// the ehr_id, not a version.
+func newEHRMetadata(m *transport.Metadata) *client.VersionMetadata {
+	if m == nil {
+		return nil
+	}
+	// Only Location is handed to the shared parser, so the ETag is never
+	// read.
+	loc := client.NewVersionMetadata(&transport.Metadata{Location: m.Location})
+	return &client.VersionMetadata{Metadata: m, VersionUID: loc.VersionUID}
 }

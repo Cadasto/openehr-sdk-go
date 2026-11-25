@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -196,7 +196,7 @@ func status204() http.HandlerFunc {
 }
 
 func TestProbe103AdminBulkDelete(t *testing.T) { // PROBE-103, REQ-099
-	ids := []openehrclient.EHRID{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"}
+	ids := []ehr.EHRID{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"}
 	b, snap := capturing(t, nil, status204())
 	r, err := restprobes.Probe103AdminBulkDelete(t.Context(), newClient(t, b), snap, ids)
 	if err != nil {
@@ -250,7 +250,7 @@ func TestProbe103FlagsOffContractDeletes(t *testing.T) { // PROBE-103
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			b, snap := capturing(t, tc.mutate, status204())
-			r, err := restprobes.Probe103AdminBulkDelete(t.Context(), newClient(t, b), snap, []openehrclient.EHRID{id})
+			r, err := restprobes.Probe103AdminBulkDelete(t.Context(), newClient(t, b), snap, []ehr.EHRID{id})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -266,7 +266,7 @@ func TestProbe103FlagsOffContractDeletes(t *testing.T) { // PROBE-103
 
 func TestProbe103RejectsMissingInputs(t *testing.T) { // PROBE-103
 	b, snap := capturing(t, nil, status204())
-	ids := []openehrclient.EHRID{"id-1"}
+	ids := []ehr.EHRID{"id-1"}
 	if _, err := restprobes.Probe103AdminBulkDelete(t.Context(), nil, snap, ids); err == nil {
 		t.Error("nil client: want an error")
 	}
@@ -506,8 +506,8 @@ func TestProbe060RejectsMissingInputs(t *testing.T) { // PROBE-060
 // --- PROBE-062 audit-details header -----------------------------------------
 
 const (
-	probe062EHRID      openehrclient.EHRID = "44444444-4444-4444-8444-444444444444"
-	probe062ContribUID string              = "0826851c-c4c2-4d61-92b9-410fb8275ff0"
+	probe062EHRID      ehr.EHRID = "44444444-4444-4444-8444-444444444444"
+	probe062ContribUID string    = "0826851c-c4c2-4d61-92b9-410fb8275ff0"
 	// probe062VersionUID is the version uid the fake's write Location names;
 	// the happy-path CONTRIBUTION must list exactly it, because that binding
 	// is what ties the read-back to the write.
@@ -693,7 +693,7 @@ func TestProbe062RejectsMissingInputs(t *testing.T) { // PROBE-062
 // --- PROBE-108 composition formats ------------------------------------------
 
 const (
-	probe108EHRID openehrclient.EHRID = "55555555-5555-4555-8555-555555555555"
+	probe108EHRID ehr.EHRID = "55555555-5555-4555-8555-555555555555"
 	// probe108TemplateID names the vendored OPT and canonical composition the
 	// probe writes; PROBE-076 round-trips this pair through both simplified
 	// codecs, and the composition leaf's format tests use it too.
@@ -1315,7 +1315,7 @@ func TestProbe108RejectsMissingInputs(t *testing.T) { // PROBE-108
 		name     string
 		c        *transport.Client
 		captured func() []*http.Request
-		ehrID    openehrclient.EHRID
+		ehrID    ehr.EHRID
 		wt       *webtemplate.WebTemplate
 		comp     *rm.Composition
 		// wantErr, when set, is a substring the error must carry.

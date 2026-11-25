@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"slices"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
@@ -119,7 +119,7 @@ const probe084BatchCode = "253"
 // payloads this SDK did not author, so a byte comparison would assert the
 // fixture instead of the contract. The corpus is a required input: an arm
 // with no data to run against is not a passing arm.
-func Probe084BuiltContributionBody(ctx context.Context, c *transport.Client, capturedBody *[]byte, ehrID openehrclient.EHRID, corpus [][]byte) (Result, error) { // PROBE-084 (REQ-130)
+func Probe084BuiltContributionBody(ctx context.Context, c *transport.Client, capturedBody *[]byte, ehrID ehr.EHRID, corpus [][]byte) (Result, error) { // PROBE-084 (REQ-130)
 	r := Result{Probe: "PROBE-084"}
 	if c == nil || ehrID == "" || capturedBody == nil {
 		return r, errors.New("PROBE-084: missing required inputs (client/ehr/captured)")

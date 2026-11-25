@@ -63,7 +63,7 @@ func detectUID(s string) UID {
 }
 
 // UIDValue returns the canonical string value carried by a UID, or ""
-// when u is nil. A convenience for callers (e.g. openehr/client/ehr)
+// when u is nil. A convenience for callers (e.g. openehr/client)
 // that need the lexical form back from a derived UID without a type
 // switch of their own.
 func UIDValue(u UID) string {

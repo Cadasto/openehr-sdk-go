@@ -63,9 +63,9 @@ No application-specific healthcare models live here.
 | `openehr/aql/lint/` | Three-layer AQL static lint (syntax, shape, template-aware archetype/path checks) over `parse` (REQ-109), plus the REQ-161 semantic, portability and path-shape checks over `openehr/aql/contain`'s containment relation and the always-on, Warning-only REQ-161 path-shape and paging group. Bridged into the validation model by `aqlvalidation.Validate`; never imports `openehr/validation`. |
 | `openehr/aql/contain/` | Containment admissibility relation (REQ-160): verdicts derived at runtime from the pinned BMM via `openehr/rm/rminfo` plus cited overlay edges, and the `Unavoidable` route-forcing query (REQ-161) — is every route from one class to another forced through a third — consumed by `aql_contains_redundant_step`. Sits below `openehr/aql` and `openehr/aql/lint`; imports only `openehr/rm`, `openehr/rm/rminfo`, and the standard library. |
 | `openehr/composition/` | Generic OPT-driven Composition builder (path-value assignment). Template-specific generated structs do **not** live here — they belong in the consuming project. |
-| `openehr/client/` | REST clients grouped per openEHR resource. |
+| `openehr/client/` | The types and helpers every REST client shares: `client.VersionedObjectID`, `client.VersionUID`, `client.Ref` and `client.ValidateRef`, `client.VersionMetadata`, the versioned-write helpers and the openEHR request-header codecs. The REST clients sit below it, grouped per openEHR resource. |
 | `openehr/client/system/` | System API — capabilities, version, infrastructure discovery. |
-| `openehr/client/ehr/` | EHR API — EHR identity, common sub-resource types (`EHRID`, `VersionedObjectID`, `VersionMetadata`). Sub-leaves below carry the per-resource CRUD. |
+| `openehr/client/ehr/` | EHR API — EHR identity (`EHRID`) and the EHR root's create and reads; the names it keeps for the shared types of `openehr/client/` are deprecated aliases. Sub-leaves below carry the per-resource CRUD. |
 | `openehr/client/ehr/composition/` | Composition CRUD (REQ-054 optimistic concurrency). |
 | `openehr/client/ehr/contribution/` | Multi-version atomic commits. Submission body is the ITS-REST `Contribution_create` shape (inline `ORIGINAL_VERSION`/`IMPORTED_VERSION` with `data: T`); the audit envelope is carried in the JSON body (REQ-059) — unlike single-resource writes there is no `openehr-audit-details` header. Response decodes as persisted `rm.Contribution`. PROBE-072 (REQ-050). |
 | `openehr/client/ehr/directory/` | Folder / Directory CRUD. |
@@ -138,7 +138,7 @@ Application code (cmd/examples, downstream consumers)
     ├─ (building-block use, no transport) ──→ openehr/validation/aqlvalidation/  ──→ openehr/validation/  openehr/aql/lint/   (openehr/validation imports no AQL package)
     └─ (building-block use, no transport) ──→ openehr/template/
 
-openehr/{serialize, instance, client/*, validation}, internal/templatecompile ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
+openehr/{serialize, instance, client, client/*, validation}, internal/templatecompile ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
 openehr/{rm, rm/typereg, serialize/canjson, aom/aom14} ──→ openehr/internal/refused/   (stdlib-only; carries a refused literal to DecodeError.Value)
 openehr/{rm/typereg, serialize/canjson} ──→ openehr/template/constraints/   (stdlib + internal/iso8601 only; the Redacted type DecodeError.Value holds)
 openehr/client/ehr/composition ──→ openehr/template/webtemplate/   (the Web Template its FLAT and STRUCTURED formats serialise against — REQ-173)
@@ -154,6 +154,7 @@ testkit/  -. helpers for .-→ all of the above
 
 - `transport/` depends on `auth/`, never the reverse.
 - `openehr/client/*` depends on `transport/`, `openehr/rm/`, `openehr/serialize/`, never on `cadasto/…`.
+  A leaf may import `openehr/client/`, which holds the types the leaves share and imports no leaf.
   `openehr/client/ehr/composition` also depends on `openehr/template/webtemplate/`, which its FLAT and STRUCTURED formats serialise against ([wire.md § REQ-173](wire.md#req-173--composition-and-party-representation-formats)); the template-side blocks never import a client ([§ REQ-013](#req-013--building-block-independence)), so the edge points down.
 - `openehr/rm/`'s generated marshal files import `openehr/serialize/canxml/` and `openehr/internal/xmlunmatched/`.
   That edge does not cycle: `canxml` imports only `openehr/rm/typereg/`, `openehr/serialize/internal/poly`, `openehr/internal/xmlunmatched/`, `internal/reportpath/`, `openehr/internal/xmlschema/`, which imports `typereg` and `xmlunmatched`, and `openehr/internal/decodeopts/` from this module, `xmlunmatched` imports only the standard library, `openehr/rm/typereg/` and `internal/reportpath/`, which imports only the standard library, whose imports reach neither `openehr/rm/` nor `canxml`, and `decodeopts` only the standard library ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D9).
@@ -172,7 +173,7 @@ testkit/  -. helpers for .-→ all of the above
 
 ## REQ-013 — Building-block independence
 
-Each building block in the table below **MUST** be importable and useful without an authenticated client: no package in its import closure, the packages of this module it imports directly or indirectly, is `transport/`, `auth/` or `openehr/client/*`.
+Each building block in the table below **MUST** be importable and useful without an authenticated client: no package in its import closure, the packages of this module it imports directly or indirectly, is `transport/`, `auth/`, `openehr/client` or `openehr/client/*`.
 
 The table is the one home of each block's own import rule beside that closure rule.
 A closure rule holds for the block and every package of this module it imports, directly or indirectly.

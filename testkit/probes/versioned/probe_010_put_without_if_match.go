@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -20,7 +20,7 @@ import (
 // [transport.ErrInvalidConfig] before any network call. It sends nothing,
 // so it cannot observe how a backend answers a missing If-Match; the
 // transport's status-to-error mapping covers that answer.
-func Probe010PutWithoutIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (Result, error) { // PROBE-010 (REQ-054, REQ-093)
+func Probe010PutWithoutIfMatch(ctx context.Context, c *transport.Client, ehrID ehr.EHRID) (Result, error) { // PROBE-010 (REQ-054, REQ-093)
 	r := Result{Probe: "PROBE-010"}
 	if c == nil {
 		return r, errors.New("PROBE-010: nil transport.Client")

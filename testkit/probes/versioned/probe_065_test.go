@@ -21,8 +21,8 @@ import (
 // let the can-fail tests strip each half of the contract.
 //
 // Not planted, deliberately: a "201 with a body on the minimal path" case. On
-// PreferMinimal, ehr.WriteResult returns metadata only without ever reading
-// the body (openehr/client/ehr/write.go), so no backend response can make the
+// PreferMinimal, client.WriteResult returns metadata only without ever reading
+// the body (openehr/client/write.go), so no backend response can make the
 // probe's `out != nil` guard fire. That guard records the SDK contract and is
 // unit-covered where the decode decision is made.
 func probe065Backend(t *testing.T, withLocation bool, getStatus int, getBody string) *sandbox.Backend {

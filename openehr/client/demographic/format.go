@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"

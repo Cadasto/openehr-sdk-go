@@ -7,7 +7,8 @@ import (
 	"net/url"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -15,7 +16,7 @@ import (
 
 // basePath returns the per-EHR EHR_STATUS base path. Kept local so the
 // route template emitted on OTel spans is stable.
-func basePath(ehrID openehrclient.EHRID) string {
+func basePath(ehrID ehr.EHRID) string {
 	return "/ehr/" + string(ehrID) + "/ehr_status"
 }
 
@@ -27,7 +28,7 @@ const (
 // Get returns the latest EHR_STATUS for ehrID.
 //
 // Wire: GET /ehr/{ehr_id}/ehr_status.
-func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
+func Get(ctx context.Context, c *transport.Client, ehrID ehr.EHRID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.Get: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -46,7 +47,7 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (*
 //
 // Wire: GET /ehr/{ehr_id}/ehr_status?version_at_time={t}, with t sent
 // in UTC with its fraction of a second.
-func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
+func GetAtTime(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.GetAtTime: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -72,7 +73,7 @@ func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHR
 // [GetVersionByID] returns the version envelope around it as well.
 //
 // Wire: GET /ehr/{ehr_id}/ehr_status/{version_uid}.
-func GetVersioned(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
+func GetVersioned(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, versionUID openehrclient.VersionUID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.GetVersioned: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -146,7 +147,7 @@ func WithLifecycleState(s openehrclient.LifecycleState) PutOption {
 // [transport.ErrPreconditionRequired] are defensive mappings only: the
 // openEHR contract signals a stale If-Match as 412 and a missing one as
 // 400.)
-func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ifMatch string, status *rm.EHRStatus, opts ...PutOption) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
+func Put(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ifMatch string, status *rm.EHRStatus, opts ...PutOption) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.Put: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -199,15 +200,15 @@ func decodeEHRStatus(body []byte) (*rm.EHRStatus, error) {
 
 // Repository mirrors the package functions as a dependency-injection seam.
 type Repository interface {
-	Get(ctx context.Context, ehrID openehrclient.EHRID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
-	GetAtTime(ctx context.Context, ehrID openehrclient.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
-	GetVersioned(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
-	Put(ctx context.Context, ehrID openehrclient.EHRID, ifMatch string, status *rm.EHRStatus, opts ...PutOption) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
-	GetVersionedObject(ctx context.Context, ehrID openehrclient.EHRID) (*rm.VersionedEHRStatus, *openehrclient.VersionMetadata, error)
-	GetRevisionHistory(ctx context.Context, ehrID openehrclient.EHRID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error)
-	GetVersion(ctx context.Context, ehrID openehrclient.EHRID) (*Version, *openehrclient.VersionMetadata, error)
-	GetVersionAtTime(ctx context.Context, ehrID openehrclient.EHRID, t time.Time) (*Version, *openehrclient.VersionMetadata, error)
-	GetVersionByID(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error)
+	Get(ctx context.Context, ehrID ehr.EHRID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
+	GetAtTime(ctx context.Context, ehrID ehr.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
+	GetVersioned(ctx context.Context, ehrID ehr.EHRID, versionUID openehrclient.VersionUID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
+	Put(ctx context.Context, ehrID ehr.EHRID, ifMatch string, status *rm.EHRStatus, opts ...PutOption) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
+	GetVersionedObject(ctx context.Context, ehrID ehr.EHRID) (*rm.VersionedEHRStatus, *openehrclient.VersionMetadata, error)
+	GetRevisionHistory(ctx context.Context, ehrID ehr.EHRID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error)
+	GetVersion(ctx context.Context, ehrID ehr.EHRID) (*Version, *openehrclient.VersionMetadata, error)
+	GetVersionAtTime(ctx context.Context, ehrID ehr.EHRID, t time.Time) (*Version, *openehrclient.VersionMetadata, error)
+	GetVersionByID(ctx context.Context, ehrID ehr.EHRID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -215,18 +216,18 @@ func NewRepository(c *transport.Client) Repository { return &repository{c: c} }
 
 type repository struct{ c *transport.Client }
 
-func (r *repository) Get(ctx context.Context, id openehrclient.EHRID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
+func (r *repository) Get(ctx context.Context, id ehr.EHRID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	return Get(ctx, r.c, id)
 }
 
-func (r *repository) GetAtTime(ctx context.Context, id openehrclient.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
+func (r *repository) GetAtTime(ctx context.Context, id ehr.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	return GetAtTime(ctx, r.c, id, t)
 }
 
-func (r *repository) GetVersioned(ctx context.Context, id openehrclient.EHRID, uid openehrclient.VersionUID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
+func (r *repository) GetVersioned(ctx context.Context, id ehr.EHRID, uid openehrclient.VersionUID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	return GetVersioned(ctx, r.c, id, uid)
 }
 
-func (r *repository) Put(ctx context.Context, id openehrclient.EHRID, ifMatch string, status *rm.EHRStatus, opts ...PutOption) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
+func (r *repository) Put(ctx context.Context, id ehr.EHRID, ifMatch string, status *rm.EHRStatus, opts ...PutOption) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	return Put(ctx, r.c, id, ifMatch, status, opts...)
 }

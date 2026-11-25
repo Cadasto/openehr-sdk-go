@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -20,7 +21,7 @@ type SetCompositionOptions struct {
 // SetComposition replaces ITEM_TAG headers on a Composition update (PUT).
 // The composition body is sent unchanged aside from tag headers; ifMatch
 // is required.
-func SetComposition(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opt SetCompositionOptions) (*openehrclient.VersionMetadata, error) {
+func SetComposition(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opt SetCompositionOptions) (*openehrclient.VersionMetadata, error) {
 	if comp == nil {
 		return nil, fmt.Errorf("itemtags.SetComposition: %w: nil Composition", transport.ErrInvalidConfig)
 	}
@@ -37,7 +38,7 @@ func SetComposition(ctx context.Context, c *transport.Client, ehrID openehrclien
 
 // DeleteComposition removes tags whose keys match key in the given scope
 // and PUTs the composition back with the reduced tag set.
-func DeleteComposition(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ref openehrclient.Ref, ifMatch string, comp *rm.Composition, key string, objectScope bool) (*openehrclient.VersionMetadata, error) {
+func DeleteComposition(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID, ref openehrclient.Ref, ifMatch string, comp *rm.Composition, key string, objectScope bool) (*openehrclient.VersionMetadata, error) {
 	if key == "" {
 		return nil, fmt.Errorf("itemtags.DeleteComposition: %w: empty key", transport.ErrInvalidConfig)
 	}

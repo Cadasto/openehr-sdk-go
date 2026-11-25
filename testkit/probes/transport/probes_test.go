@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/sandbox"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/transport"
@@ -85,9 +85,9 @@ func TestProbe091RejectsMissingInputs(t *testing.T) {
 const (
 	// probe101UndecodableEHR is answered 200 with a body that cannot decode
 	// as an EHR.
-	probe101UndecodableEHR openehrclient.EHRID = "11111111-1111-4111-8111-111111111111"
+	probe101UndecodableEHR ehr.EHRID = "11111111-1111-4111-8111-111111111111"
 	// probe101MissingEHR is answered 404.
-	probe101MissingEHR openehrclient.EHRID = "22222222-2222-4222-8222-222222222222"
+	probe101MissingEHR ehr.EHRID = "22222222-2222-4222-8222-222222222222"
 )
 
 // probe101Arms is what the PROBE-101 fake serves on each of the three routes

@@ -1,12 +1,13 @@
-package ehr_test
+package client_test
 
 import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -139,6 +140,40 @@ func TestWriteResultRepresentationDecodeFailure(t *testing.T) {
 	}
 	if meta.VersionUID != wantUID || nre.Meta.VersionUID != wantUID {
 		t.Errorf("VersionUID meta=%q nre=%q, want %q", meta.VersionUID, nre.Meta.VersionUID, wantUID)
+	}
+}
+
+// TestWriteResultNilDecode pins REQ-025 (idiom.md § No panics): a
+// representation write with a nil decode fails with ErrInvalidConfig and
+// sends nothing, where it would panic after the commit; a minimal write,
+// which never decodes, still accepts a nil decode.
+func TestWriteResultNilDecode(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Location", "/ehr/ehr-1/composition/obj-1::sys::1")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"_type":"COMPOSITION"}`))
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	_, meta, err := openehrclient.WriteResult[*rm.Composition](t.Context(), c, writeReq(transport.PreferRepresentation), "composition", nil)
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("representation write with nil decode: err = %v, want ErrInvalidConfig", err)
+	}
+	if meta != nil {
+		t.Errorf("representation write with nil decode: meta = %+v, want nil", meta)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Fatalf("representation write with nil decode sent %d requests, want 0", n)
+	}
+
+	if _, _, err := openehrclient.WriteResult[*rm.Composition](t.Context(), c, writeReq(transport.PreferMinimal), "composition", nil); err != nil {
+		t.Errorf("minimal write with nil decode: err = %v, want nil", err)
+	}
+	if n := hits.Load(); n != 1 {
+		t.Errorf("minimal write with nil decode sent %d requests, want 1", n)
 	}
 }
 

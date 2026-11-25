@@ -7,8 +7,9 @@ import (
 	"testing"
 	"uuid"
 
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -29,7 +30,7 @@ const liveEHRStatusJSON = `{"_type":"EHR_STATUS","name":{"_type":"DV_TEXT","valu
 // to the status read-back. probe.Run executes entries in order, so the
 // closure hand-off is safe. The composition write uses a different EHR.
 type createdEHR struct {
-	id openehrclient.EHRID
+	id ehr.EHRID
 }
 
 // liveInitialEHRStatus decodes the sandbox fixture and writes runID into
@@ -93,7 +94,7 @@ func ehrStatusLiveEntries(runID string, status *rm.EHRStatus, created *createdEH
 				if status.Name == nil || status.Name.GetValue() != runID {
 					return liveFailf("initial EHR_STATUS name does not carry the per-run id %s", runID), nil
 				}
-				rec, meta, err := openehrclient.Create(ctx, c, openehrclient.WithInitialStatus(status))
+				rec, meta, err := ehr.Create(ctx, c, ehr.WithInitialStatus(status))
 				if err != nil {
 					return liveFail(err), nil
 				}
@@ -108,7 +109,7 @@ func ehrStatusLiveEntries(runID string, status *rm.EHRStatus, created *createdEH
 				if !strings.HasSuffix(strings.TrimSuffix(loc, "/"), wantTail) {
 					return liveFailf("Create Location %q, want a %q tail", loc, wantTail), nil
 				}
-				created.id = openehrclient.EHRID(rec.EHRID.Value)
+				created.id = ehr.EHRID(rec.EHRID.Value)
 				return probe.Result{Status: probe.StatusPass, Detail: rec.EHRID.Value}, nil
 			},
 		},
@@ -152,7 +153,7 @@ func ehrStatusLiveEntries(runID string, status *rm.EHRStatus, created *createdEH
 // an EHR this run created and that allows modification. Save uses the
 // default Prefer (return=minimal): a nil composition and a VersionUID.
 // Get passes when the composition is non-nil and ArchetypeNodeID is set.
-func minimalCompositionLiveEntries(ehrID openehrclient.EHRID, templateID string, optBody []byte, comp *rm.Composition, committed *committedVersion) []probe.Entry {
+func minimalCompositionLiveEntries(ehrID ehr.EHRID, templateID string, optBody []byte, comp *rm.Composition, committed *committedVersion) []probe.Entry {
 	live := []probe.Mode{probe.ModeLive}
 	return []probe.Entry{
 		{
@@ -237,7 +238,7 @@ func TestLiveEHRStatusAndMinimalSnapshot(t *testing.T) {
 	runID := uuid.NewV4().String()
 	// The composition EHR's id is the per-run identifier. The status
 	// name and the template id carry the same identifier (REQ-082).
-	compositionEHR := openehrclient.EHRID(runID)
+	compositionEHR := ehr.EHRID(runID)
 	templateID := "sdk_snapshot_" + strings.ReplaceAll(runID, "-", "") + ".v1"
 	t.Logf("per-run id %s, template %s", runID, templateID)
 

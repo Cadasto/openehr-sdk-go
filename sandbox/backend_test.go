@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/sandbox"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -36,7 +36,7 @@ func TestCreateAndGetEHR(t *testing.T) {
 	b := sandbox.New()
 	c := sandboxClient(t, b)
 
-	created, _, err := openehrclient.Create(t.Context(), c)
+	created, _, err := ehr.Create(t.Context(), c)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestCreateAndGetEHR(t *testing.T) {
 		t.Fatal("Create returned no ehr_id")
 	}
 
-	got, _, err := openehrclient.Get(t.Context(), c, openehrclient.EHRID(created.EHRID.Value))
+	got, _, err := ehr.Get(t.Context(), c, ehr.EHRID(created.EHRID.Value))
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestCreateAndGetEHR(t *testing.T) {
 		t.Fatalf("Get ehr_id = %q, want %q", got.EHRID.Value, created.EHRID.Value)
 	}
 
-	ok, err := openehrclient.Exists(t.Context(), c, openehrclient.EHRID(created.EHRID.Value))
+	ok, err := ehr.Exists(t.Context(), c, ehr.EHRID(created.EHRID.Value))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,11 +70,11 @@ func TestIsolation(t *testing.T) {
 	ca := sandboxClient(t, a)
 	cb := sandboxClient(t, b)
 
-	created, _, err := openehrclient.Create(t.Context(), ca)
+	created, _, err := ehr.Create(t.Context(), ca)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err := openehrclient.Exists(t.Context(), cb, openehrclient.EHRID(created.EHRID.Value))
+	ok, err := ehr.Exists(t.Context(), cb, ehr.EHRID(created.EHRID.Value))
 	if err != nil {
 		t.Fatal(err)
 	}

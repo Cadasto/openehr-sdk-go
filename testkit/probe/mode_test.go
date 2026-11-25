@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/sandbox"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -39,12 +39,12 @@ func capture(id string, seen *[]*transport.Client) probe.Entry {
 // createEHR is a mutating entry that creates one EHR at a fixed id.
 // It is the write whose visibility every sandbox-state test below
 // turns on.
-func createEHR(probeID string, id openehrclient.EHRID) probe.Entry {
+func createEHR(probeID string, id ehr.EHRID) probe.Entry {
 	return probe.Entry{
 		ID:     probeID,
 		Effect: probe.EffectMutating,
 		Run: func(ctx context.Context, c *transport.Client) (probe.Result, error) {
-			if _, _, err := openehrclient.Create(ctx, c, openehrclient.WithEHRID(id)); err != nil {
+			if _, _, err := ehr.Create(ctx, c, ehr.WithEHRID(id)); err != nil {
 				return probe.Result{}, err
 			}
 			return probe.Result{Status: probe.StatusPass}, nil
@@ -56,12 +56,12 @@ func createEHR(probeID string, id openehrclient.EHRID) probe.Entry {
 // present exactly as want says and fails with detail otherwise. want =
 // false is the isolation expectation, want = true the sharing one, so
 // the same helper states both halves of the Config.Sandbox contract.
-func expectEHR(probeID string, id openehrclient.EHRID, want bool, detail string) probe.Entry {
+func expectEHR(probeID string, id ehr.EHRID, want bool, detail string) probe.Entry {
 	return probe.Entry{
 		ID:     probeID,
 		Effect: probe.EffectReadOnly,
 		Run: func(ctx context.Context, c *transport.Client) (probe.Result, error) {
-			ok, err := openehrclient.Exists(ctx, c, id)
+			ok, err := ehr.Exists(ctx, c, id)
 			if err != nil {
 				return probe.Result{}, err
 			}
@@ -117,7 +117,7 @@ func TestSandboxModeBuildsItsOwnClient(t *testing.T) {
 // [TestSandboxModeSharesConfiguredBackendWithinOneRun].
 func TestSandboxModeIsolatesProbesFromEachOther(t *testing.T) {
 	t.Parallel()
-	const id openehrclient.EHRID = "9a1f0f6e-1d2c-4c0b-9b3a-6d5e4c3b2a10"
+	const id ehr.EHRID = "9a1f0f6e-1d2c-4c0b-9b3a-6d5e4c3b2a10"
 
 	create := createEHR("PROBE-060", id)
 	lookFor := expectEHR("PROBE-078", id, false,
@@ -141,7 +141,7 @@ func TestSandboxModeIsolatesProbesFromEachOther(t *testing.T) {
 func TestSandboxModeUsesTheConfiguredBackend(t *testing.T) {
 	t.Parallel()
 	backend := sandbox.New()
-	const id openehrclient.EHRID = "6c1a09d6-2b1e-4a0f-8d4d-0f2a9c7b31aa"
+	const id ehr.EHRID = "6c1a09d6-2b1e-4a0f-8d4d-0f2a9c7b31aa"
 	cfg := probe.Config{Mode: probe.ModeSandbox, Sandbox: backend}
 
 	create := createEHR("PROBE-072", id)
@@ -170,7 +170,7 @@ func TestSandboxModeUsesTheConfiguredBackend(t *testing.T) {
 // backend per probe would leave the second probe empty-handed here.
 func TestSandboxModeSharesConfiguredBackendWithinOneRun(t *testing.T) {
 	t.Parallel()
-	const id openehrclient.EHRID = "0b5e8d3c-7f21-4a9e-a6d4-2c8b1f04e775"
+	const id ehr.EHRID = "0b5e8d3c-7f21-4a9e-a6d4-2c8b1f04e775"
 	cfg := probe.Config{Mode: probe.ModeSandbox, Sandbox: sandbox.New()}
 
 	create := createEHR("PROBE-060", id)

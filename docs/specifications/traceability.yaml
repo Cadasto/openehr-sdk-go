@@ -91,7 +91,7 @@ requirements:
     canonical: docs/specifications/idiom.md#errors-req-025
     status: draft
     implementation: landed
-    packages: [transport, auth, auth/basic, auth/clientcreds, auth/jwtbearer, auth/smart, smart, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, openehr/template/constraints, internal/bmmgen]
+    packages: [transport, auth, auth/basic, auth/clientcreds, auth/jwtbearer, auth/smart, smart, smart/discovery, openehr/client, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, openehr/template/constraints, internal/bmmgen]
     tests:
       - auth/basic/print_test.go
       - auth/clientcreds/print_test.go
@@ -124,9 +124,12 @@ requirements:
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
       - openehr/client/ehr/ehr_test.go
-      - openehr/client/ehr/resource_test.go
+      - openehr/client/ehr/itemtags/itemtags_test.go
       - openehr/client/query/nilaqlerror_test.go
       - openehr/client/query/nilwiredereference_internal_test.go
+      - openehr/client/ref_test.go
+      - openehr/client/resource_test.go
+      - openehr/client/write_test.go
       - openehr/rm/character_test.go
       - openehr/rm/integer64_test.go
       - openehr/rm/integer_test.go
@@ -195,14 +198,14 @@ requirements:
     canonical: docs/specifications/reference-model.md#openehr-terminology-vocabulary-req-034
     status: draft
     implementation: landed
-    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen, openehr/client/ehr, openehr/client/ehr/contribution, openehr/serialize/simplified, openehr/instance, openehr/validation]
+    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen, openehr/client, openehr/client/ehr, openehr/client/ehr/contribution, openehr/serialize/simplified, openehr/instance, openehr/validation]
     tests:
       - internal/termgen/parse_test.go
       - internal/termgen/render_test.go
       - internal/termgen/run_test.go
       - internal/termgen/units_test.go
       - openehr/client/ehr/contribution/builder_test.go
-      - openehr/client/ehr/version_header_test.go
+      - openehr/client/version_header_test.go
       - openehr/instance/instance_test.go
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
@@ -315,8 +318,8 @@ requirements:
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
-      - openehr/client/ehr/stored_item_tag_test.go
       - openehr/client/query/query_encoding_test.go
+      - openehr/client/stored_item_tag_test.go
       - openehr/client/system/system_test.go
       - testkit/probe/cassette_test.go
       - testkit/probe/liveexample_test.go
@@ -552,7 +555,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-054
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
+    packages: [transport, openehr/client, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
     probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-065]
     tests:
       - openehr/client/demographic/party_test.go
@@ -561,7 +564,8 @@ requirements:
       - openehr/client/ehr/ehr_test.go
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
       - openehr/client/ehr/ehrstatus/versioned_test.go
-      - openehr/client/ehr/ids_test.go
+      - openehr/client/ids_test.go
+      - openehr/client/metadata_test.go
       - testkit/probe/cassette_versioned_test.go
       - testkit/probes/versioned/probe_010_put_without_if_match.go
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
@@ -720,18 +724,18 @@ requirements:
     canonical: docs/specifications/wire.md#req-059
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
+    packages: [transport, openehr/client, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
     probes: [PROBE-062]
     tests:
+      - openehr/client/audit_test.go
       - openehr/client/demographic/party_test.go
       - openehr/client/demographic/tags_test.go
-      - openehr/client/ehr/audit_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go
-      - openehr/client/ehr/itemtag_wire_test.go
       - openehr/client/ehr/itemtags/itemtags_test.go
-      - openehr/client/ehr/stored_item_tag_test.go
-      - openehr/client/ehr/version_header_test.go
+      - openehr/client/itemtag_wire_test.go
+      - openehr/client/stored_item_tag_test.go
+      - openehr/client/version_header_test.go
       - testkit/probes/rest/audit_grammar_test.go
       - testkit/probes/rest/probe_062_audit_details_header.go
       - testkit/probes/rest/probes_test.go
@@ -1110,13 +1114,13 @@ requirements:
     canonical: docs/specifications/transport.md#req-093--openehr-error-envelope-mapping
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/query]
+    packages: [transport, openehr/client, openehr/client/query]
     probes: [PROBE-010, PROBE-011, PROBE-068]
     tests:
       - cadasto/admin/probes_test.go
       - cmd/probe-record/main_test.go
       - openehr/client/ehr/contribution/contribution_test.go
-      - openehr/client/ehr/resource_test.go
+      - openehr/client/resource_test.go
       - openehr/rm/character_test.go
       - openehr/rm/real_test.go
       - openehr/validation/rmfloor_party_proxy_test.go
@@ -1145,9 +1149,10 @@ requirements:
     canonical: docs/specifications/transport.md#req-094--prefer-response-shape-negotiation
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/demographic]
+    packages: [transport, openehr/client, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/demographic]
     probes: [PROBE-061, PROBE-065, PROBE-071]
     tests:
+      - openehr/client/decode_error_test.go
       - openehr/client/demographic/party_test.go
       - openehr/client/demographic/tags_test.go
       - openehr/client/ehr/composition/body_read_error_test.go
@@ -1157,12 +1162,11 @@ requirements:
       - openehr/client/ehr/contribution/body_read_error_test.go
       - openehr/client/ehr/contribution/decode_error_test.go
       - openehr/client/ehr/contribution/representation_test.go
-      - openehr/client/ehr/decode_error_test.go
       - openehr/client/ehr/directory/directory_test.go
       - openehr/client/ehr/ehr_test.go
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
-      - openehr/client/ehr/resource_test.go
-      - openehr/client/ehr/write_test.go
+      - openehr/client/resource_test.go
+      - openehr/client/write_test.go
       - testkit/probe/cassette_test.go
       - testkit/probe/cassette_versioned_test.go
       - testkit/probe/livestatus_test.go
@@ -1953,11 +1957,11 @@ requirements:
     probes: []
     packages:
       - openehr/rm
-      - openehr/client/ehr
+      - openehr/client
     tests:
       - internal/bmmgen/render_test.go
       - openehr/aql/lint/semantic_test.go
-      - openehr/client/ehr/ids_test.go
+      - openehr/client/ids_test.go
       - openehr/rm/changecontrol_funcs_test.go
       - openehr/rm/identification_funcs_test.go
       - openehr/rm/uri_funcs_test.go
@@ -2114,9 +2118,10 @@ requirements:
     canonical: docs/specifications/transport.md#req-151--typed-2xx-decode-failure
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/definition, openehr/client/system, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, testkit/probes/transport, openehr/client/ehr/contribution, openehr/client/query]
+    packages: [transport, openehr/client, openehr/client/definition, openehr/client/system, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, testkit/probes/transport, openehr/client/ehr/contribution, openehr/client/query]
     probes: [PROBE-101]
     tests:
+      - openehr/client/decode_error_test.go
       - openehr/client/definition/body_read_error_test.go
       - openehr/client/definition/decode_error_test.go
       - openehr/client/definition/null_body_test.go
@@ -2137,11 +2142,10 @@ requirements:
       - openehr/client/ehr/composition/versioned_test.go
       - openehr/client/ehr/contribution/body_read_error_test.go
       - openehr/client/ehr/contribution/decode_error_test.go
-      - openehr/client/ehr/decode_error_test.go
       - openehr/client/ehr/ehr_test.go
       - openehr/client/ehr/ehrstatus/versioned_test.go
-      - openehr/client/ehr/resource_test.go
       - openehr/client/query/body_read_error_test.go
+      - openehr/client/resource_test.go
       - openehr/client/system/body_read_error_test.go
       - openehr/client/system/decode_error_test.go
       - openehr/client/system/null_body_test.go
@@ -2466,7 +2470,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-174--versioned-object-reads
     status: draft
     implementation: landed
-    packages: [openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus, openehr/client/ehr/directory, openehr/client/demographic, openehr/client/ehr/contribution]
+    packages: [openehr/client, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus, openehr/client/ehr/directory, openehr/client/demographic, openehr/client/ehr/contribution]
     probes: [PROBE-109, PROBE-092]
     tests:
       - openehr/client/demographic/party_test.go
@@ -2476,10 +2480,10 @@ requirements:
       - openehr/client/ehr/composition/versioned_test.go
       - openehr/client/ehr/contribution/contribution_test.go
       - openehr/client/ehr/directory/directory_test.go
-      - openehr/client/ehr/ehr_test.go
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
       - openehr/client/ehr/ehrstatus/versioned_test.go
-      - openehr/client/ehr/version_at_time_test.go
+      - openehr/client/ref_test.go
+      - openehr/client/version_at_time_test.go
       - testkit/probes/versioned/probe_092_contribution_get.go
       - testkit/probes/versioned/probe_109_versioned_object_reads.go
       - testkit/probes/versioned/probes_test.go

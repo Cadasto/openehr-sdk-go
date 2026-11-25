@@ -14,7 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/sandbox"
@@ -26,7 +27,7 @@ import (
 )
 
 const (
-	ehrIDFixture    openehrclient.EHRID             = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
+	ehrIDFixture    ehr.EHRID                       = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
 	compositionVOID openehrclient.VersionedObjectID = "1234abcd-5678-9012-3456-7890abcdef00"
 	initialVUID     openehrclient.VersionUID        = "1234abcd-5678-9012-3456-7890abcdef00::cdr.example::1"
 	updatedVUID     openehrclient.VersionUID        = "1234abcd-5678-9012-3456-7890abcdef00::cdr.example::2"
@@ -541,8 +542,8 @@ func TestProbe072RejectsDeletionExceptionMisuse(t *testing.T) {
 
 func TestProbe013CrossEHRIsolation(t *testing.T) {
 	const (
-		ehrAID          openehrclient.EHRID      = "ehrA-1111-2222-3333-444444444444"
-		ehrBID          openehrclient.EHRID      = "ehrB-aaaa-bbbb-cccc-dddddddddddd"
+		ehrAID          ehr.EHRID                = "ehrA-1111-2222-3333-444444444444"
+		ehrBID          ehr.EHRID                = "ehrB-aaaa-bbbb-cccc-dddddddddddd"
 		versionUIDFromA openehrclient.VersionUID = "9999abcd-5678-9012-3456-7890abcdef00::cdr.example::1"
 	)
 	b := sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {

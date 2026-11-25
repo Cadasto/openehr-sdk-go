@@ -1,10 +1,10 @@
 package contribution_test
 
-// decode_error_test.go — the *ehr.NoRepresentationError row of REQ-151
+// decode_error_test.go — the *client.NoRepresentationError row of REQ-151
 // § The taxonomy, held at contribution.Commit.
 //
 // Commit is named in that row: its committed-but-unusable arm is REQ-094's
-// *ehr.NoRepresentationError, never a *transport.DecodeError. The distinction
+// *client.NoRepresentationError, never a *transport.DecodeError. The distinction
 // is not cosmetic — a Commit that reaches this arm has already been persisted
 // by the server, so the caller's recovery is to re-read the contribution, not
 // to re-parse the body a read failed on. Handing back a *transport.DecodeError
@@ -16,13 +16,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
 // TestCommitUndecodableIsNotDecodeError is the negative pin. It restates the
-// arm's existing contract — *ehr.NoRepresentationError carrying the commit
+// arm's existing contract — *client.NoRepresentationError carrying the commit
 // metadata — and then asserts the exclusion itself: errors.AsType for
 // *transport.DecodeError must NOT match. Deleting the exclusion from the code
 // would fail this test.
@@ -43,7 +43,7 @@ func TestCommitUndecodableIsNotDecodeError(t *testing.T) { // REQ-151
 
 	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
 	if !ok {
-		t.Fatalf("err = %T (%v), want *ehr.NoRepresentationError — REQ-094 owns contribution.Commit's committed-but-unusable arm", err, err)
+		t.Fatalf("err = %T (%v), want *client.NoRepresentationError — REQ-094 owns contribution.Commit's committed-but-unusable arm", err, err)
 	}
 	if errors.Is(err, transport.ErrInvalidShape) {
 		t.Error("a decode failure is not an empty-body ErrInvalidShape")
@@ -58,6 +58,6 @@ func TestCommitUndecodableIsNotDecodeError(t *testing.T) { // REQ-151
 
 	// The disjointness itself: no *transport.DecodeError.
 	if de, ok := errors.AsType[*transport.DecodeError](err); ok {
-		t.Errorf("contribution.Commit's decode failure surfaced as *transport.DecodeError (%v); REQ-151 § The taxonomy reports it as REQ-094's *ehr.NoRepresentationError", de)
+		t.Errorf("contribution.Commit's decode failure surfaced as *transport.DecodeError (%v); REQ-151 § The taxonomy reports it as REQ-094's *client.NoRepresentationError", de)
 	}
 }

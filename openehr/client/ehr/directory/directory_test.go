@@ -12,7 +12,8 @@ import (
 	"testing"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/directory"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -20,7 +21,7 @@ import (
 )
 
 const (
-	ehrIDFixture openehrclient.EHRID      = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
+	ehrIDFixture ehr.EHRID                = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
 	folderVUID   openehrclient.VersionUID = "0a1b2c3d-4e5f-6789-abcd-ef0123456789::cdr.example::1"
 )
 

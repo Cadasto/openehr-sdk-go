@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -27,7 +28,7 @@ import (
 //
 // The probe issues [composition.Update] with the stale If-Match and
 // asserts the returned error matches [transport.ErrPreconditionFailed].
-func Probe011PutStaleIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, staleIfMatch string, comp *rm.Composition) (Result, error) { // PROBE-011 (REQ-054, REQ-093)
+func Probe011PutStaleIfMatch(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID, staleIfMatch string, comp *rm.Composition) (Result, error) { // PROBE-011 (REQ-054, REQ-093)
 	r := Result{Probe: "PROBE-011"}
 	if c == nil || ehrID == "" || voID == "" || staleIfMatch == "" || comp == nil {
 		return r, errors.New("PROBE-011: missing required inputs (client/ehr/voID/staleIfMatch/comp)")

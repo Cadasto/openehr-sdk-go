@@ -1,11 +1,11 @@
-package ehr_test
+package client_test
 
 import (
 	"errors"
 	"testing"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 

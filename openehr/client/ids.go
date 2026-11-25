@@ -1,4 +1,4 @@
-package ehr
+package client
 
 import (
 	"net/url"
@@ -6,15 +6,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
-
-// EHRID identifies an EHR root. Distinct type from the openEHR
-// HierObjectID it wraps so call sites cannot accidentally mix it with
-// VersionedObjectID / VersionUID. The string form is the UID value
-// (typically a UUID), not the full HierObjectID JSON envelope.
-type EHRID string
-
-// String returns the EHRID as a plain string for URL-path composition.
-func (e EHRID) String() string { return string(e) }
 
 // VersionedObjectID identifies a versioned-resource family (e.g. a
 // Composition's "versioned_object_id"). Using one in a GET resolves to

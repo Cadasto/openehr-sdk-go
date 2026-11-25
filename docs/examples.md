@@ -37,9 +37,9 @@ The Packages column lists the SDK packages each program imports, by short name (
 | [webtemplate-export](#webtemplate-export) | No | `aom14`, `templatecompile`, `template/webtemplate` | Compiled OPT → Web Template JSON |
 | [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `aom14`, `template/webtemplate`, `templatecompile`, `canjson`, `validation`, `rm` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + template-aware `WithTemplate` decode |
 | [ehr_create](#ehr_create) | Fake (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
-| [contribution-build](#contribution-build) | Optional fake (`-commit`) | `client/ehr/contribution`, `client/ehr`, `canjson`, `rm`, `discovery`, `transport` | Multi-version `Contribution_create` assembly, optionally committed |
+| [contribution-build](#contribution-build) | Optional fake (`-commit`) | `client/ehr/contribution`, `client`, `client/ehr`, `canjson`, `rm`, `discovery`, `transport` | Multi-version `Contribution_create` assembly, optionally committed |
 | [definition-lifecycle](#definition-lifecycle) | Fake (`sandbox`) | `client/definition`, `aom14`, `templatecompile`, `discovery`, `transport`, `sandbox` | Upload, list, download and compile a template; the server's copy vs the local compiled handle |
-| [composition-crud](#composition-crud) | Fake (`sandbox`) | `client/ehr/composition`, `client/ehr`, `rm`, `rmpath`, `canjson`, `discovery`, `transport`, `sandbox` | Save, read, update; a stale `If-Match` refused with 412 |
+| [composition-crud](#composition-crud) | Fake (`sandbox`) | `client/ehr/composition`, `client`, `client/ehr`, `rm`, `rmpath`, `canjson`, `discovery`, `transport`, `sandbox` | Save, read, update; a stale `If-Match` refused with 412 |
 | [query-execute](#query-execute) | Fake (`sandbox`) | `aql`, `client/query`, `rm`, `typereg`, `discovery`, `transport`, `sandbox` | Execute bound AQL, decode a RESULT_SET cell into a typed value, classify a refusal |
 | [smart-launch](#smart-launch) | Fake (`httptest`) | `auth/smart`, `auth`, `discovery` | Standalone PKCE launch; **state + verifier persistence** across the redirect |
 | [service-auth](#service-auth) | Fake (`sandbox`) | `auth/clientcreds`, `auth`, `client/system`, `discovery`, `transport`, `sandbox` | OAuth 2.0 client credentials for a backend service; the cached token reused |
@@ -672,7 +672,7 @@ go run ./cmd/examples/contribution-build
 go run ./cmd/examples/contribution-build -commit
 ```
 
-**Packages:** `openehr/client/ehr/contribution`, `openehr/client/ehr`, `openehr/rm`, `openehr/serialize/canjson`, `testkit/fixtures` (`smart/discovery` and `transport` are used only under `-commit`)
+**Packages:** `openehr/client/ehr/contribution`, `openehr/client`, `openehr/rm`, `openehr/serialize/canjson`, `testkit/fixtures` (`openehr/client/ehr`, `smart/discovery` and `transport` are used only under `-commit`)
 
 **Sample output** (body elided):
 
@@ -743,7 +743,7 @@ OK: template uploaded, listed, downloaded and compiled; example received
 go run ./cmd/examples/composition-crud
 ```
 
-**Packages:** `openehr/client/ehr/composition`, `openehr/client/ehr`, `openehr/rm`, `openehr/rm/rmpath`, `openehr/serialize/canjson`, `smart/discovery`, `transport`, `sandbox` (plus `testkit/fixtures`, which locates the fixture)
+**Packages:** `openehr/client/ehr/composition`, `openehr/client`, `openehr/client/ehr`, `openehr/rm`, `openehr/rm/rmpath`, `openehr/serialize/canjson`, `smart/discovery`, `transport`, `sandbox` (plus `testkit/fixtures`, which locates the fixture)
 
 **Fixture:** `testkit/corpus/compositions/body_weight.json`
 
@@ -763,7 +763,7 @@ stale update: If-Match=8f14e45f-ceea-467a-9575-4e1a8b2c3d4e::sandbox.local::1 re
 OK: composition saved, read, updated, and a stale update refused, against an in-process fake CDR
 ```
 
-A version uid has three parts, `<versioned object id>::<system id>::<version>`. `composition.Save` sends the default `Prefer: return=minimal`, so the server sends no body and the returned composition is nil; the version uid, `Location` and `ETag` come from the response metadata. `composition.Get` with `ehr.LatestOf` asks for the newest version of the family the versioned object id names. The program then corrects the weight value, found by its path with `rmpath.ItemAtPath`, and `composition.Update` sends the uid it read as `If-Match` with `Prefer: return=representation`, so version 2 comes back. The last update still carries the version 1 uid. The server refuses it with `412 Precondition Failed` and names its latest version in the `ETag`. `Update` maps that status to `transport.ErrPreconditionFailed` and returns the metadata beside the error.
+A version uid has three parts, `<versioned object id>::<system id>::<version>`. `composition.Save` sends the default `Prefer: return=minimal`, so the server sends no body and the returned composition is nil; the version uid, `Location` and `ETag` come from the response metadata. `composition.Get` with `client.LatestOf` asks for the newest version of the family the versioned object id names. The program then corrects the weight value, found by its path with `rmpath.ItemAtPath`, and `composition.Update` sends the uid it read as `If-Match` with `Prefer: return=representation`, so version 2 comes back. The last update still carries the version 1 uid. The server refuses it with `412 Precondition Failed` and names its latest version in the `ETag`. `Update` maps that status to `transport.ErrPreconditionFailed` and returns the metadata beside the error.
 
 The fake answers as the pinned ITS-REST contract describes. A create answers `201 Created`, with the new version uid in `ETag` and its URL in `Location`. An update answers `200 OK` with a body when `Prefer` asks for one, and `204 No Content` otherwise. For a stale `If-Match`, the `composition_update` operation lists `412` and no `409`.
 

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -32,7 +32,7 @@ import (
 // read-back on `/ehr/{ehr_id}/ehr_status` for the id the create returned, so a
 // read-back aimed at some other EHR cannot pass by returning a matching status.
 //
-// The probe does not assert the numeric status code (201): [openehrclient.Create]
+// The probe does not assert the numeric status code (201): [ehr.Create]
 // does not surface it: the leaf returns the decoded EHR and the version
 // metadata, and the code itself never reaches the caller. Asserting it here
 // would mean asserting against the fixture instead of against the SDK.
@@ -47,7 +47,7 @@ func Probe060EHRCreationRoundTrip(ctx context.Context, c *transport.Client, capt
 
 	// Create arm — server-assigned id, initial EHR_STATUS in the body.
 	before := len(captured())
-	rec, meta, err := openehrclient.Create(ctx, c, openehrclient.WithInitialStatus(status))
+	rec, meta, err := ehr.Create(ctx, c, ehr.WithInitialStatus(status))
 	if err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("Create failed: %v", err)
@@ -105,7 +105,7 @@ func Probe060EHRCreationRoundTrip(ctx context.Context, c *transport.Client, capt
 	}
 
 	// Read-back arm — the committed EHR_STATUS reads back with the same fields.
-	ehrID := openehrclient.EHRID(rec.EHRID.Value)
+	ehrID := ehr.EHRID(rec.EHRID.Value)
 	beforeRead := len(captured())
 	st, _, err := ehrstatus.Get(ctx, c, ehrID)
 	if err != nil {

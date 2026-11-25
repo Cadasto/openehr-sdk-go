@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -29,7 +30,7 @@ import (
 // POST arm; these preconditions reflect deployments that don't expose a
 // preconfigured family for the test caller. A pass requires the POST
 // arm at minimum; when both inputs are present, both arms must succeed.
-func Probe071CompositionWriteResponseShape(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition) (Result, error) { // PROBE-071 (REQ-094)
+func Probe071CompositionWriteResponseShape(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition) (Result, error) { // PROBE-071 (REQ-094)
 	r := Result{Probe: "PROBE-071"}
 	if c == nil || ehrID == "" || comp == nil {
 		return r, errors.New("PROBE-071: missing required inputs (client/ehr/comp)")

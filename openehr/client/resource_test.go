@@ -1,4 +1,4 @@
-package ehr_test
+package client_test
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -70,13 +70,13 @@ func TestHasResourceUncomparable(t *testing.T) {
 // instead of panicking.
 func TestNoRepresentationErrorStrings(t *testing.T) {
 	var nilErr *openehrclient.NoRepresentationError
-	if got := nilErr.Error(); got != "ehr: no representation" {
+	if got := nilErr.Error(); got != "client: no representation" {
 		t.Errorf("nil receiver Error() = %q", got)
 	}
 	if nilErr.Unwrap() != nil {
 		t.Error("nil receiver Unwrap() must be nil")
 	}
-	if got := (&openehrclient.NoRepresentationError{}).Error(); got != "ehr: committed write has no usable representation" {
+	if got := (&openehrclient.NoRepresentationError{}).Error(); got != "client: committed write has no usable representation" {
 		t.Errorf("nil-Cause Error() = %q", got)
 	}
 	// The ErrInvalidShape cause now covers zero bytes, whitespace and JSON
@@ -89,14 +89,14 @@ func TestNoRepresentationErrorStrings(t *testing.T) {
 		empty := &openehrclient.NoRepresentationError{
 			Cause: fmt.Errorf(cause, transport.ErrInvalidShape),
 		}
-		if got := empty.Error(); got != "ehr: committed write has no usable representation (empty or null body)" {
+		if got := empty.Error(); got != "client: committed write has no usable representation (empty or null body)" {
 			t.Errorf("no-representation Error() = %q, want the empty-or-null summary", got)
 		}
 	}
 	decode := &openehrclient.NoRepresentationError{Cause: errors.New(`parse "secret-payload-value"`)}
 	if got := decode.Error(); strings.Contains(got, "secret-payload-value") {
 		t.Errorf("Error() leaked Cause text: %q", got)
-	} else if got != "ehr: committed write has no usable representation (decode failed)" {
+	} else if got != "client: committed write has no usable representation (decode failed)" {
 		t.Errorf("decode-failure Error() = %q", got)
 	}
 }

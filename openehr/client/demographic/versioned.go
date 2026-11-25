@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -40,7 +40,7 @@ const (
 // not surfaced (the read family is not signature- or merge-aware). Read the raw VERSION via the CDR if those are needed.
 type PartyVersion struct {
 	// UID is this version's OBJECT_VERSION_ID. Its Value is the wire string
-	// you pass back as an [ehr.VersionUID]; see [PartyVersion.VersionUID].
+	// you pass back as an [openehrclient.VersionUID]; see [PartyVersion.VersionUID].
 	UID rm.ObjectVersionID
 	// PrecedingVersionUID is the prior version, or nil for the first.
 	PrecedingVersionUID *rm.ObjectVersionID
@@ -57,7 +57,7 @@ type PartyVersion struct {
 	Party rm.Party
 }
 
-// VersionUID returns this version's id as an [ehr.VersionUID], the string
+// VersionUID returns this version's id as an [openehrclient.VersionUID], the string
 // newtype the read paths take (e.g. [GetVersionByID]), so a read result can
 // be passed straight back to a targeted fetch.
 func (pv *PartyVersion) VersionUID() openehrclient.VersionUID {

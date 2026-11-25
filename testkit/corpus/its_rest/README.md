@@ -128,7 +128,7 @@ What `openehr/client/*` decodes today, and whether a vendored body under this di
 | Demographic: five party kinds, ORIGINAL_VERSION, REVISION_HISTORY, VERSIONED_PARTY, in canonical JSON and XML | yes | `demographic/` |
 | Demographic ITEM_TAG lists (`/demographic/tags`, `/demographic/{type}/{uid_based_id}/tags`) | yes | `demographic/person_tags.json`, `demographic/demographic_tags.json` |
 | EHR-side ITEM_TAG lists (`/ehr/{ehr_id}/…/tags`) | **gap** | header-carried today (REQ-059); no client for these routes yet |
-| `Identifier` write response (`{"uid": …}`, `Prefer: return=identifier`) | **gap** | decoded by `openehr/client/ehr/identifier.go` `ResolveIdentifierBody`; hand-built in tests only, e.g. `openehr/client/ehr/composition/composition_test.go`; no vendored body |
+| `Identifier` write response (`{"uid": …}`, `Prefer: return=identifier`) | **gap** | decoded by `openehr/client/identifier.go` `ResolveIdentifierBody`; hand-built in tests only, e.g. `openehr/client/ehr/composition/composition_test.go`; no vendored body |
 | Admin | n/a | `204` by contract, no bodies |
 | VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS, their REVISION_HISTORY and ORIGINAL_VERSION | **gap** | hand-built in `openehr/client/ehr/composition/versioned_test.go`, `openehr/client/ehr/ehrstatus/versioned_test.go` and PROBE-109's harness (`testkit/probes/versioned/probes_test.go`); no vendored body |
 | Error envelopes | yes | `errors/` |

@@ -8,8 +8,9 @@ import (
 	"uuid"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -124,7 +125,7 @@ func generatedUploadEntry(short string, optBody []byte) probe.Entry {
 // per-run EHR, then reads the committed version back. The read-back skips
 // when the save committed nothing, and passes only when the CDR returns the
 // composition under templateID.
-func generatedCommitEntries(id openehrclient.EHRID, short, templateID string, policy instance.Policy, comp *rm.Composition) []probe.Entry {
+func generatedCommitEntries(id ehr.EHRID, short, templateID string, policy instance.Policy, comp *rm.Composition) []probe.Entry {
 	live := []probe.Mode{probe.ModeLive}
 	suffix := strings.ToUpper(short) + "-" + strings.ToUpper(policy.String())
 	out := &committedVersion{}
@@ -189,7 +190,7 @@ func generatedCommitEntries(id openehrclient.EHRID, short, templateID string, po
 // RM floor (REQ-107 Output) before anything goes live, so a Live failure is
 // the CDR refusing what the SDK holds valid.
 func TestLiveGeneratedCommit_REQ107_REQ082(t *testing.T) {
-	id := openehrclient.EHRID(uuid.NewV4().String())
+	id := ehr.EHRID(uuid.NewV4().String())
 	runID := strings.ReplaceAll(string(id), "-", "")
 	t.Logf("per-run EHR id %s", id)
 

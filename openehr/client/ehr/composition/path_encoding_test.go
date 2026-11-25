@@ -10,7 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 )
 
@@ -23,7 +24,7 @@ func TestGetPathSingleEncoded(t *testing.T) {
 	}))
 	defer srv.Close()
 	_, _, _ = composition.Get(t.Context(), newClient(t, srv),
-		openehrclient.EHRID("ehr id with space"),
+		ehr.EHRID("ehr id with space"),
 		openehrclient.LatestOf(openehrclient.VersionedObjectID("bp.v1")))
 	if !strings.Contains(decoded, "/ehr/ehr id with space/composition/") {
 		t.Errorf("server-decoded path = %q, want the raw spaced ehr_id segment", decoded)

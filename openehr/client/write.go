@@ -1,4 +1,4 @@
-package ehr
+package client
 
 import (
 	"context"
@@ -91,8 +91,18 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 // T instantiates as an interface for demographic ([rm.Party]). That is
 // safe because the zero value of an interface type is a true nil, the
 // same pattern typereg.DecodeAs[T] relies on, and needs no reflection.
+//
+// A representation write with a nil decode fails with an error wrapping
+// [transport.ErrInvalidConfig] before any request; the other Prefer values
+// never call decode, so they accept a nil one.
 func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport.Request, label string, decode func([]byte) (T, error)) (T, *VersionMetadata, error) {
 	var zero T
+	// REQ-025 (idiom.md § No panics): the representation arm calls decode
+	// after the server has committed the write, so a nil one would panic
+	// with the commit's outcome lost; refuse it before sending anything.
+	if req != nil && req.Prefer == transport.PreferRepresentation && decode == nil {
+		return zero, nil, fmt.Errorf("%s: %w: nil decode for a representation write", label, transport.ErrInvalidConfig)
+	}
 	resp, err := c.Do(ctx, req)
 	if err != nil {
 		if resp != nil {
@@ -151,18 +161,19 @@ type NoRepresentationError struct {
 }
 
 // Error names the classification only: never Cause text, never a
-// payload-derived value.
+// payload-derived value. A nil receiver answers "client: no
+// representation".
 func (e *NoRepresentationError) Error() string {
 	if e == nil {
-		return "ehr: no representation"
+		return "client: no representation"
 	}
 	if errors.Is(e.Cause, transport.ErrInvalidShape) {
-		return "ehr: committed write has no usable representation (empty or null body)"
+		return "client: committed write has no usable representation (empty or null body)"
 	}
 	if e.Cause != nil {
-		return "ehr: committed write has no usable representation (decode failed)"
+		return "client: committed write has no usable representation (decode failed)"
 	}
-	return "ehr: committed write has no usable representation"
+	return "client: committed write has no usable representation"
 }
 
 // Unwrap exposes Cause so errors.Is/As reach the wrapped sentinel or decode
