@@ -11,6 +11,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -94,13 +95,16 @@ func genericParamComposition() *rm.Composition {
 // as the element's first attribute, whether the Go instantiation is an
 // interface (ORIGINAL_VERSION<PARTY>, ORIGINAL_VERSION<any>, Proper_interval
 // of DV_ORDERED) or the class itself (ORIGINAL_VERSION<COMPOSITION>,
-// Point_interval of DV_QUANTITY), and the value decodes back, strictly, to
-// the same canonical JSON. A primitive value is written as its text, with no
+// Point_interval of DV_QUANTITY), and whether an interface holds the value
+// through a pointer or by value, and the value decodes back, strictly, to the
+// same canonical JSON. A primitive value is written as its text, with no
 // `xsi:type`.
 //
 // Can-fail control: before the encoder wrote `xsi:type` there, the
 // interface instantiations failed to decode with typereg.ErrMissingType and
-// the concrete ones were written with no `xsi:type`.
+// the concrete ones were written with no `xsi:type`; before it wrote a class
+// value an interface holds by value through canxml.EncodePoly, encoding/xml
+// wrote that value's Go field names, which the decoder refuses.
 func TestREQ056_XMLGenericParamClassValueRoundTrips(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -119,6 +123,20 @@ func TestREQ056_XMLGenericParamClassValueRoundTrips(t *testing.T) {
 		{
 			name:  "ORIGINAL_VERSION<any> holding a PERSON",
 			value: originalVersionOf[any](genericParamPerson()),
+			fresh: func() any { return new(rm.OriginalVersion[any]) },
+			elem:  "data",
+			want:  "PERSON",
+		},
+		{
+			name:  "ORIGINAL_VERSION<PARTY> holding a PERSON by value",
+			value: originalVersionOf[rm.Party](*genericParamPerson()),
+			fresh: func() any { return new(rm.OriginalVersion[rm.Party]) },
+			elem:  "data",
+			want:  "PERSON",
+		},
+		{
+			name:  "ORIGINAL_VERSION<any> holding a PERSON by value",
+			value: originalVersionOf[any](*genericParamPerson()),
 			fresh: func() any { return new(rm.OriginalVersion[any]) },
 			elem:  "data",
 			want:  "PERSON",
@@ -203,6 +221,62 @@ func TestREQ056_XMLGenericParamClassValueRoundTrips(t *testing.T) {
 			}
 			if !bytes.Equal(gotJSON, wantJSON) {
 				t.Errorf("XML round trip of %T:\n got %s\nwant %s\nwire: %s", tc.value, gotJSON, wantJSON, b)
+			}
+		})
+	}
+}
+
+// genericParamNotAClass is a Go struct that is no openEHR class, held where a
+// member typed by an open generic parameter is instantiated with an
+// interface.
+type genericParamNotAClass struct {
+	Note string
+}
+
+// TestREQ056_XMLGenericParamRefusesUnknownValue pins that a member typed by
+// an open generic parameter instantiated with an interface refuses a value
+// that is neither a registered class nor a primitive, which the decoder could
+// not read back by its `xsi:type`. canxml.Marshal fails with
+// canxml.ErrInvalidShape, naming the member and the Go type it holds and
+// never the value.
+//
+// Can-fail control: before the encoder refused such a value, encoding/xml
+// wrote its Go field names and the value's text, with no error.
+func TestREQ056_XMLGenericParamRefusesUnknownValue(t *testing.T) {
+	const secret = "note-7f3a-not-for-errors"
+	cases := []struct {
+		name   string
+		value  any
+		member string
+	}{
+		{
+			name:   "ORIGINAL_VERSION<any>",
+			value:  originalVersionOf[any](genericParamNotAClass{Note: secret}),
+			member: "ORIGINAL_VERSION.data",
+		},
+		{
+			name: "Proper_interval of any",
+			value: &rm.ProperInterval[any]{
+				Lower: genericParamNotAClass{Note: secret}, LowerIncluded: true,
+				UpperUnbounded: true,
+			},
+			member: "Proper_interval.lower",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			b, err := canxml.Marshal(tc.value)
+			if !errors.Is(err, canxml.ErrInvalidShape) {
+				t.Fatalf("canxml.Marshal(%T) = %v; want an error wrapping canxml.ErrInvalidShape:\n%s", tc.value, err, b)
+			}
+			msg := err.Error()
+			for _, want := range []string{tc.member, "genericParamNotAClass"} {
+				if !strings.Contains(msg, want) {
+					t.Errorf("canxml.Marshal(%T) error %q does not name %q", tc.value, msg, want)
+				}
+			}
+			if strings.Contains(msg, secret) {
+				t.Errorf("canxml.Marshal(%T) error %q carries the value it refused", tc.value, msg)
 			}
 		})
 	}
