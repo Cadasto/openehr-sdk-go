@@ -170,9 +170,9 @@ AQL, all without going near the network.
 :material-api:
 
 ### REST client
-The REST client packages cover EHR, composition, query, and definition. Point
-them at the in-process mock the examples use, or at a live openEHR REST
-deployment.
+The REST client packages cover EHR, composition, query, definition, and
+demographic. Point them at the in-process mock the examples use, or at a live
+openEHR REST deployment.
 
 [Run an example](examples.md){ .md-button }
 

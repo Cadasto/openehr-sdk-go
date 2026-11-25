@@ -125,6 +125,7 @@ call made through `sandbox.Backend` as the transport, see
 | [Build a Contribution](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/contribution-build) | `contribution-build` | In-process fake, with `-commit` | Fluent `Contribution_create` assembly |
 | [Manage a template on the server](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/definition-lifecycle) | `definition-lifecycle` | In-process fake | Upload, list, download and compile a template |
 | [Save, read and update a Composition](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/composition-crud) | `composition-crud` | In-process fake | Optimistic concurrency with `If-Match`; a stale update refused |
+| [Create, read and update a PERSON](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/demographic-crud) | `demographic-crud` | In-process fake | A PERSON in canonical JSON and XML, item tags, an earlier version read back |
 | [Execute an AQL query](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/query-execute) | `query-execute` | In-process fake | Bound parameters, RESULT_SET cells as typed values, a refused query |
 | [Run a SMART PKCE launch](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/smart-launch) | `smart-launch` | In-process fake | Standalone PKCE launch; state and verifier persistence |
 | [Authenticate a backend service](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/service-auth) | `service-auth` | In-process fake | OAuth 2.0 client credentials; the cached token reused |
