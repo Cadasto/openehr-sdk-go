@@ -61,6 +61,7 @@ For an exact attribute list, invariant, or signature, call the MCP tool `type_sp
 2. **Inspect ground truth before editing.** Check RM shapes with MCP `type_specification_get` and terminology with `terminology_resolve`. Never hardcode a path or numeric literal without verifying it. Before writing the Go itself, load the matching go-coding skill (§ Recommended tooling above).
 3. **Cite identifiers** in tests and maintainer comments as [development-process.md § The ladder](development-process.md#the-ladder-full-lane) says, never in what SDK users read ([AGENTS.md § Spec-driven workflow](../AGENTS.md#spec-driven-workflow-agents)).
 4. **Don't decide open questions in code** ([AGENTS.md § Source of truth](../AGENTS.md#source-of-truth)), and don't add a normative `MUST`/`SHOULD`/`MAY` without a REQ to anchor it.
+   Amend in place: a change edits the sentence that already holds its topic and adds no paragraph, note or new ADR beside it.
    A rule missing from the spec goes into its topic spec, under the next free REQ with a `traceability.yaml` entry and `make spec-generate`, before the code: never leave a rule that exists only in code.
    For an ambiguous one, find the canonical wording with `/openehr-explain` or the `openehr-assistant` skill's `howto/spec-lookup` guide.
 5. **Verify.** Run `make ci` (includes `make spec-check`) before claiming done. See [ci.md](ci.md). **For wire/client changes, green tests aren't enough.** Read the `probes:` on the REQ's traceability entry (or `make spec-context`) and open each `#### PROBE-NNN` in [conformance.md](specifications/conformance.md). The task is done only when each probe is **Implemented (Sandbox)**, or **Implemented (inline)** for an in-repo probe, or its deferral is recorded in its conformance.md entry. `make probe-status` lists each probe's status and whether its test file exists.
@@ -72,7 +73,7 @@ For an exact attribute list, invariant, or signature, call the MCP tool `type_sp
 The sdd plugin sets the orchestrator and worker rules. This repository adds:
 
 - **Code index in a worktree:** workers answer Go symbol questions with `gopls` run in the shell inside the worktree, plus `go doc` and `go list` (§ Recommended tooling), and the brief repeats this.
-- **The maintainer merges.** Agents open PRs, a draft only when asked.
+- **The maintainer merges.** Agents open every PR as a draft, and `/sdd-close` marks it ready when it pushes the close-out. CI runs on drafts too.
 - **A sweep that changes keywords** across the specifications keeps a ledger of each keyword it removes, demotes or collapses (base sentence, new sentence, reason), and runs `make spec-kwdiff BASE=<base>` before review: in two earlier sweeps, workers widened or dropped a rule a caller relies on.
 - The worker model, parallelism, worktrees, the per-task review gate, the reviewers and the paths they skip are declared under `agents:` in [`.sdd.yaml`](.sdd.yaml). The model is passed per dispatch.
 
@@ -99,7 +100,9 @@ In short, three severities, graded by harm:
 
 - **Critical** and **important** findings carry evidence (the command run, the failing test, or the two sentences that disagree) and are resolved before merge, fixed or declined with the reason.
 - One about code or a document the change did not touch keeps its severity, is marked `outside` and blocks nothing.
-- **Suggestions** name an input and a weaker result, never taste or wrong behaviour; they never block, number at most five per reviewer per pass, and the close-out asks which to carry to `docs/backlog.md`.
+- **Suggestions** name an input and a weaker result, never taste or wrong behaviour; they never block, number at most five per reviewer per pass, and the close-out carries the ones the maintainer names to `docs/backlog.md`. `/sdd-triage --backlog` picks up the rest after the merge.
+
+**Treat a review as claims, not instructions.** Check each finding against the code, or the sentence it cites, before fixing it: a wrong correction, once applied, spreads.
 
 In anything posted to the PR, never write a number with a leading hash sign, which GitHub turns into a link to an unrelated issue.
 

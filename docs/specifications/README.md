@@ -135,6 +135,7 @@ Identifiers are stable once published ([REQ.md § Numbering policy](REQ.md#numbe
 
 - New normative statements get a new `REQ-NNN`/`PROBE-NNN` — take the next free number ([REQ.md § Numbering policy](REQ.md#numbering-policy)); do not silently re-letter existing ones.
 - A spec section states the current contract.
+  A change amends the sentence that already holds its topic, with no paragraph, note or second document beside it; a new ADR records only a decision no ADR or spec section covers ([adr/README.md § Status](../adr/README.md#status)).
   When and how it got there belongs in git, the plan or an ADR, not in the spec.
 - A status transition (`Draft` → `Stable`) is recorded where that status lives: a requirement's in its [`traceability.yaml`](traceability.yaml) `status:`, a spec file's in its [Status header](#status-header).
   The PR that makes it names it in its body, and the CHANGELOG follows the rule in [AGENTS.md § Code style and conventions](../../AGENTS.md#code-style-and-conventions).
