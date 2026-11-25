@@ -42,12 +42,28 @@ func (i *Interval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		return err
 	}
 	if !omitIntervalBound(i.LowerUnbounded, i.Lower) {
-		if err := _e.EncodeElement(&i.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
+		if _c, _ok := any(&i.Lower).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
+				return err
+			}
+		} else if _c, _ok = any(i.Lower).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
+				return err
+			}
+		} else if err := _e.EncodeElement(&i.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
 			return err
 		}
 	}
 	if !omitIntervalBound(i.UpperUnbounded, i.Upper) {
-		if err := _e.EncodeElement(&i.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
+		if _c, _ok := any(&i.Upper).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
+				return err
+			}
+		} else if _c, _ok = any(i.Upper).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
+				return err
+			}
+		} else if err := _e.EncodeElement(&i.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
 			return err
 		}
 	}
@@ -93,12 +109,28 @@ func (p *PointInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) 
 		return err
 	}
 	if !omitIntervalBound(p.LowerUnbounded, p.Lower) {
-		if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
+		if _c, _ok := any(&p.Lower).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
+				return err
+			}
+		} else if _c, _ok = any(p.Lower).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
+				return err
+			}
+		} else if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
 			return err
 		}
 	}
 	if !omitIntervalBound(p.UpperUnbounded, p.Upper) {
-		if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
+		if _c, _ok := any(&p.Upper).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
+				return err
+			}
+		} else if _c, _ok = any(p.Upper).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
+				return err
+			}
+		} else if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
 			return err
 		}
 	}
@@ -144,12 +176,28 @@ func (p *ProperInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 		return err
 	}
 	if !omitIntervalBound(p.LowerUnbounded, p.Lower) {
-		if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
+		if _c, _ok := any(&p.Lower).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
+				return err
+			}
+		} else if _c, _ok = any(p.Lower).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
+				return err
+			}
+		} else if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
 			return err
 		}
 	}
 	if !omitIntervalBound(p.UpperUnbounded, p.Upper) {
-		if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
+		if _c, _ok := any(&p.Upper).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
+				return err
+			}
+		} else if _c, _ok = any(p.Upper).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
+				return err
+			}
+		} else if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
 			return err
 		}
 	}

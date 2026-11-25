@@ -136,7 +136,15 @@ func (o *OriginalVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 		return err
 	}
 	if o.Data != nil {
-		if err := _e.EncodeElement(o.Data, xml.StartElement{Name: xml.Name{Local: "data"}}); err != nil {
+		if _c, _ok := any(o.Data).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "data", _c); err != nil {
+				return err
+			}
+		} else if _c, _ok = any(*o.Data).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "data", _c); err != nil {
+				return err
+			}
+		} else if err := _e.EncodeElement(o.Data, xml.StartElement{Name: xml.Name{Local: "data"}}); err != nil {
 			return err
 		}
 	}
