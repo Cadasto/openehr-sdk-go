@@ -348,6 +348,12 @@ type Repository interface {
 	GetVersion(ctx context.Context, voUID openehrclient.VersionedObjectID) (*PartyVersion, *openehrclient.VersionMetadata, error)
 	GetVersionAtTime(ctx context.Context, voUID openehrclient.VersionedObjectID, t time.Time) (*PartyVersion, *openehrclient.VersionMetadata, error)
 	GetVersionByID(ctx context.Context, voUID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID) (*PartyVersion, *openehrclient.VersionMetadata, error)
+
+	// ITEM_TAG routes.
+	GetTags(ctx context.Context, t Type, target openehrclient.Ref) ([]openehrclient.StoredItemTag, error)
+	SetTags(ctx context.Context, t Type, target openehrclient.Ref, tags []openehrclient.ItemTag, opts ...SetTagsOption) ([]openehrclient.StoredItemTag, error)
+	DeleteTag(ctx context.Context, t Type, target openehrclient.Ref, key string) error
+	ListTags(ctx context.Context, opts ...ListTagsOption) ([]openehrclient.StoredItemTag, error)
 }
 
 // NewRepository binds c to a Repository.

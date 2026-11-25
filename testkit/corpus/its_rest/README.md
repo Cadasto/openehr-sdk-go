@@ -24,7 +24,7 @@ Pinned: the ITS-REST `Release-1.1.0` tag, commit `24058992d5fa96e8dfbd855d9c133f
 | `ehr/` | openEHR REST EHR API read-path responses (EHR, EHR_STATUS, Folder) | `openehr/client/ehr/`, `.../ehrstatus`, `.../directory` tests |
 | `definition/` | openEHR REST Definition API responses (ADL 1.4 OPT + metadata) | `openehr/client/definition/` tests |
 | `query/` | openEHR REST Query API RESULT_SET response | `openehr/client/query/` tests read `result_set.json` |
-| `demographic/` | openEHR REST Demographic API PARTY CRUD + VERSIONED_PARTY responses | `openehr/client/demographic/` tests read the party files |
+| `demographic/` | openEHR REST Demographic API PARTY CRUD, VERSIONED_PARTY and ITEM_TAG list responses | `openehr/client/demographic/` tests read the party and tag files; `openehr/client/ehr/` tests decode `demographic_tags.json` |
 
 Tests exercise Composition GET responses (Phase 3 reads) against the canonical-JSON fixtures vendored under [`../compositions/`](../compositions/) and [`../rm/`](../rm/). Those carry full COMPOSITION shapes and are reused here instead of being duplicated. Resolve paths via [`../../fixtures/`](../../fixtures/). ADL 2 source-form templates are **deferred** until their leaf client lands; the [roadmap](../../../docs/roadmap.md) tracks it as Deferred. AQL already has a vendored RESULT_SET body (`query/result_set.json`). Stored-query metadata bodies are a separate gap, named in the Coverage table below: their client has already landed, so it is not a leaf-client deferral.
 
@@ -94,7 +94,7 @@ Hand-crafted to the ITS-REST OpenAPI result-set example shape (`meta._type: "RES
 
 ### `demographic/`
 
-Hand-crafted to the ITS-REST OpenAPI shape for the five DEMOGRAPHIC party kinds plus their VERSIONED_PARTY read-path bodies. Landed 2026-06-16 with the demographic PARTY CRUD client (commit `8338271`).
+Hand-crafted to the ITS-REST OpenAPI shape for the five DEMOGRAPHIC party kinds plus their VERSIONED_PARTY read-path bodies. Landed 2026-06-16 with the demographic PARTY CRUD client (commit `8338271`). The two ITEM_TAG lists follow the pinned `ItemTagOfPerson` example (`owner_id` a `SYSTEM` reference) and landed with the demographic tags calls.
 
 | File | Notes |
 |---|---|
@@ -106,6 +106,8 @@ Hand-crafted to the ITS-REST OpenAPI shape for the five DEMOGRAPHIC party kinds 
 | `original_version.json` | `ORIGINAL_VERSION` wrapping a `PERSON`, with `preceding_version_uid`, `lifecycle_state`, `commit_audit`, and `contribution` `OBJECT_REF`. |
 | `revision_history.json` | `REVISION_HISTORY` with one `REVISION_HISTORY_ITEM`. |
 | `versioned_party.json` | `VERSIONED_PARTY` root (`uid`, `owner_id`, `time_created`). |
+| `person_tags.json` | ITEM_TAG list of one PERSON version (`GET` or `PUT …/person/{uid_based_id}/tags`): a tag with a value on the whole target, and one with no value on a `target_path`. |
+| `demographic_tags.json` | ITEM_TAG list from `GET /demographic/tags?tag_key=flag`: a PERSON versioned party, an ORGANISATION version and an AGENT versioned party, told apart by `target.type`. |
 
 ## Coverage against the client surface
 
@@ -122,7 +124,8 @@ What `openehr/client/*` decodes today, and whether a vendored body under this di
 | Definition: stored-query metadata and list | **gap** | hand-built in `openehr/client/definition/stored_query_test.go`; no vendored `StoredQueryMetadata` body |
 | Query: RESULT_SET | yes | `query/result_set.json` |
 | Demographic: five party kinds, ORIGINAL_VERSION, REVISION_HISTORY | yes | `demographic/` |
-| ITEM_TAG | **gap** | header-carried today (REQ-059 `partial`); no tag bodies until the dedicated endpoints land |
+| Demographic ITEM_TAG lists (`/demographic/tags`, `/demographic/{type}/{uid_based_id}/tags`) | yes | `demographic/person_tags.json`, `demographic/demographic_tags.json` |
+| EHR-side ITEM_TAG lists (`/ehr/{ehr_id}/…/tags`) | **gap** | header-carried today (REQ-059); no client for these routes yet |
 | `Identifier` write response (`{"uid": …}`, `Prefer: return=identifier`) | **gap** | decoded by `openehr/client/ehr/identifier.go` `ResolveIdentifierBody`; hand-built in tests only, e.g. `openehr/client/ehr/composition/composition_test.go`; no vendored body |
 | Admin | n/a | `204` by contract, no bodies |
 | VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS, their REVISION_HISTORY and ORIGINAL_VERSION | **gap** | hand-built in `openehr/client/ehr/composition/versioned_test.go`, `openehr/client/ehr/ehrstatus/versioned_test.go` and PROBE-109's harness (`testkit/probes/versioned/probes_test.go`); no vendored body |

@@ -306,6 +306,7 @@ requirements:
     tests:
       - openehr/client/definition/stored_query_test.go
       - openehr/client/demographic/party_test.go
+      - openehr/client/demographic/tags_test.go
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
@@ -716,6 +717,7 @@ requirements:
     probes: [PROBE-062]
     tests:
       - openehr/client/demographic/party_test.go
+      - openehr/client/demographic/tags_test.go
       - openehr/client/ehr/audit_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go
@@ -1140,6 +1142,7 @@ requirements:
     probes: [PROBE-061, PROBE-065, PROBE-071]
     tests:
       - openehr/client/demographic/party_test.go
+      - openehr/client/demographic/tags_test.go
       - openehr/client/ehr/composition/body_read_error_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/decode_error_test.go
@@ -2081,6 +2084,7 @@ requirements:
     probes: [PROBE-091]
     tests:
       - openehr/client/definition/path_encoding_test.go
+      - openehr/client/demographic/tags_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/path_encoding_test.go
       - openehr/client/ehr/composition/versioned_test.go
@@ -2114,6 +2118,7 @@ requirements:
       - openehr/client/demographic/body_read_error_test.go
       - openehr/client/demographic/decode_error_test.go
       - openehr/client/demographic/null_body_test.go
+      - openehr/client/demographic/tags_test.go
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/composition/body_read_error_test.go
       - openehr/client/ehr/composition/decode_error_test.go
