@@ -51,3 +51,20 @@ func TestEffectivePropertiesCyclicAncestors(t *testing.T) {
 	_ = attrs
 	_ = order
 }
+
+// TestPropToAttrGenericPropertyWithoutTypeDef pins the fallback
+// genericRootType documents: a generic property with no type definition
+// reports "Any". The loader refuses such a property, but a hand-built plan
+// can carry one, and the nil definition reaches genericRootType as a
+// non-nil interface holding a nil pointer.
+func TestPropToAttrGenericPropertyWithoutTypeDef(t *testing.T) {
+	p := &bmm.GenericProperty{}
+	p.Name = "untyped"
+	attr, ok := propToAttr(p)
+	if !ok {
+		t.Fatal("propToAttr(GenericProperty with nil TypeDef): ok = false, want true")
+	}
+	if attr.typeName != "Any" {
+		t.Errorf("propToAttr(GenericProperty with nil TypeDef).typeName = %q, want %q", attr.typeName, "Any")
+	}
+}

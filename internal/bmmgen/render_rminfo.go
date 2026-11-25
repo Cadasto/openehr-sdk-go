@@ -464,15 +464,17 @@ func containerRequired(card *bmm.Cardinality, mandatory bool) bool {
 // Used by GenericProperty to expose the outer class name (e.g.
 // "INTERVAL" for an INTERVAL[DV_QUANTITY] property).
 func genericRootType(td bmm.Type) string {
-	if td == nil {
-		return "Any"
-	}
+	// A nil pointer in a non-nil interface is as missing as a nil interface:
+	// GenericProperty passes its *GenericType here unconverted.
 	switch t := td.(type) {
 	case *bmm.GenericType:
-		return t.RootType
+		if t != nil {
+			return t.RootType
+		}
 	case *bmm.SimpleType:
-		return t.TypeName
-	default:
-		return "Any"
+		if t != nil {
+			return t.TypeName
+		}
 	}
+	return "Any"
 }
