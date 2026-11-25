@@ -114,7 +114,7 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | One package, fast loop | `go test ./openehr/serialize/canjson/... -run TestName -count=1`; skips the codegen checks `make test` runs first, so `make ci` stays the gate |
 | Spec gate | `make spec-check` prints the verdict; `make sdd-check` prints every warning |
 | Regenerate spec indexes | `make spec-generate`: the map's `tests:` lists, the REQ.md registry and the ADR index |
-| Spec context bundle | `make spec-context REQ=NNN OUTLINE=1`, then `RULE=<name>` (§ Spec-driven workflow) |
+| Spec context bundle | `make spec-context REQ=NNN OUTLINE=1`, then `RULE=<name>` (§ Spec-driven workflow); `PROBE=NNN` prints one probe's catalog entry |
 | Keyword diff against a base | `make spec-kwdiff BASE=<ref>`; `CHECK=1` fails when a file's keyword counts change |
 
 **Gotchas worth the reading:**

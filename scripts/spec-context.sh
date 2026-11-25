@@ -14,10 +14,13 @@
 #                  sentence.
 #   RULE=<name>    only one rule of the canonical section, by its heading's
 #                  anchor or text, looked up inside that section; nothing else.
+# PROBE=NNN, with or without a REQ, prints one probe's catalog entry from
+# conformance.md and nothing else.
 set -euo pipefail
 
 OUTLINE="${OUTLINE:-}"
 RULE="${RULE:-}"
+PROBE="${PROBE:-}"
 # Rule mode prints the rule alone: the bundle's other sections go nowhere.
 exec 3>&1
 [[ -z "$RULE" ]] || exec 1>/dev/null
@@ -27,6 +30,23 @@ SPECS="${ROOT}/docs/specifications"
 REQ_REG="${SPECS}/REQ.md"
 YAML="${SPECS}/traceability.yaml"
 STRANDS="${SPECS}/research-strands.md"
+
+# Probe mode: one catalog entry, from its heading to the next heading of the
+# same or a higher level, outside fenced code blocks.
+if [[ -n "$PROBE" ]]; then
+  pnum="$(printf '%s' "$PROBE" | tr -cd '0-9')"
+  [[ -n "$pnum" ]] || { echo "error: no PROBE number in '$PROBE'" >&2; exit 2; }
+  pid="PROBE-$(printf '%03d' "$((10#$pnum))")"
+  entry="$(awk -v h="#### ${pid} " '
+    /^[ \t]*(```|~~~)/ { fence = !fence }
+    !fence && index($0, h) == 1 { on = 1; print; next }
+    on && !fence && /^#{1,4}[ \t]/ { exit }
+    on { print }
+  ' "${SPECS}/conformance.md")"
+  [[ -n "$entry" ]] || { echo "error: ${pid} has no entry in conformance.md" >&3; exit 1; }
+  printf '%s\n' "$entry" >&3
+  exit 0
+fi
 
 raw="${1:-}"
 [[ -n "$raw" ]] || { echo "usage: $(basename "$0") REQ-NNN (e.g. 094)" >&2; exit 2; }
@@ -63,6 +83,17 @@ block="$(awk -v id="$REQ" '
   g && /^[[:space:]]*-[[:space:]]*id:/ && $0 !~ ("id:[[:space:]]*" id "([[:space:]]|$)") { exit }
   g { print }
 ' "$YAML")"
+# The outline counts the generated tests list instead of printing it: the list
+# runs to 178 paths for the largest REQ.
+if [[ -n "$OUTLINE" && -n "$block" ]]; then
+  block="$(printf '%s\n' "$block" | awk '
+    /^[[:space:]]*tests:[[:space:]]*$/ { intests = 1; n = 0; next }
+    intests && /^[[:space:]]*-[[:space:]]/ { n++; next }
+    intests { print "    tests: " n " files (run without OUTLINE=1 for the list)"; intests = 0 }
+    { print }
+    END { if (intests) print "    tests: " n " files (run without OUTLINE=1 for the list)" }
+  ')"
+fi
 if [[ -n "$block" ]]; then printf '```yaml\n%s\n```\n' "$block"; else echo "_no traceability entry — add one (spec-check enforces coverage)_"; fi
 echo
 
@@ -270,4 +301,4 @@ echo
 
 # --- definition of done ----------------------------------------------------
 echo "---"
-echo "**Definition of done:** code + tests green **and** \`traceability.yaml\` updated and the canonical spec current. For wire/client work the \`probes:\` listed above are part of done — each must be Implemented (Sandbox), or Implemented (inline) for an in-repo probe, in [conformance.md](docs/specifications/conformance.md), or explicitly deferred in the plan."
+echo "**Definition of done:** code + tests green **and** \`traceability.yaml\` updated and the canonical spec current. For wire/client work the \`probes:\` listed above are part of done — each must be Implemented (Sandbox), or Implemented (inline) for an in-repo probe, in [conformance.md](docs/specifications/conformance.md), or explicitly deferred in the plan; \`make spec-context PROBE=NNN\` prints one entry."

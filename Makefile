@@ -84,6 +84,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 ##= REQ=094 | the requirement spec-context bundles
 ##= OUTLINE=1 | spec-context: the section's outline in place of its text
 ##= RULE=<name> | spec-context: only that rule of the section, by its anchor or heading
+##= PROBE=NNN | spec-context: one probe's catalog entry, alone
 ##= BASE=<ref> | spec-kwdiff: the commit to compare with (default origin/main)
 ##= FILES=<names> | spec-kwdiff: only these spec files, e.g. FILES="wire.md auth.md"
 ##= CHECK=1 | spec-kwdiff: fail when a file's keyword counts change
@@ -356,8 +357,8 @@ sdd-check: ## Print the SDD gate's full report, warnings included
 
 ##@ Run
 
-spec-context: ## Print the SDD context bundle of one REQ (REQ=094; OUTLINE=1 or RULE=<name> to read less)
-	@OUTLINE="$(OUTLINE)" RULE="$(RULE)" bash scripts/spec-context.sh $(REQ)
+spec-context: ## Print the SDD context bundle of one REQ (REQ=094; OUTLINE=1 or RULE=<name> to read less; PROBE=NNN for one probe)
+	@OUTLINE="$(OUTLINE)" RULE="$(RULE)" PROBE="$(PROBE)" bash scripts/spec-context.sh $(REQ)
 
 spec-kwdiff: ## Show the specs' RFC-2119 keyword changes since BASE
 	@python3 scripts/spec-kwdiff.py $(if $(filter 1,$(CHECK)),--check) "$(if $(BASE),$(BASE),origin/main)" $(FILES)
