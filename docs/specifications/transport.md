@@ -179,7 +179,7 @@ The SDK **MUST** support:
 
 Rules:
 
-- Per-call option: each write leaf exposes `WithPrefer(transport.Prefer)` (e.g. `composition.WithPrefer`) — typed enum, not a raw string.
+- Per-call option: each write leaf exposes `WithPrefer(transport.Prefer)` (e.g. `composition.WithPrefer`) — typed enum, not a raw string; `demographic.SetTags` takes it as `WithTagsPrefer`, since the package's `WithPrefer` is a PARTY-write option.
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
