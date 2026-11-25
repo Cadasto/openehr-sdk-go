@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/xml"
+	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -50,6 +51,12 @@ func (i *Interval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
 				return err
 			}
+		} else if _c, _ok = xmlOpenParamClass(i.Lower); _ok {
+			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
+				return err
+			}
+		} else if !xmlOpenParamText(&i.Lower) {
+			return fmt.Errorf("%w: Interval.lower holds %T, which is no registered class or primitive", canxml.ErrInvalidShape, i.Lower)
 		} else if err := _e.EncodeElement(&i.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
 			return err
 		}
@@ -63,6 +70,12 @@ func (i *Interval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
 				return err
 			}
+		} else if _c, _ok = xmlOpenParamClass(i.Upper); _ok {
+			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
+				return err
+			}
+		} else if !xmlOpenParamText(&i.Upper) {
+			return fmt.Errorf("%w: Interval.upper holds %T, which is no registered class or primitive", canxml.ErrInvalidShape, i.Upper)
 		} else if err := _e.EncodeElement(&i.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
 			return err
 		}
@@ -117,6 +130,12 @@ func (p *PointInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) 
 			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
 				return err
 			}
+		} else if _c, _ok = xmlOpenParamClass(p.Lower); _ok {
+			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
+				return err
+			}
+		} else if !xmlOpenParamText(&p.Lower) {
+			return fmt.Errorf("%w: Point_interval.lower holds %T, which is no registered class or primitive", canxml.ErrInvalidShape, p.Lower)
 		} else if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
 			return err
 		}
@@ -130,6 +149,12 @@ func (p *PointInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) 
 			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
 				return err
 			}
+		} else if _c, _ok = xmlOpenParamClass(p.Upper); _ok {
+			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
+				return err
+			}
+		} else if !xmlOpenParamText(&p.Upper) {
+			return fmt.Errorf("%w: Point_interval.upper holds %T, which is no registered class or primitive", canxml.ErrInvalidShape, p.Upper)
 		} else if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
 			return err
 		}
@@ -184,6 +209,12 @@ func (p *ProperInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
 				return err
 			}
+		} else if _c, _ok = xmlOpenParamClass(p.Lower); _ok {
+			if err := canxml.EncodePoly(_e, "lower", _c); err != nil {
+				return err
+			}
+		} else if !xmlOpenParamText(&p.Lower) {
+			return fmt.Errorf("%w: Proper_interval.lower holds %T, which is no registered class or primitive", canxml.ErrInvalidShape, p.Lower)
 		} else if err := _e.EncodeElement(&p.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
 			return err
 		}
@@ -197,6 +228,12 @@ func (p *ProperInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
 				return err
 			}
+		} else if _c, _ok = xmlOpenParamClass(p.Upper); _ok {
+			if err := canxml.EncodePoly(_e, "upper", _c); err != nil {
+				return err
+			}
+		} else if !xmlOpenParamText(&p.Upper) {
+			return fmt.Errorf("%w: Proper_interval.upper holds %T, which is no registered class or primitive", canxml.ErrInvalidShape, p.Upper)
 		} else if err := _e.EncodeElement(&p.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
 			return err
 		}
