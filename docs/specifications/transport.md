@@ -306,7 +306,7 @@ When the body of a 2xx response cannot be used, the SDK **MUST** report it with 
 | The body could not be read: the connection dropped mid-body, the body did not match its `Content-Encoding`, it was longer than the [§ REQ-093](#req-093--openehr-error-envelope-mapping) *Bounded response reads* ceiling, or net/http refused what followed its last byte | `*transport.BodyReadError`, in every `Prefer` mode |
 | A write that sent `Prefer: return=representation`, through the `ehr.WriteResult` family or `contribution.Commit`, got an empty body or one that does not decode as the expected resource; or `ehr.Create` got an empty body | `*ehr.NoRepresentationError`, wrapping `transport.ErrInvalidShape` for an empty body and the decoder's error otherwise |
 | Any other body that does not decode as the requested representation, `ehr.Create`'s included | `*transport.DecodeError` |
-| A read that expected a representation got an empty body: `transport.Decode` and the reads that mirror it | an error wrapping `transport.ErrInvalidShape` |
+| An empty body where a representation was expected: on a read (`transport.Decode` and the reads that mirror it), or on `demographic.SetTags` under `return=representation`, a write that commits no version | an error wrapping `transport.ErrInvalidShape` |
 
 A body that could not be read is never decoded, so the first row takes precedence over the others.
 *Empty* means zero bytes, whitespace only, or the JSON `null` literal, decided on the raw bytes before any decode by `transport.IsNoRepresentationBody`: a `null` body decodes into a struct as a no-op with no error, so a decoder that tested only the length would return an all-zero value that looks populated.
