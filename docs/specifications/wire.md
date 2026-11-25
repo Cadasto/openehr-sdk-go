@@ -95,7 +95,7 @@ The SDK **MUST** support them via **typed per-call options**, never via raw head
 
 | Header | Direction | Carries | Typed option |
 |---|---|---|---|
-| `openehr-version` | request (writes) | committed VERSION lifecycle state, as `lifecycle_state.code_string="<code>"` | `WithLifecycleState(openehrclient.LifecycleState)` on the affected write |
+| `openehr-version` | request (writes) | committed VERSION lifecycle state, as `lifecycle_state.code_string="<code>"` | `WithLifecycleState(client.LifecycleState)` on the affected write |
 | `openehr-audit-details` | request (writes) | commit-time audit envelope: committer, change-type, description, system_id | `WithAuditDetails(*rm.AuditDetails)` on the affected write (composition, directory, EHR_STATUS, demographic) |
 | `openehr-template-id` | request (composition writes) | declares the template id the payload conforms to | `composition.WithTemplateID(string)`; a FLAT or STRUCTURED write sends it by [§ REQ-173](#req-173--composition-and-party-representation-formats) |
 | `openehr-uri` | request / response | opaque openEHR resource pointer (selected endpoints) | typed on the affected method |
@@ -129,8 +129,8 @@ The Demographic API also carries ITEM_TAGs in request and response bodies, on ro
 | `DeleteTag` | `DELETE /demographic/{type}/{uid_based_id}/tags/{key}`, the key encoded as [§ REQ-150](transport.md#req-150--path-parameter-encoding-and-segment-validation) says | nothing |
 | `ListTags` | `GET /demographic/tags` with `tag_key`, `tag_value` and `tag_target_path` from `WithTagKey`, `WithTagValue` and `WithTagTargetPath`; with no option it lists every tag | the matching tags |
 
-A returned tag is an `ehr.StoredItemTag`: the key, value and target path, and `target` and `owner_id` as `OBJECT_REF`s.
-The target is an `ehr.Ref` naming a version uid or a versioned-object uid.
+A returned tag is a `client.StoredItemTag`: the key, value and target path, and `target` and `owner_id` as `OBJECT_REF`s.
+The target is a `client.Ref` naming a version uid or a versioned-object uid.
 The SDK **MUST** refuse each of these with `transport.ErrInvalidConfig` before any request:
 
 - a Ref that carries a time, since the routes take no `version_at_time`;

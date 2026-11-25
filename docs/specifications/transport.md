@@ -183,7 +183,7 @@ Rules:
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
-For the `WriteResult` family (`composition`, `directory`, `ehr_status`, `demographic`), `identifier` fills the identifier slot of `VersionMetadata` from the ITS-REST `Identifier` body (`{"uid": …}`) through `(*ehr.VersionMetadata).ResolveIdentifierBody`, after the version identifier [REQ-054](wire.md#req-054) selects.
+For the `WriteResult` family (`composition`, `directory`, `ehr_status`, `demographic`), `identifier` fills the identifier slot of `VersionMetadata` from the ITS-REST `Identifier` body (`{"uid": …}`) through `(*client.VersionMetadata).ResolveIdentifierBody`, after the version identifier [REQ-054](wire.md#req-054) selects.
 `contribution.Commit` decodes a `representation` body and never fills the identifier slot from a body.
 
 **Absent resource on a successful write.** `minimal` and `identifier` **MUST** return a nil error and a zero resource.
@@ -304,7 +304,7 @@ When the body of a 2xx response cannot be used, the SDK **MUST** report it with 
 | After a 2xx | Error |
 |---|---|
 | The body could not be read: the connection dropped mid-body, the body did not match its `Content-Encoding`, it was longer than the [§ REQ-093](#req-093--openehr-error-envelope-mapping) *Bounded response reads* ceiling, or net/http refused what followed its last byte | `*transport.BodyReadError`, in every `Prefer` mode |
-| A write that sent `Prefer: return=representation`, through the `ehr.WriteResult` family or `contribution.Commit`, got an empty body or one that does not decode as the expected resource; or `ehr.Create` got an empty body | `*ehr.NoRepresentationError`, wrapping `transport.ErrInvalidShape` for an empty body and the decoder's error otherwise |
+| A write that sent `Prefer: return=representation`, through the `client.WriteResult` family or `contribution.Commit`, got an empty body or one that does not decode as the expected resource; or `ehr.Create` got an empty body | `*client.NoRepresentationError`, wrapping `transport.ErrInvalidShape` for an empty body and the decoder's error otherwise |
 | Any other body that does not decode as the requested representation, `ehr.Create`'s included | `*transport.DecodeError` |
 | An empty body where a representation was expected: on a read (`transport.Decode` and the reads that mirror it), or on `demographic.SetTags` under `return=representation`, a write that commits no version | an error wrapping `transport.ErrInvalidShape` |
 
@@ -313,7 +313,7 @@ A body that could not be read is never decoded, so the first row takes precedenc
 
 These outcomes are their own, and the table **MUST NOT** override them:
 
-- The `Prefer: return=identifier` arm (`(*ehr.VersionMetadata).ResolveIdentifierBody`, [§ REQ-094](#req-094--prefer-response-shape-negotiation)) reports a body it cannot read as an identifier with an error wrapping `transport.ErrInvalidShape`, not a `*transport.DecodeError`.
+- The `Prefer: return=identifier` arm (`(*client.VersionMetadata).ResolveIdentifierBody`, [§ REQ-094](#req-094--prefer-response-shape-negotiation)) reports a body it cannot read as an identifier with an error wrapping `transport.ErrInvalidShape`, not a `*transport.DecodeError`.
 - On the Definition list operations, and on `GetStoredQuery`, `PutStoredQuery`, `PutStoredQueryVersion` and `UploadTemplate`, an empty body is a success: the list operations return an empty catalog ([wire.md § REQ-144](wire.md#req-144--definition-metadata-decoding) *Empty list bodies*), and the other four return metadata they build themselves with a nil error ([wire.md § REQ-057](wire.md#req-057), [§ REQ-144](wire.md#req-144--definition-metadata-decoding)).
   A non-empty body there that does not decode is still a `*transport.DecodeError`.
 - A read that answers `204 No Content` with an outcome of its own before the empty-body refusal keeps it: `composition.ErrDeletedAtTime`, and `demographic.Get`'s nil PARTY for a party deleted at the requested time.
@@ -337,12 +337,12 @@ For a body over the ceiling the message names the limit, as REQ-093 requires; th
 ### Metadata still arrives
 
 The `(*T, *Metadata, error)` triples the leaf packages return **MUST** populate `*Metadata` from the response beside each typed error in the table, and beside the `*transport.WireError` of a non-2xx response whose body could not be read, so the `ETag`, `Location` and the other headers stay available.
-A `*ehr.NoRepresentationError` **MUST** also carry that version metadata itself, `VersionUID` included when the server supplied it, so a caller needs no correlation against a separately returned value.
+A `*client.NoRepresentationError` **MUST** also carry that version metadata itself, `VersionUID` included when the server supplied it, so a caller needs no correlation against a separately returned value.
 A leaf whose return has no metadata slot returns the error alone.
 
 ### A non-2xx is never this error
 
-A response whose status is not 2xx **MUST** be reported as a `*transport.WireError`, never as an error in the table, and recovering one of `*transport.WireError`, `*transport.BodyReadError`, `*transport.DecodeError` and `*ehr.NoRepresentationError` **MUST NOT** recover another.
+A response whose status is not 2xx **MUST** be reported as a `*transport.WireError`, never as an error in the table, and recovering one of `*transport.WireError`, `*transport.BodyReadError`, `*transport.DecodeError` and `*client.NoRepresentationError` **MUST NOT** recover another.
 
 ### A body that cannot be read
 
@@ -370,7 +370,7 @@ A read failure the SDK does not recognise **MUST** count as incomplete, so an un
 ### A body that does not decode
 
 A `*transport.DecodeError` **MUST** carry the request's method and route template, and the raw response bytes in `Body` whatever the client's options ([ADR 0018](../adr/0018-raw-bytes-on-decode-error.md)), bounded only by the client's `WithMaxResponseBody` ceiling: the 64 MiB default, an explicit positive limit, or none where the caller disabled the cap with a negative value (*Bounded response reads*, [§ REQ-093](#req-093--openehr-error-envelope-mapping)).
-`Body` holds patient data for a clinical resource, so reading it is a deliberate act: `Error()` never includes it, and the type's documentation says so, as it does for `ehr.NoRepresentationError.Cause`.
+`Body` holds patient data for a clinical resource, so reading it is a deliberate act: `Error()` never includes it, and the type's documentation says so, as it does for `client.NoRepresentationError.Cause`.
 ADR 0018 settles why these bytes are attached unconditionally while REQ-093 gates the bodies of non-2xx responses.
 
 ### Scope
