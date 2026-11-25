@@ -232,10 +232,24 @@ func TestSaveSendsDottedAuditHeader(t *testing.T) {
 	}
 }
 
+// TestGetRejectsNilRef: a nil Ref, and a Ref holding a nil pointer to either
+// Ref type, fail with ErrInvalidConfig, never with a panic (REQ-025,
+// idiom.md § No panics).
 func TestGetRejectsNilRef(t *testing.T) {
-	_, _, err := composition.Get(t.Context(), nil, ehrIDFixture, nil)
-	if !errors.Is(err, transport.ErrInvalidConfig) {
-		t.Errorf("expected ErrInvalidConfig, got %v", err)
+	for _, tc := range []struct {
+		name string
+		ref  openehrclient.Ref
+	}{
+		{"nil Ref", nil},
+		{"nil *ByVersionUID", (*openehrclient.ByVersionUID)(nil)},
+		{"nil *ByVersionedObjectID", (*openehrclient.ByVersionedObjectID)(nil)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := composition.Get(t.Context(), nil, ehrIDFixture, tc.ref)
+			if !errors.Is(err, transport.ErrInvalidConfig) {
+				t.Errorf("Get(%s): err = %v, want ErrInvalidConfig", tc.name, err)
+			}
+		})
 	}
 }
 

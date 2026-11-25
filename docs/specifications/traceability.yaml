@@ -117,6 +117,7 @@ requirements:
       - openehr/aql/version_test.go
       - openehr/client/demographic/party_test.go
       - openehr/client/demographic/tags_test.go
+      - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/format_write_test.go
       - openehr/client/ehr/contribution/builder_test.go
       - openehr/client/ehr/contribution/submission_test.go
