@@ -137,6 +137,41 @@ func TestGetXMLRootNamesOtherClass(t *testing.T) {
 	}
 }
 
+// TestGetJSONTypeNamesOtherClass pins REQ-173 with REQ-151 at the
+// demographic leaf: a canonical JSON PARTY whose _type names another class
+// than the one the call names is the typed decode failure wrapping
+// typereg.ErrTypeMismatch, with the version metadata beside it and no party,
+// as an XML root of another class is.
+func TestGetJSONTypeNamesOtherClass(t *testing.T) {
+	cases := []struct {
+		name string
+		typ  demographic.Type
+		file string
+	}{
+		{name: "ORGANISATION body on a person read", typ: demographic.Person, file: "organisation.json"},
+		{name: "PERSON body on a role read", typ: demographic.Role, file: "person.json"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := newRecorder(t, http.StatusOK, mediaJSON, fixture(t, tc.file))
+			got, meta, err := demographic.Get(t.Context(), newClient(t, rec.srv), tc.typ, openehrclient.LatestOf(personVOID))
+			de, ok := errors.AsType[*transport.DecodeError](err)
+			if !ok || de == nil {
+				t.Fatalf("Get error = %v, want a *transport.DecodeError", err)
+			}
+			if !errors.Is(err, typereg.ErrTypeMismatch) {
+				t.Errorf("Get error = %v, want it to wrap %v", err, typereg.ErrTypeMismatch)
+			}
+			if got != nil {
+				t.Errorf("Get returned %T beside the error, want nil", got)
+			}
+			if meta == nil || meta.VersionUID != personVersion {
+				t.Errorf("metadata = %+v, want VersionUID %q", meta, personVersion)
+			}
+		})
+	}
+}
+
 // TestGetDecoderFollowsAskedFormat pins REQ-173: the decoder is the one the
 // caller asked for, never the one the response's Content-Type names.
 func TestGetDecoderFollowsAskedFormat(t *testing.T) {

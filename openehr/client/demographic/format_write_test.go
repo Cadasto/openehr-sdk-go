@@ -532,6 +532,35 @@ func TestWriteXMLRepresentationDecodeFailureIsCommitted(t *testing.T) {
 	}
 }
 
+// TestWriteJSONRepresentationOfAnotherClassIsCommitted pins REQ-173 with
+// REQ-151: a canonical JSON representation body whose _type names another
+// class than the one written is a committed write with an unusable
+// representation wrapping typereg.ErrTypeMismatch, carrying the version
+// metadata, never a failed write or a party of the wrong class.
+func TestWriteJSONRepresentationOfAnotherClassIsCommitted(t *testing.T) {
+	party := jsonParty(t, "person.json")
+	for _, op := range partyWriteOps {
+		t.Run(op.name, func(t *testing.T) {
+			rec := newRecorder(t, http.StatusCreated, mediaJSON, fixture(t, "organisation.json"))
+			out, meta, err := op.do(t.Context(), newClient(t, rec.srv), demographic.Person, party,
+				demographic.WithPrefer(transport.PreferRepresentation))
+			nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+			if !ok || nre == nil {
+				t.Fatalf("%s error = %v, want *NoRepresentationError", op.name, err)
+			}
+			if !errors.Is(err, typereg.ErrTypeMismatch) {
+				t.Errorf("%s error = %v, want it to wrap %v", op.name, err, typereg.ErrTypeMismatch)
+			}
+			if out != nil {
+				t.Errorf("returned party = %T, want nil", out)
+			}
+			if meta == nil || meta.VersionUID != personVersion || nre.Meta == nil {
+				t.Errorf("version metadata = %+v (error carries %+v), want VersionUID %q", meta, nre.Meta, personVersion)
+			}
+		})
+	}
+}
+
 // TestWriteXMLRootTypeOfTheClassIsAccepted pins that a root xsi:type naming
 // the class written is read as that class.
 func TestWriteXMLRootTypeOfTheClassIsAccepted(t *testing.T) {

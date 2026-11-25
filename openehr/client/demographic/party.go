@@ -9,7 +9,6 @@ import (
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -66,7 +65,8 @@ func basePath(t Type) string { return "/demographic/" + string(t) }
 // year outside 0000-9999 fails with [transport.ErrInvalidConfig] before any
 // request, since RFC 3339 cannot write it. The returned value is the
 // concrete type ([*rm.Person] etc.) behind the [rm.Party] interface, decoded
-// polymorphically by its `_type` discriminator.
+// polymorphically by its `_type` discriminator; a `_type` naming a class
+// other than t's does not decode.
 //
 // With no option, Get asks for canonical JSON and decodes it.
 // [WithGetFormat] asks for canonical XML instead, and decodes the body as
@@ -346,16 +346,6 @@ func getParty(ctx context.Context, c *transport.Client, req *transport.Request, 
 		})
 	}
 	return party, meta, nil
-}
-
-// decodeParty decodes a Prefer=representation write response
-// polymorphically via the type registry (REQ-040).
-func decodeParty(body []byte) (rm.Party, error) {
-	party, err := typereg.DecodeAs[rm.Party](body)
-	if err != nil {
-		return nil, fmt.Errorf("demographic: decode PARTY body: %w", err)
-	}
-	return party, nil
 }
 
 // Repository mirrors the package-level functions as a dependency-injection

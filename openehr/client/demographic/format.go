@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -123,15 +124,26 @@ func (f Format) marshal(party rm.Party) ([]byte, error) {
 	}
 }
 
-// decodeParty decodes body, a bare PARTY, in f. Canonical JSON decodes the
-// class its `_type` names; canonical XML decodes the class t names, and
-// refuses a root element whose xsi:type names another. The codec's error is
-// returned unwrapped. Callers refuse a format outside the two with valid
-// first, so the default arm is unreachable.
+// decodeParty decodes body, a bare PARTY, as the class t names, in f.
+// Canonical JSON decodes the class its `_type` names and refuses one other
+// than t's; canonical XML decodes t's class and refuses a root element whose
+// xsi:type names another. The codec's error is returned unwrapped. Callers
+// refuse a format outside the two with valid first, so the default arm is
+// unreachable.
 func (f Format) decodeParty(body []byte, t Type) (rm.Party, error) {
 	switch f {
 	case FormatJSON:
-		return typereg.DecodeAs[rm.Party](body)
+		// REQ-173: the class the call names decides in canonical JSON as in
+		// XML; a `_type` naming another PARTY class is a decode failure
+		// (REQ-151), never a silent decode of the wrong class.
+		party, err := typereg.DecodeAs[rm.Party](body)
+		if err != nil {
+			return nil, err
+		}
+		if got, _ := resourceType(party); got != t {
+			return nil, fmt.Errorf("demographic: the body's _type names %T, not the %s the call names: %w", party, strings.ToUpper(string(t)), typereg.ErrTypeMismatch)
+		}
+		return party, nil
 	case FormatXML:
 		party := newParty(t)
 		if party == nil {
@@ -294,19 +306,16 @@ func (c *writeConfig) resolveFormat(op string, party rm.Party, t Type) (formatWr
 		body:        body,
 		contentType: f.MediaType(),
 		accept:      mediaTypeJSON, // the Identifier body is JSON
-		decode:      decodeParty,
+		decode: func(body []byte) (rm.Party, error) {
+			party, err := f.decodeParty(body, t)
+			if err != nil {
+				return nil, fmt.Errorf("demographic: decode %s PARTY body: %w", f, err)
+			}
+			return party, nil
+		},
 	}
 	if c.Prefer == transport.PreferRepresentation {
 		fw.accept = f.MediaType()
-	}
-	if f == FormatXML {
-		fw.decode = func(body []byte) (rm.Party, error) {
-			party, err := FormatXML.decodeParty(body, t)
-			if err != nil {
-				return nil, fmt.Errorf("demographic: decode XML PARTY body: %w", err)
-			}
-			return party, nil
-		}
 	}
 	return fw, nil
 }
@@ -367,11 +376,11 @@ type GetOption func(*getConfig)
 // one wins.
 //
 // The read sends f's media type as `Accept` and decodes a 200 body in f,
-// whatever `Content-Type` the server labels it with. A canonical XML body
-// is decoded as the class the read names: the [Type] given to [Get], or the
+// whatever `Content-Type` the server labels it with. The body is decoded
+// as the class the read names: the [Type] given to [Get], or the
 // VERSIONED_PARTY, REVISION_HISTORY or ORIGINAL_VERSION a versioned_party
-// read returns. A root element whose `xsi:type` names another class does
-// not decode. The PARTY inside an ORIGINAL_VERSION is decoded by the
+// read returns. A body whose `_type`, or in canonical XML whose root
+// element's `xsi:type`, names another class does not decode. The PARTY inside an ORIGINAL_VERSION is decoded by the
 // `xsi:type` of its `data` element, as canonical JSON decodes it by `_type`.
 //
 // The read fails with [transport.ErrInvalidConfig], before any request,

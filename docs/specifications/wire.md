@@ -1556,8 +1556,8 @@ On the demographic leaf `Get` and the `versioned_party` reads take `WithGetForma
   A nil `dst` **MUST** fail with `ErrInvalidConfig` before any request.
 - The decoder **MUST** be chosen by the format the caller asked for, never by the response's `Content-Type`.
   A body that does not decode **MUST** surface as the typed decode failure of [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) with the version metadata beside it, and an empty body and a `204` keep their outcomes (`ErrInvalidShape`, `ErrDeletedAtTime`) in every format.
-- Canonical XML need not name its root element's class, so the demographic leaf **MUST** decode an XML body as the class the call names: the `Type` of a PARTY read or write, or the `VERSIONED_PARTY`, `REVISION_HISTORY` or `ORIGINAL_VERSION` a `versioned_party` read returns.
-  A root element whose `xsi:type`, read as [§ REQ-056](#req-056) reads a discriminator, names another class **MUST** fail as the typed decode failure.
+- The demographic leaf **MUST** decode a body as the class the call names: the `Type` of a PARTY read or write, or the `VERSIONED_PARTY`, `REVISION_HISTORY` or `ORIGINAL_VERSION` a `versioned_party` read returns.
+  A body whose `_type`, or in canonical XML whose root element's `xsi:type` read as [§ REQ-056](#req-056) reads a discriminator, names another class **MUST** fail as the typed decode failure; canonical XML need not name its root element's class.
   The PARTY inside an `ORIGINAL_VERSION` is decoded by the `xsi:type` of its `data` element, as canonical JSON decodes it by `_type`.
 
 #### Simplified decode options
@@ -1601,7 +1601,7 @@ The form is outside the pin, so both options are off by default, and their docum
 - No request the leaf sends carries a `.schema`-suffixed media type.
 - A demographic `Create` or `Update` with `WithFormat(demographic.FormatXML)` under `PreferRepresentation` sends `Content-Type` and `Accept` `application/xml` and returns the PARTY decoded from the XML body.
   A demographic `Get` and each `versioned_party` read with `WithGetFormat(demographic.FormatXML)` send `Accept: application/xml` and decode the XML body, the version's PARTY by its `xsi:type`.
-  An XML body whose root `xsi:type` names another class than the call's fails as the typed decode failure, wrapping `typereg.ErrUnknownType` for a namespace-prefixed value such as `ns2:PERSON`.
+  An XML body whose root `xsi:type` names another class than the call's fails as the typed decode failure, wrapping `typereg.ErrUnknownType` for a namespace-prefixed value such as `ns2:PERSON`; a JSON PARTY whose `_type` does fails wrapping `typereg.ErrTypeMismatch`.
 - A demographic write of a PARTY canonical JSON refuses, such as one holding a NaN magnitude, fails with a `*demographic.EncodeError` and issues no request.
 
 Out of scope: the raw body of a write's response, the other EHR leaves and the contribution envelope's inner payloads ([§ REQ-174](#req-174--versioned-object-reads) keeps the contribution read in canonical JSON), and sending the deprecated `.schema`-suffixed media types.

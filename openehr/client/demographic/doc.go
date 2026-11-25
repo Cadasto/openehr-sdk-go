@@ -11,7 +11,8 @@
 // first argument, functional options, typed transport errors, and If-Match /
 // ETag optimistic concurrency on writes. Reads decode the bare PARTY body
 // polymorphically by its `_type` discriminator via the type registry,
-// returning the concrete type behind the [rm.Party] interface.
+// returning the concrete type behind the [rm.Party] interface, and refuse a
+// `_type` naming a class other than the one the call names.
 //
 // The read-only `versioned_party` family ([GetVersionedParty],
 // [GetRevisionHistory], and [GetVersion] / [GetVersionAtTime] /
