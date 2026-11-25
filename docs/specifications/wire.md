@@ -120,7 +120,7 @@ A caller-supplied value with an embedded CR or LF is a caller error, not somethi
 #### ITEM_TAG resource routes
 
 The Demographic API also carries ITEM_TAGs in request and response bodies, on routes that commit no PARTY version.
-`openehr/client/demographic` **MUST** expose one call per operation, each taking the PARTY type as `Get` does:
+`openehr/client/demographic` **MUST** expose one call per operation, each but `ListTags` taking the PARTY type as `Get` does:
 
 | Call | Request | Returns |
 |---|---|---|
