@@ -244,6 +244,7 @@ func TestGetRejectsNilRef(t *testing.T) {
 		{"nil Ref", nil},
 		{"nil *ByVersionUID", (*openehrclient.ByVersionUID)(nil)},
 		{"nil *ByVersionedObjectID", (*openehrclient.ByVersionedObjectID)(nil)},
+		{"type embedding a nil *ByVersionUID", struct{ *openehrclient.ByVersionUID }{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, err := composition.Get(t.Context(), nil, ehrIDFixture, tc.ref)

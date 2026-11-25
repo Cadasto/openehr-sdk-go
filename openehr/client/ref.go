@@ -12,10 +12,10 @@ import (
 // latest version of the named family) and [ByVersionUID] (returns one
 // specific version).
 //
-// Ref is a sealed interface: only this package defines implementations
-// (the unexported isRef marker prevents external satisfaction), so
-// leaf clients cannot accidentally accept arbitrary types from
-// callers. Construct refs via [LatestOf], [LatestAtTime], or
+// Ref is a sealed interface: the unexported isRef marker keeps other
+// packages from declaring their own implementations. A caller type that
+// embeds one of the two still satisfies it, and [ValidateRef] refuses
+// such a type. Construct refs via [LatestOf], [LatestAtTime], or
 // [VersionOf].
 type Ref interface {
 	isRef()
@@ -29,8 +29,8 @@ type Ref interface {
 	Query() (key, value string)
 	// Validate reports whether the Ref can be sent. A time whose UTC year
 	// falls outside 0000-9999, which RFC 3339 cannot write, fails with
-	// [transport.ErrInvalidConfig]. The SDK's reads call it, through
-	// [ValidateRef], before any request.
+	// [transport.ErrInvalidConfig]. The SDK's reads refuse a Ref that fails
+	// it before any request.
 	Validate() error
 }
 
@@ -113,14 +113,20 @@ func VersionOf(uid VersionUID) Ref { return ByVersionUID{UID: uid} }
 
 // ValidateRef reports whether r names a target a read can send. It fails
 // with an error wrapping [transport.ErrInvalidConfig] when r is nil, holds
-// a nil *[ByVersionUID] or *[ByVersionedObjectID], or has an empty
-// [Ref.PathSegment], and otherwise returns what r.Validate returns. It
-// never panics. Every read in the SDK that takes a Ref calls it before
-// any request.
+// a nil *[ByVersionUID] or *[ByVersionedObjectID], is of any other type,
+// such as a caller struct embedding one of them, or has an empty
+// [Ref.PathSegment]; otherwise it returns what r.Validate returns. It
+// never panics. A read whose route carries the Ref's path segment calls it
+// before any request.
 func ValidateRef(r Ref) error {
+	// REQ-025 (idiom.md § No panics): a type embedding a nil pointer to one
+	// of the two satisfies Ref through the promoted marker, and calling
+	// its methods would dereference that pointer, so only the four forms
+	// this package declares pass.
 	switch v := r.(type) {
 	case nil:
 		return fmt.Errorf("%w: nil Ref", transport.ErrInvalidConfig)
+	case ByVersionUID, ByVersionedObjectID:
 	case *ByVersionUID:
 		if v == nil {
 			return fmt.Errorf("%w: nil Ref", transport.ErrInvalidConfig)
@@ -129,6 +135,8 @@ func ValidateRef(r Ref) error {
 		if v == nil {
 			return fmt.Errorf("%w: nil Ref", transport.ErrInvalidConfig)
 		}
+	default:
+		return fmt.Errorf("%w: unsupported Ref type %T", transport.ErrInvalidConfig, r)
 	}
 	if r.PathSegment() == "" {
 		return fmt.Errorf("%w: empty Ref path segment", transport.ErrInvalidConfig)

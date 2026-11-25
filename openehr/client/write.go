@@ -151,7 +151,8 @@ type NoRepresentationError struct {
 }
 
 // Error names the classification only: never Cause text, never a
-// payload-derived value.
+// payload-derived value. A nil receiver answers "client: no
+// representation".
 func (e *NoRepresentationError) Error() string {
 	if e == nil {
 		return "client: no representation"
