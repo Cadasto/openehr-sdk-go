@@ -47,6 +47,8 @@ Out-of-scope items are not gaps — they are deliberate boundaries with named ha
 | Webhooks client | Not provided. |
 | Extraction of Cadasto-platform extras (`cadasto/…`) into a separate Go module | Conditional later step driven by STRAND-08. v1 keeps everything together; the cut line ([module-layout.md § Boundary rules](module-layout.md#boundary-rules)) ensures extraction would be mechanical. |
 | Code generation from a shared contract source (OpenAPI-generated wire DTOs) | Not pursued (STRAND-02, cancelled). The SDK is hand-written; openEHR wire conformance is the probe suite. |
+| Operational templates shipped with the SDK | The generic EHR_STATUS and FOLDER templates, and demographic ones, are maintained in the [openehr-reference-content](https://github.com/Cadasto/openehr-reference-content) repository, from which a program downloads or imports them; the SDK vendors them only as test fixtures under `testkit/corpus/reference/` ([testkit/corpus/README.md](../../testkit/corpus/README.md)). |
+| Parity with another openEHR SDK | Not checked. Wire output is checked against the openEHR specification by the [probe catalog](conformance.md#probe-catalog), and the Go surface follows [idiom.md § Surface shape](idiom.md#surface-shape). |
 | Template-specific generated structs (e.g. a typed Go struct for a vital-signs OPT) | Belongs in the consuming project; the generic OPT-driven builder lives in `openehr/composition`. |
 | Connection-pooling, transport-level TLS, proxy config | Owned by the consumer's injected `*http.Client` (REQ-021); SDK does not allocate transports. |
 | Multi-tenant routing, per-tenant credential storage | A consumer concern. The SDK exposes per-call auth via `TokenSource`; storage and selection of credentials is application-side. |

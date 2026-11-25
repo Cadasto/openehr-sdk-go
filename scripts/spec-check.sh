@@ -105,15 +105,11 @@ flush_req() {
   if [[ -n "$current_status" && ! "$current_status" =~ ^(draft|stable|deprecated)$ ]]; then
     die "$current_id: invalid status '$current_status' (expected draft|stable|deprecated — implementation status is a separate field)"
   fi
-  # Out-of-vocabulary implementation values must fail loudly: an unmatched
-  # value used to leave the row's implementation empty, silently skipping
-  # every artefact check below (the REQ-116 'proposed' hole).
-  if [[ -n "$current_impl" && ! "$current_impl" =~ ^(landed|partial|planned|retired)$ ]]; then
-    die "$current_id: invalid implementation '$current_impl' (expected landed|partial|planned|retired)"
-  fi
-  # A withdrawn requirement is retired, and only a deprecated one can be.
-  if [[ "$current_impl" == "retired" && "$current_status" != "deprecated" ]]; then
-    die "$current_id: implementation retired needs status: deprecated (found '${current_status}')"
+  # An out-of-vocabulary implementation value fails loudly: an unmatched one
+  # would leave the row's implementation empty and skip every artefact check
+  # below. A retired requirement has no row at all.
+  if [[ -n "$current_impl" && ! "$current_impl" =~ ^(landed|partial|planned)$ ]]; then
+    die "$current_id: invalid implementation '$current_impl' (expected landed|partial|planned; a retired requirement has no row, its entry is in retired-requirements.md)"
   fi
   if [[ "$current_impl" == "landed" || "$current_impl" == "partial" ]]; then
     if [[ ${#pkg_paths[@]} -eq 0 && ${#test_paths[@]} -eq 0 ]]; then
@@ -303,9 +299,20 @@ done
 stray="$(awk '
   index($0, "<!-- BEGIN GENERATED: registry ") == 1 { inside = 1; next }
   index($0, "<!-- END GENERATED: registry ") == 1 { inside = 0; next }
-  !inside && /^\| REQ-[0-9]+ \|.*\| (landed|partial|planned|retired) \|$/ { print NR }
+  !inside && /^\| REQ-[0-9]+ \|.*\| (landed|partial|planned) \|$/ { print NR }
 ' "$REQ_REG")"
 [[ -z "$stray" ]] || die "REQ.md: registry row(s) outside the generated block at line(s) $(echo $stray) — edit traceability.yaml and run make spec-generate"
+
+# A retired number is never reused: no map row may carry one that
+# retired-requirements.md lists, as an entry or among the numbers never used.
+RETIRED="${ROOT}/docs/specifications/retired-requirements.md"
+if [[ -f "$RETIRED" ]]; then
+  while IFS= read -r rid; do
+    [[ -n "${trace_canonical[$rid]+x}" ]] \
+      && die "$rid: listed in retired-requirements.md, so the number is never reused — take the next one (REQ.md § Numbering policy)"
+  done < <(awk '/^## Numbers never used/ { n = 1; next } /^## / { n = 0 } /^## REQ-[0-9]+ / || n' "$RETIRED" \
+    | grep -oE 'REQ-[0-9]+' | sort -u)
+fi
 
 if [[ -f "${ROOT}/scripts/spec-gen.sh" ]]; then
   bash "${ROOT}/scripts/spec-gen.sh" --check || die "generated blocks are stale — run make spec-generate"

@@ -358,32 +358,38 @@ check tests-list-emptied "$r" ok
 # 35 - a row without a tests: key gains one, after its last line, when a test
 #      starts citing its REQ.
 r="$(new_case tests-gained)"
-printf '\n### REQ-002 Beta\n\nNormative fixture text.\n' >> "$r/docs/specifications/topic.md"
-printf '\n  - id: REQ-002\n    title: Beta\n    canonical: docs/specifications/topic.md#req-002-beta\n    status: stable\n    implementation: planned\n' \
+printf '\n### REQ-998 Beta\n\nNormative fixture text.\n' >> "$r/docs/specifications/topic.md"
+printf '\n  - id: REQ-998\n    title: Beta\n    canonical: docs/specifications/topic.md#req-998-beta\n    status: stable\n    implementation: planned\n' \
   >> "$r/docs/specifications/traceability.yaml"
 bash "$r/scripts/spec-gen.sh" >/dev/null
 check tests-gained-before "$r" ok
-printf 'package good\n\n// REQ-002: a first citing test.\n' > "$r/pkg/good/beta_test.go"
-check tests-gained-stale "$r" fail "pkg/good/beta_test.go cites REQ-002 but is not listed"
+printf 'package good\n\n// REQ-998: a first citing test.\n' > "$r/pkg/good/beta_test.go"
+check tests-gained-stale "$r" fail "pkg/good/beta_test.go cites REQ-998 but is not listed"
 bash "$r/scripts/spec-gen.sh" >/dev/null
-_row="$(awk '/^  - id: REQ-002$/{f=1} f' "$r/docs/specifications/traceability.yaml" | tail -2 | paste -sd'|' -)"
+_row="$(awk '/^  - id: REQ-998$/{f=1} f' "$r/docs/specifications/traceability.yaml" | tail -2 | paste -sd'|' -)"
 [[ "$_row" == "    tests:|      - pkg/good/beta_test.go" ]] \
-  || { echo "spec-check-selftest: FAIL tests-gained: REQ-002 row ends '${_row}'" >&2; fail=1; }
+  || { echo "spec-check-selftest: FAIL tests-gained: REQ-998 row ends '${_row}'" >&2; fail=1; }
 check tests-gained "$r" ok
 
-# 36 - a withdrawn requirement is `retired`, which needs `status: deprecated`;
-#      the old word `deprecated` in implementation: is out of vocabulary.
+# 36 - a retired requirement has no map row: `retired` and the old word
+#      `deprecated` are out of the implementation vocabulary, and a row whose
+#      number retired-requirements.md lists is refused, so no number is reused.
 r="$(new_case impl-retired)"
-sed -i 's/^    status: stable$/    status: deprecated/; s/^    implementation: landed$/    implementation: retired/' \
-  "$r/docs/specifications/traceability.yaml"
-bash "$r/scripts/spec-gen.sh" >/dev/null
-check impl-retired "$r" ok
-r="$(new_case impl-retired-stable)"
 sed -i 's/^    implementation: landed$/    implementation: retired/' "$r/docs/specifications/traceability.yaml"
-check impl-retired-stable "$r" fail "implementation retired needs status: deprecated"
+check impl-retired "$r" fail "invalid implementation 'retired'"
 r="$(new_case impl-deprecated)"
 sed -i 's/^    implementation: landed$/    implementation: deprecated/' "$r/docs/specifications/traceability.yaml"
 check impl-deprecated "$r" fail "invalid implementation 'deprecated'"
+r="$(new_case retired-number-reused)"
+printf '# Retired requirements\n\n## REQ-001 — Alpha\n\nWithdrawn.\n' > "$r/docs/specifications/retired-requirements.md"
+check retired-number-reused "$r" fail "REQ-001: listed in retired-requirements.md"
+r="$(new_case never-used-number-reused)"
+printf '# Retired requirements\n\n## REQ-999 — Other\n\nWithdrawn.\n\n## Numbers never used\n\nREQ-001 was released unused.\n' \
+  > "$r/docs/specifications/retired-requirements.md"
+check never-used-number-reused "$r" fail "REQ-001: listed in retired-requirements.md"
+r="$(new_case retired-other-number)"
+printf '# Retired requirements\n\n## REQ-999 — Other\n\nWithdrawn; REQ-001 holds its rule.\n' > "$r/docs/specifications/retired-requirements.md"
+check retired-other-number "$r" ok
 
 # 37 - a CRLF traceability.yaml is otherwise current: spec-check accepts it,
 #      and spec-gen has nothing to rewrite, so the file stays byte-identical.

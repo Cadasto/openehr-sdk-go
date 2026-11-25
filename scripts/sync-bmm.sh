@@ -236,7 +236,7 @@ cmd_sync() {
     echo "  go test ./internal/bmmgen -run RootSchemas -count=1"
   fi
 
-  # Keep the generated code in step with the pin (REQ-042).
+  # Keep the generated code in step with the pin (REQ-041).
   if [[ "${BMM_SKIP_GEN:-}" == "1" ]]; then
     echo "(BMM_SKIP_GEN=1 — skipped 'make codegen')"
     return 0

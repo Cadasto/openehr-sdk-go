@@ -5,11 +5,11 @@ kind: reference
 # Retired requirements
 
 A requirement is retired when its rule is withdrawn, or moves into another requirement or into plain prose.
-Its identifier is never reused: it keeps its `deprecated` / `retired` row in [traceability.yaml](traceability.yaml), and that row's canonical link opens its entry below, which says where the rule lives now.
+Its entry moves here and its row leaves [traceability.yaml](traceability.yaml) and the [registry](REQ.md#registry), so this page is the only place its number appears.
+The number is never reused: a new requirement takes the next number above the highest in the registry or on this page ([REQ.md § Numbering policy](REQ.md#numbering-policy)).
 
-Nothing on this page binds.
-The rules are in the topic specs listed in [README.md § Index](README.md#index).
-Numbers that were reserved and released without becoming a requirement are listed in [REQ.md § Numbering policy](REQ.md#numbering-policy).
+Nothing on this page binds; the rules are in the topic specs listed in [README.md § Index](README.md#index).
+An entry says where its rule lives now.
 
 ## REQ-002 — Go version
 
@@ -53,19 +53,19 @@ Its conventions, the no-reflection rule included, are now prose in [idiom.md § 
 
 ## REQ-030 — Concrete RM structs
 
-The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
+Its rule is now [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
 
 ## REQ-031 — Embedded base structs
 
-The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
+Its rule is now [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
 
 ## REQ-032 — Interfaces for abstract RM
 
-The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
+Its rule is now [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
 
 ## REQ-033 — No inheritance emulation
 
-The rule is now [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
+Its rule is now [reference-model.md § The shape of the RM in Go](reference-model.md#the-shape-of-the-rm-in-go).
 
 ## REQ-042 — Generated code, drift-detected
 
@@ -97,7 +97,7 @@ The rule for the `Cadasto-OpenEhr-Spec-Version` header moved to [wire.md § REQ-
 
 ## REQ-065 — Per-client tenant binding
 
-A client takes the catalog of one Platform ([auth.md § REQ-070](auth.md#req-070)), and a SMART source built from a catalog defaults its audience to that Platform's base URL ([auth.md § REQ-061](auth.md#req-061--pkce-flow)).
+Replaced by the one-Platform catalog of [auth.md § REQ-070](auth.md#req-070) and the audience default of [auth.md § REQ-061](auth.md#req-061--pkce-flow).
 
 ## REQ-067 — Platform principal claims
 
@@ -109,7 +109,7 @@ Its test-writing rules moved to [probe-harness.md § Writing a probe](../probe-h
 
 ## REQ-081 — Wire-level parity
 
-The SDK checks no parity with another SDK: its wire output is checked against the openEHR specification by the [probe catalog](conformance.md#probe-catalog), and its Go surface follows [idiom.md § Surface shape](idiom.md#surface-shape).
+Withdrawn; [scope.md § Out of scope](scope.md#out-of-scope-v1) says what the SDK checks instead.
 
 ## REQ-095 — OpenAPI authoritative source
 
@@ -121,11 +121,11 @@ The rule that tells "no retries" apart from "use the package default" moved to [
 
 ## REQ-097 — First-class `Idempotency-Key`
 
-Cadasto openEHR services no longer accept the `Idempotency-Key` header, so the SDK does not send it.
+Withdrawn: the SDK sends no `Idempotency-Key` header, which Cadasto openEHR services do not accept.
 
 ## REQ-100 — ADL 1.4 operational template (OPT) parse and paths
 
-The OPT parser, `template.ParseOPT` and its tree, was removed in 0.46.0 ([ADR 0035](../adr/0035-compile-step-reads-operational-template-model.md)); its path grammar, resolution rules and path errors moved to [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) *Path lookup*, and the readings the operational template reader and the compile step keep to *Reading the model* there.
+Its path grammar, resolution rules and path errors moved to [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) *Path lookup*; the operational template model of [REQ-176](clinical-modeling.md#req-176--adl-14-operational-template-model) replaced the parser.
 
 ## REQ-104 — Slot assertion grammar
 
@@ -177,6 +177,8 @@ Its rules moved to [transport.md § REQ-151](transport.md#req-151--typed-2xx-dec
 
 ## REQ-178 — Generic templates shipped with the SDK
 
-The SDK ships no operational templates.
-The generic EHR_STATUS and FOLDER templates, under the same template ids, are maintained with demographic ones in the [openehr-reference-content](https://github.com/Cadasto/openehr-reference-content) repository, from which a program downloads or imports them.
-The SDK vendors that repository's templates as test fixtures under `testkit/corpus/reference/`, described in [testkit/corpus/README.md](../../testkit/corpus/README.md).
+Withdrawn; [scope.md § Out of scope](scope.md#out-of-scope-v1) says where the generic templates live.
+
+## Numbers never used
+
+REQ-114, REQ-115, REQ-124, REQ-125 and REQ-141 were reserved and released without becoming a requirement: an OPT author validator and a FLAT author linter that were never started, the RM-function stubs [reference-model.md](reference-model.md) records as out of scope, and one number released unused.

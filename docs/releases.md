@@ -41,7 +41,7 @@ While on `v0.x`, minor bumps may break the public API (release notes list every 
 
 Cut when all three hold:
 
-1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` or `retired`, with no `partial` and no `planned`. (`retired` is terminal: a retired requirement carries no active rule and will never land, so a gate demanding `landed` for every row could not be met.)
+1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed`, with no `partial` and no `planned`.
 2. The openEHR wire-conformance probe suite in [`conformance.md`](specifications/conformance.md) passes.
 3. A reference openEHR deployment passes the live probe suite ([REQ-082](specifications/conformance.md#req-082--runnability)).
 
