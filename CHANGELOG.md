@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **`demographic.GetTags`, `SetTags`, `DeleteTag` and `ListTags`** read, replace and delete the ITEM_TAGs on a party, or search the tags of every party by key, value or target path, and return each tag as a `client.StoredItemTag` (REQ-059).
+- **`demographic.WithFormat` and `WithGetFormat`** let `Create` and `Update` write a PARTY, and `Get` and the versioned_party reads read one, in canonical XML as well as canonical JSON; `WithRawBody` hands back a read's body as received (REQ-173, REQ-174).
+- **`openehr/client`** now holds the types every REST client shares, such as `Ref` and `VersionMetadata`, moved from `openehr/client/ehr`; its new `ValidateRef` refuses a nil Ref, a nil pointer or an empty id with `transport.ErrInvalidConfig` (REQ-025).
+- **`rminfo.BoundTypeReporter` and `AttrMeta.BoundTypeName`** give an attribute's type with the generic parameters its BMM declaration binds, `DV_INTERVAL<DV_DATE>` for `PARTY_RELATIONSHIP.time_validity` where `AttributeRMType` answers `DV_INTERVAL` (REQ-048).
+
+### Changed
+
+- **Breaking: `demographic.Repository`** gains `GetTags`, `SetTags`, `DeleteTag` and `ListTags`, and its `Get` and versioned reads take options, so an implementation outside the module must add them (REQ-059, REQ-173).
+- **Breaking: `demographic.Get`** fails with a `*transport.DecodeError` when the body names a PARTY class other than the one the call asks for, instead of returning that party (REQ-173).
+- **Breaking: `composition.Get` and `demographic.Get`** refuse with `transport.ErrInvalidConfig` a caller's own type that embeds `ByVersionUID` or `ByVersionedObjectID`, which they accepted before, and return that error for a nil pointer instead of panicking (REQ-025).
+- **Breaking: `demographicprobes.Probe073DemographicRoundTrip`** takes the `demographic.Format` to round-trip the party in, canonical JSON or canonical XML (REQ-173, PROBE-073).
+- **`demographic.Create` and `Update`** report a party the codec cannot serialise as a `*demographic.EncodeError`, before any request, in place of a plain error (REQ-173).
+
+### Deprecated
+
+- **The shared names in `openehr/client/ehr`**, such as `ehr.Ref` and `ehr.VersionOf`, keep working as aliases of the same names in `openehr/client`, and the item-tag header and `NoRepresentationError` error texts start `client:` instead of `ehr:`.
+
 ## [0.52.0] - 2026-11-20
 
 Fifty-second `v0.x` minor: the reference templates move to their own repository, AQL parsing refuses nesting past 128 levels, AQL lint reads names in any letter case and every archetype a class bracket names, and validation checks codes, quantities and ordinals typed, allocating less. **Breaking:** `openehr/template/generic` is removed, `parse.Parse` and `Emit` refuse deeper nesting, and AQL lint fails an upper-case path attribute.
