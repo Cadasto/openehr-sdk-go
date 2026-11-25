@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -56,9 +56,9 @@ func tagsTarget(op string, t Type, target openehrclient.Ref) (path, route string
 }
 
 // GetTags retrieves the ITEM_TAGs attached to a PARTY of the given type. The
-// Ref names the target: [ehr.VersionOf](uid) for one version, or
-// [ehr.LatestOf](voID) for the versioned party itself. A Ref that carries a
-// time ([ehr.LatestAtTime]) fails with [transport.ErrInvalidConfig] before any
+// Ref names the target: [openehrclient.VersionOf](uid) for one version, or
+// [openehrclient.LatestOf](voID) for the versioned party itself. A Ref that carries a
+// time ([openehrclient.LatestAtTime]) fails with [transport.ErrInvalidConfig] before any
 // request, since the tags routes take none. A target with no tags returns an
 // empty list.
 //

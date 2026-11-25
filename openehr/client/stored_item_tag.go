@@ -1,4 +1,4 @@
-package ehr
+package client
 
 import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 

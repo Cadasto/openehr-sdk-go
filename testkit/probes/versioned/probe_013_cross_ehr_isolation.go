@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -25,7 +26,7 @@ import (
 //     It must differ from ehrAID; if equal, the probe returns an
 //     error (probe-framework misuse, not a wire failure).
 //   - versionUIDFromA is a known Composition VersionUID owned by EHR A.
-func Probe013CrossEHRIsolation(ctx context.Context, c *transport.Client, ehrAID, ehrBID openehrclient.EHRID, versionUIDFromA openehrclient.VersionUID) (Result, error) { // PROBE-013 (REQ-054)
+func Probe013CrossEHRIsolation(ctx context.Context, c *transport.Client, ehrAID, ehrBID ehr.EHRID, versionUIDFromA openehrclient.VersionUID) (Result, error) { // PROBE-013 (REQ-054)
 	r := Result{Probe: "PROBE-013"}
 	if c == nil || ehrAID == "" || ehrBID == "" || versionUIDFromA == "" {
 		return r, errors.New("PROBE-013: missing required inputs (client/ehrAID/ehrBID/versionUIDFromA)")

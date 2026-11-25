@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -228,8 +228,8 @@ func TestBuilderPrecedingVersionPerOperation(t *testing.T) {
 func TestBuilderLifecycleStateOverride(t *testing.T) {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	sub, err := newBuilder().
-		Add(contribution.Deletion("1::cdr.example::1", &comp, contribution.WithLifecycleState(ehr.LifecycleStateComplete))).
-		Add(contribution.Creation(&comp, contribution.WithLifecycleState(ehr.LifecycleStateIncomplete))).
+		Add(contribution.Deletion("1::cdr.example::1", &comp, contribution.WithLifecycleState(openehrclient.LifecycleStateComplete))).
+		Add(contribution.Creation(&comp, contribution.WithLifecycleState(openehrclient.LifecycleStateIncomplete))).
 		Build()
 	if err != nil {
 		t.Fatalf("Build: %v", err)
@@ -377,18 +377,18 @@ func TestBuilderDeletionLifecycleOverride(t *testing.T) {
 	}{
 		{
 			name:     "complete with a payload",
-			change:   contribution.Deletion(preceding, &comp, contribution.WithLifecycleState(ehr.LifecycleStateComplete)),
+			change:   contribution.Deletion(preceding, &comp, contribution.WithLifecycleState(openehrclient.LifecycleStateComplete)),
 			wantCode: "532",
 			wantData: true,
 		},
 		{
 			name:     "complete without a payload",
-			change:   contribution.Deletion[rm.Composition](preceding, nil, contribution.WithLifecycleState(ehr.LifecycleStateComplete)),
+			change:   contribution.Deletion[rm.Composition](preceding, nil, contribution.WithLifecycleState(openehrclient.LifecycleStateComplete)),
 			wantCode: "532",
 		},
 		{
 			name:     "incomplete without a payload",
-			change:   contribution.Deletion[rm.Composition](preceding, nil, contribution.WithLifecycleState(ehr.LifecycleStateIncomplete)),
+			change:   contribution.Deletion[rm.Composition](preceding, nil, contribution.WithLifecycleState(openehrclient.LifecycleStateIncomplete)),
 			wantCode: "553",
 		},
 	}
@@ -470,7 +470,7 @@ func TestBuilderDeletionWithoutPayloadDecodesIntoRM(t *testing.T) {
 func TestBuilderRejectsUnknownLifecycleState(t *testing.T) {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	sub, err := newBuilder().
-		Add(contribution.Creation(&comp, contribution.WithLifecycleState(ehr.LifecycleState("999")))).
+		Add(contribution.Creation(&comp, contribution.WithLifecycleState(openehrclient.LifecycleState("999")))).
 		Build()
 	if err == nil {
 		t.Fatalf("Build accepted lifecycle code 999: %+v", sub)
@@ -606,7 +606,7 @@ func TestBuilderDeletionWithoutPayloadRefusals(t *testing.T) {
 		},
 		{
 			name:   "unknown lifecycle code",
-			change: contribution.Deletion[rm.Composition](preceding, nil, contribution.WithLifecycleState(ehr.LifecycleState("999"))),
+			change: contribution.Deletion[rm.Composition](preceding, nil, contribution.WithLifecycleState(openehrclient.LifecycleState("999"))),
 			want:   "version-lifecycle-state",
 		},
 	}
@@ -996,7 +996,7 @@ func TestVersionLifecycleStateCarriesThePinnedRubric(t *testing.T) {
 	for c := range terminology.VersionLifecycleState.All() {
 		t.Run(c.Code, func(t *testing.T) {
 			sub, err := newBuilder().
-				Add(contribution.Creation(&comp, contribution.WithLifecycleState(ehr.LifecycleState(c.Code)))).
+				Add(contribution.Creation(&comp, contribution.WithLifecycleState(openehrclient.LifecycleState(c.Code)))).
 				Build()
 			if err != nil {
 				t.Fatalf("Build with WithLifecycleState(%q): %v", c.Code, err)

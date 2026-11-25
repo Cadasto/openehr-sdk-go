@@ -8,8 +8,9 @@ import (
 	"testing"
 	"uuid"
 
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -46,7 +47,7 @@ type committedVersion struct {
 // self-scoping (REQ-082 Live): it collides with no other run and depends on no
 // pre-seeded catalog entry — a genuine 201, never a foreign 409 counted as a
 // pass. The composition reuses the EHR the caller created earlier in the run.
-func compositionLiveEntries(id openehrclient.EHRID, templateID string, optBody []byte, comp *rm.Composition, out *committedVersion) []probe.Entry {
+func compositionLiveEntries(id ehr.EHRID, templateID string, optBody []byte, comp *rm.Composition, out *committedVersion) []probe.Entry {
 	live := []probe.Mode{probe.ModeLive}
 	return []probe.Entry{
 		{
@@ -118,7 +119,7 @@ func compositionLiveEntries(id openehrclient.EHRID, templateID string, optBody [
 // (REQ-082 self-scoping); the structure is unchanged, so a conformant CDR
 // accepts both and a failure is the SDK's wire encoding.
 func TestLiveCompositionSnapshot(t *testing.T) {
-	id := openehrclient.EHRID(uuid.NewV4().String())
+	id := ehr.EHRID(uuid.NewV4().String())
 	// Per-run template id: embeds the run identifier so the mutating template
 	// upload is self-scoping — no collision with another run, no dependency on a
 	// pre-seeded catalog template (REQ-082 Live).

@@ -65,7 +65,7 @@
 // accessors. There is no runtime terminology-service lookup: the
 // generated tables are plain Go literals.
 //
-// [github.com/cadasto/openehr-sdk-go/openehr/client/ehr] and
+// [github.com/cadasto/openehr-sdk-go/openehr/client] and
 // [github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution] use it
 // for version-lifecycle-state and audit-change-type validity and rubrics,
 // [github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified] for

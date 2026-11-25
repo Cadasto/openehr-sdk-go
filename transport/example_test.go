@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -26,7 +27,7 @@ func Example_errorClassification() {
 	edited := &rm.Composition{} // the composition you changed; the fake server ignores it
 
 	// The fake server answers each of these updates with a different error.
-	for _, voID := range []ehr.VersionedObjectID{unknownComposition, changedComposition, invalidComposition} {
+	for _, voID := range []openehrclient.VersionedObjectID{unknownComposition, changedComposition, invalidComposition} {
 		lastRead := string(voID) + "::cdr.example::1" // the version you read, sent as If-Match
 		_, _, err := composition.Update(ctx, client, exampleEHRID, voID, lastRead, edited)
 		// errors.Is matches the class of the failure, however the error
@@ -95,10 +96,10 @@ func ExampleWireError() {
 // The ids the examples send. The fake server answers each versioned object
 // id with a different error status.
 const (
-	exampleEHRID       ehr.EHRID             = "7d44b88c-4199-4bad-97dc-d78268e01398"
-	unknownComposition ehr.VersionedObjectID = "0f1e2d3c-4b5a-4697-8877-665544332211"
-	changedComposition ehr.VersionedObjectID = "8849182c-82ad-4088-a07f-48ead4180515"
-	invalidComposition ehr.VersionedObjectID = "c0ffee00-1234-4abc-9def-0123456789ab"
+	exampleEHRID       ehr.EHRID                       = "7d44b88c-4199-4bad-97dc-d78268e01398"
+	unknownComposition openehrclient.VersionedObjectID = "0f1e2d3c-4b5a-4697-8877-665544332211"
+	changedComposition openehrclient.VersionedObjectID = "8849182c-82ad-4088-a07f-48ead4180515"
+	invalidComposition openehrclient.VersionedObjectID = "c0ffee00-1234-4abc-9def-0123456789ab"
 )
 
 // newCompositionErrorBackend is a fake openEHR server. It answers a
@@ -107,7 +108,7 @@ const (
 // chosen by the versioned object id.
 func newCompositionErrorBackend() *sandbox.Backend {
 	b := sandbox.New()
-	answer := func(voID ehr.VersionedObjectID, status int, etag, body string) {
+	answer := func(voID openehrclient.VersionedObjectID, status int, etag, body string) {
 		path := "/ehr/" + string(exampleEHRID) + "/composition/" + string(voID)
 		b.HandleFunc(http.MethodPut, path, func(w http.ResponseWriter, r *http.Request) {
 			if etag != "" {

@@ -1,4 +1,4 @@
-package ehr_test
+package client_test
 
 // decode_error_test.go — the identifier surface that keeps an outcome of its
 // own under REQ-151 § The taxonomy, held at
@@ -14,7 +14,7 @@ import (
 	"errors"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 

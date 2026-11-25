@@ -29,7 +29,8 @@ import (
 	"os"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -204,7 +205,7 @@ func commitToFakeCDR(ctx context.Context, submission *contribution.Submission, b
 	// value is nil; pass contribution.WithPrefer(transport.PreferRepresentation)
 	// to get the persisted contribution back. It also returns the response
 	// metadata and an error mapped to the transport sentinels.
-	_, meta, err := contribution.Commit(ctx, client, openehrclient.EHRID(ehrID), submission)
+	_, meta, err := contribution.Commit(ctx, client, ehr.EHRID(ehrID), submission)
 	if err != nil {
 		return fmt.Errorf("commit contribution: %w", err)
 	}

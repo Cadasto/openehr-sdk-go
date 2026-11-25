@@ -1,24 +1,24 @@
-package ehr_test
+package client_test
 
 import (
 	"errors"
 	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
 func TestItemTagHeaderRoundTrip(t *testing.T) {
-	in := []ehr.ItemTag{
+	in := []openehrclient.ItemTag{
 		{Key: "category", Value: "final"},
 		{Key: `say "hi"`, Value: `with "quote"`, TargetPath: "/path"},
 	}
-	encoded, err := ehr.FormatItemTagHeader(in)
+	encoded, err := openehrclient.FormatItemTagHeader(in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := ehr.ParseItemTagHeader(encoded)
+	got, err := openehrclient.ParseItemTagHeader(encoded)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,12 +30,12 @@ func TestItemTagHeaderRoundTrip(t *testing.T) {
 // TestItemTagHeaderRoundTripBackslash verifies a literal backslash survives
 // encode→parse (the escaper escapes \ as well as ").
 func TestItemTagHeaderRoundTripBackslash(t *testing.T) {
-	in := []ehr.ItemTag{{Key: "path", Value: `C:\temp\"x"`}}
-	encoded, err := ehr.FormatItemTagHeader(in)
+	in := []openehrclient.ItemTag{{Key: "path", Value: `C:\temp\"x"`}}
+	encoded, err := openehrclient.FormatItemTagHeader(in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := ehr.ParseItemTagHeader(encoded)
+	got, err := openehrclient.ParseItemTagHeader(encoded)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,27 +53,27 @@ func TestItemTagHeaderRoundTripBackslash(t *testing.T) {
 func TestFormatItemTagHeader_ControlCharsRejected(t *testing.T) {
 	cases := []struct {
 		name string
-		tag  ehr.ItemTag
+		tag  openehrclient.ItemTag
 	}{
 		{
 			name: "CR LF in Key",
-			tag:  ehr.ItemTag{Key: "k\r\nX-Evil: 1", Value: "v"},
+			tag:  openehrclient.ItemTag{Key: "k\r\nX-Evil: 1", Value: "v"},
 		},
 		{
 			name: "LF in Value",
-			tag:  ehr.ItemTag{Key: "k", Value: "v\ninjected"},
+			tag:  openehrclient.ItemTag{Key: "k", Value: "v\ninjected"},
 		},
 		{
 			name: "CR in TargetPath",
-			tag:  ehr.ItemTag{Key: "k", Value: "v", TargetPath: "/path\rbad"},
+			tag:  openehrclient.ItemTag{Key: "k", Value: "v", TargetPath: "/path\rbad"},
 		},
 		{
 			name: "NUL in Key",
-			tag:  ehr.ItemTag{Key: "k\x00z"},
+			tag:  openehrclient.ItemTag{Key: "k\x00z"},
 		},
 		{
 			name: "DEL in Value",
-			tag:  ehr.ItemTag{Key: "k", Value: "v\x7fz"},
+			tag:  openehrclient.ItemTag{Key: "k", Value: "v\x7fz"},
 		},
 		// The guard is defined over bytes, so a control byte must still be
 		// seen when it sits next to multi-byte UTF-8. (These pass under a
@@ -82,16 +82,16 @@ func TestFormatItemTagHeader_ControlCharsRejected(t *testing.T) {
 		// contract the doc comment states.)
 		{
 			name: "LF after a multi-byte rune",
-			tag:  ehr.ItemTag{Key: "k", Value: "café\ninjected"},
+			tag:  openehrclient.ItemTag{Key: "k", Value: "café\ninjected"},
 		},
 		{
 			name: "DEL between multi-byte runes",
-			tag:  ehr.ItemTag{Key: "k", Value: "é\x7fé"},
+			tag:  openehrclient.ItemTag{Key: "k", Value: "é\x7fé"},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ehr.FormatItemTagHeader([]ehr.ItemTag{tc.tag})
+			got, err := openehrclient.FormatItemTagHeader([]openehrclient.ItemTag{tc.tag})
 			if err == nil {
 				t.Fatalf("expected error, got nil (result=%q)", got)
 			}
@@ -114,10 +114,10 @@ func TestFormatItemTagHeader_ControlCharsRejected(t *testing.T) {
 // TestFormatItemTagHeader_TabAllowed verifies that a horizontal tab (0x09)
 // inside a value does not cause an error (RFC 9110 permits HT in field values).
 func TestFormatItemTagHeader_TabAllowed(t *testing.T) {
-	tags := []ehr.ItemTag{
+	tags := []openehrclient.ItemTag{
 		{Key: "k\tey", Value: "v\twith\ttabs", TargetPath: "/p\tath"},
 	}
-	got, err := ehr.FormatItemTagHeader(tags)
+	got, err := openehrclient.FormatItemTagHeader(tags)
 	if err != nil {
 		t.Fatalf("tab should be allowed, got error: %v", err)
 	}

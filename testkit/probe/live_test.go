@@ -14,7 +14,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/basic"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -46,13 +46,13 @@ var liveTargets = []struct {
 // createEHRProbe creates one EHR under a caller-supplied identifier,
 // so a Live run is self-scoping: everything it writes is derived from
 // the per-run id the test generated and logged (REQ-082).
-func createEHRProbe(id openehrclient.EHRID) probe.Entry {
+func createEHRProbe(id ehr.EHRID) probe.Entry {
 	return probe.Entry{
 		ID:     "PROBE-LIVE-EHR-CREATE",
 		Effect: probe.EffectMutating,
 		Modes:  []probe.Mode{probe.ModeSandbox, probe.ModeLive},
 		Run: func(ctx context.Context, cl *transport.Client) (probe.Result, error) {
-			rec, _, err := openehrclient.Create(ctx, cl, openehrclient.WithEHRID(id))
+			rec, _, err := ehr.Create(ctx, cl, ehr.WithEHRID(id))
 			if err != nil {
 				return probe.Result{Status: probe.StatusFail, Detail: err.Error()}, nil
 			}
@@ -95,7 +95,7 @@ func TestLiveCreateEHR(t *testing.T) {
 
 			// One identifier per run, logged, so anything left on the
 			// deployment is attributable to this run.
-			id := openehrclient.EHRID(uuid.NewV4().String())
+			id := ehr.EHRID(uuid.NewV4().String())
 			t.Logf("%s: per-run EHR id %s", target.name, id)
 
 			hc := &http.Client{Timeout: 5 * time.Second}
@@ -139,7 +139,7 @@ func TestLiveCreateEHR(t *testing.T) {
 
 func TestSandboxCreateEHRThroughRunner(t *testing.T) {
 	t.Parallel()
-	id := openehrclient.EHRID(uuid.NewV4().String())
+	id := ehr.EHRID(uuid.NewV4().String())
 	sum, err := probe.Run(t.Context(), probe.Config{Mode: probe.ModeSandbox}, []probe.Entry{createEHRProbe(id)})
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestSandboxCreateEHRThroughRunner(t *testing.T) {
 // proves one is there.
 func liveReachable(t *testing.T, c *transport.Client) bool {
 	t.Helper()
-	_, err := openehrclient.Exists(t.Context(), c, "00000000-0000-4000-8000-000000000000")
+	_, err := ehr.Exists(t.Context(), c, "00000000-0000-4000-8000-000000000000")
 	if err == nil {
 		return true
 	}

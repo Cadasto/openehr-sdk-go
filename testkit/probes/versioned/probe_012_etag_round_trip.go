@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -27,7 +28,7 @@ import (
 //   - ehrID and voID identify an existing versioned Composition.
 //   - update is the modification body. The probe is opaque about
 //     content semantics; the wire shape is what matters.
-func Probe012ETagRoundTrip(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, update *rm.Composition) (Result, error) { // PROBE-012 (REQ-054)
+func Probe012ETagRoundTrip(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID, update *rm.Composition) (Result, error) { // PROBE-012 (REQ-054)
 	r := Result{Probe: "PROBE-012"}
 	if c == nil || ehrID == "" || voID == "" || update == nil {
 		return r, errors.New("PROBE-012: missing required inputs (client/ehr/voID/update)")

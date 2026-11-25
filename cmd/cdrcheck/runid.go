@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"uuid"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 )
 
 // runIDs names the EHRs one run creates. Every id begins with the run's own
@@ -41,7 +41,7 @@ func (g *runIDs) id() string {
 }
 
 // next returns the id of the run's next EHR. Workers call it concurrently.
-func (g *runIDs) next() openehrclient.EHRID {
+func (g *runIDs) next() ehr.EHRID {
 	var seq [8]byte
 	binary.BigEndian.PutUint64(seq[:], g.n.Add(1))
 	var u uuid.UUID
@@ -49,5 +49,5 @@ func (g *runIDs) next() openehrclient.EHRID {
 	u[6] = 0x80 // version 8
 	u[8] = 0x80 // the RFC 9562 variant
 	copy(u[10:], seq[2:])
-	return openehrclient.EHRID(u.String())
+	return ehr.EHRID(u.String())
 }

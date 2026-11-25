@@ -25,7 +25,7 @@
 // [DeleteTag] address one PARTY version or its versioned party; [SetTags]
 // replaces the whole list, and an empty list clears it. [ListTags] searches
 // the tags of every party, narrowed by [WithTagKey], [WithTagValue] and
-// [WithTagTargetPath]. A returned tag is an [ehr.StoredItemTag], which names
+// [WithTagTargetPath]. A returned tag is an [openehrclient.StoredItemTag], which names
 // the tagged object and its class.
 //
 // Every call travels in canonical JSON unless an option names canonical

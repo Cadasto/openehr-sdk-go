@@ -1,4 +1,4 @@
-package ehr
+package client
 
 import (
 	"context"
@@ -154,15 +154,15 @@ type NoRepresentationError struct {
 // payload-derived value.
 func (e *NoRepresentationError) Error() string {
 	if e == nil {
-		return "ehr: no representation"
+		return "client: no representation"
 	}
 	if errors.Is(e.Cause, transport.ErrInvalidShape) {
-		return "ehr: committed write has no usable representation (empty or null body)"
+		return "client: committed write has no usable representation (empty or null body)"
 	}
 	if e.Cause != nil {
-		return "ehr: committed write has no usable representation (decode failed)"
+		return "client: committed write has no usable representation (decode failed)"
 	}
-	return "ehr: committed write has no usable representation"
+	return "client: committed write has no usable representation"
 }
 
 // Unwrap exposes Cause so errors.Is/As reach the wrapped sentinel or decode

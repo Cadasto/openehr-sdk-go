@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -20,7 +21,7 @@ import (
 )
 
 const (
-	ehrIDFixture    openehrclient.EHRID             = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
+	ehrIDFixture    ehr.EHRID                       = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
 	compositionVOID openehrclient.VersionedObjectID = "1234abcd-5678-9012-3456-7890abcdef00"
 	compositionVUID openehrclient.VersionUID        = "1234abcd-5678-9012-3456-7890abcdef00::cdr.example::1"
 )
@@ -766,7 +767,7 @@ func readComposition(t *testing.T) *rm.Composition {
 func TestGetRefusesTraversalEHRID(t *testing.T) {
 	cases := []struct {
 		name  string
-		ehrID openehrclient.EHRID
+		ehrID ehr.EHRID
 	}{
 		// Traversal: the segments themselves are illegal.
 		{"traversal", "a/../../definition/query/evil"},

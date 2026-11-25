@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -41,7 +41,7 @@ var auditDetailsAttributes = []string{
 //
 //   - Grammar. The header is re-parsed by [parseAuditDetailsHeader], written
 //     here from the normative grammar in the ITS-REST contract and calling
-//     nothing in openehr/client/ehr. Comparing the header against
+//     nothing in openehr/client. Comparing the header against
 //     MarshalAuditDetails instead would only prove the encoder agrees with
 //     itself; re-parsing proves the bytes on the wire are a well-formed
 //     assignment list whose attributes are documented ones carrying the values
@@ -61,7 +61,7 @@ var auditDetailsAttributes = []string{
 // captured returns the requests the backend received; the probe reads the write
 // request to check the header grammar and route, then the read-back request to
 // check its route.
-func Probe062AuditDetailsHeader(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID openehrclient.EHRID, contributionUID string, audit *rm.AuditDetails, comp *rm.Composition) (Result, error) { // PROBE-062 (REQ-059)
+func Probe062AuditDetailsHeader(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID ehr.EHRID, contributionUID string, audit *rm.AuditDetails, comp *rm.Composition) (Result, error) { // PROBE-062 (REQ-059)
 	r := Result{Probe: "PROBE-062"}
 	if c == nil || ehrID == "" || contributionUID == "" || audit == nil || comp == nil {
 		return r, errors.New("PROBE-062: missing required inputs (client/ehr/contributionUID/audit/comp)")
@@ -279,7 +279,7 @@ func nameOf(s *string) (string, bool) {
 // header are both errors. Returns the unescaped values keyed by attribute.
 //
 // This is the probe's independent oracle for the header shape: it deliberately
-// calls nothing in openehr/client/ehr, so a bug shared between the SDK's
+// calls nothing in openehr/client, so a bug shared between the SDK's
 // encoder and this parser cannot pass unnoticed.
 func parseAuditDetailsHeader(s string) (map[string]string, error) {
 	if s == "" {

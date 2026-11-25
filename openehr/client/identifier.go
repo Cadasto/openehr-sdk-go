@@ -1,4 +1,4 @@
-package ehr
+package client
 
 import (
 	"encoding/json"

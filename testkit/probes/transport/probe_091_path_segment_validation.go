@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/admin"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/demographic"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/directory"
@@ -163,33 +164,33 @@ type hostileLeaf struct {
 // mutated by a caller between probe runs.
 func hostileLeaves() []hostileLeaf {
 	const versionUID openehrclient.VersionUID = "1234abcd-5678-9012-3456-7890abcdef00::cdr.example::1"
-	const ehrID openehrclient.EHRID = "1234abcd-5678-9012-3456-7890abcdef00"
+	const ehrID ehr.EHRID = "1234abcd-5678-9012-3456-7890abcdef00"
 	return []hostileLeaf{
 		{"ehr.Get", func(ctx context.Context, c *transport.Client, id string) error {
-			_, _, err := openehrclient.Get(ctx, c, openehrclient.EHRID(id))
+			_, _, err := ehr.Get(ctx, c, ehr.EHRID(id))
 			return err
 		}},
 		{"composition.Get", func(ctx context.Context, c *transport.Client, id string) error {
-			_, _, err := composition.Get(ctx, c, openehrclient.EHRID(id), openehrclient.VersionOf(versionUID))
+			_, _, err := composition.Get(ctx, c, ehr.EHRID(id), openehrclient.VersionOf(versionUID))
 			return err
 		}},
 		{"directory.Get", func(ctx context.Context, c *transport.Client, id string) error {
-			_, _, err := directory.Get(ctx, c, openehrclient.EHRID(id))
+			_, _, err := directory.Get(ctx, c, ehr.EHRID(id))
 			return err
 		}},
 		{"ehrstatus.Get", func(ctx context.Context, c *transport.Client, id string) error {
-			_, _, err := ehrstatus.Get(ctx, c, openehrclient.EHRID(id))
+			_, _, err := ehrstatus.Get(ctx, c, ehr.EHRID(id))
 			return err
 		}},
 		{"ehrstatus.GetAtTime", func(ctx context.Context, c *transport.Client, id string) error {
-			_, _, err := ehrstatus.GetAtTime(ctx, c, openehrclient.EHRID(id), time.Unix(0, 0).UTC())
+			_, _, err := ehrstatus.GetAtTime(ctx, c, ehr.EHRID(id), time.Unix(0, 0).UTC())
 			return err
 		}},
 		{"contribution.Commit", func(ctx context.Context, c *transport.Client, id string) error {
 			// A write, so it needs a Submission that survives Commit's own
 			// guards -- otherwise the leaf refuses on the body and the probe
 			// would credit a refusal the transport never made.
-			_, _, err := contribution.Commit(ctx, c, openehrclient.EHRID(id), minimalSubmission())
+			_, _, err := contribution.Commit(ctx, c, ehr.EHRID(id), minimalSubmission())
 			return err
 		}},
 		{"contribution.Get", func(ctx context.Context, c *transport.Client, id string) error {
@@ -213,7 +214,7 @@ func hostileLeaves() []hostileLeaf {
 			return err
 		}},
 		{"admin.DeleteEHR", func(ctx context.Context, c *transport.Client, id string) error {
-			return admin.DeleteEHR(ctx, c, openehrclient.EHRID(id))
+			return admin.DeleteEHR(ctx, c, ehr.EHRID(id))
 		}},
 	}
 }

@@ -1,4 +1,4 @@
-package ehr
+package client
 
 import (
 	"errors"
@@ -26,16 +26,16 @@ func FormatItemTagHeader(tags []ItemTag) (string, error) {
 	parts := make([]string, 0, len(tags))
 	for i, t := range tags {
 		if strings.TrimSpace(t.Key) == "" {
-			return "", fmt.Errorf("ehr: %w: item tag[%d]: empty key", transport.ErrInvalidConfig, i)
+			return "", fmt.Errorf("client: %w: item tag[%d]: empty key", transport.ErrInvalidConfig, i)
 		}
 		if hasCtrlChars(t.Key) {
-			return "", fmt.Errorf("ehr: %w: item tag[%d]: key contains control characters", transport.ErrInvalidConfig, i)
+			return "", fmt.Errorf("client: %w: item tag[%d]: key contains control characters", transport.ErrInvalidConfig, i)
 		}
 		if t.Value != "" && hasCtrlChars(t.Value) {
-			return "", fmt.Errorf("ehr: %w: item tag[%d]: value contains control characters", transport.ErrInvalidConfig, i)
+			return "", fmt.Errorf("client: %w: item tag[%d]: value contains control characters", transport.ErrInvalidConfig, i)
 		}
 		if t.TargetPath != "" && hasCtrlChars(t.TargetPath) {
-			return "", fmt.Errorf("ehr: %w: item tag[%d]: target_path contains control characters", transport.ErrInvalidConfig, i)
+			return "", fmt.Errorf("client: %w: item tag[%d]: target_path contains control characters", transport.ErrInvalidConfig, i)
 		}
 		var b strings.Builder
 		b.WriteString(`key="`)
@@ -72,7 +72,7 @@ func ParseItemTagHeader(header string) ([]ItemTag, error) {
 		}
 		t, err := parseItemTagSegment(seg)
 		if err != nil {
-			return nil, fmt.Errorf("ehr: item tag segment[%d]: %w", i, err)
+			return nil, fmt.Errorf("client: item tag segment[%d]: %w", i, err)
 		}
 		out = append(out, t)
 	}

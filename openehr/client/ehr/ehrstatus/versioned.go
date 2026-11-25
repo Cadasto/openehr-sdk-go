@@ -7,7 +7,8 @@ import (
 	"net/url"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -15,7 +16,7 @@ import (
 // versionedBase returns the path of the EHR's VERSIONED_EHR_STATUS. An EHR
 // has one EHR_STATUS, so the ehr_id alone addresses its versioned object.
 // All four endpoints under it are GET-only.
-func versionedBase(ehrID openehrclient.EHRID) string {
+func versionedBase(ehrID ehr.EHRID) string {
 	return "/ehr/" + string(ehrID) + "/versioned_ehr_status"
 }
 
@@ -66,7 +67,7 @@ func (v *Version) VersionUID() openehrclient.VersionUID {
 // the change log and [GetVersion] for a version's content.
 //
 // Wire: GET /ehr/{ehr_id}/versioned_ehr_status.
-func GetVersionedObject(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (*rm.VersionedEHRStatus, *openehrclient.VersionMetadata, error) {
+func GetVersionedObject(ctx context.Context, c *transport.Client, ehrID ehr.EHRID) (*rm.VersionedEHRStatus, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.GetVersionedObject: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -83,7 +84,7 @@ func GetVersionedObject(ctx context.Context, c *transport.Client, ehrID openehrc
 // item per version, with the audits recorded for it.
 //
 // Wire: GET /ehr/{ehr_id}/versioned_ehr_status/revision_history.
-func GetRevisionHistory(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error) {
+func GetRevisionHistory(ctx context.Context, c *transport.Client, ehrID ehr.EHRID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.GetRevisionHistory: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -100,7 +101,7 @@ func GetRevisionHistory(ctx context.Context, c *transport.Client, ehrID openehrc
 //
 // Wire: GET /ehr/{ehr_id}/versioned_ehr_status/version, with no
 // version_at_time.
-func GetVersion(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (*Version, *openehrclient.VersionMetadata, error) {
+func GetVersion(ctx context.Context, c *transport.Client, ehrID ehr.EHRID) (*Version, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.GetVersion: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -119,7 +120,7 @@ func GetVersion(ctx context.Context, c *transport.Client, ehrID openehrclient.EH
 //
 // Wire: GET /ehr/{ehr_id}/versioned_ehr_status/version?version_at_time={t},
 // with t sent in UTC with its fraction of a second.
-func GetVersionAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, t time.Time) (*Version, *openehrclient.VersionMetadata, error) {
+func GetVersionAtTime(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, t time.Time) (*Version, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.GetVersionAtTime: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -145,7 +146,7 @@ func GetVersionAtTime(ctx context.Context, c *transport.Client, ehrID openehrcli
 // [GetVersioned] returns the EHR_STATUS alone.
 //
 // Wire: GET /ehr/{ehr_id}/versioned_ehr_status/version/{version_uid}.
-func GetVersionByID(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error) {
+func GetVersionByID(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.GetVersionByID: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -178,22 +179,22 @@ func getVersion(ctx context.Context, c *transport.Client, req *transport.Request
 	}, openehrclient.NewVersionMetadata(meta), nil
 }
 
-func (r *repository) GetVersionedObject(ctx context.Context, ehrID openehrclient.EHRID) (*rm.VersionedEHRStatus, *openehrclient.VersionMetadata, error) {
+func (r *repository) GetVersionedObject(ctx context.Context, ehrID ehr.EHRID) (*rm.VersionedEHRStatus, *openehrclient.VersionMetadata, error) {
 	return GetVersionedObject(ctx, r.c, ehrID)
 }
 
-func (r *repository) GetRevisionHistory(ctx context.Context, ehrID openehrclient.EHRID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error) {
+func (r *repository) GetRevisionHistory(ctx context.Context, ehrID ehr.EHRID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error) {
 	return GetRevisionHistory(ctx, r.c, ehrID)
 }
 
-func (r *repository) GetVersion(ctx context.Context, ehrID openehrclient.EHRID) (*Version, *openehrclient.VersionMetadata, error) {
+func (r *repository) GetVersion(ctx context.Context, ehrID ehr.EHRID) (*Version, *openehrclient.VersionMetadata, error) {
 	return GetVersion(ctx, r.c, ehrID)
 }
 
-func (r *repository) GetVersionAtTime(ctx context.Context, ehrID openehrclient.EHRID, t time.Time) (*Version, *openehrclient.VersionMetadata, error) {
+func (r *repository) GetVersionAtTime(ctx context.Context, ehrID ehr.EHRID, t time.Time) (*Version, *openehrclient.VersionMetadata, error) {
 	return GetVersionAtTime(ctx, r.c, ehrID, t)
 }
 
-func (r *repository) GetVersionByID(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error) {
+func (r *repository) GetVersionByID(ctx context.Context, ehrID ehr.EHRID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error) {
 	return GetVersionByID(ctx, r.c, ehrID, versionUID)
 }

@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 )
 
 // renameSuffix is appended to a template id whose CDR copy holds other
@@ -509,7 +509,7 @@ func (r *runner) generateStage(ctx context.Context, cc *compiler, present map[st
 					continue
 				}
 				p := postRecord{CDR: c.name, TemplateID: t.TemplateID, Label: d.rec.label(), File: d.rec.File}
-				r.post(ctx, c, p, r.posts, func(ctx context.Context, id openehrclient.EHRID) outcome {
+				r.post(ctx, c, p, r.posts, func(ctx context.Context, id ehr.EHRID) outcome {
 					return c.saveComposition(ctx, id, d.comp)
 				})
 			}
@@ -521,7 +521,7 @@ func (r *runner) generateStage(ctx context.Context, cc *compiler, present map[st
 // document there with send. The EHR create is recorded in ehrs.jsonl as it
 // returns, then the post in out. A create the CDR refuses is the document's
 // outcome, with stage "ehr".
-func (r *runner) post(ctx context.Context, c *cdrClient, p postRecord, out *stream[postRecord], send func(context.Context, openehrclient.EHRID) outcome) {
+func (r *runner) post(ctx context.Context, c *cdrClient, p postRecord, out *stream[postRecord], send func(context.Context, ehr.EHRID) outcome) {
 	id := r.ids.next()
 	eo := c.newEHR(ctx, id)
 	r.ehrs.add(ehrRecord{CDR: c.name, EHRID: string(id), TemplateID: p.TemplateID, Label: p.Label, Source: p.Source, outcome: eo})
@@ -638,7 +638,7 @@ func (r *runner) crossStage(ctx context.Context, present map[string]map[string]b
 				r.cross.add(p)
 				continue
 			}
-			r.post(ctx, c, p, r.cross, func(ctx context.Context, id openehrclient.EHRID) outcome {
+			r.post(ctx, c, p, r.cross, func(ctx context.Context, id ehr.EHRID) outcome {
 				return c.postRaw(ctx, id, doc)
 			})
 		}

@@ -20,6 +20,7 @@ import (
 	"os"
 	"time"
 
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -84,7 +85,7 @@ func run() error {
 	// "<versioned object id>::<system id>::<version>"; the versioned object
 	// id names the whole family, and LatestOf asks for its newest version.
 	voID := created.VersionUID.VersionedObjectID()
-	latest, current, err := composition.Get(ctx, client, exampleEHRID, ehr.LatestOf(voID))
+	latest, current, err := composition.Get(ctx, client, exampleEHRID, openehrclient.LatestOf(voID))
 	if err != nil {
 		return fmt.Errorf("composition.Get: %w", err)
 	}

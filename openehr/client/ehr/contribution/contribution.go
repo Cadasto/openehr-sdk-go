@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -57,7 +58,7 @@ func WithPrefer(p transport.Prefer) CommitOption {
 //
 // Concurrency failures within the batch surface as
 // [transport.ErrVersionConflict].
-func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
+func Commit(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("contribution.Commit: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -130,7 +131,7 @@ func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 // [transport.ErrInvalidConfig] before any request is issued; a 404 maps
 // to [transport.ErrNotFound]. v1 requests canonical JSON only;
 // simplified-format Accept values are not supported.
-func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
+func Get(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("contribution.Get: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -148,8 +149,8 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, co
 
 // Repository mirrors the package functions as a dependency-injection seam.
 type Repository interface {
-	Commit(ctx context.Context, ehrID openehrclient.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error)
-	Get(ctx context.Context, ehrID openehrclient.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error)
+	Commit(ctx context.Context, ehrID ehr.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error)
+	Get(ctx context.Context, ehrID ehr.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -157,10 +158,10 @@ func NewRepository(c *transport.Client) Repository { return &repository{c: c} }
 
 type repository struct{ c *transport.Client }
 
-func (r *repository) Commit(ctx context.Context, ehrID openehrclient.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
+func (r *repository) Commit(ctx context.Context, ehrID ehr.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
 	return Commit(ctx, r.c, ehrID, batch, opts...)
 }
 
-func (r *repository) Get(ctx context.Context, ehrID openehrclient.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
+func (r *repository) Get(ctx context.Context, ehrID ehr.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
 	return Get(ctx, r.c, ehrID, contributionUID)
 }

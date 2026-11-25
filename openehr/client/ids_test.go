@@ -1,4 +1,4 @@
-package ehr
+package client
 
 import (
 	"testing"
@@ -114,5 +114,23 @@ func TestVersionUIDMalformedSegments(t *testing.T) {
 		if got := versionUIDFromETag(raw); got != "" {
 			t.Errorf("versionUIDFromETag(%q) = %q, want empty", raw, got)
 		}
+	}
+}
+
+func TestVersionUIDParsing(t *testing.T) {
+	v := VersionUID("aaa::cdr.example::3")
+	if got := v.VersionedObjectID(); got != "aaa" {
+		t.Errorf("VersionedObjectID = %q", got)
+	}
+	if got := v.CreatingSystemID(); got != "cdr.example" {
+		t.Errorf("CreatingSystemID = %q", got)
+	}
+	if got := v.VersionNumber(); got != "3" {
+		t.Errorf("VersionNumber = %q", got)
+	}
+	// Malformed.
+	v2 := VersionUID("not-a-version")
+	if v2.VersionedObjectID() != "" || v2.CreatingSystemID() != "" || v2.VersionNumber() != "" {
+		t.Error("malformed VersionUID should return empty segments")
 	}
 }

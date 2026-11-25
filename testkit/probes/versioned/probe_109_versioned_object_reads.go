@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/demographic"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/directory"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus"
@@ -34,7 +35,7 @@ const probe109AtTimeWire = "2015-01-20T18:30:22.765432101Z"
 type Probe109Inputs struct {
 	// EHRID is the EHR whose VERSIONED_COMPOSITION, VERSIONED_EHR_STATUS,
 	// EHR_STATUS and directory are read.
-	EHRID openehrclient.EHRID
+	EHRID ehr.EHRID
 	// CompositionVOID is a VERSIONED_COMPOSITION in EHRID. It is also the
 	// composition read by a Ref with a time.
 	CompositionVOID openehrclient.VersionedObjectID
@@ -181,9 +182,9 @@ func Probe109VersionedObjectReads(ctx context.Context, c *transport.Client, capt
 // refusals holds the two by-id reads of a version the backend answers with
 // an IMPORTED_VERSION.
 func probe109Reads(c *transport.Client, base string, in Probe109Inputs) (reads, refusals []probe109Read) {
-	ehr := base + "/ehr/" + string(in.EHRID)
-	vc := ehr + "/versioned_composition/" + string(in.CompositionVOID)
-	vs := ehr + "/versioned_ehr_status"
+	ehrBase := base + "/ehr/" + string(in.EHRID)
+	vc := ehrBase + "/versioned_composition/" + string(in.CompositionVOID)
+	vs := ehrBase + "/versioned_ehr_status"
 	refusals = []probe109Read{
 		{name: "composition.GetVersionByID", path: vc + "/version/" + string(in.ImportedVersionUID), acceptJSON: true, call: func(ctx context.Context) (string, error) {
 			_, _, err := composition.GetVersionByID(ctx, c, in.EHRID, in.CompositionVOID, in.ImportedVersionUID)
@@ -257,15 +258,15 @@ func probe109Reads(c *transport.Client, base string, in Probe109Inputs) (reads, 
 		// The other leaves that send version_at_time. Their own reads are
 		// not this probe's subject, so only the request is judged: its
 		// method, path and version_at_time, not Accept or the read's result.
-		{name: "composition.Get(LatestAtTime)", path: ehr + "/composition/" + string(in.CompositionVOID), atTime: true, requestOnly: true, call: func(ctx context.Context) (string, error) {
+		{name: "composition.Get(LatestAtTime)", path: ehrBase + "/composition/" + string(in.CompositionVOID), atTime: true, requestOnly: true, call: func(ctx context.Context) (string, error) {
 			_, _, err := composition.Get(ctx, c, in.EHRID, openehrclient.LatestAtTime(in.CompositionVOID, probe109AtTime))
 			return "", err
 		}},
-		{name: "ehrstatus.GetAtTime", path: ehr + "/ehr_status", atTime: true, requestOnly: true, call: func(ctx context.Context) (string, error) {
+		{name: "ehrstatus.GetAtTime", path: ehrBase + "/ehr_status", atTime: true, requestOnly: true, call: func(ctx context.Context) (string, error) {
 			_, _, err := ehrstatus.GetAtTime(ctx, c, in.EHRID, probe109AtTime)
 			return "", err
 		}},
-		{name: "directory.GetAtTime", path: ehr + "/directory", atTime: true, requestOnly: true, call: func(ctx context.Context) (string, error) {
+		{name: "directory.GetAtTime", path: ehrBase + "/directory", atTime: true, requestOnly: true, call: func(ctx context.Context) (string, error) {
 			_, _, err := directory.GetAtTime(ctx, c, in.EHRID, probe109AtTime)
 			return "", err
 		}},

@@ -6,9 +6,9 @@
 //
 // A Composition GET addresses either the versioned-object family
 // (returns the latest) or a specific version, discriminated by
-// [github.com/cadasto/openehr-sdk-go/openehr/client/ehr.Ref];
-// callers construct one via [ehr.LatestOf], [ehr.LatestAtTime], or
-// [ehr.VersionOf].
+// [github.com/cadasto/openehr-sdk-go/openehr/client.Ref]; callers
+// construct one via [openehrclient.LatestOf],
+// [openehrclient.LatestAtTime], or [openehrclient.VersionOf].
 //
 // Save and Update write canonical JSON by default, and Get reads it.
 // [WithFormat] writes a composition as canonical XML ([FormatXML]) or in the

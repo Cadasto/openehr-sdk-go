@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -59,9 +59,9 @@ func resourceType(p rm.Party) (Type, error) {
 func basePath(t Type) string { return "/demographic/" + string(t) }
 
 // Get retrieves a PARTY of the given type. The Ref selects the target:
-// [ehr.LatestOf](voID) for the latest version of a versioned-object family,
-// [ehr.LatestAtTime](voID, t) for the as-of-time variant, or
-// [ehr.VersionOf](uid) for a specific version. A Ref whose time has a UTC
+// [openehrclient.LatestOf](voID) for the latest version of a versioned-object family,
+// [openehrclient.LatestAtTime](voID, t) for the as-of-time variant, or
+// [openehrclient.VersionOf](uid) for a specific version. A Ref whose time has a UTC
 // year outside 0000-9999 fails with [transport.ErrInvalidConfig] before any
 // request, since RFC 3339 cannot write it. The returned value is the
 // concrete type ([*rm.Person] etc.) behind the [rm.Party] interface, decoded

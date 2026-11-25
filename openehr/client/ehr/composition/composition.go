@@ -10,7 +10,8 @@ import (
 	"slices"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
@@ -30,9 +31,9 @@ const routeTemplate = "/ehr/{ehr_id}/composition/{versioned_object_or_version_ui
 var ErrDeletedAtTime = errors.New("composition: deleted at requested time")
 
 // Get retrieves a Composition under the given EHR. The Ref selects
-// the target: [ehr.LatestOf](voID) for the latest version of a
-// versioned-object family, [ehr.LatestAtTime](voID, t) for the
-// as-of-time variant, or [ehr.VersionOf](uid) for a specific version. A
+// the target: [openehrclient.LatestOf](voID) for the latest version of a
+// versioned-object family, [openehrclient.LatestAtTime](voID, t) for the
+// as-of-time variant, or [openehrclient.VersionOf](uid) for a specific version. A
 // Ref whose time has a UTC year outside 0000-9999 fails with
 // [transport.ErrInvalidConfig] before any request, since RFC 3339 cannot
 // write it.
@@ -52,7 +53,7 @@ var ErrDeletedAtTime = errors.New("composition: deleted at requested time")
 // A body that does not decode returns a [*transport.DecodeError] beside the
 // version metadata. An empty or null body returns [transport.ErrInvalidShape]
 // in every format.
-func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ref openehrclient.Ref, opts ...GetOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
+func Get(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ref openehrclient.Ref, opts ...GetOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Get: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -438,7 +439,7 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // request with an [*EncodeError], which wraps the codec's error; an option
 // the write refuses fails with [transport.ErrInvalidConfig], also before
 // any request.
-func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
+func Save(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Save: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -505,7 +506,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 // ITS-REST OpenAPI `200_COMPOSITION_updated` response. The format
 // options apply as they do for [Save], and a composition the format's
 // codec cannot serialise fails before any request with an [*EncodeError].
-func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
+func Update(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Update: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -570,7 +571,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 // the metadata returned beside the error; 404 (unknown EHR or version) →
 // [transport.ErrNotFound]. A 400 (for example, already deleted) has no
 // sentinel and surfaces as a bare [transport.WireError].
-func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+func Delete(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, fmt.Errorf("composition.Delete: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -698,15 +699,15 @@ func marshalItemTagHeaders(object, version []openehrclient.ItemTag) (objectHdr, 
 
 // Repository mirrors the package-level Composition functions.
 type Repository interface {
-	Get(ctx context.Context, ehrID openehrclient.EHRID, ref openehrclient.Ref, opts ...GetOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
-	Save(ctx context.Context, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
-	Update(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
-	Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
-	GetVersionedObject(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID) (*rm.VersionedComposition, *openehrclient.VersionMetadata, error)
-	GetRevisionHistory(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error)
-	GetVersion(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID) (*Version, *openehrclient.VersionMetadata, error)
-	GetVersionAtTime(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, t time.Time) (*Version, *openehrclient.VersionMetadata, error)
-	GetVersionByID(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error)
+	Get(ctx context.Context, ehrID ehr.EHRID, ref openehrclient.Ref, opts ...GetOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
+	Save(ctx context.Context, ehrID ehr.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
+	Update(ctx context.Context, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
+	Delete(ctx context.Context, ehrID ehr.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
+	GetVersionedObject(ctx context.Context, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID) (*rm.VersionedComposition, *openehrclient.VersionMetadata, error)
+	GetRevisionHistory(ctx context.Context, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error)
+	GetVersion(ctx context.Context, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID) (*Version, *openehrclient.VersionMetadata, error)
+	GetVersionAtTime(ctx context.Context, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID, t time.Time) (*Version, *openehrclient.VersionMetadata, error)
+	GetVersionByID(ctx context.Context, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -714,18 +715,18 @@ func NewRepository(c *transport.Client) Repository { return &repository{c: c} }
 
 type repository struct{ c *transport.Client }
 
-func (r *repository) Get(ctx context.Context, ehrID openehrclient.EHRID, ref openehrclient.Ref, opts ...GetOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
+func (r *repository) Get(ctx context.Context, ehrID ehr.EHRID, ref openehrclient.Ref, opts ...GetOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	return Get(ctx, r.c, ehrID, ref, opts...)
 }
 
-func (r *repository) Save(ctx context.Context, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
+func (r *repository) Save(ctx context.Context, ehrID ehr.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	return Save(ctx, r.c, ehrID, comp, opts...)
 }
 
-func (r *repository) Update(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
+func (r *repository) Update(ctx context.Context, ehrID ehr.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	return Update(ctx, r.c, ehrID, voID, ifMatch, comp, opts...)
 }
 
-func (r *repository) Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+func (r *repository) Delete(ctx context.Context, ehrID ehr.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
 	return Delete(ctx, r.c, ehrID, versionUID, opts...)
 }

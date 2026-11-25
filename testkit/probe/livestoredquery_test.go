@@ -8,7 +8,7 @@ import (
 	"uuid"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/query"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -39,7 +39,7 @@ type storedQuery struct {
 //     metadata for the body-less 200 store reply.
 //   - PROBE-066 (REQ-057): the stored execution returns a typed ResultSet with
 //     Columns and Rows populated; the bound parameter round-trips this run's EHR.
-func storedQueryLiveEntries(id openehrclient.EHRID, qualifiedName string, out *storedQuery) []probe.Entry {
+func storedQueryLiveEntries(id ehr.EHRID, qualifiedName string, out *storedQuery) []probe.Entry {
 	live := []probe.Mode{probe.ModeLive}
 	return []probe.Entry{
 		{
@@ -123,7 +123,7 @@ func storedQueryLiveEntries(id openehrclient.EHRID, qualifiedName string, out *s
 // self-scoping (REQ-082 Live): no collision with another run, no dependency on a
 // pre-seeded catalog query.
 func TestLiveStoredQuerySnapshot(t *testing.T) {
-	id := openehrclient.EHRID(uuid.NewV4().String())
+	id := ehr.EHRID(uuid.NewV4().String())
 	// Per-run qualified query name: {namespace}::{query-name} with the run
 	// identifier in the name part, so the store is self-scoping (REQ-082 Live).
 	qualifiedName := "org.cadasto.sdk::snapshot_q_" + strings.ReplaceAll(string(id), "-", "")

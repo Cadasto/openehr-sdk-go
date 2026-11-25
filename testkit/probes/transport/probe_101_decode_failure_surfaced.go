@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -50,7 +50,7 @@ import (
 //     cannot decode as an EHR; missingID is one it answers 404 for. The
 //     Definition list route (GET /definition/template/adl1.4) answers 200
 //     with a non-empty JSON object where an array is expected.
-func Probe101DecodeFailureSurfaced(ctx context.Context, c *transport.Client, captured func() []string, undecodableID, missingID openehrclient.EHRID) (Result, error) { // PROBE-101 (REQ-151)
+func Probe101DecodeFailureSurfaced(ctx context.Context, c *transport.Client, captured func() []string, undecodableID, missingID ehr.EHRID) (Result, error) { // PROBE-101 (REQ-151)
 	r := Result{Probe: "PROBE-101"}
 	if c == nil {
 		return r, errors.New("PROBE-101: nil transport.Client")
@@ -65,7 +65,7 @@ func Probe101DecodeFailureSurfaced(ctx context.Context, c *transport.Client, cap
 
 	// (a) A 200 the read cannot decode.
 	before := requests()
-	ehr, _, err := openehrclient.Get(ctx, c, undecodableID)
+	got, _, err := ehr.Get(ctx, c, undecodableID)
 	if n := requests() - before; n != 1 {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("the undecodable-200 read issued %d requests, want exactly 1 — the failure must come from the response, not from a refusal before the wire", n)
@@ -75,14 +75,14 @@ func Probe101DecodeFailureSurfaced(ctx context.Context, c *transport.Client, cap
 		r.Status = "fail"
 		r.Detail = "a read served a 200 whose body does not decode as the requested representation returned a nil error"
 		switch {
-		case ehr == nil:
+		case got == nil:
 			r.Detail += "; it handed back no resource either — a silent success with nothing decoded is exactly what REQ-151 forbids"
-		case ehr.EHRID.Value == "":
+		case got.EHRID.Value == "":
 			r.Detail += "; the resource it handed back is a zero value — a silently zero-valued success is exactly what REQ-151 forbids"
 		}
 		return r, nil
 	}
-	if ehr != nil {
+	if got != nil {
 		r.Status = "fail"
 		r.Detail = "a failed 2xx decode handed back a resource beside the error; there is nothing decoded to return"
 		return r, nil
@@ -90,7 +90,7 @@ func Probe101DecodeFailureSurfaced(ctx context.Context, c *transport.Client, cap
 
 	// (b) A non-2xx on the same route still fails.
 	before = requests()
-	ehr, _, err = openehrclient.Get(ctx, c, missingID)
+	got, _, err = ehr.Get(ctx, c, missingID)
 	if n := requests() - before; n != 1 {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("the 404 read issued %d requests, want exactly 1", n)
@@ -101,7 +101,7 @@ func Probe101DecodeFailureSurfaced(ctx context.Context, c *transport.Client, cap
 		r.Detail = "a read served a 404 returned a nil error"
 		return r, nil
 	}
-	if ehr != nil {
+	if got != nil {
 		r.Status = "fail"
 		r.Detail = "a read served a 404 handed back a resource beside the error"
 		return r, nil

@@ -8,7 +8,7 @@ package composition_test
 // REQ-151 § Scope requires it satisfy the contract identically anyway. Update
 // under Prefer=return=representation decodes through the REQ-094 write-result
 // funnel, whose failure REQ-151 § The taxonomy reports as
-// *ehr.NoRepresentationError, never as a *transport.DecodeError. Both are
+// *client.NoRepresentationError, never as a *transport.DecodeError. Both are
 // pinned here, so the boundary between the two is visible in one file.
 
 import (
@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -102,16 +102,16 @@ func TestGetEmptyBodyKeepsInvalidShape(t *testing.T) { // REQ-151
 }
 
 // TestUpdateRepresentationDecodeFailureIsNotDecodeError pins the write-result
-// funnel's row of REQ-151 § The taxonomy, *ehr.NoRepresentationError.
+// funnel's row of REQ-151 § The taxonomy, *client.NoRepresentationError.
 // Update under Prefer=return=representation decodes through
-// ehr.WriteResult, whose committed-but-unusable arm is REQ-094's
-// *ehr.NoRepresentationError — a materially different contract, since the
+// client.WriteResult, whose committed-but-unusable arm is REQ-094's
+// *client.NoRepresentationError — a materially different contract, since the
 // write did commit and the caller's recovery is to re-read the version, not to
 // re-parse the body. Re-typing it as *transport.DecodeError would tell the
 // caller the opposite.
 //
 // composition.Update is one concrete leaf of that funnel; directory,
-// ehrstatus and demographic reach the same statement in ehr.WriteResult.
+// ehrstatus and demographic reach the same statement in client.WriteResult.
 func TestUpdateRepresentationDecodeFailureIsNotDecodeError(t *testing.T) { // REQ-151
 	newVUID := openehrclient.VersionUID("1234abcd-5678-9012-3456-7890abcdef00::cdr.example::2")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -132,7 +132,7 @@ func TestUpdateRepresentationDecodeFailureIsNotDecodeError(t *testing.T) { // RE
 	// The arm's existing contract, unchanged.
 	nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
 	if !ok {
-		t.Fatalf("err = %T (%v), want *ehr.NoRepresentationError — REQ-094 owns the write-result funnel", err, err)
+		t.Fatalf("err = %T (%v), want *client.NoRepresentationError — REQ-094 owns the write-result funnel", err, err)
 	}
 	if errors.Is(err, transport.ErrInvalidShape) {
 		t.Error("a decode failure is not an empty-body ErrInvalidShape")
@@ -146,6 +146,6 @@ func TestUpdateRepresentationDecodeFailureIsNotDecodeError(t *testing.T) { // RE
 
 	// The disjointness itself: this arm is never a *transport.DecodeError.
 	if de, ok := errors.AsType[*transport.DecodeError](err); ok {
-		t.Errorf("a write-result representation decode failure surfaced as *transport.DecodeError (%v); REQ-151 § The taxonomy reports this arm as REQ-094's *ehr.NoRepresentationError", de)
+		t.Errorf("a write-result representation decode failure surfaced as *transport.DecodeError (%v); REQ-151 § The taxonomy reports this arm as REQ-094's *client.NoRepresentationError", de)
 	}
 }

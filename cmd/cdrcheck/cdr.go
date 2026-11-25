@@ -14,7 +14,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth/basic"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -202,19 +202,19 @@ func (c *cdrClient) storedTemplate(ctx context.Context, id string) ([]byte, outc
 //
 // A create the CDR answered with a 2xx whose body the SDK cannot read is
 // still a create: the EHR is the one the run named.
-func (c *cdrClient) newEHR(ctx context.Context, id openehrclient.EHRID) outcome {
+func (c *cdrClient) newEHR(ctx context.Context, id ehr.EHRID) outcome {
 	return c.call(ctx, func(ctx context.Context) error {
-		ehr, meta, err := openehrclient.Create(ctx, c.c, openehrclient.WithEHRID(id))
+		created, meta, err := ehr.Create(ctx, c.c, ehr.WithEHRID(id))
 		if err != nil {
 			if _, wire := errors.AsType[*transport.WireError](err); !wire && meta != nil {
 				return nil // a 2xx: the EHR exists, its representation did not decode
 			}
 			return err
 		}
-		if ehr == nil {
+		if created == nil {
 			return nil
 		}
-		if got := ehr.EHRID.Value; got != "" && got != string(id) {
+		if got := created.EHRID.Value; got != "" && got != string(id) {
 			return fmt.Errorf("the CDR answered with ehr_id %s, not the %s it was asked to create", got, id)
 		}
 		return nil
@@ -222,7 +222,7 @@ func (c *cdrClient) newEHR(ctx context.Context, id openehrclient.EHRID) outcome 
 }
 
 // saveComposition posts comp, as the SDK serialises it, to the EHR id.
-func (c *cdrClient) saveComposition(ctx context.Context, id openehrclient.EHRID, comp *rm.Composition) outcome {
+func (c *cdrClient) saveComposition(ctx context.Context, id ehr.EHRID, comp *rm.Composition) outcome {
 	return c.call(ctx, func(ctx context.Context) error {
 		_, _, err := composition.Save(ctx, c.c, id, comp)
 		return err
@@ -232,7 +232,7 @@ func (c *cdrClient) saveComposition(ctx context.Context, id openehrclient.EHRID,
 // postRaw posts a canonical-JSON document as given to the EHR id. A CDR's
 // own example goes this way, so that what the other CDR judges is that
 // CDR's bytes, not the SDK's reading of them.
-func (c *cdrClient) postRaw(ctx context.Context, id openehrclient.EHRID, doc []byte) outcome {
+func (c *cdrClient) postRaw(ctx context.Context, id ehr.EHRID, doc []byte) outcome {
 	return c.call(ctx, func(ctx context.Context) error {
 		_, err := c.c.Do(ctx, &transport.Request{
 			Method: http.MethodPost,

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )

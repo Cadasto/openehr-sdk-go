@@ -7,7 +7,8 @@ import (
 	"net/url"
 	"time"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -18,7 +19,7 @@ const (
 	routeVersioned = "/ehr/{ehr_id}/directory/{version_uid}"
 )
 
-func basePath(ehrID openehrclient.EHRID) string {
+func basePath(ehrID ehr.EHRID) string {
 	return "/ehr/" + string(ehrID) + "/directory"
 }
 
@@ -57,7 +58,7 @@ func applyPath(req *transport.Request, opts []GetOption) {
 // Get returns the latest Directory FOLDER for ehrID.
 //
 // Wire: GET /ehr/{ehr_id}/directory [?path=...].
-func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
+func Get(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.Get: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -77,7 +78,7 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, op
 //
 // Wire: GET /ehr/{ehr_id}/directory?version_at_time={t} [&path=...],
 // with t sent in UTC with its fraction of a second.
-func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, t time.Time, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
+func GetAtTime(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, t time.Time, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.GetAtTime: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -103,7 +104,7 @@ func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHR
 // GetVersioned returns the Directory identified by versionUID.
 //
 // Wire: GET /ehr/{ehr_id}/directory/{version_uid} [?path=...].
-func GetVersioned(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
+func GetVersioned(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, versionUID openehrclient.VersionUID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.GetVersioned: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -182,7 +183,7 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // the uniform presence test across write leaves. After 2xx +
 // PreferRepresentation, an empty or undecodable body is a
 // [*openehrclient.NoRepresentationError] carrying commit metadata.
-func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
+func Save(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.Save: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -227,7 +228,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 // Wire: PUT /ehr/{ehr_id}/directory with If-Match. Response shape
 // matches [Save]: bare `*rm.Folder` per the ITS-REST OpenAPI
 // `200_FOLDER_retrieved`.
-func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
+func Update(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.Update: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -276,7 +277,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 // ITS-REST definition this SDK targets gives. If a deployment expects
 // another path, such as `/directory/{version_uid}`, use
 // [transport.Client.Do] with a custom request.
-func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+func Delete(ctx context.Context, c *transport.Client, ehrID ehr.EHRID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, fmt.Errorf("directory.Delete: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -317,12 +318,12 @@ func decodeFolder(body []byte) (*rm.Folder, error) {
 
 // Repository mirrors the package-level Directory functions.
 type Repository interface {
-	Get(ctx context.Context, ehrID openehrclient.EHRID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
-	GetAtTime(ctx context.Context, ehrID openehrclient.EHRID, t time.Time, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
-	GetVersioned(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
-	Save(ctx context.Context, ehrID openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
-	Update(ctx context.Context, ehrID openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
-	Delete(ctx context.Context, ehrID openehrclient.EHRID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
+	Get(ctx context.Context, ehrID ehr.EHRID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
+	GetAtTime(ctx context.Context, ehrID ehr.EHRID, t time.Time, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
+	GetVersioned(ctx context.Context, ehrID ehr.EHRID, versionUID openehrclient.VersionUID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
+	Save(ctx context.Context, ehrID ehr.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
+	Update(ctx context.Context, ehrID ehr.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
+	Delete(ctx context.Context, ehrID ehr.EHRID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -330,26 +331,26 @@ func NewRepository(c *transport.Client) Repository { return &repository{c: c} }
 
 type repository struct{ c *transport.Client }
 
-func (r *repository) Get(ctx context.Context, id openehrclient.EHRID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
+func (r *repository) Get(ctx context.Context, id ehr.EHRID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	return Get(ctx, r.c, id, opts...)
 }
 
-func (r *repository) GetAtTime(ctx context.Context, id openehrclient.EHRID, t time.Time, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
+func (r *repository) GetAtTime(ctx context.Context, id ehr.EHRID, t time.Time, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	return GetAtTime(ctx, r.c, id, t, opts...)
 }
 
-func (r *repository) GetVersioned(ctx context.Context, id openehrclient.EHRID, uid openehrclient.VersionUID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
+func (r *repository) GetVersioned(ctx context.Context, id ehr.EHRID, uid openehrclient.VersionUID, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	return GetVersioned(ctx, r.c, id, uid, opts...)
 }
 
-func (r *repository) Save(ctx context.Context, id openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
+func (r *repository) Save(ctx context.Context, id ehr.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	return Save(ctx, r.c, id, folder, opts...)
 }
 
-func (r *repository) Update(ctx context.Context, id openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
+func (r *repository) Update(ctx context.Context, id ehr.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	return Update(ctx, r.c, id, ifMatch, folder, opts...)
 }
 
-func (r *repository) Delete(ctx context.Context, id openehrclient.EHRID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+func (r *repository) Delete(ctx context.Context, id ehr.EHRID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
 	return Delete(ctx, r.c, id, ifMatch, opts...)
 }

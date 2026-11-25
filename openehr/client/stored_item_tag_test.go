@@ -1,9 +1,9 @@
-package ehr_test
+package client_test
 
 import (
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
@@ -27,7 +27,7 @@ func objectIDValue(id rm.ObjectID) (value, class string) {
 // concrete class, so a version target and a versioned-object target stay
 // apart, and whose type names the tagged party's class.
 func TestStoredItemTagDecodesTheTagsListBody(t *testing.T) {
-	var tags []ehr.StoredItemTag
+	var tags []openehrclient.StoredItemTag
 	if err := canjson.Unmarshal(readFixture(t, "demographic", "demographic_tags.json"), &tags); err != nil {
 		t.Fatalf("decode demographic_tags.json: %v", err)
 	}
@@ -68,14 +68,14 @@ func TestStoredItemTagDecodesTheTagsListBody(t *testing.T) {
 // back is the stored tag's key, value and target path, so a read can be
 // edited and written without copying fields by hand.
 func TestStoredItemTagItemTagKeepsTheWritablePart(t *testing.T) {
-	st := ehr.StoredItemTag{
+	st := openehrclient.StoredItemTag{
 		Key:        "flag",
 		Value:      "follow-up",
 		TargetPath: "/identities",
 		Target:     rm.ObjectRef{ID: &rm.HierObjectID{Value: "8849182c-82ad-4088-a07f-48ead4180515"}, Namespace: "local", Type: "PERSON"},
 		OwnerID:    rm.ObjectRef{ID: &rm.HierObjectID{Value: "7d44b88c-4199-4bad-97dc-d78268e01398"}, Namespace: "local", Type: "SYSTEM"},
 	}
-	want := ehr.ItemTag{Key: "flag", Value: "follow-up", TargetPath: "/identities"}
+	want := openehrclient.ItemTag{Key: "flag", Value: "follow-up", TargetPath: "/identities"}
 	if got := st.ItemTag(); got != want {
 		t.Errorf("ItemTag() = %+v, want %+v", got, want)
 	}

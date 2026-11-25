@@ -1,4 +1,4 @@
-package ehr
+package client
 
 import "time"
 
@@ -32,7 +32,7 @@ type Ref interface {
 // ByVersionedObjectID addresses the latest version of a versioned
 // resource family. Use with [LatestOf] for readability:
 //
-//	composition.Get(ctx, c, ehrID, ehr.LatestOf(voID))
+//	composition.Get(ctx, c, ehrID, client.LatestOf(voID))
 type ByVersionedObjectID struct {
 	VOID VersionedObjectID
 	// AtTime optionally requests the version that was current at the
@@ -77,7 +77,7 @@ func (r ByVersionedObjectID) Validate() error {
 // ByVersionUID addresses one specific version of a versioned resource.
 // Use with [VersionOf]:
 //
-//	composition.Get(ctx, c, ehrID, ehr.VersionOf(uid))
+//	composition.Get(ctx, c, ehrID, client.VersionOf(uid))
 type ByVersionUID struct {
 	UID VersionUID
 }

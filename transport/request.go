@@ -88,14 +88,14 @@ type Request struct {
 	Prefer Prefer
 	// AuditDetailsHeader sets the openehr-audit-details header. The
 	// caller pre-encodes their *rm.AuditDetails to the openEHR
-	// dotted-attribute header grammar (via ehr.MarshalAuditDetails),
+	// dotted-attribute header grammar (via client.MarshalAuditDetails),
 	// not JSON; the transport does not allocate codecs. Empty omits the
 	// header.
 	AuditDetailsHeader string
 	// RMVersion sets the openehr-version header. It conveys the
 	// committed VERSION's lifecycle_state as the dotted-attribute value
 	// `lifecycle_state.code_string="<code>"` (via
-	// ehr.FormatLifecycleStateHeader), not an RM spec version. Empty omits
+	// client.FormatLifecycleStateHeader), not an RM spec version. Empty omits
 	// the header.
 	RMVersion string
 	// TemplateID sets the openehr-template-id header. Empty

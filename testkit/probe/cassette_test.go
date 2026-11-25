@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
@@ -391,7 +392,7 @@ func replayCompositionMinimal(ctx context.Context, c *transport.Client, template
 	if meta == nil || meta.VersionUID == "" {
 		return "", fmt.Errorf("save version uid: composition.Save metadata %#v carries no version uid", meta)
 	}
-	got, _, err := composition.Get(ctx, c, id, ehr.VersionOf(meta.VersionUID))
+	got, _, err := composition.Get(ctx, c, id, openehrclient.VersionOf(meta.VersionUID))
 	if err != nil {
 		return "", fmt.Errorf("composition.Get: %w", err)
 	}

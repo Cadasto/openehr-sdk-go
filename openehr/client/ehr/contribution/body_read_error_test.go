@@ -11,7 +11,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -71,6 +71,6 @@ func TestCommitCutBodyKeepsMetadata(t *testing.T) { // REQ-151
 	// A body that was never read is not REQ-094's committed-but-unusable
 	// representation either.
 	if nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err); ok {
-		t.Errorf("errors.AsType[*ehr.NoRepresentationError] matched a body-read failure (%v)", nre)
+		t.Errorf("errors.AsType[*client.NoRepresentationError] matched a body-read failure (%v)", nre)
 	}
 }

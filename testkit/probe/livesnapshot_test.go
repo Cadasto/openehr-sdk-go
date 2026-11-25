@@ -14,7 +14,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/basic"
-	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/system"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
@@ -53,7 +53,7 @@ func safeBase(base string) string {
 // REQ-082's cross-mode-agreement rule (the runner requires the same verdict in
 // every mode a probe lists). The sandbox create/get/head path is exercised by
 // TestSandboxCreateEHRThroughRunner.
-func coreLiveEntries(id openehrclient.EHRID) []probe.Entry {
+func coreLiveEntries(id ehr.EHRID) []probe.Entry {
 	live := []probe.Mode{probe.ModeLive}
 	return []probe.Entry{
 		{
@@ -61,7 +61,7 @@ func coreLiveEntries(id openehrclient.EHRID) []probe.Entry {
 			Effect: probe.EffectMutating,
 			Modes:  live,
 			Run: func(ctx context.Context, c *transport.Client) (probe.Result, error) {
-				rec, meta, err := openehrclient.Create(ctx, c, openehrclient.WithEHRID(id))
+				rec, meta, err := ehr.Create(ctx, c, ehr.WithEHRID(id))
 				if err != nil {
 					return liveFail(err), nil
 				}
@@ -79,7 +79,7 @@ func coreLiveEntries(id openehrclient.EHRID) []probe.Entry {
 			Effect: probe.EffectReadOnly,
 			Modes:  live,
 			Run: func(ctx context.Context, c *transport.Client) (probe.Result, error) {
-				got, _, err := openehrclient.Get(ctx, c, id)
+				got, _, err := ehr.Get(ctx, c, id)
 				if err != nil {
 					return liveFail(err), nil
 				}
@@ -94,7 +94,7 @@ func coreLiveEntries(id openehrclient.EHRID) []probe.Entry {
 			Effect: probe.EffectReadOnly,
 			Modes:  live,
 			Run: func(ctx context.Context, c *transport.Client) (probe.Result, error) {
-				ok, err := openehrclient.Exists(ctx, c, id)
+				ok, err := ehr.Exists(ctx, c, id)
 				if err != nil {
 					return liveFail(err), nil
 				}
@@ -227,7 +227,7 @@ func runLiveSnapshot(t *testing.T, label string, entries []probe.Entry) {
 // skipped in CI (see runLiveSnapshot) and fails unless the run is green, so it
 // doubles as a Live gate for the core flows.
 func TestLiveCoreSnapshot(t *testing.T) {
-	id := openehrclient.EHRID(uuid.NewV4().String())
+	id := ehr.EHRID(uuid.NewV4().String())
 	t.Logf("per-run EHR id %s", id)
 	runLiveSnapshot(t, "core", coreLiveEntries(id))
 }
