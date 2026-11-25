@@ -122,7 +122,7 @@ Premature resolution is worse than no resolution.
 
 ## STRAND-09 — ITS-REST conformance follow-ups
 
-Resolved by the REST probes PROBE-062, PROBE-102, PROBE-103 and PROBE-104, and by [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md) for the stored-query paging fields; codified in [conformance.md](conformance.md) and [wire.md § REQ-057](wire.md#req-057) *Paging*.
+Resolved by the REST probes PROBE-062, PROBE-102, PROBE-103 and PROBE-104, and by [wire.md § REQ-057](wire.md#req-057) *Paging* for the stored-query paging fields; codified in [conformance.md](conformance.md).
 
 ---
 

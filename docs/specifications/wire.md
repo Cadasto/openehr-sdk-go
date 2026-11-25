@@ -65,29 +65,20 @@ When the OpenAPI files and any in-repo prose disagree, the OpenAPI wins; the pro
 ##### Keyed exceptions
 
 The SDK departs from the pin in the places below, each specified by the section that owns it.
-A departure that takes an irreversible fork has an ADR; one that is cheap to undo is keyed by its row here and its reason in the owning section.
+A departure that takes an irreversible fork has an ADR, named in the last column; one that is cheap to undo is keyed by its row here, with its reason in the owning section.
 A departure this list does not name is a defect, not an exception, and a new one is added here with the section that keys it.
 
-| Departure from the pin | Specified by | ADR |
+| Departure from the pin | Specified by | Why |
 |---|---|---|
 | Decode of `StoredQueryMetadata.saved` accepts values the pin's `format: date-time` excludes, by the decode path `created_timestamp` shares | [§ REQ-144](#req-144--definition-metadata-decoding) | [ADR 0019](../adr/0019-definition-timestamp-tolerance.md) |
 | Decode of `created_timestamp` and `saved` reads an absent, `null` or empty value, which the pin lists as required, as the zero `time.Time` | [§ REQ-144](#req-144--definition-metadata-decoding) *Absent and empty values* | [ADR 0019](../adr/0019-definition-timestamp-tolerance.md) |
 | Decode of a zone-less `created_timestamp` or `saved` reads it as UTC, where the pin's overview assumes the deployment's local zone | [§ REQ-144](#req-144--definition-metadata-decoding) *Zone handling* | [ADR 0019](../adr/0019-definition-timestamp-tolerance.md) |
-| A contribution deletion built without a payload omits `data`, which the pin's `UpdateVersion` lists as required | [§ REQ-130](#req-130--contribution-builder) *Deletion* | [ADR 0024](../adr/0024-contribution-deletion-without-data.md) |
-| A contribution's commit audit carries `_type: "AUDIT_DETAILS"` by default, where the pin's `Contribution_create` asks a client to send `UPDATE_AUDIT` | [§ REQ-130](#req-130--contribution-builder) *Audit* | none: cheap to undo |
-| A stored-query execution body omits `offset` and `fetch` the caller did not set, which the pin's `Query` schema lists as required | [§ REQ-057](#req-057) *Paging* | [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md) |
-| A composition write or read carries the `format` and `templateId` query parameters, which the pin does not define on those operations, when the caller opts in | [§ REQ-173](#req-173--composition-representation-formats) *The format query parameters* | [ADR 0030](../adr/0030-composition-format-query-parameters.md) |
-| A version read of a composition or an EHR_STATUS refuses an `IMPORTED_VERSION` body, which the pin's `UVersionOfComposition` and `UVersionOfEhrStatus` admit | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | [ADR 0031](../adr/0031-version-reads-refuse-imported-version.md) |
-| A version read of a composition or an EHR_STATUS accepts an `ORIGINAL_VERSION` without `data`, which the pin's `UMOriginalVersionOfComposition` and `UMOriginalVersionOfEhrStatus` list as required | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | [ADR 0032](../adr/0032-version-reads-accept-logical-deletion.md) |
-
-#### Path-parameter encoding
-
-A request path **MUST** conform to the OAS path template: each path parameter is percent-encoded exactly once on the wire.
-The transport is the one place that encodes a path.
-`transport.Request.Path` is a decoded path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out, so a leaf client (`openehr/client/*`) puts the raw, decoded id into `Request.Path` and does not escape it first with `url.PathEscape`.
-A pre-escaped parameter is encoded twice (a template id `Referral Request.v1` becomes `%20`, then `%2520`), which a strict server unescapes to a literal `%20` and answers `404`.
-Which characters a segment may hold is a separate question, answered by [REQ-150](transport.md#req-150--path-parameter-segment-validation), which also ignores `url.URL.RawPath`, so an encoded spelling cannot carry a separator past the validator.
-Decoding a server-supplied value, such as the `Location` header with `url.PathUnescape`, is unaffected: the rule is about forming the request path, not reading a response.
+| A contribution deletion built without a payload omits `data`, which the pin's `UpdateVersion` lists as required | [§ REQ-130](#req-130--contribution-builder) *Deletion* | the RM's logical deletion has no `data` |
+| A contribution's commit audit carries `_type: "AUDIT_DETAILS"` by default, where the pin's `Contribution_create` asks a client to send `UPDATE_AUDIT` | [§ REQ-130](#req-130--contribution-builder) *Audit* | in the owning section |
+| A stored-query execution body omits `offset` and `fetch` the caller did not set, which the pin's `Query` schema lists as required | [§ REQ-057](#req-057) *Paging* | the pin gives `fetch` no default |
+| A composition write or read carries the `format` and `templateId` query parameters, which the pin does not define on those operations, when the caller opts in | [§ REQ-173](#req-173--composition-representation-formats) *The format query parameters* | a deployment extension, off by default |
+| A version read of a composition or an EHR_STATUS refuses an `IMPORTED_VERSION` body, which the pin's `UVersionOfComposition` and `UVersionOfEhrStatus` admit | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | imported versions come with the EHR Extract, out of scope |
+| A version read of a composition or an EHR_STATUS accepts an `ORIGINAL_VERSION` without `data`, which the pin's `UMOriginalVersionOfComposition` and `UMOriginalVersionOfEhrStatus` list as required | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | the RM's logical deletion has no `data` |
 
 #### ITS-REST envelopes
 
@@ -96,17 +87,6 @@ The SDK **MUST** decode a well-formed envelope into a typed Go struct and surfac
 
 The exact envelope shapes are openEHR REST 1.1.0; this spec does not re-define them, it pins to them.
 A 2xx envelope that does not decode fails as [transport.md § REQ-151](transport.md#req-151--typed-2xx-decode-failure) says, and a non-2xx error envelope is decoded best-effort ([§ REQ-093](transport.md#req-093--openehr-error-envelope-mapping)).
-
-#### Request vs response shape asymmetry
-
-Two endpoints take a request body shaped unlike their response, which is easy to miss because the RM ships only the persisted (response) form:
-
-- A composition write (`POST /ehr/{ehr_id}/composition`, `PUT /ehr/{ehr_id}/composition/{vo_uid}`, and `directory.Save` / `Update` alike) sends a bare `COMPOSITION`, and under `Prefer: return=representation` gets a bare `COMPOSITION` back, not the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope ([PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition)).
-- A contribution (`POST /ehr/{ehr_id}/contribution`) sends ITS-REST `Contribution_create`, each version carrying its payload inline, and gets back the persisted `CONTRIBUTION`, whose `versions[]` are `OBJECT_REF`s to versions the server assigned ([PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)).
-  A submission shaped like the persisted `CONTRIBUTION` is refused, because its `OBJECT_REF`s point at versions that do not exist yet.
-  Its commit audit has the shape of the `UPDATE_AUDIT` DTO of SPECITS-95 ([ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)), not of the persisted `AUDIT_DETAILS`; the `_type` it carries is [§ REQ-130](#req-130--contribution-builder) *Audit*'s.
-
-Which shape each submission path sends, and which server-assigned fields a request body omits, is [§ REQ-130](#req-130--contribution-builder)'s.
 
 ## openEHR custom header family
 
@@ -1317,7 +1297,9 @@ Stored-query execution (`query.RunStored`, `query.RunStoredVersion`) **MUST** se
 The pin gives `fetch` no default and `fetch: 0` asks for zero rows, so a server applies its own default to an absent field.
 A request that sets one of the two fields and not the other is sent as set, not refused client-side; whether a server accepts `offset` without `fetch` is the server's rule.
 The POST body **MUST** carry `query_parameters`, as an empty object when the caller passes none.
-Leaving `offset` and `fetch` out of the POST body departs from the pin's `Query` schema, a departure [§ REQ-050](#the-openapi-files-are-authoritative) keys and [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md) decides.
+Leaving `offset` and `fetch` out of the POST body departs from the pin's `Query` schema, a departure [§ REQ-050](#the-openapi-files-are-authoritative) keys.
+The schema lists both as required but gives `fetch` no default, so any value the SDK sent would be a row cap the caller never chose; sending neither unless set follows the pin's GET operations and `AdhocQueryExecute`, where both are optional, and a server that pairs the two (EHRbase answers `422` to `offset` without `fetch`) keeps its own rule.
+The exception lapses when the pin makes the two fields optional on `Query`.
 
 #### Store-response version recovery
 
@@ -1368,7 +1350,7 @@ The Definition leaf **MUST** offer each through its own call on that route, so t
 
 Both **MUST** return a 2xx body byte for byte, undecoded, with the response metadata.
 A `TemplateFormat` other than `FormatADL14` **MUST** fail with `ErrInvalidConfig` before any request is issued.
-An empty template id is refused with `ErrInvalidConfig` before any request is issued, and a malformed one by [REQ-150](transport.md#req-150--path-parameter-segment-validation).
+An empty template id is refused with `ErrInvalidConfig` before any request is issued, and a malformed one by [REQ-150](transport.md#req-150--path-parameter-encoding-and-segment-validation).
 On a non-2xx answer, the `406` of a server that does not offer the representation included, both **MUST** return the typed wire error of [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) with the response metadata beside it.
 `GetTemplate` stays as a deprecated alias of `GetOperationalTemplate`.
 
@@ -1499,6 +1481,7 @@ A `Format` outside the four **MUST** fail with `ErrInvalidConfig` before any req
 FLAT and STRUCTURED serialise against the Web Template given, which **MUST** be non-nil for them; canonical JSON and XML do not consult it.
 A composition the codec cannot serialise **MUST** fail before any request, as a `*composition.EncodeError` that names the format and wraps the codec's error, so a caller tells it apart from a request that went out and failed and from an `ErrInvalidConfig` refusal.
 Everything else a write sends and returns **MUST** be what it is for canonical JSON: `If-Match`, `Prefer`, the audit, lifecycle and item-tag headers, and the version metadata.
+The request body of a composition write (`POST /ehr/{ehr_id}/composition`, `PUT /ehr/{ehr_id}/composition/{vo_uid}`, and `directory.Save` / `Update` alike) is a bare `COMPOSITION`, and under `Prefer: return=representation` its response body is a bare `COMPOSITION` too, never the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope the RM ships ([PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition)).
 
 - **Template id.**
   The pin's overview requires the `openehr-template-id` header whenever a composition is committed in a simplified format.
@@ -1538,7 +1521,7 @@ Some deployments select a simplified format with query parameters rather than wi
 
 The body is serialised and decoded in the format asked for, as above.
 On canonical JSON and XML the two options **MUST NOT** add a parameter.
-The form is outside the pin, so both options are off by default, and their documentation **SHOULD** name it a deployment extension, so a caller does not take it for openEHR REST; [§ REQ-050](#the-openapi-files-are-authoritative) keys it as an exception ([ADR 0030](../adr/0030-composition-format-query-parameters.md)).
+The form is outside the pin, so both options are off by default, and their documentation **SHOULD** name it a deployment extension, so a caller does not take it for openEHR REST; [§ REQ-050](#the-openapi-files-are-authoritative) keys it as an exception, which lapses if the pin defines these parameters on the composition operations.
 
 **Acceptance.**
 
@@ -1579,15 +1562,16 @@ Each family has four operations (`versioned_composition_*` and `versioned_ehr_st
 An EHR has one EHR_STATUS, so its versioned object is addressed by the `ehr_id` alone.
 The demographic leaf offers the same reads for `VERSIONED_PARTY`; of this §'s rules only *The `version_at_time` value* and the empty-body sentence of *Responses* bind it, the latter because the demographic pin answers each of the four `versioned_party_*` reads `200` with a body or `404`, a version absent at the requested time included (`404_not_found_or_no_version_at_time` in `demographic-validation.openapi.yaml`).
 
-An empty path parameter is refused with `ErrInvalidConfig` before any request is issued, a malformed one by [REQ-150](transport.md#req-150--path-parameter-segment-validation), and a `404` is mapped as on every leaf, by [REQ-093](transport.md#req-093--openehr-error-envelope-mapping).
+An empty path parameter is refused with `ErrInvalidConfig` before any request is issued, a malformed one by [REQ-150](transport.md#req-150--path-parameter-encoding-and-segment-validation), and a `404` is mapped as on every leaf, by [REQ-093](transport.md#req-093--openehr-error-envelope-mapping).
 
 #### Responses
 
 The versioned-object read **MUST** return the `VERSIONED_COMPOSITION` or `VERSIONED_EHR_STATUS`, and the revision-history read the `REVISION_HISTORY`, each decoded as its RM type.
-A version read **MUST** decode the `ORIGINAL_VERSION` envelope and return at least its `uid`, `preceding_version_uid`, `lifecycle_state`, `commit_audit` and `contribution`, and its `data` decoded as a `COMPOSITION` or an `EHR_STATUS`; a version that carries no `data`, the RM's logical deletion, returns no payload and no error, a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative) decided by [ADR 0032](../adr/0032-version-reads-accept-logical-deletion.md).
+A version read **MUST** decode the `ORIGINAL_VERSION` envelope and return at least its `uid`, `preceding_version_uid`, `lifecycle_state`, `commit_audit` and `contribution`, and its `data` decoded as a `COMPOSITION` or an `EHR_STATUS`; a version that carries no `data`, the RM's logical deletion, returns no payload and no error.
+The pin's `UMOriginalVersionOfComposition` and `UMOriginalVersionOfEhrStatus` list `data` as required, where the RM keeps it optional to allow logical deletion; reading the RM's form is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative) that lapses when the pin makes `data` optional.
 The pin's version schemas (`UVersionOfComposition`, `UVersionOfEhrStatus`) also admit an `IMPORTED_VERSION`.
 The SDK reads only `ORIGINAL_VERSION`: a body whose `_type` names anything else **MUST** fail as the typed decode failure of [REQ-151](transport.md#req-151--typed-2xx-decode-failure), never decode to an empty version.
-Refusing the `IMPORTED_VERSION` the pin admits is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative), decided by [ADR 0031](../adr/0031-version-reads-refuse-imported-version.md).
+Refusing the `IMPORTED_VERSION` the pin admits is a keyed exception of [§ REQ-050](#the-openapi-files-are-authoritative): imported versions come from the EHR Extract exchange, which is out of scope ([scope.md](scope.md#out-of-scope-v1)), and the exception is revisited when that exchange comes into scope.
 An empty or `null` 2xx body on any of these reads **MUST** fail with `ErrInvalidShape`, since the pin defines no successful response without a body for any of them.
 
 #### The contribution read
@@ -1646,7 +1630,12 @@ The builder introduces no wire shape of its own: what it emits is a `Submission`
 
 #### Submission shapes
 
-The SDK **MUST NOT** send the persisted shape on either submission path: a contribution sends a `contribution.Submission`, distinct from `rm.Contribution`, and a composition or directory write sends the bare RM type ([§ Request vs response shape asymmetry](#request-vs-response-shape-asymmetry)).
+A submission's request body is shaped unlike its response, which is easy to miss because the RM ships only the persisted (response) form.
+- A contribution (`POST /ehr/{ehr_id}/contribution`) sends ITS-REST `Contribution_create`, each version carrying its payload inline, and gets back the persisted `CONTRIBUTION`, whose `versions[]` are `OBJECT_REF`s to versions the server assigned ([PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)).
+  A submission shaped like the persisted `CONTRIBUTION` is refused, because its `OBJECT_REF`s point at versions that do not exist yet.
+  Its commit audit has the shape of the `UPDATE_AUDIT` DTO of SPECITS-95 ([ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)), not of the persisted `AUDIT_DETAILS`; the `_type` it carries is *Audit*'s below.
+
+The SDK **MUST NOT** send the persisted shape on either submission path: a contribution sends a `contribution.Submission`, distinct from `rm.Contribution`, and a composition or directory write sends the bare RM type ([§ REQ-173](#req-173--composition-representation-formats) *Writes*).
 
 #### Change types
 
@@ -1682,11 +1671,13 @@ The builder **MUST** build a deletion given no payload and emit it as a version 
 A deletion's `commit_audit.change_type` is `deleted` (`523`), and its `lifecycle_state` **MUST** default to `deleted` (`523`) with or without a payload; a per-version override replaces it.
 A creation, amendment or modification given no payload **MUST** be refused at `Build`.
 `Submission.Validate` **MUST** accept a version with no `data`, and the marshalled version decodes into an `rm.OriginalVersion` whose `data` is nil.
-A deletion built without a payload is the one version that carries no payload inline: it is the exception to the inline-`data` shape of [PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create), and the departure from the pinned schema that [REQ-050](#the-openapi-files-are-authoritative) keys to [ADR 0024](../adr/0024-contribution-deletion-without-data.md).
+A deletion built without a payload is the one version that carries no payload inline: it is the exception to the inline-`data` shape of [PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create), and a departure from the pinned schema that [REQ-050](#the-openapi-files-are-authoritative) keys.
+The pin's `UpdateVersion` lists `data` as required, while the RM's logical deletion is an `ORIGINAL_VERSION` whose `data` is Void, and servers split: some refuse a deleted version that carries `data`, others accept the pin's body.
+The departure is opt-in per call, since a caller who passes a payload gets the pin's form, and it lapses when the pin makes `data` optional.
 
 #### Audit
 
-The batch `audit` and every version's `commit_audit` are the write-side commit-audit DTO, which **MUST NOT** carry the server-assigned `time_committed` (§ [Request vs response shape asymmetry](#request-vs-response-shape-asymmetry)).
+The batch `audit` and every version's `commit_audit` are the write-side commit-audit DTO, which **MUST NOT** carry the server-assigned `time_committed` (*Submission shapes* above).
 The pin marks `change_type` and `committer` **required** on both.
 The builder **MUST** refuse at build time when either is missing, rather than emitting an audit the pin rejects, and **MUST** apply the batch committer, system id, and audit `_type` to every version whose own audit does not override them — one declaration, not one per version.
 The pin asks a client to send `_type:"UPDATE_AUDIT"` and a server to accept `AUDIT_DETAILS` or an omitted `_type`.

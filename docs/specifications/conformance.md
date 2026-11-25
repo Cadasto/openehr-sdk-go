@@ -941,13 +941,13 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 
 - **Title:** `POST /ehr/{ehr_id}/contribution` request body is the ITS-REST `Contribution_create` shape — `{audit, versions: [ORIGINAL_VERSION<T>|IMPORTED_VERSION<T> with inline data]}`, bar a deletion built without a payload — not the persisted `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`.
 - **Preconditions:** Existing EHR; at least one resource payload (`Composition` / `EHRStatus` / `Folder` / `EHRAccess`) to commit.
-- **Wire assertion:** Captured request body has `versions[i]._type ∈ {"ORIGINAL_VERSION","IMPORTED_VERSION"}` and carries the resource payload inline under `data`, except an `ORIGINAL_VERSION` with change type `523` built without a payload ([§ REQ-130](wire.md#req-130--contribution-builder) *Deletion*, keyed by [ADR 0024](../adr/0024-contribution-deletion-without-data.md)), which carries no `data` member; a `"data":null` fails on every version.
+- **Wire assertion:** Captured request body has `versions[i]._type ∈ {"ORIGINAL_VERSION","IMPORTED_VERSION"}` and carries the resource payload inline under `data`, except an `ORIGINAL_VERSION` with change type `523` built without a payload ([§ REQ-130](wire.md#req-130--contribution-builder) *Deletion*), which carries no `data` member; a `"data":null` fails on every version.
   A request body whose `versions[]` contains `{"_type":"OBJECT_REF", ...}` is non-conformant per the ITS-REST OpenAPI `Contribution_create` schema (the persisted `OBJECT_REF` shape returns at read time only).
   **Commit-audit shape (SPECITS-95 / ITS-REST PR 131):** the batch `audit` and each `versions[i].commit_audit` omit the server-assigned `time_committed` and carry a `DV_CODED_TEXT`-shaped `change_type` (nested `defining_code`), not the erroneous flat `TERMINOLOGY_CODE`.
   The SDK emits `_type:"AUDIT_DETAILS"` by default, a form the pin asks servers to accept; `UPDATE_AUDIT`, the form the pin asks clients to send, is a caller-selected alternative.
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox).
-- **Satisfies:** REQ-050.
+- **Satisfies:** REQ-130.
 
 #### PROBE-073 — Demographic PARTY polymorphic round-trip
 

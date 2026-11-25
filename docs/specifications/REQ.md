@@ -79,7 +79,7 @@ To change a title, a canonical link, the spec stability or the implementation st
 | REQ-130 | Contribution builder | [wire.md](wire.md#req-130--contribution-builder) | draft | landed |
 | REQ-140 | Underscore-prefixed RM attributes (simplified formats) | [wire.md](wire.md#req-140--underscore-prefixed-rm-attributes) | draft | landed |
 | REQ-144 | Definition metadata decoding | [wire.md](wire.md#req-144--definition-metadata-decoding) | draft | landed |
-| REQ-150 | Path-parameter segment validation | [transport.md](transport.md#req-150--path-parameter-segment-validation) | draft | landed |
+| REQ-150 | Path-parameter encoding and segment validation | [transport.md](transport.md#req-150--path-parameter-encoding-and-segment-validation) | draft | landed |
 | REQ-151 | Typed 2xx decode failure | [transport.md](transport.md#req-151--typed-2xx-decode-failure) | draft | landed |
 | REQ-160 | AQL containment admissibility relation | [aql.md](aql.md#req-160--aql-containment-admissibility-relation) | draft | landed |
 | REQ-161 | AQL semantic and portability lint | [aql.md](aql.md#req-161--aql-semantic-and-portability-lint) | draft | landed |

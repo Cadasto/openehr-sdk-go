@@ -302,20 +302,13 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin, openehr/client/demographic, testkit/corpus/its_rest, openehr/client]
-    probes: [PROBE-072, PROBE-073, PROBE-060, PROBE-102, PROBE-104]
+    probes: [PROBE-073, PROBE-060, PROBE-102, PROBE-104]
     tests:
-      - openehr/client/definition/path_encoding_test.go
       - openehr/client/definition/stored_query_test.go
       - openehr/client/demographic/party_test.go
       - openehr/client/demographic/versioned_test.go
-      - openehr/client/ehr/composition/path_encoding_test.go
-      - openehr/client/ehr/contribution/contribution_test.go
-      - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
-      - openehr/client/ehr/path_encoding_test.go
-      - openehr/client/pathencoding_guard_test.go
-      - openehr/client/query/path_encoding_test.go
       - openehr/client/query/query_encoding_test.go
       - openehr/client/system/system_test.go
       - testkit/probe/cassette_test.go
@@ -329,11 +322,9 @@ requirements:
       - testkit/probes/rest/probes_test.go
       - testkit/probes/transport/probe_091_path_segment_validation.go
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
-      - testkit/probes/versioned/probes_test.go
       - transport/base_url_encoding_test.go
       - transport/cadasto_header_test.go
       - transport/hot_path_internal_test.go
-      - transport/path_encoding_test.go
       - transport/query_encoding_test.go
 
   - id: REQ-052
@@ -2003,10 +1994,11 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/ehr/contribution]
-    probes: [PROBE-084]
+    probes: [PROBE-084, PROBE-072]
     tests:
       - cmd/probe-record/scenarios_contribution_test.go
       - openehr/client/ehr/contribution/builder_test.go
+      - openehr/client/ehr/contribution/contribution_test.go
       - openehr/client/ehr/contribution/submission_decode_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/version_shadow_internal_test.go
@@ -2079,22 +2071,28 @@ requirements:
       - testkit/probes/definition/probe_093_template_list_filters.go
 
   - id: REQ-150
-    title: Path-parameter segment validation
-    canonical: docs/specifications/transport.md#req-150--path-parameter-segment-validation
+    title: Path-parameter encoding and segment validation
+    canonical: docs/specifications/transport.md#req-150--path-parameter-encoding-and-segment-validation
     status: draft
     implementation: landed
     packages: [transport, openehr/client]
     probes: [PROBE-091]
     tests:
+      - openehr/client/definition/path_encoding_test.go
       - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/composition/path_encoding_test.go
       - openehr/client/ehr/composition/versioned_test.go
       - openehr/client/ehr/contribution/contribution_test.go
+      - openehr/client/ehr/path_encoding_test.go
+      - openehr/client/pathencoding_guard_test.go
+      - openehr/client/query/path_encoding_test.go
       - openehr/client/route_guard_test.go
       - testkit/probes/transport/probe_091_path_segment_validation.go
       - testkit/probes/transport/probes_test.go
       - transport/base_url_encoding_test.go
       - transport/diagnostics_internal_test.go
       - transport/hot_path_internal_test.go
+      - transport/path_encoding_test.go
       - transport/path_error_text_test.go
       - transport/path_test.go
 

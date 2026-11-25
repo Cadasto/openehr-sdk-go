@@ -117,7 +117,7 @@ Withdrawn; [scope.md § Out of scope](scope.md#out-of-scope-v1) says what the SD
 
 ## REQ-095 — OpenAPI authoritative source
 
-Its rules, the keyed exceptions to the pin and path-parameter encoding among them, are now [wire.md § REQ-050](wire.md#req-050) *[The OpenAPI files are authoritative](wire.md#the-openapi-files-are-authoritative)*.
+Its rules are now [wire.md § REQ-050](wire.md#req-050) *[The OpenAPI files are authoritative](wire.md#the-openapi-files-are-authoritative)*, and path-parameter encoding is [transport.md § REQ-150](transport.md#encoding).
 
 ## REQ-096 — Unambiguous "disable retry"
 
