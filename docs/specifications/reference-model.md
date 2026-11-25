@@ -672,7 +672,7 @@ The SDK **MUST** expose the derived components of the openEHR identifier types, 
 
 `LOCATABLE_REF` **SHOULD** provide `as_uri()`, the `ehr:`-scheme URI built from `namespace` + `id.value` + `path`, because callers otherwise rebuild it from the fields by hand.
 
-Each fallible identifier form has one error-returning parser in `openehr/rm` (`ParseObjectVersionID`, `ParseVersionTreeID`, `ParseArchetypeID`, `ParseTerminologyID`), and client-side helpers such as the version-uid splitter in `openehr/client/ehr` delegate to it rather than re-parse.
+Each fallible identifier form has one error-returning parser in `openehr/rm` (`ParseObjectVersionID`, `ParseVersionTreeID`, `ParseArchetypeID`, `ParseTerminologyID`), and client-side helpers such as the version-uid splitter in `openehr/client` delegate to it rather than re-parse.
 `HIER_OBJECT_ID` / `UID_BASED_ID` decomposition is best-effort only, with no `Parse…` entry point.
 
 `ParseObjectVersionID` and `ParseVersionTreeID` check each part of their form and **MUST** return an error when one fails:
