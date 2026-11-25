@@ -1123,7 +1123,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 
 #### PROBE-094 — RM meta-model introspection equals the pinned BMM
 
-- **Title:** The compiled-in RM class graph — class universe, abstractness, immediate parents, transitive ancestors, concrete-descendant expansion, per-attribute declaring class and bound attribute type — equals an independent reduction of the pinned RM BMM, and every answer it gives is closed over the universe it reports.
+- **Title:** The compiled-in RM class graph — class universe, abstractness, immediate parents, transitive ancestors, concrete-descendant expansion, per-attribute declaring class and bound attribute type — equals an independent reduction of the pinned RM BMM, and every class-graph answer it gives is closed over the universe it reports.
 - **Preconditions:** The pinned primary RM schema and its includes under [`resources/bmm/`](../../resources/bmm) (REQ-041), reduced in-test through the `openehr/bmm` loader (REQ-045) — deliberately **not** through the generator's own reduction, which would make the comparison tautological and would pass on a generator whose walk is itself wrong.
 - **Wire assertion:** In-repo property, not backend-facing, over the rules of [§ REQ-048](reference-model.md#req-048--rm-meta-model-introspection-surface), which this entry does not restate; each arm compares the compiled-in answers with the independent reduction.
   (a) **Universe** — the compiled-in class set equals [§ The class universe](reference-model.md#the-class-universe), and a class on one side only fails in either direction: a missing class is an unanswerable question, an extra one a class name the pinned schemas do not define.
