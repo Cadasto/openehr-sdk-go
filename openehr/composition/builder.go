@@ -166,6 +166,13 @@ func (b *Builder) TemplateID() string {
 // DV_PROPORTION.is_integral), one that is not an RM value (a Go string,
 // even at a DURATION node), nil, and a nil pointer.
 //
+// Set returns ErrInvalidPath for a value it does not refuse with
+// ErrTypeMismatch at a path it writes no value at: the composition root,
+// and a path that ends in a member of a multi-valued attribute, such as an
+// ELEMENT under ITEM_TREE.items or an EVENT under HISTORY.events. A path
+// that goes on to an attribute of such a member, such as the ELEMENT's
+// value, is one Set writes.
+//
 // Errors are accumulated and surfaced from Build. Set never
 // short-circuits the builder so the caller can stack assignments and
 // recover every faulty path in one round-trip.
@@ -216,6 +223,13 @@ func (b *Builder) Set(path string, v any) error {
 		b.errs = append(b.errs, wrapped)
 		return wrapped
 	}
+	// A path Set writes no value at is refused after the type checks, so a
+	// value of the wrong type there keeps its ErrTypeMismatch (REQ-101 Type
+	// enforcement).
+	if err := checkWritable(path, bound); err != nil {
+		b.errs = append(b.errs, err)
+		return err
+	}
 	b.pending = append(b.pending, pendingAssignment{
 		path:     path,
 		rawValue: v,
@@ -257,7 +271,11 @@ func (b *Builder) SetCodedText(path, terminology, code, display string) error {
 // Build finalises the graph. Pending assignments are applied in
 // order against the skeleton; per-path failures accumulate via
 // errors.Join. The returned *rm.Composition is the same skeleton
-// instance: Build mutates it in place.
+// instance: Build mutates it in place. A value whose path runs through an
+// item the skeleton does not hold is written nowhere, and Build reports
+// ErrInvalidPath for it: an attribute the skeleton leaves absent or empty,
+// or an archetype id, node id or name that no member of a multi-valued
+// attribute carries, such as a named sibling the skeleton left out.
 //
 // Build is repeatable: pending Set calls and accumulated errors are
 // consumed by each invocation. A second Build with no intervening Set
@@ -298,18 +316,34 @@ func (b *Builder) Build() (*rm.Composition, error) {
 	return b.skeleton, nil
 }
 
+// checkWritable returns an error wrapping ErrInvalidPath when node, the
+// node a value set at path binds, is one the builder writes no value at:
+// the composition root, which sits under no attribute and which the
+// builder does not replace, or a member of a multi-valued attribute, which
+// a value would replace or add to. A node below such a member is writable.
+func checkWritable(path string, node *tcimpl.CompiledNode) error {
+	parent := node.Parent()
+	if parent == nil {
+		return fmt.Errorf("%w: %s: the composition root takes no value", ErrInvalidPath, path)
+	}
+	if attr := findAttributeContaining(parent, node); attr != nil && attr.Cardinality() == template.Multiple {
+		return fmt.Errorf("%w: %s ends in a member of the multi-valued attribute %q: extend the path to an attribute of that member",
+			ErrInvalidPath, path, attr.Name())
+	}
+	return nil
+}
+
 // applyAssignment navigates the skeleton along the compiled path's
-// parent chain, then routes the assignment through rmwrite.EnsureSingle
-// when the path's last attribute is single-valued. A path that resolves
-// to a member of a multi-valued attribute returns ErrInvalidPath: v1
-// leaves container assignment to a future follow-up, since the common
-// authoring case is leaf assignment.
+// parent chain, then routes the assignment through rmwrite.EnsureSingle,
+// since the path's last attribute is single-valued: Set refuses the root
+// and a path that ends in a member of a multi-valued attribute
+// (checkWritable), and applyAssignment refuses either again with
+// ErrInvalidPath rather than index past its segments or write nothing.
 func (b *Builder) applyAssignment(p pendingAssignment) error {
 	parent := p.node.Parent()
 	if parent == nil {
-		// Root assignment — supplied value replaces the composition.
-		// v1 does not support this (the skeleton root is the
-		// builder's invariant); error rather than silently swap.
+		// Set refuses the root (checkWritable); with no segment to write
+		// through, refuse it here too.
 		return fmt.Errorf("%w: cannot Set the composition root", ErrInvalidPath)
 	}
 	// Walk the parent chain from compiled root → parent collecting
@@ -330,30 +364,15 @@ func (b *Builder) applyAssignment(p pendingAssignment) error {
 		return err
 	}
 	leaf := segs[len(segs)-1]
-	// Single attrs → EnsureSingle. A path ending in a multi-valued
-	// attribute is refused with ErrInvalidPath (below). For the common
-	// leaf assignment (DV_QUANTITY at ELEMENT.value) the parent is
-	// single, so this path is the routine case.
 	switch leaf.cardinality {
 	case template.Single:
 		if err := rmwrite.EnsureSingle(rmParent, leaf.attrName, p.rawValue); err != nil {
 			return fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 	case template.Multiple:
-		// Replace-vs-append on multi-valued attrs is ambiguous from a
-		// bare path; v1 surfaces this as ErrInvalidPath and asks the
-		// caller to address a specific child slot (predicate-bearing
-		// path) which Set already resolved. Implementation note: the
-		// leaf node ALREADY identifies one specific child (predicates
-		// in the path narrow it to one CompiledNode); the assignment
-		// should walk to that child's index and overwrite. Phase 2
-		// scope: only leaf-DV assignments are guaranteed, multi-attr
-		// container assignment is a follow-up. Return a descriptive
-		// error so the caller knows this is an intentional v1 gap;
-		// the leaf-DV path (extending the path with .value or
-		// .magnitude / .units for DV_QUANTITY) covers the common
-		// authoring case end-to-end today.
-		return fmt.Errorf("%w: multi-attribute container assignment not supported in v1 (path: %s) — use a leaf path (e.g. extend with /value or /magnitude for DV_QUANTITY) to address the primitive directly", ErrInvalidPath, p.path)
+		// Set refuses such a path (checkWritable), so a pending assignment
+		// never ends here; refuse one rather than write nothing.
+		return fmt.Errorf("%w: %s ends in a member of the multi-valued attribute %q", ErrInvalidPath, p.path, leaf.attrName)
 	}
 	return nil
 }
