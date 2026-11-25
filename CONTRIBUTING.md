@@ -89,7 +89,7 @@ make fmt     # gofumpt + goimports
 
 `make help` lists every target, grouped, and [`docs/ci.md`](docs/ci.md) explains what the gate checks. The Docker fallback when you have no host Go is in [`docs/quick-start.md`](docs/quick-start.md#if-you-dont-have-host-go).
 
-The scripts behind several targets need bash 4 or later, and `make spec-check` needs GNU sed. macOS ships bash 3.2 and BSD sed, so on a Mac run `brew install bash gnu-sed` once; Homebrew's bash comes first on `PATH`, and the scripts find GNU sed as `gsed`. `make doctor` shows the make, bash and sed it will use.
+The scripts behind several targets need bash 4 or later, and `make spec-check` needs GNU sed and Python 3.11 or later. macOS ships bash 3.2, BSD sed and Python 3.9, so on a Mac run `brew install bash gnu-sed python` once; Homebrew's bash and `python3` come first on `PATH`, and the scripts find GNU sed as `gsed`. `make doctor` shows the make, bash, sed and `python3` it will use.
 
 ### Hooks and IDE integration
 
