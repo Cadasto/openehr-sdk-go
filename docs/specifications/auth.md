@@ -7,8 +7,7 @@ kind: specification
 **Status:** Draft
 
 Normative contract for the `auth/` package family, the application-level `smart/` package and service discovery in `smart/discovery`.
-Covers REQ-060 to REQ-064, REQ-068, REQ-069 and REQ-165, and discovery's REQ-070 to REQ-072 ([§ Service discovery](#service-discovery)).
-REQ-065 and REQ-067 are retired, and caller attribution (REQ-066) is in [transport.md](transport.md#req-066--caller-attribution).
+Caller attribution is in [transport.md § REQ-066](transport.md#req-066--caller-attribution).
 
 The SDK supports authenticated requests through a layered model:
 

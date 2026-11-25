@@ -7,7 +7,6 @@ kind: specification
 **Status:** Draft
 
 The idiomatic Go surface rules every public package in this SDK adheres to.
-Covers REQ-020, REQ-021, REQ-025 and REQ-026; the conventions of the retired REQ-022, REQ-023 and REQ-024 are [§ API conventions](#api-conventions).
 
 The premise: **the SDK is idiomatic Go.**
 Wire-level correctness is defined against the openEHR specifications and the conformance probes in [conformance.md](conformance.md), not by a particular source shape.
@@ -119,7 +118,7 @@ saved, meta, err := repo.Save(ctx, ehrID, comp)
 ```
 
 Such a repository is an interface (e.g. `composition.Repository`), so consumers can mock it directly rather than wrap the package functions, and the package-level functions stay present beside it.
-When a leaf gains an operation or an option, its package's `Repository` interface **MUST** grow with it.
+When a leaf gains an operation or an option, its package's `Repository` interface grows with it.
 That is no break for a caller of the package functions, but it breaks an implementer of the interface at compile time ([module-layout.md § REQ-004](module-layout.md#req-004--semantic-versioning)).
 
 ### Generics and reflection

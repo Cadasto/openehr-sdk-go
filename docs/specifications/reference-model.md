@@ -7,7 +7,6 @@ kind: specification
 **Status:** Draft
 
 Rules for representing the openEHR Reference Model (RM) and the other BMM-derived models in Go: the shape of the generated types, the openEHR terminology vocabulary (REQ-034) and the type registry (REQ-040); the pinned BMM sources, the loader and the generator's mapping (REQ-041, REQ-045, REQ-048); and the RM's behavioural functions (REQ-120, REQ-121, REQ-123).
-The retired REQ-030 to REQ-033 are [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go); the retired REQ-042, REQ-043, REQ-044, REQ-046 and REQ-047 are part of REQ-041, the retired REQ-049 is part of REQ-048, and the retired REQ-122 is part of REQ-120.
 
 The RM types in `openehr/rm/` are **generated** from the SDK-authored RM root over the pinned BMM schemas in [`../resources/bmm/`](../../resources/bmm); the rules below state the *shape* the generator emits.
 Generator semantics (mapping rules per P_BMM construct, primitive types, file conventions) are [§ BMM sources and the generator](#bmm-sources-and-the-generator).
@@ -21,7 +20,7 @@ The generator's output rule is [ADR 0002](../adr/0002-bmm-codegen-decisions.md) 
 - **Concrete structs.** Every concrete RM class is a concrete Go struct (`Composition`, `Observation`, `DVQuantity`, …).
   There is no runtime base struct that types inherit from, no single RM struct with a `Type` discriminator field, and no `interface{}`-typed payload with a `Kind` enum.
 - **Flattened ancestors.** An abstract non-generic ancestor's properties are flattened into every concrete descendant: the generated `Composition` carries `Name`, `ArchetypeNodeID`, `UID` and the other `LOCATABLE` fields as its own.
-  Only concrete ancestors and whitelisted abstract-generic ancestors (such as `EVENT`, [ADR 0003](../adr/0003-rm-event-polymorphism.md)) appear as embedded structs.
+  Concrete ancestors and abstract generic ancestors appear as embedded structs (`ObjectRef` in `PartyRef`, `Version[T]` in `OriginalVersion[T]`), with one exception: `EVENT` is a marker interface that `PointEvent` and `IntervalEvent` implement with its fields flattened into them, so a `HISTORY.events` member decodes polymorphically ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4).
 - **Marker interfaces for abstract categories.** An abstract RM category (`DATA_VALUE`, `ITEM_STRUCTURE`, `ENTRY`, …) is a Go interface with an unexported marker method (`isDataValue()`), which keeps a type outside the package from satisfying it by accident; a concrete type satisfies it through its method set, with no registration.
 - **The type registry for `_type`.** The `_type` discriminator maps onto a concrete Go type only through the type registry ([§ Type registry (REQ-040)](#type-registry-req-040)): no tag-magic dispatch on a peeked `_type`, and no generic "RM node" that holds any kind of RM value indistinguishably.
 

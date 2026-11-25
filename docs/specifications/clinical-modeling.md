@@ -8,7 +8,6 @@ kind: specification
 
 Normative contract for the SDK's clinical-modeling artefacts: operational templates (OPT), templated composition assembly, and validation against templates.
 The AQL requirements, including the lint's checks against a compiled template, are in [aql.md](aql.md).
-Covers REQ-101 onwards, except those AQL requirements.
 
 The "clinical modeling" band sits above the openEHR Reference Model and below the REST clients: it consumes RM types from `openehr/rm/` and AOM 1.4 constraint types from `openehr/aom/aom14/`, and produces typed building blocks usable by `openehr/composition/`, `openehr/validation/`, and `openehr/aql/`.
 
@@ -193,7 +192,7 @@ Each leaves wide room above real templates, schemas and records while still boun
 
 - An RM value that opens deeper than the decode depth limit below the document root **MUST** be refused with `typereg.ErrMaxDepthExceeded` on every canonical-JSON decode route, `Registry.Decode`, `canjson.Unmarshal`, `canjson.Decoder`, and a bare `encoding/json/v2` or v1 `encoding/json` caller of the generated methods; on the two routes that buffer a value, `Registry.Decode` for its document and a polymorphic slot for its value, so is any bracket of that value deeper than the limit.
   Nesting below which no RM value opens, inside a declared array, an `any` or map member, or an undeclared member, counts toward the limit only on those two routes; outside a buffered value, `jsontext`'s own limit of about 10 000 levels bounds it.
-  See [ADR 0002](../adr/0002-bmm-codegen-decisions.md) and REQ-040.
+  See REQ-040.
 
 ---
 
@@ -1707,9 +1706,9 @@ The generator ([§ REQ-107](#req-107--template-driven-rm-instance-example-genera
   Nor does a child that states no occurrences, or occurrences with an unbounded lower bound, which the validators ask for no member ([§ REQ-102](#req-102--composition-validation) *An existence lower bound alone asks for no member*).
 - An attribute is *required* when the BMM marks it mandatory, its existence or cardinality lower bound is bounded and at least 1, or a child of it asks for its container.
 
-### Placement (ADR 0010)
+### Placement
 
-The constructor lives in the sibling package `openehr/templatecompile`, not in `openehr/template`, since a `Compile` there would form an import cycle with the compile engine and bring `openehr/rm/rminfo` and `openehr/aom/aom14` into the closure [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence) keeps them out of; [ADR 0010](../adr/0010-public-compiled-template-bridge.md) records the placement.
+The constructor lives in the sibling package `openehr/templatecompile`, not in `openehr/template`, since a `Compile` there would form an import cycle with the compile engine and bring `openehr/rm/rminfo` and `openehr/aom/aom14` into the closure [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence) keeps them out of.
 
 ### Node names and name predicates
 
@@ -2090,7 +2089,7 @@ A node is an archetype root when any of these holds:
 
 The classes that are always roots are COMPOSITION, EHR_ACCESS, EHR_STATUS, PARTY (with its concrete descendants PERSON, ORGANISATION, GROUP, AGENT, ROLE) and ENTRY (with its concrete descendants ADMIN_ENTRY, OBSERVATION, EVALUATION, INSTRUCTION, ACTION).
 This set is closed: the floor takes it from the `Is_archetype_root` entries of the inventory of [§ REQ-171 *Where the RM rules come from*](#where-the-rm-rules-come-from).
-The [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator takes it from a closed list held equal to it and to the vendored BMM's `Is_archetype_root` declarations, so a BMM bump that adds a root class fails the build ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md)).
+The [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator takes it from a closed list held equal to it and to the vendored BMM's `Is_archetype_root` declarations, so a BMM bump that adds a root class fails the build.
 
 The floor **MUST** report an absent or `null` `archetype_details` on an archetype root once, as `is_archetype_root` at `…/archetype_details`, with the rule this table gives:
 
@@ -2499,7 +2498,7 @@ An issue whose code is already specific to a rule, any code [§ REQ-102 *Issue c
 ### Where the RM rules come from
 
 Every invariant of the pinned RM and BASE BMMs, BASE's primitive types included, is an entry of an inventory keyed by class and invariant name, classified as one of: *evaluated*; *not mechanical*, with the reason (the rule needs a terminology service, stored history, or a comparison the RM leaves undefined); or *out of scope*, with the reason.
-A BMM bump that adds an invariant fails code generation until the invariant is classified ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md)).
+A BMM bump that adds an invariant fails code generation until the invariant is classified.
 An invariant that another evaluated check already decides, the mandatory-presence rule among them, is *evaluated*; its findings carry the rule of the check that reports them (*Finding identity*).
 
 The RM rules the validators apply are the *evaluated* entries together with the rules *Finding identity* takes from an attribute's definition (`mandatory`, `cardinality`, `precision_range`, `archetype_root_id`).

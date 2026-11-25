@@ -7,7 +7,6 @@ kind: specification
 **Status:** Draft
 
 Authoritative module identity, package taxonomy, dependency rules, and versioning policy for `github.com/cadasto/openehr-sdk-go`.
-Covers REQ-001, REQ-004, REQ-013 and REQ-058; the rules of the retired REQ-005, REQ-010, REQ-011, REQ-012 and REQ-014 are [§ The `internal/` boundary](#the-internal-boundary) and [§ Boundary rules](#boundary-rules).
 
 ## Module identity
 

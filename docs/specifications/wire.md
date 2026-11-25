@@ -7,9 +7,7 @@ kind: specification
 **Status:** Draft
 
 The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others).
-Covers REQ-050 (the REST 1.1.0 pin and its OpenAPI files), REQ-052 to REQ-057 and REQ-059 (wire surface and openEHR headers), REQ-099 (Admin client surface), REQ-130 (contribution builder) and REQ-140 (underscore-prefixed RM attributes).
-It also covers REQ-144 (Definition metadata decoding), REQ-169 (interval boundary flag defaults), REQ-170 (unmatched content on decode), REQ-173 (composition representation formats), REQ-174 (versioned-object reads), REQ-175 (missing members on decode), and REQ-177 (template representations, list filters and upload).
-Transport hygiene (REQ-066, REQ-090 to REQ-094, REQ-098, REQ-150, REQ-151, REQ-166) lives in [transport.md](transport.md).
+Transport hygiene lives in [transport.md](transport.md).
 
 The premise: correctness is wire-level.
 The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
@@ -118,11 +116,6 @@ The grammar and worked examples are normative in the upstream contract, `resourc
 
 The SDK **MUST** refuse a request-header value of this family that contains a control character, a byte below `0x20` other than tab or the byte `DEL` (`0x7F`): an `openehr-item-tag` key, value or target path, or a value written into `openehr-audit-details` or `openehr-version`.
 A caller-supplied value with an embedded CR or LF is a caller error, not something to clean up, since it would inject a header.
-
-## `Prefer` negotiation and error envelope
-
-REQ-094 (`Prefer`) and REQ-093 (structured error envelope) are normative in [transport.md](transport.md).
-Leaf clients under `openehr/client/*` consume them via `transport.Client`.
 
 ## Canonical JSON
 
@@ -782,7 +775,7 @@ REST reads through `transport` and the `openehr/client/*` packages decode with t
 ### REQ-053
 
 The SDK **MUST** provide codecs in `openehr/serialize` for the openEHR **FLAT** and **STRUCTURED** *Simplified Formats* — the JSON serializations of a composition **data instance** standardised by the openEHR ITS-REST [*Simplified Formats*](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html) specification (STABLE, targeting 1.1.0).
-The spec names exactly these two variants — *Flat* and *Structured*; the earlier "Simplified Data Template (SDT)" naming (and EHRbase's `simSDT`/`structSDT` labels) is superseded, and the SDK's public surface does not use it.
+The spec names exactly these two variants, *Flat* and *Structured*; the SDK's public surface does not use the older "Simplified Data Template (SDT)" naming or EHRbase's `simSDT`/`structSDT` labels.
 This section pins to that document for the wire grammar; it does not re-define it.
 
 Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-specific**, human-readable field identifiers taken from the template's *Web Template* projection (REQ-106) — **not** canonical AQL/AOM paths:
@@ -1732,15 +1725,3 @@ A caller who receives a contribution as one document, authored elsewhere, commit
 #### Out of scope
 
 `IMPORTED_VERSION` authoring beyond the pass-through wrapper, multi-EHR batching, checkpoint/resume — the seeder's responsibility per [scope.md](scope.md#synthetic-data-seeder) — and decoding a canonical-XML submission.
-
-## Transport cross-cutting concerns
-
-REQ-090 (OpenTelemetry), REQ-091 (retry), REQ-092 (TLS posture), REQ-093 (error envelope), REQ-094 (`Prefer`), REQ-150 (path-parameter segment validation) and REQ-151 (typed 2xx failures) are specified in [transport.md](transport.md).
-
-## Streaming and large payloads
-
-Out of scope:
-
-- Streaming response bodies: the SDK reads complete responses into memory.
-- Multipart uploads beyond what openEHR REST 1.1.0 requires.
-- Range requests, partial reads.

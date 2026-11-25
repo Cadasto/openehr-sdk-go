@@ -7,8 +7,6 @@ kind: specification
 **Status:** Draft
 
 Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages.
-Covers REQ-090 through REQ-094, REQ-098, REQ-150 (path-parameter segment validation), REQ-151 (typed 2xx failures), REQ-166 (Bearer challenge on 401 and 403) and REQ-066 (caller attribution).
-REQ-096, REQ-097 and REQ-172 are retired.
 
 openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.md](wire.md).
 Service catalog resolution lives in [auth.md](auth.md).

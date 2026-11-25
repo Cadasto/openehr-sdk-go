@@ -443,11 +443,11 @@ Its client scenarios map to SDK coverage as follows:
 - **Wire assertion:** In-repo property, three arms.
   **(a) Per-code corpus:** for each REQ-161 code, at least one corpus query yields it with the specified severity at the span of the offending construct, and at least one near-miss query stays silent.
   The unknown-class suppression rule (an unknown operand suppresses the pair checks), the archetype-mismatch suppression (a literal archetype predicate whose declared class or HRID type segment is unknown yields `aql_unknown_rm_class` only, never `aql_archetype_class_mismatch`) and the `aql_fanout_row_grain` conservative firing rule are each pinned by their own negative case.
-  **(b) Additivity guard:** every query of the pre-REQ-161 corpus that carried no REQ-161 defect yields an unchanged issue-code multiset; corpus queries that genuinely carry a newly-checked defect are re-baselined deliberately, recorded here.
+  **(b) Additivity guard:** every query of the PROBE-028 lint corpus that carries no REQ-161 defect yields an unchanged issue-code multiset; a corpus query that carries a newly checked defect is re-baselined deliberately and recorded here.
   **(c) Read/write parity** ([§ REQ-161 § Builder adapter](aql.md#builder-adapter)): for corpus queries the builder can express, the verification's code multiset equals the containment-code subset of `lint.LintString` over the emitted text.
   The class-position `VERSION` predicate, the class-position standing comparison and the typed projection are builder constructs, so the corpus carries them through the same comparison; what stays unspellable is the FROM root's own bracket in every spelling (archetype, standing or version), since the write-side FROM clause carries an RM type and an alias and nothing else.
 - **Modes:** In-repo (unit-level; no backend).
-- **Status:** Implemented (inline) — PROBE-028's three fixtures gain none of the REQ-161 codes this probe pins, so arm (b) needed no re-baseline.
+- **Status:** Implemented (inline) — PROBE-028's three fixtures gain none of the REQ-161 codes this probe pins.
 - **Satisfies:** REQ-160, REQ-161, REQ-055.
 
 #### PROBE-099 — AQL path-shape lint corpus
@@ -467,7 +467,7 @@ Its client scenarios map to SDK coverage as follows:
 - **Title:** Every FROM/CONTAINS variant a vendored FROM-family combination corpus recorded as engine-accepted parsed under the SDK grammar profile and raised no Error-severity containment code.
 - **Modes:** In-repo (no longer run).
 - **Status:** Deprecated — superseded by [PROBE-107](#probe-107--upstream-aql-suite-admissibility-corpus), which holds every answered query to no Error-severity lint issue at all; the identifier is retained and not reused.
-- **Satisfies:** none (formerly REQ-160).
+- **Satisfies:** none.
 
 #### PROBE-107 — Upstream AQL suite admissibility corpus
 
@@ -915,7 +915,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 #### PROBE-069 — `Idempotency-Key` header round-trip
 
 - **Modes:** Sandbox.
-- **Status:** Deprecated — its requirement, REQ-097, is retired and the SDK no longer sends `Idempotency-Key`; the identifier is retained and not reused.
+- **Status:** Deprecated — the SDK sends no `Idempotency-Key` ([retired REQ-097](retired-requirements.md#req-097--first-class-idempotency-key)); the identifier is retained and not reused.
 
 #### PROBE-070 — Admin `DeleteEHR` round-trip
 

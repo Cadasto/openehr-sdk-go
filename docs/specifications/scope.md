@@ -50,6 +50,7 @@ Out-of-scope items are not gaps — they are deliberate boundaries with named ha
 | Operational templates shipped with the SDK | The generic EHR_STATUS and FOLDER templates, and demographic ones, are maintained in the [openehr-reference-content](https://github.com/Cadasto/openehr-reference-content) repository, from which a program downloads or imports them; the SDK vendors them only as test fixtures under `testkit/corpus/reference/` ([testkit/corpus/README.md](../../testkit/corpus/README.md)). |
 | Parity with another openEHR SDK | Not checked. Wire output is checked against the openEHR specification by the [probe catalog](conformance.md#probe-catalog), and the Go surface follows [idiom.md § Surface shape](idiom.md#surface-shape). |
 | Template-specific generated structs (e.g. a typed Go struct for a vital-signs OPT) | Belongs in the consuming project; the generic OPT-driven builder lives in `openehr/composition`. |
+| Streaming response bodies, range requests and partial reads; multipart uploads beyond what openEHR REST 1.1.0 requires | Not provided: the SDK reads complete responses into memory. |
 | Connection-pooling, transport-level TLS, proxy config | Owned by the consumer's injected `*http.Client` (REQ-021); SDK does not allocate transports. |
 | Multi-tenant routing, per-tenant credential storage | A consumer concern. The SDK exposes per-call auth via `TokenSource`; storage and selection of credentials is application-side. |
 
