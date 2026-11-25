@@ -2421,7 +2421,11 @@ Two entry points:
   - and a nil or typed-nil value.
 
   `Set` **MUST** return `ErrUnknownPath` for a path the template does not have.
-  The root path writes no attribute and is not settable: `Build` **MUST** refuse a value set there with `ErrInvalidPath`.
+  `Set` **MUST** return `ErrInvalidPath` for a value it does not refuse with `ErrTypeMismatch` at a path it writes no value at:
+  - the root path, which writes no attribute;
+  - a path that ends in a member of a multi-valued attribute, such as an ELEMENT under `items` or an EVENT under `events`; a path that goes on to an attribute of that member is settable.
+
+  `Build` **MUST** return `ErrInvalidPath`, and write the value nowhere, where the value's path runs through an item the skeleton does not hold: an attribute it leaves absent or empty, or an archetype id, node id or name no member of a multi-valued attribute carries, such as a named sibling the skeleton left out.
   Each wraps its context with `fmt.Errorf("...: %w", err)`, so a caller compares it with `errors.Is`.
 - **Aggregated errors** — `Set` records errors against the builder but does NOT short-circuit; subsequent assignments still attempt.
   `Build()` returns the populated `*rm.Composition` plus the aggregated error (joined via `errors.Join`) so callers can recover every faulty path in one round-trip rather than chasing one error at a time.
