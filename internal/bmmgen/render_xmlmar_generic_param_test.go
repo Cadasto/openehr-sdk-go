@@ -14,12 +14,14 @@ import (
 // the RM and AOM 1.4 targets encode that is typed by a generic parameter of
 // its class, that the canonical-XML encoder writes a class value there
 // through canxml.EncodePoly, with its `xsi:type`, whatever the instantiation,
-// and anything else, a primitive, through the encoder's own EncodeElement, as
-// its text. A member whose parameter is bound to an abstract class, such as
-// EVENT.data, is a polymorphic site by its bound and goes to canxml.EncodePoly
-// alone. The census must reach ORIGINAL_VERSION.data and the bounds of BASE
-// Interval, and finds no list of a generic parameter, which the encoder does
-// not cover.
+// a value an interface holds by value included, through xmlOpenParamClass; a
+// primitive through the encoder's own EncodeElement, as its text; and refuses
+// any other value an interface holds, through xmlOpenParamText, with
+// canxml.ErrInvalidShape naming the member. A member whose parameter is bound
+// to an abstract class, such as EVENT.data, is a polymorphic site by its
+// bound and goes to canxml.EncodePoly alone. The census must reach
+// ORIGINAL_VERSION.data and the bounds of BASE Interval, and finds no list of
+// a generic parameter, which the encoder does not cover.
 func TestREQ056_RenderMarshalXMLGenericParamClassValue(t *testing.T) {
 	var covered []string
 	for _, target := range []Target{TargetRM, TargetAOM14} {
@@ -65,10 +67,20 @@ func TestREQ056_RenderMarshalXMLGenericParamClassValue(t *testing.T) {
 					for _, want := range []string{
 						".(canxml.BMMNamer)",
 						fmt.Sprintf("canxml.EncodePoly(_e, %q, _c)", prop),
+						fmt.Sprintf("_c, _ok = %s(%s); _ok", openParamClassFunc, openParamValue(recv, ef)),
 						fmt.Sprintf("_e.EncodeElement(%s, xml.StartElement{Name: xml.Name{Local: %q}})", openParamPointer(recv, ef), prop),
 					} {
 						if !strings.Contains(src, want) {
 							t.Errorf("%s.%s is typed by a generic parameter; its encoder lacks %q, so a class value would be written with no xsi:type or a primitive not as its text:\n%s", pc.BMMName, prop, want, src)
+						}
+					}
+					for _, want := range []string{
+						fmt.Sprintf("!%s(%s)", openParamTextFunc, openParamPointer(recv, ef)),
+						fmt.Sprintf("canxml.ErrInvalidShape, %s)", openParamValue(recv, ef)),
+						fmt.Sprintf(" %s.%s holds %%T, ", sc.ClassName(), prop),
+					} {
+						if !strings.Contains(src, want) {
+							t.Errorf("%s.%s is typed by a generic parameter; its encoder lacks %q, so a value that is no class or primitive would not be refused, naming the member:\n%s", pc.BMMName, prop, want, src)
 						}
 					}
 				}
@@ -91,4 +103,92 @@ func openParamPointer(recv string, ef emittedField) string {
 		return field
 	}
 	return "&" + field
+}
+
+// openParamValue returns the expression of the value of ef, a member typed by
+// a generic parameter, in recv's encoder: the value an optional member's
+// pointer points to, the field otherwise.
+func openParamValue(recv string, ef emittedField) string {
+	field := recv + "." + FieldName(ef.Prop.PropertyName())
+	if p, ok := ef.Prop.(*bmm.SingleProperty); ok && !p.IsMandatory {
+		return "*" + field
+	}
+	return field
+}
+
+// TestREQ056_RenderXMLOpenParamHelpersOnce pins that a target whose
+// canonical-XML encoders call xmlOpenParamClass and xmlOpenParamText declares
+// each once, in the file xmlOpenParamFile names, and that a target that calls
+// neither declares neither, so the package compiles and lint finds no unused
+// function. xmlOpenParamClass returns a pointer to a copy of a value, held by
+// value, of each class the type registry constructs; xmlOpenParamText accepts,
+// for an interface type argument, nil and a value of each Go type a BMM
+// primitive maps to. The RM target calls them, for ORIGINAL_VERSION.data and
+// the bounds of BASE Interval; the AOM 1.4 target has no such member.
+func TestREQ056_RenderXMLOpenParamHelpersOnce(t *testing.T) {
+	for _, tc := range []struct {
+		target Target
+		calls  bool
+	}{
+		{target: TargetRM, calls: true},
+		{target: TargetAOM14, calls: false},
+	} {
+		t.Run(tc.target.GoPackage, func(t *testing.T) {
+			plan, err := BuildPlanForTarget(context.Background(), tc.target, testResolver())
+			if err != nil {
+				t.Fatalf("BuildPlanForTarget: %v", err)
+			}
+			declaring, err := xmlOpenParamFile(plan)
+			if err != nil {
+				t.Fatalf("xmlOpenParamFile: %v", err)
+			}
+			classDecl := "func " + openParamClassFunc + "(v any) (canxml.BMMNamer, bool) {"
+			textDecl := "func " + openParamTextFunc + "[T any](v *T) bool {"
+			calls, classDecls, textDecls := 0, 0, 0
+			var helpers string
+			for _, f := range plan.Files {
+				out, err := RenderMarshalXMLFile(plan, f)
+				if err != nil {
+					t.Fatalf("RenderMarshalXMLFile(%s): %v", f.FileBase, err)
+				}
+				src := string(out)
+				calls += strings.Count(src, "= "+openParamClassFunc+"(")
+				classDecls += strings.Count(src, classDecl)
+				textDecls += strings.Count(src, textDecl)
+				if strings.Contains(src, classDecl) {
+					if f != declaring {
+						t.Errorf("%s declares %s; want it declared in the file xmlOpenParamFile names", f.FileBase, openParamClassFunc)
+					}
+					helpers = src
+				}
+			}
+			if (calls > 0) != tc.calls {
+				t.Fatalf("%d calls to %s; want calls %t", calls, openParamClassFunc, tc.calls)
+			}
+			want := 0
+			if calls > 0 {
+				want = 1
+			}
+			if classDecls != want || textDecls != want {
+				t.Fatalf("%d calls to %s; got %d declarations of it and %d of %s, want %d of each", calls, openParamClassFunc, classDecls, textDecls, openParamTextFunc, want)
+			}
+			if want == 0 {
+				if declaring != nil {
+					t.Errorf("xmlOpenParamFile = %s; want nil for a target that calls no %s", declaring.FileBase, openParamClassFunc)
+				}
+				return
+			}
+			for _, pc := range anyMemberClasses(plan) {
+				if c := fmt.Sprintf("\tcase %s:\n\t\treturn &x, true\n", anyMemberGoType(plan, pc)); !strings.Contains(helpers, c) {
+					t.Errorf("%s lacks %q, so a %s held by value would be refused", openParamClassFunc, c, pc.BMMName)
+				}
+			}
+			if c := "\tcase nil, " + strings.Join(xmlOpenParamPrimitives(), ", ") + ":\n\t\treturn true\n"; !strings.Contains(helpers, c) {
+				t.Errorf("%s lacks %q, so a primitive an interface holds would be refused", openParamTextFunc, c)
+			}
+			if !strings.Contains(helpers, "\tif any(*new(T)) != nil {\n\t\treturn true\n\t}\n") {
+				t.Errorf("%s does not accept every value of a type argument that is no interface type", openParamTextFunc)
+			}
+		})
+	}
 }
