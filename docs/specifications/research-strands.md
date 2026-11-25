@@ -311,4 +311,4 @@ Resolved by [ADR 0035](../adr/0035-compile-step-reads-operational-template-model
 | [STRAND-14](#strand-14) | Template-driven validation and the RM floor | Resolved | REQ-102, REQ-112 |
 | [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Partially resolved | REQ-040, REQ-052, REQ-112, REQ-170, REQ-175 |
 | [STRAND-16](#strand-16--validator-policy-beyond-the-limits) | Validator policy beyond the limits | Open | REQ-102, REQ-171 |
-| [STRAND-17](#strand-17--the-opt-parser-and-the-generated-operational-template-model) | The OPT parser and the generated OPT model | Resolved | REQ-013, REQ-100, REQ-103, REQ-107, REQ-108, REQ-111, REQ-176 |
+| [STRAND-17](#strand-17--the-opt-parser-and-the-generated-operational-template-model) | The OPT parser and the generated OPT model | Resolved | REQ-013, REQ-103, REQ-107, REQ-108, REQ-111, REQ-176 |

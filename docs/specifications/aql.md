@@ -543,7 +543,7 @@ Changing any rule below rewrites every golden and is a **semver-major** change t
    (`OFFSET` / `LIMIT` are not emitted in the string — see rule 7.)
 2. **Whitespace** — exactly one space between tokens; no leading or trailing space on the emitted string.
 3. **Paths and archetype ids** — emitted verbatim; no case folding.
-4. **Parameters** — caller values appear only as `$name` placeholders in the string, never interpolated as literals (the injection guard, below); placeholder keys carry no leading `$`.
+4. **Parameters** — caller values appear only as `$name` placeholders in the string, never interpolated as literals ([wire.md § REQ-057](wire.md#aql-injection) *AQL injection*); placeholder keys carry no leading `$`.
    A bind whose name is empty after that strip **MUST** fail at `Build()` with an error wrapping `aql.ErrInvalidQuery` — no placeholder can match an empty name, so the value would ship only as a dead key.
 5. **SELECT list** — comma-separated, one space after each comma, no trailing comma.
 6. **FROM / CONTAINS** — every class carries an alias (`EHR e`, `OBSERVATION o`); archetype predicates attach in square brackets (`OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2]`); consecutive `CONTAINS` express nested containment.

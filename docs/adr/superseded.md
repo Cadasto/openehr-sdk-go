@@ -9,7 +9,7 @@ ADR numbers are never reused, so a new ADR takes the next number above the highe
 
 ## ADR-0001 — BMM version-bump runbook
 
-Folded into [ADR 0002](0002-bmm-codegen-decisions.md) § Consequences, the version-bump rule, on 2026-11-25; the steps are in [`resources/bmm/README.md` § Updating](../../resources/bmm/README.md#updating).
+Folded into [ADR 0002 § D11](0002-bmm-codegen-decisions.md#d11--a-bmm-version-bump-is-one-pull-request), the version-bump rule, on 2026-11-25; the steps are in [`resources/bmm/README.md` § Updating](../../resources/bmm/README.md#updating).
 
 ## ADR-0003 — Codec polymorphism for abstract generic RM classes
 

@@ -9,7 +9,7 @@ date: 2026-05-16
 # ADR 0002 — BMM code generator structural decisions
 
 - **Status:** Accepted, 2026-05-16.
-- **Amended:** 2026-11-25: D4 states which abstract generics become interfaces, Consequences carry the version-bump rule, and the JSON encoder design, D8 until now, is [ADR 0022](0022-canonical-json-encoding-json-v2.md)'s.
+- **Amended:** 2026-11-25: D4 states which abstract generics become interfaces, D11 states the version-bump rule, and the JSON encoder design, D8 until now, is [ADR 0022](0022-canonical-json-encoding-json-v2.md)'s.
 - **Requirements:** [REQ-041](../specifications/reference-model.md#req-041--pinned-bmm-sources) (the pinned sources, the mapping rules the generator applies and its drift check), [REQ-056](../specifications/wire.md#req-056) (the canonical-XML child order D10 supplies); the type shape D4 sets is summarised in [reference-model.md § The shape of the RM in Go](../specifications/reference-model.md#the-shape-of-the-rm-in-go).
 - **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (the JSON codec the generator emits), [ADR 0034](0034-sdk-authored-root-schemas.md) (the SDK-authored root schemas D2, D5 and D10 serve).
 
@@ -78,12 +78,16 @@ In canonical XML, element order is part of a document's identity ([REQ-056](../s
 
 The generator therefore reads a second pinned input beside `resources/bmm/`: the ITS-XML schemas vendored under `resources/its-xml/`, RM Release-1.1.0 with BASE Release-1.2.0, and AM Release-1.4 for the AOM 1.4 classes. For each class it takes the schema type of the same name, or of its nearest ancestor when the schema has none, with that type's `xs:extension` bases, the bases' sequences first, and it emits the class's children in that order. Under [ADR 0034](0034-sdk-authored-root-schemas.md) it also takes from that type which members are XML attributes, in place of its former name check on `archetype_node_id`, a rule the operational template model ([REQ-176](../specifications/clinical-modeling.md#req-176--adl-14-operational-template-model)) needs. A class generated into `openehr/rm` is looked up in the RM and BASE schemas, and an AOM 1.4 class in the AM schemas first. Four BASE resource classes (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, `RESOURCE_DESCRIPTION_ITEM`, `TRANSLATION_DETAILS`) are declared in both sets, the AM 1.4 copy without the elements BASE added and with ones BASE dropped. The SDK writes them through one `openehr/rm` encoder, so a property its own set does not declare is placed where the other set's sequence puts it, right after the nearest earlier property both declare: `RESOURCE_DESCRIPTION_ITEM.copyright`, which only AM 1.4 declares, comes after `misuse`. Any other property the schema does not declare follows the declared ones, in the generator's own order, so no property is dropped: one a later release added, such as `EHR.tags`, or an interval's bounds, which the schema declares only on its `IntervalOf…` subtypes. The decoders keep matching children by name in any order. A test holds every generated encoder to the vendored schemas, and `make codegen-check` holds the generated files to the generator.
 
+### D11 — A BMM version bump is one pull request
+
+A BMM version bump is one pull request. The new schema is added beside the old one and the old one removed in the same commit, so the diff shows the pair and the SDK pins one version per schema id. The steps are in [`resources/bmm/README.md` § Updating](../../resources/bmm/README.md#updating), and [`internal/bmmgen/sim_bump_test.go`](../../internal/bmmgen/sim_bump_test.go) runs a simulated bump on every CI run.
+
 ## Consequences
 
 - Consumers construct COMPOSITION values from a single `rm` import; no six-package import fan-out.
 - Calling an unimplemented BMM function panics by design; see the package doc of `openehr/rm`.
 - Generated files are never edited by hand. `make test` runs `make codegen-check`, which holds every `*_gen.go` file to the generator, and the weekly [`codegen-drift`](../../.github/workflows/codegen-drift.yml) workflow re-runs it on a clean checkout and tracks a failure in one `bmm-drift` issue.
-- A BMM version bump is one pull request. The new schema is added beside the old one and the old one removed in the same commit, so the diff shows the pair and the SDK pins one version per schema id. The steps are in [`resources/bmm/README.md` § Updating](../../resources/bmm/README.md#updating), and [`internal/bmmgen/sim_bump_test.go`](../../internal/bmmgen/sim_bump_test.go) runs a simulated bump on every CI run.
+- A BMM version bump is one reviewable pull request with one pinned version per schema id (D11).
 - D10 makes the vendored ITS-XML schemas a second pinned input to the generator: a re-pin can re-order the generated XML encoders, and `make codegen-check` fails until `make codegen` is rerun.
 
 ## References

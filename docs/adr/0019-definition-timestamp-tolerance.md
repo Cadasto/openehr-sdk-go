@@ -9,7 +9,7 @@ date: 2026-08-30
 # ADR 0019 — Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode
 
 - **Status:** Accepted, 2026-08-30.
-- **Introduces:** [REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) (Definition metadata decoding). **Amends:** REQ-050 (OpenAPI authoritative source), since retired into [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative) — one keyed compatibility exception, carried by REQ-050's section rather than asserted from here.
+- **Introduces:** [REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) (Definition metadata decoding). **Amends:** [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative) (the OpenAPI files are authoritative) — one keyed compatibility exception, carried by REQ-050's section rather than asserted from here.
 - **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (strict encode, tolerant decode for BMM numerics — the asymmetry precedent and its evidence bar); [ADR 0015](0015-flat-metadata-spelling.md) (accept both spellings on input, emit exactly one).
 
 ## Context

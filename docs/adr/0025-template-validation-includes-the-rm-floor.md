@@ -11,7 +11,7 @@ date: 2026-10-11
 - **Status:** Accepted, 2026-10-11 — maintainer decision.
 - **Amended:** 2026-11-25: takes in template admission before the RM rules and the place of the walk; states the one walk the engine runs.
 - **Strand:** resolves [STRAND-14](../specifications/research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants).
-- **Amends:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (*RM floor*, *Contract*, and *Roots beyond COMPOSITION*, which holds the retired REQ-102), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the composition sentence, *Driver*). **Introduces:** [REQ-171](../specifications/clinical-modeling.md#req-171--validation-engine), which carries the mechanics. **Applies:** REQ-102 *Issue paths* (one path per node), [REQ-168](../specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics).
+- **Amends:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (*RM floor*, *Contract* and *Roots beyond COMPOSITION*), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the composition sentence, *Driver*). **Introduces:** [REQ-171](../specifications/clinical-modeling.md#req-171--validation-engine), which carries the mechanics. **Applies:** REQ-102 *Issue paths* (one path per node), [REQ-168](../specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics).
 - **Related:** [ADR 0028](0028-generated-rm-attribute-access.md) gives both layers one generated reader, which the one walk stands on.
 
 ## Context

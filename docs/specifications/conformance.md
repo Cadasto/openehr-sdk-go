@@ -322,7 +322,7 @@ Its client scenarios map to SDK coverage as follows:
 - **Preconditions:** Reference deployment that validates AQL against templates.
 - **Wire assertion:** The typed builders cannot emit syntactically invalid AQL (structural guarantee).
   Execution of a query referencing a non-existent path returns the backend's AQL error envelope; the SDK maps it to `*query.AQLError`, which satisfies `errors.Is(err, aql.ErrPathResolution)`.
-  A **501** response maps to `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)` and never `aql.ErrPathResolution`: the capability gap is read from the status alone, with an envelope or bare, never from message text (REQ-055).
+  A **501** response maps to `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)` and never `aql.ErrPathResolution`: the capability gap is read from the status alone, with an envelope or bare, never from message text (REQ-057).
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — against synthesised backend responses: a path-resolution envelope, and a 501 capability gap with an envelope and bare.
 - **Satisfies:** REQ-057.
@@ -915,7 +915,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 #### PROBE-069 — `Idempotency-Key` header round-trip
 
 - **Modes:** Sandbox.
-- **Status:** Deprecated — the SDK sends no `Idempotency-Key` ([retired REQ-097](retired-requirements.md#req-097--first-class-idempotency-key)); the identifier is retained and not reused.
+- **Status:** Deprecated — the SDK sends no `Idempotency-Key`; the identifier is retained and not reused.
 
 #### PROBE-070 — Admin `DeleteEHR` round-trip
 

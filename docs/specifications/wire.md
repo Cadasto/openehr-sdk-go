@@ -101,7 +101,7 @@ The SDK **MUST** support them via **typed per-call options**, never via raw head
 | `openehr-uri` | request / response | opaque openEHR resource pointer (selected endpoints) | typed on the affected method |
 | `openehr-item-tag` | request / response | ItemTag operations (REST 1.1.0 new resource) | exposed on `openehr/client/ehr/itemtags/` |
 | `openehr-version-item-tag` | request / response | the ItemTags of the VERSION a write commits or a read returns | `WithVersionItemTags` on the affected write; exposed on `openehr/client/ehr/itemtags/` |
-| `openehr-ehr-id` | request (AQL `POST`) | the EHR an AQL execution is scoped to | `query.WithEHRID` on a `POST` execution ([§ REQ-055](aql.md#req-055--aql-builder) *EHR scoping*) |
+| `openehr-ehr-id` | request (AQL `POST`) | the EHR an AQL execution is scoped to | `query.WithEHRID` on a `POST` execution ([§ REQ-057](#ehr-scoping-verb-aware) *EHR scoping (verb-aware)*) |
 
 Response headers in this family **MUST** be surfaced on the typed response metadata returned by each method (alongside `ETag`, `Location`).
 
@@ -345,7 +345,7 @@ A quoted string that spells no such number is refused with a typed error.
 An `Integer` or `Integer64` field **MUST** accept on decode a number whose value is a whole number however the literal writes it, with a zero fraction or an exponent (`1.0`, `1e0`), bare or quoted, and read it as that integer, since JSON gives `1.0` and `1` the same value, and refuse with a typed error, never truncating or rounding, a number with a non-zero fraction or one outside the field's range (32-bit for `Integer`, 64-bit for `Integer64`).
 Some producers write an integral RM value with a fraction (the reference's `test_all_types` FLAT writes a DV_PROPORTION `|type: 1.0`).
 Encode **MUST** write the integer form.
-`rm.Integer` and `rm.Integer64` are the primitives this rule governs; `DV_COUNT.magnitude` is the RM's one `Integer64` attribute, and `Double` keeps its plain decode ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers) *Out of scope*).
+`rm.Integer` and `rm.Integer64` are the primitives this rule governs; `DV_COUNT.magnitude` is the RM's one `Integer64` attribute, and `Double` keeps its plain decode ([ADR 0022 § Numbers](../adr/0022-canonical-json-encoding-json-v2.md#numbers)).
 
 **Acceptance (whole-number decode):**
 
