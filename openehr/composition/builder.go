@@ -167,11 +167,18 @@ func (b *Builder) TemplateID() string {
 // even at a DURATION node), nil, and a nil pointer.
 //
 // Set returns ErrInvalidPath for a value it does not refuse with
-// ErrTypeMismatch at a path it writes no value at: the composition root,
-// and a path that ends in a member of a multi-valued attribute, such as an
-// ELEMENT under ITEM_TREE.items or an EVENT under HISTORY.events. A path
-// that goes on to an attribute of such a member, such as the ELEMENT's
-// value, is one Set writes.
+// ErrTypeMismatch at a path it writes no value at:
+//
+//   - the composition root;
+//   - a path that ends in a member of a multi-valued attribute, such as an
+//     ELEMENT under ITEM_TREE.items or an EVENT under HISTORY.events; a path
+//     that goes on to an attribute of such a member, such as the ELEMENT's
+//     value, is one Set writes;
+//   - a path through a positional segment, the [@N] the compiled template
+//     gives a list member with no archetype id, node id or slot predicate,
+//     such as a PARTICIPATION, where the template lists more than one child
+//     for that list: no list item says which child it was built from. Where
+//     the template lists that child alone, the path is one Set writes.
 //
 // Errors are accumulated and surfaced from Build. Set never
 // short-circuits the builder so the caller can stack assignments and
@@ -318,9 +325,18 @@ func (b *Builder) Build() (*rm.Composition, error) {
 
 // checkWritable returns an error wrapping ErrInvalidPath when node, the
 // node a value set at path binds, is one the builder writes no value at:
-// the composition root, which sits under no attribute and which the
-// builder does not replace, or a member of a multi-valued attribute, which
-// a value would replace or add to. A node below such a member is writable.
+//
+//   - the composition root, which sits under no attribute and which the
+//     builder does not replace;
+//   - a member of a multi-valued attribute, which a value would replace or
+//     add to; a node below such a member is writable;
+//   - a node below a positional member of a multi-valued attribute for
+//     which the template lists more than one child. A positional member
+//     ([positional]) carries nothing to match a list item by, and the
+//     skeleton's list order need not follow the template's, so the builder
+//     cannot tell which item the position names. Where the template lists
+//     that child alone, every item the skeleton holds there was built from
+//     it, and the first serves.
 func checkWritable(path string, node *tcimpl.CompiledNode) error {
 	parent := node.Parent()
 	if parent == nil {
@@ -330,7 +346,27 @@ func checkWritable(path string, node *tcimpl.CompiledNode) error {
 		return fmt.Errorf("%w: %s ends in a member of the multi-valued attribute %q: extend the path to an attribute of that member",
 			ErrInvalidPath, path, attr.Name())
 	}
+	// Every positional segment on the path counts, not only the nearest.
+	for cur := parent; cur.Parent() != nil; cur = cur.Parent() {
+		attr := findAttributeContaining(cur.Parent(), cur)
+		if attr == nil || attr.Cardinality() != template.Multiple || !positional(cur) {
+			continue
+		}
+		if len(tcimpl.ChildNodes(attr)) > 1 {
+			return fmt.Errorf("%w: %s: the positional segment %s sits under the multi-valued attribute %q, for which the template lists more than one child: the builder cannot tell which list item it names",
+				ErrInvalidPath, path, cur.AQLPath(), attr.Name())
+		}
+	}
 	return nil
+}
+
+// positional reports whether the compile step keys n, a child of a
+// multi-valued attribute, by its position among its siblings ([@N]), as it
+// does a child with no archetype id, no node id and, for a slot, no include
+// pattern to put in the path. A slot holds no attributes, so a slot is never
+// a node on the way to the one a path binds.
+func positional(n *tcimpl.CompiledNode) bool {
+	return n.ArchetypeID() == "" && n.NodeID() == "" && (!n.IsSlot() || len(n.SlotIncludes()) == 0)
 }
 
 // applyAssignment navigates the skeleton along the compiled path's
@@ -497,6 +533,9 @@ func descendOne(cur any, s pathSegment) (any, error) {
 			return nil, fmt.Errorf("%w: multi-attribute %q empty on %T (NewSkeleton should have seeded at least one child)", ErrInvalidPath, s.attrName, cur)
 		}
 		if s.matchID == "" {
+			// A positional segment: Set refuses one whose list the template
+			// gives more than one child (checkWritable), so every item here
+			// was built from the one child it gives, and the first serves.
 			return items[0], nil
 		}
 		for _, it := range items {
