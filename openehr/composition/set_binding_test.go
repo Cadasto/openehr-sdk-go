@@ -559,3 +559,52 @@ func TestREQ101_SetAtTheRootReturns(t *testing.T) {
 		t.Errorf("Build after Set(%s, %T) = %v (Set returned %v), want ErrInvalidPath", root, v, err, setErr)
 	}
 }
+
+// TestREQ101_SetRefusesAPathItWritesNoValueAt checks, for REQ-101, that Set
+// returns ErrInvalidPath, and Build carries it, for a value of a type the
+// path binds at a path the builder writes no value at: the composition
+// root, and a path that ends in a member of a multi-valued attribute, here
+// an EVENT under HISTORY.events, an ELEMENT under ITEM_TREE.items and a
+// PARTICIPATION, at its positional key, under EVENT_CONTEXT.participations.
+// A value there would replace a member or add one, which the builder does
+// not do; a path that goes on to an attribute of the member is one it
+// writes.
+func TestREQ101_SetRefusesAPathItWritesNoValueAt(t *testing.T) {
+	t.Parallel()
+	element := compileAlternatives(t, valueAlternative("DV_TEXT", false))
+	cases := []struct {
+		name string
+		c    *templatecompile.Compiled
+		path string
+		v    any
+	}{
+		{name: "COMPOSITION at the root", c: element, path: "/", v: &rm.Composition{}},
+		{
+			name: "POINT_EVENT at an EVENT under events", c: compileEventData(t, "EVENT"),
+			path: strings.TrimSuffix(eventDataPath, "/data"), v: &rm.PointEvent[rm.ItemStructure]{},
+		},
+		{name: "ELEMENT under items", c: element, path: abstractElementPath, v: &rm.Element{ArchetypeNodeID: "at0002"}},
+		{
+			name: "PARTICIPATION under participations", c: compileInline(t, participationOPT),
+			path: "/context/participations[@1]", v: &rm.Participation{},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b, err := composition.NewBuilder(t.Context(), tc.c,
+				composition.WithTerritory("NL"),
+				composition.WithComposer(testComposer()),
+			)
+			if err != nil {
+				t.Fatalf("NewBuilder: %v", err)
+			}
+			if err := b.Set(tc.path, tc.v); !errors.Is(err, composition.ErrInvalidPath) {
+				t.Errorf("Set(%s, %T) = %v, want ErrInvalidPath", tc.path, tc.v, err)
+			}
+			if _, err := b.Build(); !errors.Is(err, composition.ErrInvalidPath) {
+				t.Errorf("Build after Set(%s, %T) = %v, want ErrInvalidPath", tc.path, tc.v, err)
+			}
+		})
+	}
+}
