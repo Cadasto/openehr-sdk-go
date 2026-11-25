@@ -24,7 +24,7 @@ Pinned: the ITS-REST `Release-1.1.0` tag, commit `24058992d5fa96e8dfbd855d9c133f
 | `ehr/` | openEHR REST EHR API read-path responses (EHR, EHR_STATUS, Folder) | `openehr/client/ehr/`, `.../ehrstatus`, `.../directory` tests |
 | `definition/` | openEHR REST Definition API responses (ADL 1.4 OPT + metadata) | `openehr/client/definition/` tests |
 | `query/` | openEHR REST Query API RESULT_SET response | `openehr/client/query/` tests read `result_set.json` |
-| `demographic/` | openEHR REST Demographic API PARTY CRUD, VERSIONED_PARTY and ITEM_TAG list responses | `openehr/client/demographic/` tests read the party and tag files; `openehr/client/ehr/` tests decode `demographic_tags.json` |
+| `demographic/` | openEHR REST Demographic API PARTY CRUD and VERSIONED_PARTY responses, in canonical JSON and canonical XML, and ITEM_TAG list responses | `openehr/client/demographic/` tests read the party and tag files; `openehr/client/ehr/` tests decode `demographic_tags.json`; PROBE-073 |
 
 Tests exercise Composition GET responses (Phase 3 reads) against the canonical-JSON fixtures vendored under [`../compositions/`](../compositions/) and [`../rm/`](../rm/). Those carry full COMPOSITION shapes and are reused here instead of being duplicated. Resolve paths via [`../../fixtures/`](../../fixtures/). ADL 2 source-form templates are **deferred** until their leaf client lands; the [roadmap](../../../docs/roadmap.md) tracks it as Deferred. AQL already has a vendored RESULT_SET body (`query/result_set.json`). Stored-query metadata bodies are a separate gap, named in the Coverage table below: their client has already landed, so it is not a leaf-client deferral.
 
@@ -96,6 +96,8 @@ Hand-crafted to the ITS-REST OpenAPI result-set example shape (`meta._type: "RES
 
 Hand-crafted to the ITS-REST OpenAPI shape for the five DEMOGRAPHIC party kinds plus their VERSIONED_PARTY read-path bodies. Landed 2026-06-16 with the demographic PARTY CRUD client (commit `8338271`). The two ITEM_TAG lists follow the pinned `ItemTagOfPerson` example (`owner_id` a `SYSTEM` reference) and landed with the demographic tags calls.
 
+Each PARTY and version `.json` file (not the two ITEM_TAG lists) has a canonical XML twin of the same name ending `.xml`: the bytes `canxml.Marshal` writes for the value the JSON file decodes to, with no trailing newline. `original_version.xml` adds one attribute to them, `xsi:type="PERSON"` on `data`, which the ITS-XML schemas need on the generic `data` and the encoder does not write. `TestCorpusXMLTwins` in `openehr/client/demographic/` checks both halves: each twin is those bytes, and it decodes back, strictly, to the value its JSON file decodes to. After a JSON file changes, write its twin again from it.
+
 | File | Notes |
 |---|---|
 | `person.json` | `PERSON` with a `name` and one `PARTY_IDENTITY`. |
@@ -123,7 +125,7 @@ What `openehr/client/*` decodes today, and whether a vendored body under this di
 | Definition: template list, metadata, OPT | yes | `definition/` |
 | Definition: stored-query metadata and list | **gap** | hand-built in `openehr/client/definition/stored_query_test.go`; no vendored `StoredQueryMetadata` body |
 | Query: RESULT_SET | yes | `query/result_set.json` |
-| Demographic: five party kinds, ORIGINAL_VERSION, REVISION_HISTORY | yes | `demographic/` |
+| Demographic: five party kinds, ORIGINAL_VERSION, REVISION_HISTORY, VERSIONED_PARTY, in canonical JSON and XML | yes | `demographic/` |
 | Demographic ITEM_TAG lists (`/demographic/tags`, `/demographic/{type}/{uid_based_id}/tags`) | yes | `demographic/person_tags.json`, `demographic/demographic_tags.json` |
 | EHR-side ITEM_TAG lists (`/ehr/{ehr_id}/…/tags`) | **gap** | header-carried today (REQ-059); no client for these routes yet |
 | `Identifier` write response (`{"uid": …}`, `Prefer: return=identifier`) | **gap** | decoded by `openehr/client/ehr/identifier.go` `ResolveIdentifierBody`; hand-built in tests only, e.g. `openehr/client/ehr/composition/composition_test.go`; no vendored body |

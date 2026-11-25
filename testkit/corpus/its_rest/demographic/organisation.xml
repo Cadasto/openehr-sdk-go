@@ -1,0 +1,1 @@
+<organisation xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" archetype_node_id="openEHR-DEMOGRAPHIC-ORGANISATION.organisation.v1"><name xsi:type="DV_TEXT"><value>Acme Hospital</value></name><identities archetype_node_id=""><name xsi:type="DV_TEXT"><value>registered name</value></name></identities></organisation>
