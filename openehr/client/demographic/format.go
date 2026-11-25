@@ -202,12 +202,15 @@ func newParty(t Type) rm.Party {
 // unmarshalXML decodes body, one canonical XML document, into out, the
 // class the call names. The codec matches the root element neither by name
 // nor by type, so a body of another class could decode into out without
-// complaint; a root whose xsi:type names a class other than out's is
-// refused, wrapping typereg.ErrTypeMismatch. A root with no xsi:type, which
-// is how canxml writes one, is read as out's class.
+// complaint. The root's discriminator is read as the codec reads one at a
+// polymorphic site: a value that names no openEHR class, a namespace-prefixed
+// one included, is refused wrapping typereg.ErrUnknownType, and a class other
+// than out's wrapping typereg.ErrTypeMismatch. A root with no discriminator,
+// which is how canxml writes one, is read as out's class.
 func unmarshalXML(body []byte, out any) error {
 	// REQ-173: the class the call names decides, and a root xsi:type that
-	// contradicts it is a decode failure (REQ-151), never a silent decode.
+	// contradicts it is a decode failure (REQ-151), never a silent decode;
+	// REQ-056 decides how the xsi:type value reads.
 	if err := canxml.Unmarshal(body, out); err != nil {
 		return err
 	}
@@ -215,36 +218,33 @@ func unmarshalXML(body []byte, out any) error {
 	if !ok {
 		return fmt.Errorf("demographic: %T has no openEHR class name", out)
 	}
-	got, err := rootXSIType(body)
+	got, err := rootDiscriminator(body)
 	if err != nil {
 		return err
 	}
-	if got != "" && got != want {
-		return fmt.Errorf("demographic: the root element's xsi:type names a class other than %s: %w", want, typereg.ErrTypeMismatch)
+	if got == "" || got == want {
+		return nil
 	}
-	return nil
+	if _, known := typereg.Default.Lookup(got); !known {
+		return fmt.Errorf("demographic: the root element's xsi:type names no openEHR class: %w", typereg.ErrUnknownType)
+	}
+	return fmt.Errorf("demographic: the root element's xsi:type names a class other than %s: %w", want, typereg.ErrTypeMismatch)
 }
 
-// rootXSIType returns the value of the xsi:type attribute on the root
-// element of body, or "" when the root carries none. Only an attribute in
-// the XML Schema instance namespace counts, as the codec reads it.
-func rootXSIType(body []byte) (string, error) {
+// rootDiscriminator returns the discriminator of the root element of body,
+// read by canxml.XSITypeOf as the codec reads one, or "" when the root
+// carries none. The root has no enclosing element, so the namespace
+// declarations it carries itself are all that is in scope.
+func rootDiscriminator(body []byte) (string, error) {
 	dec := xml.NewDecoder(bytes.NewReader(body))
 	for {
 		tok, err := dec.Token()
 		if err != nil {
 			return "", err
 		}
-		start, ok := tok.(xml.StartElement)
-		if !ok {
-			continue
+		if start, ok := tok.(xml.StartElement); ok {
+			return canxml.XSITypeOf(start)
 		}
-		for _, a := range start.Attr {
-			if a.Name.Space == canxml.NSXSI && a.Name.Local == "type" {
-				return a.Value, nil
-			}
-		}
-		return "", nil
 	}
 }
 

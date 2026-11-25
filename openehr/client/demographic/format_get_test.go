@@ -99,16 +99,21 @@ func TestGetXMLRootTypeOfTheClass(t *testing.T) {
 // TestGetXMLRootNamesOtherClass pins REQ-173 with REQ-151 at the
 // demographic leaf: a canonical XML body whose root xsi:type names another
 // class than the one the call names is the typed decode failure, with the
-// version metadata beside it and no party.
+// version metadata beside it and no party. The value reads as REQ-056 reads
+// a discriminator: one that names no openEHR class, a namespace-prefixed one
+// included, wraps typereg.ErrUnknownType, and another class
+// typereg.ErrTypeMismatch.
 func TestGetXMLRootNamesOtherClass(t *testing.T) {
 	cases := []struct {
-		name string
-		typ  demographic.Type
-		body []byte
+		name  string
+		typ   demographic.Type
+		body  []byte
+		cause error
 	}{
-		{name: "ORGANISATION root on a person read", typ: demographic.Person, body: withRootType(t, fixture(t, "person.xml"), "ORGANISATION")},
-		{name: "PERSON root on an organisation read", typ: demographic.Organisation, body: testPersonXML(t)},
-		{name: "prefixed PERSON root on a person read", typ: demographic.Person, body: withRootType(t, fixture(t, "person.xml"), "ns2:PERSON")},
+		{name: "ORGANISATION root on a person read", typ: demographic.Person, body: withRootType(t, fixture(t, "person.xml"), "ORGANISATION"), cause: typereg.ErrTypeMismatch},
+		{name: "PERSON root on an organisation read", typ: demographic.Organisation, body: testPersonXML(t), cause: typereg.ErrTypeMismatch},
+		{name: "prefixed PERSON root on a person read", typ: demographic.Person, body: withRootType(t, fixture(t, "person.xml"), "ns2:PERSON"), cause: typereg.ErrUnknownType},
+		{name: "unknown class root on a person read", typ: demographic.Person, body: withRootType(t, fixture(t, "person.xml"), "NOT_A_CLASS"), cause: typereg.ErrUnknownType},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -119,8 +124,8 @@ func TestGetXMLRootNamesOtherClass(t *testing.T) {
 			if !ok || de == nil {
 				t.Fatalf("Get error = %v, want a *transport.DecodeError", err)
 			}
-			if !errors.Is(err, typereg.ErrTypeMismatch) {
-				t.Errorf("Get error = %v, want it to wrap typereg.ErrTypeMismatch", err)
+			if !errors.Is(err, tc.cause) {
+				t.Errorf("Get error = %v, want it to wrap %v", err, tc.cause)
 			}
 			if got != nil {
 				t.Errorf("Get returned %T beside the error, want nil", got)
