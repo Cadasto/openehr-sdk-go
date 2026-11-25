@@ -9,7 +9,7 @@ date: 2026-08-22
 # ADR 0017 — AQL semantic layer: derived containment relation, overlays, opt-in enforcement
 
 - **Status:** Accepted, 2026-08-22.
-- **Introduces:** [REQ-160](../specifications/aql.md#req-160--aql-containment-admissibility-relation) / [REQ-161](../specifications/aql.md#req-161--aql-semantic-and-portability-lint) / [REQ-162](../specifications/retired-requirements.md#req-162--builder-containment-verification). **Amends:** [REQ-109](../specifications/aql.md#req-109--aql-static-lint) (Layer 2 gains the REQ-161 check groups; the out-of-scope list narrows to version-predicate *value* semantics — predicate presence is REQ-161's).
+- **Introduces:** [REQ-160](../specifications/aql.md#req-160--aql-containment-admissibility-relation) / [REQ-161](../specifications/aql.md#req-161--aql-semantic-and-portability-lint) / [REQ-161](../specifications/aql.md#req-161--aql-semantic-and-portability-lint). **Amends:** [REQ-109](../specifications/aql.md#req-109--aql-static-lint) (Layer 2 gains the REQ-161 check groups; the out-of-scope list narrows to version-predicate *value* semantics — predicate presence is REQ-161's).
 - **Related:** [ADR 0007](0007-aql-antlr-grammar-profile.md) (the permissive grammar profile this layer sits above); [REQ-048](../specifications/reference-model.md#req-048--rm-meta-model-introspection-surface) (the `rminfo` class graph it consumes); [REQ-120](../specifications/reference-model.md#req-120--rm-identifier-parsing-and-derivation) (the canonical HRID parser it delegates to).
 
 ## Context
@@ -64,7 +64,7 @@ contract unchanged.**
 - **Enforcement is opt-in; nothing existing tightens.** The parser keeps accepting everything
   the grammar profile admits (a linter must read foreign, broken queries); `Builder.Build`
   keeps its exact validation set; the semantic checks run as additional lint findings (REQ-161)
-  and an explicit builder verification entry point (REQ-162). EHRbase remains a first-class
+  and an explicit builder verification entry point (REQ-161). EHRbase remains a first-class
   target: an RM-valid query that runs on EHRbase must never draw an Error from the default
   relation.
 
@@ -76,7 +76,7 @@ contract unchanged.**
   (REQ-013-safe; `contain`'s direct imports are `rminfo`, `openehr/rm` — REQ-120's canonical
   `ParseArchetypeID`, no duplicate lexical logic — and stdlib, and it sits below both `aql`
   and `lint` because `lint` already imports `aql`).
-- REQ-162's read/write parity (`(*aql.Builder).VerifyContainment` against `lint.LintString`) is
+- REQ-161's read/write parity (`(*aql.Builder).VerifyContainment` against `lint.LintString`) is
   structural, not merely asserted: every verdict→code decision and the operand/pair suppression
   rule between the containment codes live ONCE, in a second new sub-package,
   `openehr/aql/internal/semcheck` — Go-internal, so it adds no public API — consumed verbatim by
@@ -89,7 +89,7 @@ contract unchanged.**
   (PROBE-097 / the REQ-160 acceptance tests), including a compatibility guard for EHRbase.
 - A BMM pin bump can change derived verdicts; the REQ-160 acceptance table pins the
   representative rows, so a bump that moves a verdict fails a named test and is triaged like
-  any other generated-surface drift (ADR 0001 spirit).
+  any other generated-surface drift (the spirit of ADR 0002's BMM version-bump rule).
 - New lint codes extend the REQ-109 catalogue additively; PROBE-028's corpus gains REQ-161
   codes only where a corpus query genuinely carries a newly-checked defect, as a deliberate,
   recorded re-baseline.
@@ -99,5 +99,5 @@ contract unchanged.**
 
 ## Traceability
 
-- Introduces: REQ-160, REQ-161, REQ-162
+- Introduces: REQ-160, REQ-161
 - Amends: REQ-109

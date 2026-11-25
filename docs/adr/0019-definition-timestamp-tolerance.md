@@ -9,8 +9,8 @@ date: 2026-08-30
 # ADR 0019 — Definition metadata timestamps: a closed tolerant layout set on decode, RFC 3339 on encode
 
 - **Status:** Accepted, 2026-08-30.
-- **Introduces:** [REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) (Definition metadata decoding). **Amends:** REQ-095 (OpenAPI authoritative source), since retired into [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative) — one keyed compatibility exception, carried by REQ-050's section rather than asserted from here.
-- **Related:** [ADR 0004](0004-numeric-wire-tolerance.md) (strict-encode / permissive-decode for BMM numerics — the asymmetry precedent and its evidence bar); [ADR 0015](0015-flat-metadata-spelling.md) (accept both spellings on input, emit exactly one).
+- **Introduces:** [REQ-144](../specifications/wire.md#req-144--definition-metadata-decoding) (Definition metadata decoding). **Amends:** REQ-050 (OpenAPI authoritative source), since retired into [REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative) — one keyed compatibility exception, carried by REQ-050's section rather than asserted from here.
+- **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (strict encode, tolerant decode for BMM numerics — the asymmetry precedent and its evidence bar); [ADR 0015](0015-flat-metadata-spelling.md) (accept both spellings on input, emit exactly one).
 
 ## Context
 
@@ -18,7 +18,7 @@ Two Definition-area catalog descriptors carry a timestamp, and both decode into 
 `encoding/json` unmarshals a `time.Time` from RFC 3339 and from nothing else.
 
 **The vendored pin is not symmetric about the two fields.**
-[REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) makes the OpenAPI files authoritative for per-endpoint detail, so how far tolerance may go is a different question for each:
+[REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative) makes the OpenAPI files authoritative for per-endpoint detail, so how far tolerance may go is a different question for each:
 
 | Field | Pin declaration | Consequence for an RFC 3339-only decoder |
 |---|---|---|
@@ -36,7 +36,7 @@ A server omitting the zone is following that `SHOULD`.
 "Local" is well defined for a human reading a catalog on the server's own console, and undefined for an SDK talking to a remote host over HTTP.
 
 The encode side is not in question: nothing here proposes emitting anything but RFC 3339.
-This is the asymmetry ADR 0004 settled for quoted numerics, liberal on decode and single-valued on encode, applied to a different surface, and ADR 0004's evidence bar applies with it: tolerance is granted for a failure that was actually observed, not pre-emptively for every format a server might emit.
+This is the asymmetry ADR 0022 settles for quoted numerics, liberal on decode and single-valued on encode, applied to a different surface, and ADR 0022's evidence bar applies with it: tolerance is granted for a failure that was actually observed, not pre-emptively for every format a server might emit.
 
 ## Decision
 
@@ -51,11 +51,11 @@ It is a **one-way door**: removing a layout later breaks every consumer whose se
 
 ### The three departures
 
-**(a) For `saved`, the tolerance exceeds the pin — a keyed exception to REQ-095.**
-`saved` is pinned `required` with `format: date-time`, and REQ-095 says the OpenAPI wins when it and in-repo prose disagree.
+**(a) For `saved`, the tolerance exceeds the pin — a keyed exception to REQ-050.**
+`saved` is pinned `required` with `format: date-time`, and REQ-050 says the OpenAPI wins when it and in-repo prose disagree.
 Accepting a zone-less or space-separated `saved` is therefore not a reading of the pin; it is a departure from it, granted here as a **named compatibility exception**.
-The evidence bar is ADR 0004's, a real observed failure, but the observation is `created_timestamp`'s; `saved` was never seen failing on its own and is carried into the exception by the shared decode path both descriptors use, for the reason the last alternative below records.
-The exception is written into [§ REQ-095](../specifications/wire.md#the-openapi-files-are-authoritative) itself, so the authoritative-source rule carries its own exceptions and no ADR overrides a requirement from outside it.
+The evidence bar is ADR 0022's, a real observed failure, but the observation is `created_timestamp`'s; `saved` was never seen failing on its own and is carried into the exception by the shared decode path both descriptors use, for the reason the last alternative below records.
+The exception is written into [§ REQ-050](../specifications/wire.md#the-openapi-files-are-authoritative) itself, so the authoritative-source rule carries its own exceptions and no ADR overrides a requirement from outside it.
 For `created_timestamp` no exception is needed: the pin declares an unformatted string, so tolerance there *closes* an over-constraint rather than opening one.
 
 **(b) An absent, `null`, or empty timestamp yields the zero `time.Time`, with no error.**
@@ -81,8 +81,8 @@ UTC is the one deterministic, reproducible choice, and the departure from the ov
 - **The layout set is load-bearing and one-way.** Every accepted layout lives in one place with the reason it is there, so adding a shape is a reviewed edit rather than a scattered fallback chain, and removing one is a breaking change.
 - **Zone-less values re-marshal with a `Z` the wire never carried.** The SDK's output is a correct RFC 3339 rendering of the instant it decoded under departure (c), not a transcription of the server's spelling; a consumer that must echo the original spelling needs the raw string, which this decision does not provide.
 - **An unreadable non-empty timestamp still fails, and names the field.** The tolerance buys more accepted inputs, not a silent zero on the ones it still refuses, which would let a wrong instant reach a consumer as though the server had sent it.
-- **REQ-095 gains its first named exception, and a precedent for how one is written.** The exception is keyed (this tolerance, this REQ, this ADR) and lives in the amended requirement, which keeps the authoritative-source rule readable in one place. It is not a general licence to depart from the pin.
-- **Encode is unchanged; nothing downstream shifts.** This is additive on the input surface only, as ADR 0004 and ADR 0015 were on theirs.
+- **REQ-050 gains its first named exception, and a precedent for how one is written.** The exception is keyed (this tolerance, this REQ, this ADR) and lives in the amended requirement, which keeps the authoritative-source rule readable in one place. It is not a general licence to depart from the pin.
+- **Encode is unchanged; nothing downstream shifts.** This is additive on the input surface only, as ADR 0022 and ADR 0015 are on theirs.
 
 ## Alternatives considered
 
@@ -95,7 +95,7 @@ UTC is the one deterministic, reproducible choice, and the departure from the ov
 
 ## References
 
-- [`docs/specifications/wire.md`](../specifications/wire.md) — § REQ-144 (the normative rule), § REQ-095 (the authoritative-source rule and its keyed exception).
+- [`docs/specifications/wire.md`](../specifications/wire.md) — § REQ-144 (the normative rule), § REQ-050 (the authoritative-source rule and its keyed exception).
 - [`resources/its-rest/definition-validation.openapi.yaml`](../../resources/its-rest/definition-validation.openapi.yaml) — the `TemplateMetadata` (`:509`, `:521-522`) and `StoredQuery` (`:3872`, `:3882-3884`) pin declarations.
 - [`resources/its-rest/overview-validation.openapi.yaml`](../../resources/its-rest/overview-validation.openapi.yaml) — the *Datetime format* note (`:675`).
 - [`openehr/client/definition/template.go`](../../openehr/client/definition/template.go), [`openehr/client/definition/stored_query.go`](../../openehr/client/definition/stored_query.go) — the two descriptors this decision reaches.
@@ -103,4 +103,4 @@ UTC is the one deterministic, reproducible choice, and the departure from the ov
 ## Traceability
 
 - Introduces: REQ-144
-- Amends: REQ-095 (retired into REQ-050)
+- Amends: REQ-050

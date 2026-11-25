@@ -9,9 +9,9 @@ date: 2026-07-12
 # ADR 0013 — Generated LOCATABLE identity surface and reverse type lookup
 
 - **Status:** Accepted, 2026-07-12.
-- **Amended by:** [ADR 0028](0028-generated-rm-attribute-access.md), which removed `openehr/validation/rmread`, its `IsTypedNilPointer` and the `handles_test.go` pin; a test now holds the generated attribute access to every class the registry decodes.
+- **Amended:** 2026-11-25: decision 3 and the paragraph after it state the consumers as they stand; `openehr/validation/rmread` is gone, replaced by the generated attribute access of [ADR 0028](0028-generated-rm-attribute-access.md).
 - **Strand:** cross-references [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance) (RM polymorphism; does **not** resolve it — the codec question stays open).
-- **Introduces:** — (no new `REQ`). **Amends:** REQ-031, REQ-040, REQ-043. **Applies:** REQ-013, REQ-014, REQ-024, REQ-042, REQ-044.
+- **Introduces:** — (no new `REQ`). **Amends:** REQ-040, REQ-041. **Applies:** REQ-013.
 - **Related:** [ADR 0011](0011-rm-behavioural-functions-surface.md) governs the hand-realised RM behavioural-function surface; the accessors here are SDK-idiom *generated* additions beside it (same `rm` method surface, different emission path) and reuse its sealed-interface and no-panic conventions. [ADR 0002](0002-bmm-codegen-decisions.md) D4/D6/D7 constrain the generator mechanics.
 
 ## Context
@@ -91,29 +91,28 @@ surface** in `*_gen.go` (ADR 0002 D6: the generator never touches non-`_gen.go` 
    the inverse of `typereg_gen.go`, one exhaustive generated type-switch with a per-type
    **typed-nil pointer guard** (a typed-nil `*T` reports `("", false)`, never a false
    positive) — plus a sibling `rm.IsTypedNil(any) bool` emitted from the same registry.
-   The predicate is what makes decision 1's guard-before-read ordering expressible: today's
-   hand-written `rmread.IsTypedNilPointer` (exported, used cross-package) and `rmpath`'s
-   `isNilPointer` delegate to it instead of maintaining their own switches.
+   The predicate is what makes decision 1's guard-before-read ordering expressible: a reader
+   checks `rm.IsTypedNil` before it calls a getter, as `rmpath`'s `isNilPointer` does, and
+   keeps no type switch of its own.
 
-The hand-maintained consumers then shrink to their essential dispatch: `rmpath`'s
-`nodeIDOf`/`nameValueOf` collapse to a guard + single `Locatable` assertion (name text read
-via `GetName().GetValue()` after a nil-name check), `instance`'s `applyLocatableIdentity`
-uses `MutableLocatable` plus `GetUID` for its set-only-if-unset UID semantics, and the
-typed-nil guards (`rmread.IsTypedNilPointer`, `rmpath.isNilPointer`) delegate to the
-generated `rm.IsTypedNil`. The two duplicated Go→RM-name maps
-converge on `RMTypeName` with one nuance: `typecheck`'s `goConcreteRMType` collapses fully,
-while `validation`'s `rmTypeInfo(v) (rmType, archetypeNodeID, ok)` does double duty and
-therefore **decomposes** into `RMTypeName(v)` plus a `Locatable` assertion for the node id
-rather than disappearing. The value-dispatch routers in `rmread`/`rmwrite`/`childrenAt`
-**stay** — only identity/nil arms are removed; their lock-step comments are updated to the
-reduced set.
+The consumers keep only their essential dispatch. `rmpath`'s `nodeIDOf` and `nameValueOf`
+are a typed-nil guard and one `Locatable` assertion, the name text read through
+`rm.DVTextValueOf(GetName())`; `nodeIDOf` also reads an ISM_TRANSITION's careflow-step code,
+since that class is not LOCATABLE. `instance`'s `applyLocatableIdentity` uses
+`MutableLocatable` plus `GetUID` for its set-only-if-unset UID. The Go-to-RM-name lookups
+reach `RMTypeName` through the internal `rmbind.TypeName`, which first gives a typed
+`DV_INTERVAL` its parameterised name: the composition builder's type check reads it alone,
+and `validation`'s `rmTypeInfo(v) (rmType, archetypeNodeID, ok)` pairs it with a `Locatable`
+assertion for the node id. `internal/templateinstance/rmwrite` and `rmpath`'s `childrenAt`
+keep their own value dispatch; the validators read attributes
+through the generated access of [ADR 0028](0028-generated-rm-attribute-access.md).
 
 ## Consequences
 
 - **Positive:** ~200 hand-maintained switch arms disappear; a BMM bump that adds a LOCATABLE
-  type extends the identity surface via `make codegen` automatically (REQ-042 drift gate);
-  identity access becomes polymorphic without reflection (REQ-024) or new dependencies
-  (REQ-013/REQ-014 unchanged).
+  type extends the identity surface via `make codegen` automatically (REQ-041 drift gate);
+  identity access becomes polymorphic without reflection or new dependencies
+  (REQ-013 unchanged).
 - **Permanent API cost:** every LOCATABLE type gains 4 value-receiver + 4 pointer-receiver
   methods, plus two sealed interfaces and two registry functions on the public `rm` surface — additive
   (the sealed markers mean no external implementer can be broken), but effectively
@@ -134,7 +133,7 @@ reduced set.
 - **Hand-written accessors in `*_funcs.go`** (no generator change): keeps `bmmgen` frozen but
   replaces the switch arms with ~248 hand-written methods — *more* human-owned lock-step, the
   opposite of the goal.
-- **Reflection-based identity access:** rejected outright (REQ-024).
+- **Reflection-based identity access:** rejected outright ([idiom.md § API conventions](../specifications/idiom.md#api-conventions)).
 - **Embedded base struct carrying the fields** (make D4 emit a real `locatable` embed):
   smallest method count, but it changes the wire-visible struct shape assumptions of every
   existing consumer and the JSON marshaling layout — a far larger, riskier fork of ADR 0002
@@ -145,5 +144,5 @@ reduced set.
 
 ## Traceability
 
-- Amends: REQ-031, REQ-040, REQ-043
-- Applies: REQ-013, REQ-014, REQ-024, REQ-042, REQ-044
+- Amends: REQ-040, REQ-041
+- Applies: REQ-013

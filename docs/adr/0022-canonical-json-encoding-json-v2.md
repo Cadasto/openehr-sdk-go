@@ -1,60 +1,135 @@
 ---
 kind: adr
 id: ADR-0022
-title: "Canonical JSON is encoded by `encoding/json/v2`"
+title: "Canonical JSON: `encoding/json/v2` through generated streaming marshalers; member order not promised; numbers strict on encode, tolerant on decode"
 status: accepted
 date: 2026-09-14
 ---
 
-# ADR 0022 — Canonical JSON is encoded by `encoding/json/v2`
+# ADR 0022 — Canonical JSON: `encoding/json/v2` through generated streaming marshalers; member order not promised; numbers strict on encode, tolerant on decode
 
 - **Status:** Accepted, 2026-09-14.
-- **Strand:** resolves the `encoding/json/v2` simplification sub-question and the default-codec sub-question of [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance).
-- **Introduces:** —. **Amends:** [ADR 0002](0002-bmm-codegen-decisions.md) (what the generator emits for JSON: new D8).
-- **Amended by:** [ADR 0002 D8](0002-bmm-codegen-decisions.md#d8--the-generator-emits-the-streaming-json-marshaler-pair) § *Encode writes each member itself*, 2026-11-18 (issue 484): each generated `MarshalJSONTo` writes its members itself and marshals the shapes below only as a fallback.
-- **Depends on:** [ADR 0021](0021-json-member-order-not-a-contract.md). Without the order withdrawal this decision would be a different and worse one.
-- **Related:** [ADR 0003](0003-rm-event-polymorphism.md) (the EVENT interface whitelist, whose codec justification this decision re-homes); [ADR 0004](0004-numeric-wire-tolerance.md) (strict encode, permissive decode, kept hand-written and unchanged); [REQ-040](../specifications/reference-model.md#type-registry-req-040) (the registry the dispatch hooks read); [REQ-052](../specifications/wire.md#req-052) (the canonical-JSON contract this codec implements).
+- **Amended:** 2026-11-25: takes in the member-order and number-tolerance decisions and the design of the generated encoders, each class now writing its members itself.
+- **Strand:** resolves the `encoding/json/v2` and default-codec sub-questions of [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance), and retires the byte-stability premise of its codec gate.
+- **Amends:** [REQ-052](../specifications/wire.md#req-052) (member order is unspecified; a quoted number decodes).
+- **Related:** [REQ-040](../specifications/reference-model.md#type-registry-req-040) (the registry the dispatch hooks read), [REQ-041](../specifications/reference-model.md#req-041--pinned-bmm-sources) (the primitive mapping the number types keep), [REQ-056](../specifications/wire.md#req-056) (canonical XML keeps its element order), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the floor a round trip is checked against); [ADR 0002](0002-bmm-codegen-decisions.md) (the generator that emits the codec).
 
 ## Context
 
-The canonical-JSON codec is generated code. `internal/bmmgen/render_jsonmar.go` (451 lines) and `internal/bmmgen/render_jsonunmar.go` (473 lines) emit one `MarshalJSON` and one `UnmarshalJSON` per generated type; `openehr/rm` carries 110 of each and `openehr/aom/aom14` 29 of each, 14 509 generated lines in total. `openehr/internal/jsonpoly/jsonpoly.go` (80 lines) supplies `_type` for a value held in an interface, through 177 generated call sites. `canjson.Marshal` was a thin pass-through over `encoding/json`.
+**What `encoding/json` v1 cannot give.**
+Canonical JSON needs `_type` on a value held in an interface or a map, dispatch on `_type` at a substitutable slot, and one place that classifies a shape failure.
+v1 gives none of them without generated methods per class and a helper per interface slot.
+`encoding/json/v2`, standard library in Go 1.27 and so within the module floor, gives the first two: it calls a marshal method whatever the value's addressability (`go doc encoding/json` § Migrating to v2), and a `json.UnmarshalFromFunc` registered through `json.WithUnmarshalers` dispatches at a slot.
 
-Almost all of it exists to obtain three things `encoding/json` v1 does not give: a discriminator on a value held in an interface, `_type`-driven dispatch on decode, and a per-type funnel for the shape sentinel. Two of the three are v2 defaults. `go doc encoding/json` § Migrating to v2 states: "In v1, MarshalJSON methods declared on a pointer receiver are only called if the Go value is addressable. In contrast, in v2 a MarshalJSON method is always callable regardless of addressability." That single sentence retires `jsonpoly`. Decode dispatch is served by `json.UnmarshalFromFunc` registered through `json.WithUnmarshalers`, one hook per polymorphic interface: 21 hooks against 181 slot occurrences.
+**Member order.**
+No openEHR specification gives JSON member order a meaning, RFC 8259 § 4 gives it none, and CDRs differ in the order they write.
+A promised order constrains every encoder the SDK might adopt, and a probe that compares two encodes tests only that the encoder agrees with itself, which it does when it drops the same field twice.
 
-Go 1.27 ships `encoding/json/v2` and `encoding/json/jsontext` as ordinary standard library, with v1 reimplemented on v2 and its behaviour preserved. The module floor is already `go 1.27.0` (`go.mod`).
+**Numbers.**
+Some producers write a `Real` or `Integer` quoted: `testkit/corpus/compositions/vital_signs.json` carries `"magnitude": "1256"`.
+A strict-number decoder refuses that output; a consumer of the SDK's own output needs numbers.
+
+**Encode cost.**
+Marshalling a wrapper struct per value allocates for every value written, and json/v2 copies a value held by value in an interface slot before calling its method.
 
 ## Decision
 
-**The canonical-JSON path is encoded and decoded by `encoding/json/v2`, and the generator emits the streaming marshaler pair instead of the `MarshalJSON` / `UnmarshalJSON` pair it emitted before.**
+**Canonical JSON is encoded and decoded by `encoding/json/v2` through a streaming marshaler pair the generator emits per concrete class. Member order is not promised. `Real`, `Integer` and `Integer64` are written as numbers and read from a number or a quoted decimal.**
 
-- **Design.** Per concrete class the generator emits a method-free alias type and the streaming pair `MarshalJSONTo(*jsontext.Encoder) error` (`go doc encoding/json/v2.MarshalerTo`) and `UnmarshalJSONFrom(*jsontext.Decoder) error` (`go doc encoding/json/v2.UnmarshalerFrom`), the second calling one shared runtime helper; [ADR 0002 D8](0002-bmm-codegen-decisions.md#d8--the-generator-emits-the-streaming-json-marshaler-pair) gives the two marshaler shapes, the alias and the flat wire struct, and why a class takes one or the other. Substitutable slots are served by one `json.UnmarshalFromFunc` per polymorphic interface, built from `typereg.Default` at init. `openehr/internal/jsonpoly` is deleted. The decoders are specified for a zero-value receiver: reuse of a populated receiver is unspecified, and the two shapes differ on it.
-- **Scope.** Five packages move: `internal/bmmgen`, `openehr/rm` (generated plus the hand-written primitives), `openehr/aom/aom14`, `openehr/rm/typereg` and `openehr/serialize/canjson`. `openehr/internal/jsonpoly` is deleted. Everything else stays on `encoding/json` v1, which remains supported and is itself implemented on v2. The split is drawn where the canonical-JSON contract ends: every package that decodes an RM value moves together, so there is never more than one decode-error taxonomy behind the sentinels REQ-052 keeps distinct.
-- **Determinism is an option, not an emergent property.** `go doc encoding/json/v2.Marshal` states that a Go map "is traversed in a non-deterministic order", and `go doc encoding/json/v2.MarshalerTo` tells a custom marshaler to "respect the Deterministic option". The generated marshalers set `json.Deterministic(true)`.
-- **Cut-over, not a flag.** The generator emits one shape. Rollback is `git revert` plus `make codegen`, proven by `make codegen-check`, which `make test` runs first.
+### The generated pair
+
+- The generator emits `MarshalJSONTo(*jsontext.Encoder) error` and `UnmarshalJSONFrom(*jsontext.Decoder) error` for each concrete RM and AOM 1.4 class, and no `MarshalJSON` / `UnmarshalJSON` pair.
+- `MarshalJSONTo` has a value receiver, so it is in the method set of a value and of a pointer: a value held in an interface slot or a map writes its `_type`.
+  The receiver matters under a v1 entry point, whose `CallMethodsWithLegacySemantics` skips a pointer-receiver method on an unaddressable value.
+- `UnmarshalJSONFrom` refuses a nil receiver and calls one shared helper, `typereg.DecodeInto`.
+  It decodes into a method-free alias of the class, or into a flat wire struct for a class that embeds a concrete ancestor with methods of its own, whose alias would promote them.
+  It then checks `_type` and classifies a shape failure ([wire.md § Decode-side shape sentinel](../specifications/wire.md#decode-side-shape-sentinel)).
+- A substitutable slot is served by one `json.UnmarshalFromFunc` per polymorphic interface, built from `typereg.Default` at init and supplied through `json.WithUnmarshalers`.
+  Every hook passes `dec.Options()` to its nested decode; without it a deeper slot loses its hook.
+- The generated decoders hold no logic per class beyond that delegation, except the interval classes.
+  Encode leaves out an open side's bound ([wire.md § An open interval side carries no bound](../specifications/wire.md#an-open-interval-side-carries-no-bound)), and decode gives an absent boundary flag its default ([wire.md § REQ-169](../specifications/wire.md#req-169--interval-boundary-flag-defaults)); the delegation sees neither.
+  The generator emits that logic for every class carrying the four flags, BASE `Interval` and the AOM 1.4 constraint intervals included, and refuses a flag-carrying class whose shape it does not handle.
+- The decoders are specified for a zero-value receiver: reuse of a populated receiver is unspecified, and the alias and the flat struct differ on it ([wire.md § Decode state after a failure](../specifications/wire.md#decode-state-after-a-failure)).
+- Determinism is an option, not an emergent property: `typereg.MarshalOptions` passes `json.Deterministic(true)` to every generated marshaler, so `Hash` keys are written sorted.
+- `internal/bmmgen`, `openehr/rm`, `openehr/aom/aom14`, `openehr/rm/typereg` and `openehr/serialize/canjson` are on v2, and SDK code decodes no RM or AOM 1.4 value through v1 ([wire.md § Decode-side shape sentinel](../specifications/wire.md#decode-side-shape-sentinel)), so one decode-error taxonomy sits behind the sentinels.
+  A package that decodes no RM value may stay on v1, which is itself implemented on v2.
+- The generator emits one shape, with no flag to choose another; rollback is a revert and `make codegen`.
+
+### Encode writes each member itself
+
+The generated `MarshalJSONTo` writes `{`, `_type` and each member in struct declaration order as tokens on the encoder:
+
+- a string, a boolean or a pointer to one, as a token;
+- `rm.Real`, `rm.Integer` and `rm.Integer64`, through unexported writers in `openehr/rm` that write the bytes their `MarshalJSON` writes; the three types have no `MarshalJSONTo`, which a struct embedding one would promote and prefer to its own method;
+- a generated class, by calling its `MarshalJSONTo`;
+- a value in an interface slot, through the `json.MarshalerTo` it implements;
+- a `Hash` map, an `Any` member, `[]byte`, `rm.Character`, an AOM 1.4 number and an integer enumeration, through `json.MarshalEncode`, so `json.Deterministic` still sorts `Hash` keys and json/v2 names the type in a failure.
+
+It applies each member's omit option as json/v2 applies the tag, a typed-nil pointer in an interface slot included.
+It marshals the wrapper instead, the alias or the flat struct with `_type` leading, through `json.MarshalEncode`, so the output and the error are json/v2's:
+
+- when the encoder carries an option that changes how a member is written or a failure reported: a caller's marshalers, `OmitZeroStructFields`, `StringifyNumbers`, v1's legacy `omitempty` or v1's legacy error reporting (`typereg.DirectEncode`);
+- when the value sits more than 900 levels deep, so a pointer cycle fails as json/v2's cycle;
+- before writing anything, when a member that may be left out, typed by an interface or a type parameter, holds a value of a type the registry does not list.
+
+The encoder's own options, indentation and escaping, apply to the tokens either way, and a failure names the class whose method failed, as json/v2 does at a method boundary.
+
+### Omit options
+
+The rules are [reference-model.md § Property → Go field](../specifications/reference-model.md#property--go-field)'s; they differ by field kind for these reasons:
+
+- An optional pointer takes `omitzero`, so only a nil pointer is left out; under v2, `omitempty` would also drop a pointer to `""`, which encodes as an empty value.
+- An optional list takes `omitempty`, so a nil list and a present empty one are both left out: `omitzero` would write the empty one as `[]`, which is RM-invalid for a list an invariant keeps non-empty, as `Mappings_valid` keeps `DV_TEXT.mappings`.
+- The item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` take `omitzero`, read from `internal/rmlists`: an archetype can make them mandatory, a CDR refuses a structure that leaves its list out, and no invariant keeps them non-empty.
+  Canonical XML, and FLAT or STRUCTURED decoded without the template, cannot carry their `[]`, and every other list an archetype can require keeps `omitempty`.
+- A mandatory list or map takes `omitzero`, so a present empty one is written.
+  A mandatory interface or type-parameter field takes `omitempty`, so a typed-nil pointer, which encodes as `null`, is left out; `any` takes `omitzero`, since an empty string or object it holds is a value.
+
+### Member order
+
+Encoded member order is not part of the contract ([wire.md § Member order](../specifications/wire.md#member-order)).
+`_type` first is recommended, so a consumer decoding a stream can select the type before the rest; beyond it the order is unspecified, and decode accepts any order.
+Writing `Hash` keys sorted is a recommended property of the encoder, so one unchanged value has one encoding, not an order promise ([wire.md § Map-valued (`Hash`) members](../specifications/wire.md#map-valued-hash-members)).
+A round trip is compared by value, never by bytes ([wire.md § Round-trip comparison](../specifications/wire.md#round-trip-comparison)).
+The SDK ships no canonical form for hashing or signing; a consumer that needs a stable digest canonicalises the output itself, with RFC 8785 for instance.
+Canonical XML keeps its element order ([REQ-056](../specifications/wire.md#req-056)), since element order is part of an XML document's identity in a way member order is not part of a JSON object's.
+
+### Numbers
+
+`rm.Real`, `rm.Integer` and `rm.Integer64` are defined types over `float64`, `int32` and `int64`: the fixed primitive mapping of [REQ-041](../specifications/reference-model.md#primitive-type-mapping) holds for the underlying type, and the codec has a type to attach the tolerance to.
+They are encoded as JSON numbers only, and decoded from a number or from a quoted decimal string, which reads as the number it spells; the integer rules, the lossy-literal refusal and the error each failure takes are [wire.md § Floating-point precision](../specifications/wire.md#floating-point-precision)'s.
+Each tolerance answers a failure observed in real input, never one foreseen: `Double` keeps a plain `float64` and plain decode, since no fixture writes it quoted.
+The SDK has no strict-number mode: the tolerant default reads the real output of CDRs and loses nothing, so a second strictness knob would only make the contract conditional.
+A caller that must refuse quoted numbers checks the input before `canjson.Unmarshal`.
 
 ## Consequences
 
-- **About 12 800 generated lines and one internal package go away.** 278 generated methods become roughly 1 700 generated lines plus 21 registered hooks, and `internal/bmmgen`'s two JSON templates shrink from 924 lines while keeping the same shape as each other. The encode half grew back by about 14 700 generated lines when ADR 0002 D8 was amended on 2026-11-18.
-- **Encoded bytes change, in four ways a consumer can see.** `jsontext.EscapeForHTML` is opt-in in v2 where v1 escaped `<`, `>` and `&` unconditionally, so a `TERM_MAPPING.match` carrying `<` now spells `"<"` on the wire where it spelled `"\u003c"`. [REQ-052](../specifications/wire.md#req-052)'s `TERM_MAPPING.match` bullet already puts that obligation on the decoded character rather than the literal bytes, so no contract breaks. Separately, pointer fields are tagged `omitzero`, not `omitempty`: under v2 `omitempty` omits a non-nil pointer to an empty string (it encodes as `""`), whereas `omitzero` omits only the nil pointer, so a pointer to `""` still emits `""`, the v1 spelling, and only a nil pointer is dropped. Container fields take the options [ADR 0002 D8](0002-bmm-codegen-decisions.md#d8--the-generator-emits-the-streaming-json-marshaler-pair) gives them. Third, an RM value held as a **map value** was unaddressable under v1 and so lost its `_type`; the value-receiver `MarshalJSONTo` now emits one: a `Hash<String, RM_TYPE>` such as `AUTHORED_RESOURCE.translations` gains a `_type` on every entry, a correctness improvement rather than a break. Fourth, an interface-typed optional attribute holding a **typed-nil pointer** (`ELEMENT.value`, `ELEMENT.null_reason`, `LOCATABLE.uid` and the like) is now omitted where v1 spelled it `null`: v2's `omitempty` drops a member that would encode as `null`, v1's dropped only a nil interface. This matches how `rm.IsTypedNil`, `ValidateRM` and the simplified encoders already read such a value as absent, so it is the truer spelling. A v1 `encoding/json` caller still gets `null`, because the generated `MarshalJSONTo` inherits that caller's `OmitEmptyWithLegacySemantics` through `typereg.MarshalOptions`, just as it inherits v1's HTML escaping; byte parity between the two entry points is not a promise.
-- **Decode is stricter in three ways.** Invalid UTF-8 and a lone surrogate escape are refused by `jsontext` rather than silently substituted with U+FFFD, which is what [REQ-052](../specifications/wire.md#req-052)'s `TERM_MAPPING.match` bullet asks for and moves the refusal out of `rm.Character` into the standard library. An object with duplicate member names is refused. Member names match case-sensitively on this path. A body that used to decode can now fail.
-- **Encode is stricter too.** `canjson.Marshal` refuses a Go string holding invalid UTF-8 with `canjson.ErrInvalidValue`, where v1 wrote U+FFFD, and `canjson.MarshalIndent` refuses an indent or prefix that is not made only of spaces or tabs. Both are new encode-side refusals a caller can now hit.
-- **Decode error types change identity.** `*json.SyntaxError` gives way to `*jsontext.SyntacticError`, and `*json.UnmarshalTypeError` and `*json.UnsupportedTypeError` to `*json.SemanticError`. The SDK's own sentinels are unchanged: `canjson.ErrInvalidShape`, `canjson.ErrInvalidValue`, `transport.ErrInvalidShape`, the `typereg.Err*` family and `*transport.DecodeError` keep their identity and their `errors.Is` and `errors.AsType` behaviour. A consumer matching on the SDK sentinels needs no change; one matching on the standard-library types does.
-- **A typed error gains a value-bearing field.** `json.SemanticError` carries `JSONValue jsontext.Value`, the JSON number or string that could not be unmarshaled. [REQ-052](../specifications/wire.md#req-052) § Value-free decode errors keeps that value off the boundary: the `canjson` entry points return every failure the input causes as a `DecodeError`, `DecodeError.Error()` writes no cause's value, the value moves to its redacted `Value` field, and a caller that unwraps to the cause still reaches it.
-- **v2 supplies the diagnostic path the SDK hand-builds.** `json.SemanticError.JSONPointer` is an RFC 6901 pointer computed by the decoder, where the generated `Composition.UnmarshalJSON` built `/content/0` by hand. `typereg.DecodeError` stays the public envelope and may read its `Path` from the pointer. One caveat: a nested decode inside a hook restarts the pointer at that slot's own root, so a hook that does not decode in place produces relative paths. The concrete decode reads `_type` from the declared wire field after one `json.UnmarshalDecode`, rather than buffering and peeking. Three edges follow. A body that is both a wrong whole-value `_type` and a shape failure now reports the shape failure (`ErrInvalidShape`), where the buffer-and-peek reported the `_type` mismatch (`ErrTypeMismatch` on `/_type`) first, because the discriminator is checked only after a successful decode, a precedence a positive test pins. And a shape failure inside a value reached without a polymorphic hook now carries a `JSONPointer` rooted at the enclosing object rather than at that value, a fuller path, which no normative sentence or test pins. And because the discriminator guard runs only on a completed decode, the receiver after a refused `_type` mismatch holds what the decode wrote for the alias shape and stays untouched for the flat shape; the codec never promised to leave it untouched on error.
-- **One public constraint moved.** `contribution.CommitVersion` embedded `json.Marshaler`. A type implementing only `MarshalJSONTo` satisfies `json.MarshalerTo`, not `json.Marshaler`, so the constraint now embeds `json.MarshalerTo`.
-- **The single-pass decode settled further edges, each stated where it binds:** which of a malformed value and a shape failure is reported first, and how a v1 caller's options reach a polymorphic slot, in [REQ-052](../specifications/wire.md#req-052) § Decode-side shape sentinel; the depth bound across polymorphic slots in [REQ-108](../specifications/clinical-modeling.md#req-108--untrusted-document-bounds); a nil decoder or target refused with `typereg.ErrNilArgument` in [REQ-025](../specifications/idiom.md#errors-req-025). The receiver left after a `_type` mismatch is unspecified ([wire.md § Decode state after a failure](../specifications/wire.md#decode-state-after-a-failure)).
-- **The codec carries a performance budget.** A benchmark regresses materially when its time/op is more than 20 percent worse than the retired generated marshalers' at p < 0.05, measured with `benchstat`; the results are in [PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171).
+- Every RM value is self-describing under any JSON entry point: a value held in an interface or a map writes its `_type`, so each entry of a `Hash<String, RM_TYPE>` such as `AUTHORED_RESOURCE.translations` carries one.
+- `canjson` and a v1 caller are not byte-identical: v2 leaves `<`, `>` and `&` unescaped, and an optional polymorphic slot holding a typed-nil pointer is absent through `canjson` and `null` through v1 ([wire.md § Typed-nil in an optional polymorphic slot](../specifications/wire.md#typed-nil-in-an-optional-polymorphic-slot)).
+- Decode refuses invalid UTF-8, a lone surrogate escape and a repeated member name, and matches member names case-sensitively ([wire.md § Decode-side shape sentinel](../specifications/wire.md#decode-side-shape-sentinel)).
+  `canjson.Marshal` refuses a string holding invalid UTF-8, and `canjson.MarshalIndent` an indent or prefix that is not spaces and tabs, with `canjson.ErrInvalidValue` ([wire.md § Encode-side refusal sentinel](../specifications/wire.md#encode-side-refusal-sentinel)).
+- The standard library's decode errors are `*jsontext.SyntacticError` and `*json.SemanticError`; the SDK's sentinels and `*transport.DecodeError` keep their identity.
+  A `SemanticError` carries the value that failed, which [wire.md § Value-free decode errors](../specifications/wire.md#value-free-decode-errors) keeps off the boundary.
+- `contribution.CommitVersion` embeds `json.MarshalerTo`, since a generated class implements no `json.Marshaler`.
+- A quoted number comes back as a bare number, and `DVCount.Magnitude` is `rm.Integer64`, so a caller assigning a typed `int64` converts it.
+- Writing members directly cut the Demonstration composition's encode from 147 to 58 µs and from 1,012 to 6 allocations (darwin/arm64); 177 of those allocations were the numbers' `MarshalJSON` calls.
+  The cost is code: the generated JSON encoders grew from 4,883 to 19,572 lines, and a program that encodes canonical JSON from 8.44 to 9.63 MB.
+  Tests encode every corpus document and every registered class both ways and compare the bytes, under each option the gate checks.
+- The codec carries a performance budget: a benchmark regresses materially when its time/op is more than 20 percent worse than the retired generated marshalers' at p < 0.05, measured with `benchstat` ([PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171)).
+- Withdrawing the order promise is one-way: restoring it after consumers have absorbed its removal would break them again.
 
 ## Alternatives considered
 
-- **Keep `encoding/json` v1 and the generated marshalers.** Zero migration risk; every pinned behaviour stays pinned by construction. **Rejected:** it keeps 924 lines of generator template and 278 generated methods whose purpose is to reproduce what v2 gives directly, in the highest-churn part of the tree, since every BMM bump re-emits all of them. With the order promise withdrawn there is nothing left for them to buy.
-- **Swap the codec but keep the v1 method pair (`MarshalJSON` / `UnmarshalJSON`).** Smaller diff, and it keeps `CommitVersion` and the nil-receiver census working unchanged. **Rejected:** it leaves all 278 methods in place and books a second migration to remove them, and it forgoes the allocation win the streaming pair exists for. `go doc encoding/json/v2.MarshalerTo` recommends it over `Marshaler` as "both more performant and more flexible".
-- **Emit no methods at all and build the codec from registry-driven options.** Fewest generated lines in theory. **Rejected:** the behaviour would then exist only when the caller supplies the options, so `json.Marshal(&rm.DVText{...})` without them emits no `_type`. Today the generated methods make every RM value self-describing under any JSON entry point, and losing that is a public API regression.
-- **`sonic`.** A JIT-assisted encoder with large throughput gains on x86-64. **Rejected:** a third-party dependency in the SDK's hottest correctness path, architecture-sensitive, and it addresses the performance axis while leaving every generated line in place. STRAND-04 keeps the two axes separate on purpose.
-- **`easyjson`.** Generated marshalers, which the SDK already has in its own generator. **Rejected:** it replaces one code-generation surface with another and adds a dependency to do it.
-- **A permanent split: migrate `openehr/rm` and leave `aom14` or the RM primitives on v1.** **Rejected:** [REQ-052](../specifications/wire.md#req-052) requires `openehr/aom/aom14` to classify decode failures "on the same terms as the canonical-JSON RM surface", and `transport.Decode` routes every 2xx body through `canjson.Unmarshal`. A permanent split leaves two decode-error taxonomies behind one sentinel set. Phasing the work across commits is fine; shipping the split is not.
+- **Keep v1 and its generated marshalers.** Rejected: 278 generated methods reproduce what v2 gives, in the part of the tree every BMM bump re-emits.
+- **Move to v2 but keep the `MarshalJSON` / `UnmarshalJSON` pair.** Rejected: it keeps every method, books a second migration, and forgoes the allocation saving `go doc encoding/json/v2.MarshalerTo` names.
+- **No methods, only options built from the registry.** Rejected: `json.Marshal(&rm.DVText{})` without the options would write no `_type`.
+- **`sonic` or `easyjson`.** Rejected: a third-party dependency in the SDK's hottest correctness path, or a second code-generation surface.
+- **Leave `openehr/aom/aom14` or the RM primitives on v1.** Rejected: [REQ-052](../specifications/wire.md#req-052) holds AOM 1.4 decode to the RM's failure classes, and two taxonomies would sit behind one sentinel set.
+- **Keep the member-order profile as a requirement.** Rejected: no specification asks for it, and `go doc encoding/json/v2.Deterministic` holds determinism only across identical binaries, so the promise would be weaker than it reads.
+- **Ship a canonicalisation helper for consumers who hash.** Rejected: the withdrawn promise under another name, for a format whose specification defines no canonical form.
+- **A strict-number decode option.** Rejected, as *Numbers* says.
 
 ## Traceability
 
 - Resolves: STRAND-04 (the `encoding/json/v2` and default-codec sub-questions)
-- Amends: ADR-0002
+- Amends: REQ-052

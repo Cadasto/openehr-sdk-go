@@ -9,6 +9,7 @@ date: 2026-06-18
 # ADR 0009 — SMART-on-openEHR auth library scope and dependency model
 
 - **Status:** Accepted, 2026-06-18.
+- **Amended:** 2026-11-25: decision (a) names the packages as they stand and cites the coverage table, and decision (c) states that no `oauth2.TokenSource` adapter ships.
 - **Resolves:** [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library). **Amends:** REQ-061, REQ-062, REQ-063, REQ-064.
 
 ## Context
@@ -24,26 +25,9 @@ The auth conformance audit produced concrete evidence: a full SMART-on-openEHR a
 
 ### (a) Build the full SMART-on-openEHR auth library
 
-The audit delivered the following scope across `auth/` and `smart/`:
-
-| Capability | Package |
-|---|---|
-| SMART discovery (`/.well-known/smart-configuration`, canonical `services` map, [ADR 0008](0008-smart-discovery-services-shape.md)) | `smart/discovery` |
-| PKCE public-client authorization-code flow (REQ-061) | `auth/smart` |
-| Confidential symmetric (`client_secret_basic`) | `auth/smart` |
-| Confidential asymmetric `private_key_jwt` (authorization-code) | `auth/smart` |
-| SMART Backend Services (`client_credentials` + `private_key_jwt`) | `auth/clientcreds` |
-| JWT Bearer Token Grant (RFC 7523) | `auth/jwtbearer` |
-| ID-token verification (RS256/RS384/ES256/ES384) | `auth/smart` (re-exported by `smart`) |
-| Token refresh with terminal/transient classification (REQ-063) | `auth/smart` |
-| Transport 401→reauth safety net | `transport` |
-| Launch context (`ehrId`, `episodeId`, `fhirUser`, …, REQ-064) | `smart` |
-| Platform principal claims (REQ-067) | `smart` |
-| Launch-context scope helpers (`ScopeLaunch*`, `ScopeOfflineAccess`, …) | `auth` |
-
-Token introspection (RFC 7662) is a resource-server operation outside the SDK's client scope ([auth.md § What is NOT in scope here](../specifications/auth.md#what-is-not-in-scope-here)); discovery still surfaces `introspection_endpoint`.
-
-**Four flows** (PKCE public, confidential symmetric, confidential asymmetric, Backend Services / JWT Bearer) and **three launch modes** (standalone, embedded/EHR-launch, backend) are covered and exercised by PROBE-001..009 in the auth conformance probe suite (see `docs/specifications/conformance.md`).
+The SDK ships the client side of SMART on openEHR across `auth/` and `smart/`: discovery in `smart/discovery` ([ADR 0023](0023-smart-platform-base-url-and-oidc-issuer.md)); the authorization-code flow with PKCE, public or confidential, ID-token verification, token refresh and revocation in `auth/smart`; SMART Backend Services and client credentials in `auth/clientcreds`; the RFC 7523 JWT Bearer grant in `auth/jwtbearer`; HTTP Basic in `auth/basic`; launch context and Platform principal claims in `smart`; the scope helpers in `auth`; and, with `transport.WithReauthOn401`, one fresh credential and one retry after a 401.
+The flows and launch modes it covers are [auth.md § REQ-068](../specifications/auth.md#req-068--flow-and-launch-mode-coverage), and PROBE-001 to PROBE-009 exercise them.
+Token introspection (RFC 7662) is a resource-server operation outside the SDK's client scope ([auth.md § What is NOT in scope here](../specifications/auth.md#what-is-not-in-scope-here)).
 
 ### (b) Relax the OTel-only dependency rule; adopt ecosystem security libraries
 
@@ -67,20 +51,10 @@ The SDK adopts three new runtime dependencies, scoped to `auth/` and `smart/`:
 
 **Scope boundary.** The new deps are consumed only within `auth/` and `smart/`. Packages without auth concerns (`openehr/rm`, `openehr/aql`, `openehr/serialize`, `openehr/validation`, `transport`, etc.) do not transitively import them.
 
-### (c) `auth.FromOAuth2TokenSource` adapter — feasible in-core, deferred
+### (c) No `oauth2.TokenSource` adapter
 
-Since `golang.org/x/oauth2` is now a core dependency, a thin adapter bridging an `oauth2.TokenSource` into the SDK's `auth.TokenSource` is feasible without a separate submodule:
-
-```go
-// Possible future API (not implemented in this audit):
-func FromOAuth2TokenSource(src oauth2.TokenSource) TokenSource
-```
-
-The primary bridging caveat: `oauth2.TokenSource.Token()` has no `context.Context` parameter, so the adapter must manage context propagation via closure (capturing the context at bridge construction, or accepting a background context for the inner call and relying on `oauth2`'s own context handling). This is a known `x/oauth2` API wart.
-
-**Decision:** this adapter is **not built in this audit** — no current SDK consumer needs it, and the SDK's own `auth/smart`, `auth/clientcreds`, and `auth/jwtbearer` already use their own `auth.TokenSource` implementations directly. The adapter is recorded here as an available, low-cost follow-up once a consumer need arises.
-
-**Issuer-matching helper.** An issuer-keyed multi-EHR helper (analogous to the `issMatch` function in SMART client.js, routing per-request contexts to the correct `auth.TokenSource` via an issuer-keyed discovery cache + `auth.WithTokenSource`) is a possible follow-up built on the per-request `auth.WithTokenSource` pattern and `smart/discovery`'s issuer-keyed resolver. Not implemented in this audit.
+The SDK's flows implement its own `auth.TokenSource`, and `golang.org/x/oauth2` serves only PKCE generation, so the SDK ships no adapter from an `oauth2.TokenSource`, whose `Token()` takes no `context.Context`, and no issuer-keyed helper that routes a request to one of several Platforms' token sources.
+Either is an additive change when a consumer needs it.
 
 ## Alternatives considered
 
@@ -98,7 +72,6 @@ Not evaluated in depth. `go-jose/v4` is the direct successor of `square/go-jose/
 - The `auth/` and `smart/` packages depend on `golang.org/x/oauth2`, `github.com/coreos/go-oidc/v3`, and `github.com/go-jose/go-jose/v4` (directly imported for JWS signing; also required by `go-oidc/v3`).
 - The OTel-only runtime dependency rule is retired. The new guidance (recorded in `docs/architecture.md`) is: prefer the standard library and established Go ecosystem libraries for security-sensitive primitives; avoid unnecessary deps for non-security concerns.
 - `auth.ScopeOfflineAccess` / `auth.ScopeOnlineAccess` are the canonical way to request a refresh token in authorization scope strings (REQ-063, `offline_access` / `online_access`).
-- The `FromOAuth2TokenSource` adapter and the issuer-matching multi-EHR helper remain open follow-ups with no blocking dependency.
 - STRAND-05 is closed.
 
 ## Traceability
