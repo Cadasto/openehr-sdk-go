@@ -91,7 +91,7 @@ func recordedMessage(e *probe.HAREntry) string {
 
 // replayErrorEnvelopes drives the error-envelopes recording through c, a
 // client that keeps error bodies, and checks what the SDK makes of each
-// recorded refusal (PROBE-068, PROBE-021, REQ-093, REQ-055): the read of the
+// recorded refusal (PROBE-068, PROBE-021, REQ-093, REQ-057): the read of the
 // unknown EHR maps to transport.ErrNotFound; each refused query is a
 // *query.AQLError over a *transport.WireError that keeps the status, the
 // envelope message and the raw bytes; and a 400 is never a capability gap,
@@ -158,7 +158,7 @@ var errorEnvelopesRecordings = []string{
 
 // TestCassette_ReplaysErrorEnvelopes_PROBE068_PROBE021_REQ093_REQ055_REQ082
 // replays each error-envelopes recording (PROBE-068, PROBE-021, REQ-082,
-// REQ-093, REQ-055): the read of an unknown EHR, then three refused
+// REQ-093, REQ-057): the read of an unknown EHR, then three refused
 // queries, checking what the SDK makes of each real refusal. An extra HEAD
 // is unmatched.
 func TestCassette_ReplaysErrorEnvelopes_PROBE068_PROBE021_REQ093_REQ055_REQ082(t *testing.T) {

@@ -84,7 +84,7 @@ A `PUT`, a `DELETE`, and a `POST` under `RetryNonIdempotent`, each with its 2xx 
 ## REQ-092 — TLS posture
 
 The SDK does not allocate its own `*http.Client` (REQ-021), so TLS configuration is the consumer's responsibility.
-The discovery resolver's refusal of plaintext URLs, its `WithAllowInsecure()` opt-out and the warnings it logs for plaintext URLs are [auth.md § REQ-073](auth.md#req-073--discovery-trust-posture)'s.
+The discovery resolver's refusal of plaintext URLs, its `WithAllowInsecure()` opt-out and the warnings it logs for plaintext URLs are [auth.md § REQ-072](auth.md#trust-posture) *Trust posture*'s.
 
 The SDK **MUST NOT** silently override or relax the consumer's `*http.Client` TLS config.
 
@@ -415,7 +415,7 @@ type BearerChallenge struct {
 ### Re-authentication retry
 
 `transport.WithReauthOn401(r auth.Reauther)` installs an opt-in retry for a wire `401`; without it, a `401` returns `transport.ErrUnauthorized` after one upstream call.
-It backs up the proactive renewal of a token source ([auth.md § REQ-063](auth.md#req-063--token-refresh)), for a token that expires between that check and the wire round trip.
+It backs up the proactive renewal of a token source ([auth.md § REQ-063](auth.md#req-063--token-refresh-and-revocation)), for a token that expires between that check and the wire round trip.
 [auth.md § Forced refresh](auth.md#forced-refresh) specifies `auth.Reauther`, `auth.ReautherFunc` and the providers that implement them.
 
 When a `401` arrives:

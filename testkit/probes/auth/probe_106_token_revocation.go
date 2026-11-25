@@ -107,7 +107,7 @@ func (p *probe106Server) requests() (token, revoke []probe106Request) {
 //     with no Authorization header at either endpoint.
 //  4. The next Token call fails with auth.ErrReauthRequired, and the token
 //     endpoint receives no further request.
-func Probe106TokenRevocation(ctx context.Context) (Result, error) { // PROBE-106 (REQ-167)
+func Probe106TokenRevocation(ctx context.Context) (Result, error) { // PROBE-106 (REQ-063)
 	r := Result{Probe: "PROBE-106"}
 	as := &probe106Server{}
 	srv := httptest.NewTLSServer(as)

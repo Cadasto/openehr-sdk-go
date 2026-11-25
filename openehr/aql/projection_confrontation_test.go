@@ -1,9 +1,9 @@
 package aql_test
 
-// REQ-163 · PROBE-088
+// REQ-055 · PROBE-088
 //
 // projection_confrontation_test.go holds the after-emission projection
-// verification — [aql.Builder.Build]'s answer to REQ-163 § rule 2 — to the
+// verification — [aql.Builder.Build]'s answer to REQ-055 § rule 2 — to the
 // grammar it was hand-derived from, over a GENERATED corpus, with the real
 // parser as the oracle.
 //
@@ -28,7 +28,7 @@ package aql_test
 //     each alias the builder fixed. Anything weaker would let a silent
 //     substitution through: the whole class this rule exists to close re-parses
 //     cleanly, and some of it re-emits byte-identically too.
-//   - ACCEPT ⇒ IDENTITY, over the TYPED constructors. REQ-163 § Read-side
+//   - ACCEPT ⇒ IDENTITY, over the TYPED constructors. REQ-055 § Read-side
 //     mirror duty makes `Build → ParseQuery → Emit` byte-identity a MUST for
 //     every construct the REQ ADDS, and § Canonical spellings is what makes
 //     identity reachable for them.
@@ -36,7 +36,7 @@ package aql_test
 //     sentinel, never a bare error and never a panic.
 //
 // Two things the oracle deliberately does NOT assert, both for the same reason —
-// [aql.Col] splices VERBATIM text and REQ-163 § rule 1 keeps it that way:
+// [aql.Col] splices VERBATIM text and REQ-055 § rule 1 keeps it that way:
 //
 //   - that accepted text PARSES. Loud, ordinary malformation stays accepted by
 //     design: the parser rejects it and the caller sees the error the moment
@@ -115,7 +115,7 @@ var projectionAlphabet = []string{
 // aliasRecorded is false for a legacy [aql.Col] with no [aql.SelectField.As]
 // call: where the `AS` boundary falls inside verbatim text is not something the
 // builder fixed, so there is nothing for the emitted text to disagree with
-// (REQ-163 § rule 1). Such an item matches whatever alias the text carries.
+// (REQ-055 § rule 1). Such an item matches whatever alias the text carries.
 type recordedItem struct {
 	expr          string
 	alias         string
@@ -151,7 +151,7 @@ func typed(expr, alias string) recordedItem {
 	return recordedItem{expr: expr, alias: alias, aliasRecorded: true}
 }
 
-// projectionCases feed the alphabet to every constructor REQ-163 adds, at the
+// projectionCases feed the alphabet to every constructor REQ-055 adds, at the
 // ITEM level and at the ARGUMENT level below it — the level with its own escape
 // scan, and the level where the review found the arity smuggle. Three rows carry
 // a clause-level flag the builder RECORDED, which is what lets the fidelity arm
@@ -322,7 +322,7 @@ func TestProjectionVerificationAgreesWithTheParser(t *testing.T) {
 		accepted++
 
 		// ACCEPT ⇒ FIDELITY, on the accepted text that PARSES. Loud
-		// malformation stays accepted by design (REQ-163 § rule 1), so a text
+		// malformation stays accepted by design (REQ-055 § rule 1), so a text
 		// the parser rejects leaves this arm vacuous rather than failing it.
 		emitted := q.String()
 		reparsed, parseErr := parse.ParseQuery(emitted)
@@ -397,7 +397,7 @@ func TestProjectionVerificationAgreesWithTheParser(t *testing.T) {
 // compareProjection reports why the emitted query's projection is not the one
 // the builder recorded, or "" when the two agree.
 //
-// The recorded side applies the ONE reduction REQ-163 § rule 2 inherits from
+// The recorded side applies the ONE reduction REQ-055 § rule 2 inherits from
 // REQ-119: a SOLE unaliased star item and the bare `SELECT *` flag are one
 // encoding, and the flag with ZERO items is how the text re-parses. Applying it
 // here rather than assuming it is what keeps the oracle from demanding a raw

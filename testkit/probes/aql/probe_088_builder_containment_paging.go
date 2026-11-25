@@ -21,8 +21,8 @@ const Probe020CanonicalQuery = "SELECT o FROM EHR e CONTAINS COMPOSITION c " +
 	"WHERE e/ehr_id/value = $ehr_id"
 
 // probe088Constructs are the builder constructs PROBE-088 pins, in assertion
-// order — REQ-163's containment algebra and in-text paging, the
-// deprecated `SELECT TOP`, and REQ-163's three write-side carriers (the VERSION
+// order — REQ-055's containment algebra and in-text paging, the
+// deprecated `SELECT TOP`, and REQ-055's three write-side carriers (the VERSION
 // predicate, the class standing predicate, the typed projection). Each name is
 // the base name of its golden file (`<name>.aql`) under
 // openehr/aql/testdata/wire/; the probe owns the builder program so a
@@ -110,7 +110,7 @@ var probe088Constructs = []struct {
 		},
 	},
 	{
-		// REQ-163: the DEPRECATED `SELECT TOP n` row limit — deprecated by
+		// REQ-055: the DEPRECATED `SELECT TOP n` row limit — deprecated by
 		// openEHR QUERY Release-1.1.0 §4.4.3, still buildable because the SDK
 		// must be able to author a shape a client may legitimately send until
 		// the announced removal.
@@ -118,7 +118,7 @@ var probe088Constructs = []struct {
 		build: func() (aql.Query, error) { return inlinePagingQuery().Top(5).Build() },
 	},
 	{
-		// REQ-163: `TOP n BACKWARD` — the direction is part of the bound, so
+		// REQ-055: `TOP n BACKWARD` — the direction is part of the bound, so
 		// dropping it would select the opposite end of the ordered result.
 		name: "select_top_backward",
 		build: func() (aql.Query, error) {
@@ -126,10 +126,10 @@ var probe088Constructs = []struct {
 		},
 	},
 
-	// --- REQ-163: the version-predicate carrier -------------------------------
+	// --- REQ-055: the version-predicate carrier -------------------------------
 	//
 	// `versionPredicate : LATEST_VERSION | ALL_VERSIONS | standardPredicate`,
-	// one fixture per alternative. Before REQ-163 the builder could emit exactly
+	// one fixture per alternative. Before REQ-055 the builder could emit exactly
 	// one VERSION shape — the predicate-less `VERSION v`, which is the shape the
 	// SDK's own aql_version_no_predicate advises against.
 	{
@@ -150,7 +150,7 @@ var probe088Constructs = []struct {
 		},
 	},
 
-	// --- REQ-163: the standing-predicate carrier ------------------------------
+	// --- REQ-055: the standing-predicate carrier ------------------------------
 	{
 		name: "standing_predicate_param",
 		build: func() (aql.Query, error) {
@@ -188,13 +188,13 @@ var probe088Constructs = []struct {
 	{
 		// REQ-161's own documented suppression shape — all versions of ONE
 		// versioned composition — which no builder program could express before
-		// REQ-163 and which the linter's aql_versioned_object_unreferenced
+		// REQ-055 and which the linter's aql_versioned_object_unreferenced
 		// advisory exists to point at.
 		name:  "standing_versioned_object",
 		build: func() (aql.Query, error) { return probe088StandingQuery(probe088VersionedObjectTerm()) },
 	},
 
-	// --- REQ-163: the typed projection ----------------------------------------
+	// --- REQ-055: the typed projection ----------------------------------------
 	//
 	// One fixture per `columnExpr` alternative plus the clause-level flags:
 	// an aliased path, the star, the two COUNT shapes, a function call, a
@@ -262,7 +262,7 @@ func inlinePagingQuery() *aql.Builder {
 		OrderBy("c/context/start_time/value", aql.Descending)
 }
 
-// probe088VersionQuery is the shared body of the REQ-163 version-predicate
+// probe088VersionQuery is the shared body of the REQ-055 version-predicate
 // fixtures: the compositions of one EHR reached through a VERSION containment
 // carrying pred. It is the same logical query openehr/aql's own version_test.go
 // builds, so the package and the probe assert one golden rather than two
@@ -274,7 +274,7 @@ func probe088VersionQuery(pred aql.VersionPredicate) (aql.Query, error) {
 		Build()
 }
 
-// probe088StandingQuery is the shared body of the REQ-163 standing-predicate
+// probe088StandingQuery is the shared body of the REQ-055 standing-predicate
 // fixtures: the compositions of one EHR reached through term. It mirrors
 // probe088VersionQuery so the two carriers' goldens differ only in the
 // construct they exercise.
@@ -297,7 +297,7 @@ func probe088VersionedObjectTerm() aql.Containment {
 			Contains(aql.Class("COMPOSITION", "c")))
 }
 
-// probe088ProjectionQuery is the shared body of the REQ-163 projection
+// probe088ProjectionQuery is the shared body of the REQ-055 projection
 // fixtures: the compositions of one EHR, projected through cols. The two
 // clause-level flag fixtures spell their own body instead, because
 // [aql.Builder.Distinct] is set on the builder rather than on an item.
@@ -308,7 +308,7 @@ func probe088ProjectionQuery(cols ...aql.SelectField) (aql.Query, error) {
 		Build()
 }
 
-// probe088Refusals are the build-time refusals REQ-163
+// probe088Refusals are the build-time refusals REQ-055
 // requires. Each MUST return an error wrapping [aql.ErrInvalidQuery] — never a
 // silently combined, ungrammatical, or question-changing emission.
 var probe088Refusals = []struct {
@@ -328,24 +328,24 @@ var probe088Refusals = []struct {
 		build: func() (aql.Query, error) { return inlinePagingQuery().OffsetInline(100).Build() },
 	},
 	{
-		// REQ-163: openEHR QUERY Release-1.1.0 §4.4.3 — "It is not allowed to
+		// REQ-055: openEHR QUERY Release-1.1.0 §4.4.3 — "It is not allowed to
 		// use TOP while also using LIMIT clause in the same query."
 		name:  "top_with_in_text_limit",
 		build: func() (aql.Query, error) { return inlinePagingQuery().Top(5).LimitInline(50).Build() },
 	},
 	{
-		// REQ-163: a TOP is an in-text row bound, so it is exclusive with the
+		// REQ-055: a TOP is an in-text row bound, so it is exclusive with the
 		// request envelope's bound too — two bounds on one query.
 		name:  "top_with_envelope_limit",
 		build: func() (aql.Query, error) { return inlinePagingQuery().Top(5).Limit(20).Build() },
 	},
 	{
-		// REQ-163: the `top` production admits no sign.
+		// REQ-055: the `top` production admits no sign.
 		name:  "negative_top_count",
 		build: func() (aql.Query, error) { return inlinePagingQuery().Top(-1).Build() },
 	},
 	{
-		// REQ-163: the emitted SELECT must read back as the projection the
+		// REQ-055: the emitted SELECT must read back as the projection the
 		// builder recorded. `Col("c/a, c/b")` re-parses as TWO items, so the
 		// query asks for a projection the caller never wrote — valid AQL,
 		// invisible to every golden and round-trip check downstream.
@@ -355,7 +355,7 @@ var probe088Refusals = []struct {
 		},
 	},
 	{
-		// REQ-163: the same rule on the clause-level flags. `DISTINCT` is
+		// REQ-055: the same rule on the clause-level flags. `DISTINCT` is
 		// consumed into the CLAUSE (`SELECT DISTINCT? top? selectExpr …`), not
 		// into the item, so this text asks for distinct rows the builder never
 		// recorded. A `Col` that re-parses as one flag-free item — a function
@@ -366,7 +366,7 @@ var probe088Refusals = []struct {
 		},
 	},
 	{
-		// REQ-163: the third mode of the same rule, and the one the wire
+		// REQ-055: the third mode of the same rule, and the one the wire
 		// assertion names last. A clause keyword at the top level ENDS the
 		// projection, so the parser reads a FROM the builder never wrote and
 		// the query it runs is not the query that was built.
@@ -376,7 +376,7 @@ var probe088Refusals = []struct {
 		},
 	},
 	{
-		// REQ-163: one carrier per grammar position. A comparison on a VERSION
+		// REQ-055: one carrier per grammar position. A comparison on a VERSION
 		// node is legal AQL and reachable — through the VERSION bracket's own
 		// carrier, `Version(alias, VersionCompare(…))`. Routing a class-position
 		// call there silently would change the caller's accept set with no
@@ -392,7 +392,7 @@ var probe088Refusals = []struct {
 // Probe088Constructs returns the construct names PROBE-088 asserts, in
 // assertion order, so a caller can read the matching
 // openehr/aql/testdata/wire/<name>.aql goldens without restating the list.
-func Probe088Constructs() []string { // PROBE-088 (REQ-163)
+func Probe088Constructs() []string { // PROBE-088 (REQ-055)
 	out := make([]string, 0, len(probe088Constructs))
 	for _, c := range probe088Constructs {
 		out = append(out, c.name)
@@ -422,7 +422,7 @@ func Probe088Constructs() []string { // PROBE-088 (REQ-163)
 // goldens maps construct name to committed canonical form; the caller reads
 // the files (probes take no filesystem dependency). The probe needs no
 // client or server.
-func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Golden string) (Result, error) { // PROBE-088 (REQ-163)
+func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Golden string) (Result, error) { // PROBE-088 (REQ-055)
 	r := Result{Probe: "PROBE-088"}
 	if len(goldens) == 0 {
 		return r, errors.New("PROBE-088: goldens required, one per Probe088Constructs entry")

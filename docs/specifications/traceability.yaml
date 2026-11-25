@@ -572,27 +572,39 @@ requirements:
       - testkit/probes/versioned/probe_065_minimal_return_round_trip.go
 
   - id: REQ-055
-    title: AQL wire boundary
-    canonical: docs/specifications/wire.md#req-055--wire-boundary
+    title: AQL builder
+    canonical: docs/specifications/aql.md#req-055--aql-builder
     status: draft
     implementation: landed
-    packages: [openehr/aql, openehr/client/query]
-    probes: [PROBE-020, PROBE-021, PROBE-078]
+    packages: [openehr/aql, openehr/client/query, testkit/probes/aql]
+    probes: [PROBE-020, PROBE-088, PROBE-097]
     tests:
+      - openehr/aql/builder_internal_test.go
       - openehr/aql/builder_test.go
+      - openehr/aql/containment_roundtrip_test.go
+      - openehr/aql/containment_test.go
+      - openehr/aql/paging_test.go
+      - openehr/aql/parse/dispatch_tripwire_test.go
+      - openehr/aql/parse/emit_parity_test.go
       - openehr/aql/parse/emit_verify_test.go
       - openehr/aql/parse/identifier_parity_test.go
       - openehr/aql/parse/literal_roundtrip_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/query_test.go
+      - openehr/aql/parse/roundtrip_test.go
+      - openehr/aql/projection_confrontation_test.go
+      - openehr/aql/projection_internal_test.go
       - openehr/aql/projection_test.go
+      - openehr/aql/standing_internal_test.go
+      - openehr/aql/standing_test.go
       - openehr/aql/value_test.go
-      - openehr/client/query/query_test.go
-      - testkit/probe/cassette_errors_test.go
+      - openehr/aql/verify_parity_test.go
+      - openehr/aql/version_internal_test.go
+      - openehr/aql/version_test.go
       - testkit/probes/aql/probe_020_builder_stability.go
+      - testkit/probes/aql/probe_088_builder_containment_paging.go
+      - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go
-      - testkit/probes/query/probe_078_verb_aware_scoping.go
-      - testkit/probes/query/probes_test.go
 
   - id: REQ-056
     title: Canonical XML
@@ -677,12 +689,12 @@ requirements:
       - testkit/probes/serialize/probes_test.go
 
   - id: REQ-057
-    title: Stored AQL queries
+    title: AQL execution and stored queries
     canonical: docs/specifications/wire.md#req-057
     status: draft
     implementation: landed
     packages: [openehr/client/query, openehr/client/definition]
-    probes: [PROBE-066, PROBE-079]
+    probes: [PROBE-066, PROBE-079, PROBE-021, PROBE-078]
     tests:
       - openehr/client/definition/null_body_test.go
       - openehr/client/definition/stored_query_test.go
@@ -690,8 +702,11 @@ requirements:
       - openehr/client/query/query_test.go
       - openehr/client/query/stored_paging_test.go
       - openehr/client/query/version_trim_test.go
+      - testkit/probe/cassette_errors_test.go
       - testkit/probe/cassette_test.go
       - testkit/probe/livestoredquery_test.go
+      - testkit/probes/query/probe_078_verb_aware_scoping.go
+      - testkit/probes/query/probes_test.go
 
   - id: REQ-058
     title: Datamap V2
@@ -803,12 +818,12 @@ requirements:
       - testkit/probes/auth/probes_test.go
 
   - id: REQ-063
-    title: Token refresh
-    canonical: docs/specifications/auth.md#req-063--token-refresh
+    title: Token refresh and revocation
+    canonical: docs/specifications/auth.md#req-063--token-refresh-and-revocation
     status: draft
     implementation: landed
     packages: [auth, auth/clientcreds, auth/jwtbearer, auth/smart, transport, testkit/probes/auth, internal/expiresin]
-    probes: [PROBE-007]
+    probes: [PROBE-007, PROBE-106]
     tests:
       - auth/clientcreds/expires_in_test.go
       - auth/clientcreds/max_token_lifetime_test.go
@@ -850,6 +865,7 @@ requirements:
       - internal/expiresin/expiresin_test.go
       - testkit/probes/auth/probe_007_proactive_refresh.go
       - testkit/probes/auth/probe_007_transport_refresh.go
+      - testkit/probes/auth/probe_106_token_revocation.go
       - testkit/probes/auth/probes_test.go
       - transport/client_test.go
       - transport/reauth_backend_test.go
@@ -970,7 +986,7 @@ requirements:
       - testkit/probes/discovery/probe_041_catalog_refresh_on_401.go
 
   - id: REQ-072
-    title: Discovery validation
+    title: Discovery validation and trust posture
     canonical: docs/specifications/auth.md#req-072
     status: draft
     implementation: landed
@@ -979,9 +995,14 @@ requirements:
     tests:
       - smart/discovery/auth_members_test.go
       - smart/discovery/cache_hit_test.go
+      - smart/discovery/diagnostics_test.go
       - smart/discovery/document_size_test.go
+      - smart/discovery/insecure_baseurl_test.go
+      - smart/discovery/issuer_test.go
       - smart/discovery/option_copy_test.go
       - smart/discovery/redact_test.go
+      - smart/discovery/redirect_test.go
+      - smart/discovery/refuse_downgrade_internal_test.go
       - smart/discovery/resolver_test.go
       - smart/discovery/service_entry_test.go
       - smart/discovery/url_shape_test.go
@@ -990,24 +1011,6 @@ requirements:
       - testkit/probes/auth/probes_test.go
       - testkit/probes/discovery/probe_040_catalog_ttl.go
       - testkit/probes/discovery/probe_041_catalog_refresh_on_401.go
-
-  - id: REQ-073
-    title: Discovery trust posture
-    canonical: docs/specifications/auth.md#req-073--discovery-trust-posture
-    status: draft
-    implementation: landed
-    packages: [smart/discovery]
-    tests:
-      - smart/discovery/cache_hit_test.go
-      - smart/discovery/diagnostics_test.go
-      - smart/discovery/document_size_test.go
-      - smart/discovery/insecure_baseurl_test.go
-      - smart/discovery/issuer_test.go
-      - smart/discovery/redact_test.go
-      - smart/discovery/redirect_test.go
-      - smart/discovery/refuse_downgrade_internal_test.go
-      - smart/discovery/resolver_test.go
-      - smart/discovery/url_shape_test.go
 
   - id: REQ-082
     title: Probe runnability
@@ -2208,35 +2211,6 @@ requirements:
       - testkit/probes/aql/probe_107_suite_corpus_test.go
       - testkit/probes/aql/probes_test.go
 
-  - id: REQ-163
-    title: AQL write-side expressivity parity
-    canonical: docs/specifications/aql.md#req-163--aql-write-side-expressivity-parity
-    status: draft
-    implementation: landed
-    packages:
-      - openehr/aql
-      - testkit/probes/aql
-    probes: [PROBE-088, PROBE-097]
-    tests:
-      - openehr/aql/builder_internal_test.go
-      - openehr/aql/containment_roundtrip_test.go
-      - openehr/aql/containment_test.go
-      - openehr/aql/paging_test.go
-      - openehr/aql/parse/dispatch_tripwire_test.go
-      - openehr/aql/parse/emit_parity_test.go
-      - openehr/aql/parse/roundtrip_test.go
-      - openehr/aql/projection_confrontation_test.go
-      - openehr/aql/projection_internal_test.go
-      - openehr/aql/projection_test.go
-      - openehr/aql/standing_internal_test.go
-      - openehr/aql/standing_test.go
-      - openehr/aql/verify_parity_test.go
-      - openehr/aql/version_internal_test.go
-      - openehr/aql/version_test.go
-      - testkit/probes/aql/probe_088_builder_containment_paging.go
-      - testkit/probes/aql/probe_097_semantic_lint.go
-      - testkit/probes/aql/probes_test.go
-
   - id: REQ-165
     title: openEHR scope syntax
     canonical: docs/specifications/auth.md#req-165--openehr-scope-syntax
@@ -2263,21 +2237,6 @@ requirements:
       - transport/reauth_backend_test.go
       - transport/reauth_challenge_test.go
       - transport/reauth_error_test.go
-
-  - id: REQ-167
-    title: Token revocation
-    canonical: docs/specifications/auth.md#req-167--token-revocation
-    status: draft
-    implementation: landed
-    packages: [auth/smart, auth, testkit/probes/auth]
-    probes: [PROBE-106]
-    tests:
-      - auth/smart/redact_test.go
-      - auth/smart/redirect_test.go
-      - auth/smart/revoke_test.go
-      - auth/smart/token_change_test.go
-      - testkit/probes/auth/probe_106_token_revocation.go
-      - testkit/probes/auth/probes_test.go
 
   - id: REQ-168
     title: Value-free validation diagnostics
@@ -2598,4 +2557,3 @@ requirements:
       - testkit/probes/definition/probe_093_template_list_filters.go
       - testkit/probes/definition/probe_112_template_representations.go
       - testkit/probes/definition/probes_test.go
-

@@ -156,12 +156,12 @@ func serve(body func(origin string) string) documentFunc {
 // notFound answers 404, so a resolver that fetches the document fails.
 func notFound(string) (int, string) { return http.StatusNotFound, `{"error":"not found"}` }
 
-// TestResolveSeparatesBaseURLFromIssuer pins REQ-070 and REQ-073: the catalog
+// TestResolveSeparatesBaseURLFromIssuer pins REQ-070 and REQ-072: the catalog
 // carries the base URL the caller resolved and the document's issuer as two
 // values, the issuer falling back to the base URL when the document declares
 // none. The OpenID configuration is fetched only for an issuer that differs
 // from the base URL, and never when the check is turned off.
-func TestResolveSeparatesBaseURLFromIssuer(t *testing.T) { // REQ-070, REQ-073
+func TestResolveSeparatesBaseURLFromIssuer(t *testing.T) { // REQ-070, REQ-072
 	tests := []struct {
 		name       string
 		issuer     func(origin string) string // the declared issuer; empty means none
@@ -225,13 +225,13 @@ func TestResolveSeparatesBaseURLFromIssuer(t *testing.T) { // REQ-070, REQ-073
 	}
 }
 
-// TestResolveCrossChecksAnotherIssuer pins REQ-073: for a declared issuer
+// TestResolveCrossChecksAnotherIssuer pins REQ-072: for a declared issuer
 // that differs from the base URL the resolver fetches the issuer's OpenID
 // configuration, with Accept: application/json, and requires its issuer to
 // equal the declared one exactly and, when both documents declare jwks_uri,
 // the two to be equal. A disagreement is ReasonIssuerMismatch; a document
 // that cannot be fetched or decoded is ReasonFetchFailed.
-func TestResolveCrossChecksAnotherIssuer(t *testing.T) { // REQ-073
+func TestResolveCrossChecksAnotherIssuer(t *testing.T) { // REQ-072
 	const (
 		jwks      = "https://auth.example.com/jwks"
 		otherJWKS = "https://other.example.com/jwks"
@@ -378,10 +378,10 @@ type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
-// TestResolveCrossCheckNetworkFailure pins REQ-073: an OpenID configuration
+// TestResolveCrossCheckNetworkFailure pins REQ-072: an OpenID configuration
 // that cannot be reached is ReasonFetchFailed, with the network error kept as
 // the cause.
-func TestResolveCrossCheckNetworkFailure(t *testing.T) { // REQ-073
+func TestResolveCrossCheckNetworkFailure(t *testing.T) { // REQ-072
 	p := startPlatform(t, false, serve(func(o string) string {
 		return smartDocument(o+idpPath, "")
 	}), serve(func(o string) string { return openIDDocument(o+idpPath, "") }))
@@ -407,9 +407,9 @@ func TestResolveCrossCheckNetworkFailure(t *testing.T) { // REQ-073
 	}
 }
 
-// TestResolveCrossCheckHonoursContext pins REQ-073: the OpenID configuration
+// TestResolveCrossCheckHonoursContext pins REQ-072: the OpenID configuration
 // fetch runs under the caller's context, so cancelling it ends the fetch.
-func TestResolveCrossCheckHonoursContext(t *testing.T) { // REQ-073
+func TestResolveCrossCheckHonoursContext(t *testing.T) { // REQ-072
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	// The OpenID handler cancels the caller's context, then holds the
@@ -446,11 +446,11 @@ func TestResolveCrossCheckHonoursContext(t *testing.T) { // REQ-073
 	}
 }
 
-// TestResolveCrossCheckOnEveryResolutionAndRefresh pins REQ-071 and REQ-073:
+// TestResolveCrossCheckOnEveryResolutionAndRefresh pins REQ-071 and REQ-072:
 // the catalog is cached under the base URL the caller resolved, never under
 // the issuer, and every fetch of the SMART configuration, refresh included,
 // repeats the OpenID configuration check.
-func TestResolveCrossCheckOnEveryResolutionAndRefresh(t *testing.T) { // REQ-071, REQ-073
+func TestResolveCrossCheckOnEveryResolutionAndRefresh(t *testing.T) { // REQ-071, REQ-072
 	var (
 		openIDHits atomic.Int32
 		disagree   atomic.Bool
@@ -518,7 +518,7 @@ func (c serialisingCache) Put(ctx context.Context, baseURL string, cat *discover
 	return c.MemoryCache.Put(ctx, baseURL, &stored)
 }
 
-// TestRenewalOnNotModifiedRechecksIssuer pins REQ-073: when a conditional
+// TestRenewalOnNotModifiedRechecksIssuer pins REQ-072: when a conditional
 // request for a cached catalog is answered 304 Not Modified, whether Refresh
 // sent it or Resolve of the expired catalog did, the resolver fetches the
 // issuer's OpenID configuration again. A configuration that now names
@@ -528,7 +528,7 @@ func (c serialisingCache) Put(ctx context.Context, baseURL string, cat *discover
 // A catalog that comes back from a cache that keeps its exported fields only
 // has lost that text, so both values are compared parsed: a real change is
 // still a mismatch, and a scheme the parser lower-cased is not.
-func TestRenewalOnNotModifiedRechecksIssuer(t *testing.T) { // REQ-073
+func TestRenewalOnNotModifiedRechecksIssuer(t *testing.T) { // REQ-072
 	const (
 		jwks      = "https://auth.example.com/jwks"
 		otherJWKS = "https://other.example.com/jwks"
@@ -645,13 +645,13 @@ func TestRenewalOnNotModifiedRechecksIssuer(t *testing.T) { // REQ-073
 	}
 }
 
-// TestResolveValidatesDeclaredIssuer pins REQ-073: a declared issuer is
+// TestResolveValidatesDeclaredIssuer pins REQ-072: a declared issuer is
 // accepted whether or not it equals the base URL, provided it is an absolute
 // https URL with a host and no query or fragment; the scheme is matched
 // without regard to case. A malformed issuer is ReasonMalformedURL and an
 // http issuer ReasonInsecureURL unless WithAllowInsecure is set. A refused
 // issuer is never contacted.
-func TestResolveValidatesDeclaredIssuer(t *testing.T) { // REQ-073
+func TestResolveValidatesDeclaredIssuer(t *testing.T) { // REQ-072
 	tests := []struct {
 		name       string
 		plaintext  bool

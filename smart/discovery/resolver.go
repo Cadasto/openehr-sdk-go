@@ -637,7 +637,7 @@ func (r *Resolver) documentURL(baseURL string) (*url.URL, error) {
 // since it needs a request. The document path is not compared: the cache
 // keys entries by base URL alone (the REQ-071 known gap).
 //
-// REQ-071, REQ-072, REQ-073: a failure is the DiscoveryError a new document
+// REQ-071, REQ-072: a failure is the DiscoveryError a new document
 // would get, and the caller leaves the entry cached, because it says
 // nothing new about the Platform.
 func (r *Resolver) checkFreshHit(baseURL string, cat *ServiceCatalog) error {
@@ -1260,7 +1260,7 @@ func (r *Resolver) warnPlaintextDocument(baseURL string, req *http.Request, resp
 // the issuer when the document declares none, and the base URL's own check
 // covers it.
 //
-// REQ-071, REQ-072, REQ-073.
+// REQ-071, REQ-072.
 func (r *Resolver) checkURLs(baseURL string, cat *ServiceCatalog) error {
 	for _, m := range authMembers {
 		u := *m.endpoint(&cat.Auth)

@@ -143,7 +143,7 @@ func setBodyField(t *testing.T, r *http.Request, k string, v any) {
 	r.ContentLength = int64(len(out))
 }
 
-func TestProbe078VerbAwareScoping(t *testing.T) { // PROBE-078, REQ-055
+func TestProbe078VerbAwareScoping(t *testing.T) { // PROBE-078, REQ-057
 	b, snapshot := scopeBackend(t, nil)
 	r, err := probes.Probe078VerbAwareScoping(t.Context(), newClient(t, b), snapshot, scopedEHRID)
 	if err != nil {

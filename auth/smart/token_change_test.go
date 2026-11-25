@@ -750,14 +750,14 @@ func TestTokenChangeAfterCodeExchangeWithoutRefreshToken(t *testing.T) { // REQ-
 	}
 }
 
-// TestTokenChangesKeepInstallOrderAcrossRevoke pins REQ-063 and REQ-167:
+// TestTokenChangesKeepInstallOrderAcrossRevoke pins REQ-063:
 // changes reach the hook one at a time, in the order the source installed
 // them, Revoke's empty change included. Revoke clears the tokens and its
 // request is held on its way while a code exchange installs new tokens;
 // the hook then sees the earlier change, Revoke's empty one and the new
 // session's, in that order, whether it was still busy with the earlier
 // change on another goroutine or had already finished it.
-func TestTokenChangesKeepInstallOrderAcrossRevoke(t *testing.T) { // REQ-063 REQ-167
+func TestTokenChangesKeepInstallOrderAcrossRevoke(t *testing.T) { // REQ-063
 	for _, busy := range []bool{true, false} {
 		name := "hook idle"
 		if busy {

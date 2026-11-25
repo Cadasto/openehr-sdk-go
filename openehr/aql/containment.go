@@ -55,7 +55,7 @@ type Containment struct {
 	archetypeID string
 
 	// versionPred is the `versionPredicate` bracket of a VERSION class
-	// expression (REQ-163), nil when the bracket is absent — which is the
+	// expression (REQ-055), nil when the bracket is absent — which is the
 	// legal predicate-less form, not a defect.
 	//
 	// It sits BESIDE archetypeID rather than sharing it because the two are
@@ -67,7 +67,7 @@ type Containment struct {
 	versionPred VersionPredicate
 
 	// standingPred is the `standardPredicate` alternative of an ordinary
-	// class expression's `pathPredicate` bracket (REQ-163), nil when the
+	// class expression's `pathPredicate` bracket (REQ-055), nil when the
 	// bracket is absent. Set by [Containment.Predicated].
 	//
 	// It sits beside archetypeID rather than sharing it for the reason
@@ -147,7 +147,7 @@ func (c Containment) NotContains(child Containment) Containment {
 // two derivations from the same operand cannot write the same backing array
 // (`base.Contains(x)` and `base.Contains(y)` are independent).
 //
-// A junction receiver is REFUSED (REQ-163). The grammar admits no
+// A junction receiver is REFUSED (REQ-055). The grammar admits no
 // `(A OR B) CONTAINS C` form, and appending to a junction would not nest
 // anything: the child would become one more boolean OPERAND, and because an
 // operand carries no connector its negation would be dropped — silently
@@ -195,7 +195,7 @@ func containmentJunction(j containsJoin, operands []Containment) Containment {
 	switch len(operands) {
 	case 0:
 		// Nothing to join. The zero value fails Build loudly rather than
-		// emitting an empty CONTAINS (no silent loss, REQ-163).
+		// emitting an empty CONTAINS (no silent loss, REQ-055).
 		return Containment{}
 	case 1:
 		return operands[0]
@@ -252,7 +252,7 @@ func (c Containment) chainEndsInJunction() bool {
 // three spellings of the ONE `[…]` position, so exactly one bracket is ever
 // written. Their order here decides nothing for a tree [Builder.Build] accepts:
 // validateTree refuses a node carrying more than one (the landed
-// archetype-on-VERSION rule, and REQ-163's standing-beside-archetype and
+// archetype-on-VERSION rule, and REQ-055's standing-beside-archetype and
 // standing-on-VERSION rules), so no two are ever populated together on an
 // emitted node.
 //
@@ -382,7 +382,7 @@ func (c Containment) validateTree(seen map[string]bool) error {
 				ErrInvalidQuery, c.archetypeID)
 		}
 		// …and the OTHER bracket of that alternative, the version predicate,
-		// has no position on any class but VERSION (REQ-163). The two rules are
+		// has no position on any class but VERSION (REQ-055). The two rules are
 		// the two halves of one `[…]` position, which is why they sit together.
 		if c.versionPred != nil {
 			if err := c.validateVersionPredicate(); err != nil {
@@ -390,7 +390,7 @@ func (c Containment) validateTree(seen map[string]bool) error {
 			}
 		}
 		// …and the class alternative's OWN bracket, the standing predicate
-		// (REQ-163). It is the third spelling of the same `[…]` position, so it
+		// (REQ-055). It is the third spelling of the same `[…]` position, so it
 		// is checked here with the other two: against the VERSION alternative
 		// (which has its own bracket production), against the archetype form
 		// (which would be silently dropped beside it), and against its own
@@ -416,7 +416,7 @@ func (c Containment) validateTree(seen map[string]bool) error {
 			return fmt.Errorf("%w: duplicate alias %q", ErrInvalidQuery, c.alias)
 		}
 		seen[c.alias] = true
-		// REQ-163: a class node's children are a CONTAINS chain, so the
+		// REQ-055: a class node's children are a CONTAINS chain, so the
 		// junction-placement rule applies. A junction node's children are
 		// unordered operands — no CONTAINS keyword separates them — so the
 		// rule deliberately does NOT apply there.
@@ -433,7 +433,7 @@ func (c Containment) validateTree(seen map[string]bool) error {
 }
 
 // validateContainsChain refuses a junction anywhere but the END of a CONTAINS
-// chain (REQ-163). The grammar takes a parenthesised group as a whole
+// chain (REQ-055). The grammar takes a parenthesised group as a whole
 // alternative — `containsExpr : classExprOperand (NOT? CONTAINS containsExpr)?
 // | '(' containsExpr ')' | …` — so nothing may follow one with a CONTAINS
 // keyword, and a junction with a further term after it emits AQL the parser

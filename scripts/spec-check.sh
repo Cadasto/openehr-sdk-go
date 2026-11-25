@@ -52,7 +52,7 @@ warn_msg() { echo "spec-check: warning: $*" >&2; warn=$((warn + 1)); }
 
 # GitHub-style heading slug: lowercase, drop everything but [a-z0-9 space hyphen],
 # then spaces -> hyphens (consecutive specials collapse to repeated hyphens, e.g.
-# "REQ-055 — Wire boundary" -> "req-055--wire-boundary"). Matches GitHub's anchor rule
+# "REQ-063 — Token refresh and revocation" -> "req-063--token-refresh-and-revocation"). Matches GitHub's anchor rule
 # for the ASCII headings used in these specs.
 #
 # `_` is KEPT: GitHub preserves underscores in anchors, so stripping them here

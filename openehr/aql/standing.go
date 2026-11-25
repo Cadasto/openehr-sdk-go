@@ -1,6 +1,6 @@
 package aql
 
-// standing.go — REQ-163 § The standing-predicate carrier. The write side of the
+// standing.go — REQ-055 § The standing-predicate carrier. The write side of the
 // `standardPredicate` alternative of an ordinary class expression's bracket:
 //
 //	classExprOperand : IDENTIFIER variable=IDENTIFIER? pathPredicate?
@@ -19,7 +19,7 @@ package aql
 // alternative of its own, so nothing joins two of them; the bracket's THIRD
 // alternative, `nodePredicate`, is defined over AND / OR recursively, so a
 // junction class predicate is perfectly legal AQL — it simply has no builder
-// carrier, before this REQ or after it (REQ-163 § Out of scope). The two are
+// carrier, before this REQ or after it (REQ-055 § Out of scope). The two are
 // easy to conflate, which is why the difference is written down here.
 //
 // The comparison is the landed [Comparison] rather than a second structurally
@@ -107,7 +107,7 @@ func (c Containment) Predicated(path string, op Operator, v Value) Containment {
 	return c
 }
 
-// standingRefusal reports the REQ-163 misuse of [Containment.Predicated] on
+// standingRefusal reports the REQ-055 misuse of [Containment.Predicated] on
 // this receiver, or nil when the node can carry the bracket. It looks at the
 // RECEIVER only — the comparison's own shape is checked at [Builder.Build]
 // time, where every other predicate defect is reported.
@@ -140,7 +140,7 @@ func (c Containment) standingRefusal() error {
 	return nil
 }
 
-// versionRoutingRefusal is REQ-163 § One carrier per grammar position: a
+// versionRoutingRefusal is REQ-055 § One carrier per grammar position: a
 // comparison on a VERSION node is legal AQL and MUST be expressible, but
 // through the VERSION bracket's own carrier and not through this one.
 //
@@ -158,7 +158,7 @@ func versionRoutingRefusal() error {
 }
 
 // validateStandingPredicate holds a class bracket to its own grammar position
-// (REQ-163 § The standing-predicate carrier). It runs only when the field is
+// (REQ-055 § The standing-predicate carrier). It runs only when the field is
 // populated; an absent predicate is the ordinary bare class expression.
 //
 // Five checks. The first two RESTATE the [Containment.Predicated] refusals at
@@ -230,7 +230,7 @@ func (c Containment) validateStandingPredicate() error {
 // [Terminology], which is the same [FuncCall] shape with a fixed name — emits
 // text the SDK's OWN parser rejects (`v[commit_audit/time > LENGTH(x)]`). The
 // value position in WHERE does admit one, which is exactly why the vocabulary
-// is NOT forked: REQ-163 § The standing-predicate carrier makes the shared
+// is NOT forked: REQ-055 § The standing-predicate carrier makes the shared
 // [Comparison] a MUST so a WHERE comparison, the parsed class predicate and the
 // built bracket keep one model — so the narrowing is a guard at the two bracket
 // positions, not a second operand type.

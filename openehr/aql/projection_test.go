@@ -1,12 +1,12 @@
 package aql_test
 
-// projection_test.go pins the REQ-163 typed projection: the constructors that
+// projection_test.go pins the REQ-055 typed projection: the constructors that
 // mirror parse.SelectClause, the clause-level DISTINCT flag, the canonical
 // spellings that make the read-side round trip byte-IDENTITY, and the
 // after-emission verification that closes the last REQ-119 write path.
 //
 // The canonical strings asserted here MUST equal what openehr/aql/parse emits
-// for the same query; that is held mechanically by the REQ-163 projection rows
+// for the same query; that is held mechanically by the REQ-055 projection rows
 // in containment_roundtrip_test.go, which re-parse and re-emit every one of
 // them. Where a refusal is pinned, the REFERENCE procedure is applied too: the
 // bytes Build would have emitted are handed to the parser, which reads them back
@@ -23,7 +23,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
-// projectionQuery is the shared body of the REQ-163 projection fixtures: the
+// projectionQuery is the shared body of the REQ-055 projection fixtures: the
 // compositions of one EHR, projected through the items under test. It mirrors
 // standingQuery (standing_test.go) so the goldens differ only in the construct
 // they exercise.
@@ -34,7 +34,7 @@ func projectionQuery(cols ...aql.SelectField) (aql.Query, error) {
 		Build()
 }
 
-// TestProjectionEmission tables the canonical spellings of REQ-163
+// TestProjectionEmission tables the canonical spellings of REQ-055
 // § Canonical spellings: DISTINCT directly after SELECT and before the
 // deprecated TOP, AS uppercase with one space each side, projected function and
 // aggregate names in upper-case ASCII, `COUNT(DISTINCT path)` with one space
@@ -162,7 +162,7 @@ func TestProjectionEmission(t *testing.T) {
 }
 
 // TestProjectionMatchesGolden pins the committed canonical form. The goldens are
-// NEW files, so no existing fixture is re-baselined (REQ-163 § Additivity).
+// NEW files, so no existing fixture is re-baselined (REQ-055 § Additivity).
 func TestProjectionMatchesGolden(t *testing.T) {
 	for name, build := range map[string]func() (aql.Query, error){
 		"select_path_alias": func() (aql.Query, error) { return projectionQuery(aql.ColAs("c/uid/value", "uid")) },
@@ -197,7 +197,7 @@ func TestProjectionMatchesGolden(t *testing.T) {
 }
 
 // TestProjectionVerbAndStructBuilderAgree holds PROBE-020's property over the
-// REQ-163 additions: the two builder styles share one emitter, so they produce
+// REQ-055 additions: the two builder styles share one emitter, so they produce
 // byte-identical AQL for every new construct — including the clause-level flag,
 // which only one of them can set first.
 func TestProjectionVerbAndStructBuilderAgree(t *testing.T) {
@@ -260,7 +260,7 @@ func TestProjectionVerbAndStructBuilderAgree(t *testing.T) {
 					From("COMPOSITION", "c").Build()
 			},
 		},
-		// § Acceptance asks for the property PER CONSTRUCT, and REQ-163 adds
+		// § Acceptance asks for the property PER CONSTRUCT, and REQ-055 adds
 		// three. The two class-position carriers are exercised from here rather
 		// than left to the projection rows alone — the constructors live in
 		// their own files, but the property under test is this one.
@@ -422,11 +422,11 @@ func TestProjectionRefusals(t *testing.T) {
 // This is the site where the fold runs BEFORE the name validator and feeds it,
 // so a wider fold accepts MORE: the Unicode mapping folds some non-ASCII letters
 // INTO the ASCII alphabet (`ı` → `I`, `ſ` → `S`), which turns a spelling the
-// lexer cannot tokenise into a legal-looking one (REQ-163 § Canonical spellings,
+// lexer cannot tokenise into a legal-looking one (REQ-055 § Canonical spellings,
 // a MUST NOT). `mın` is the worst arm — the fold does not merely respell it, it
 // MOVES the call into aql.IsAggregateFunc, so the aggregate shape rule would
 // then be applied to a call the caller never wrote. That is the
-// silent-substitution class REQ-119 and REQ-163 exist to close.
+// silent-substitution class REQ-119 and REQ-055 exist to close.
 //
 // The refusal names the offending spelling, and that is deliberate rather than a
 // gap in TestProjectionDiagnosticsAreValueFree below: a projected function name
@@ -435,7 +435,7 @@ func TestProjectionRefusals(t *testing.T) {
 func TestProjectionFuncNameFoldIsASCII(t *testing.T) {
 	// Every ASCII casing IS the name, and emits the one canonical spelling. The
 	// accept rows are the positive control: a fold tightened into refusing valid
-	// AQL fails here (REQ-163 § Acceptance).
+	// AQL fails here (REQ-055 § Acceptance).
 	for _, name := range []string{"max", "MAX", "Max"} {
 		t.Run("accepts "+name, func(t *testing.T) {
 			q, err := projectionQuery(aql.Fn(name, aql.Col("c/uid/value")))
@@ -462,14 +462,14 @@ func TestProjectionFuncNameFoldIsASCII(t *testing.T) {
 	}
 }
 
-// TestColSmugglingShapesArePinned is REQ-163 § Acceptance's per-shape ruling on
+// TestColSmugglingShapesArePinned is REQ-055 § Acceptance's per-shape ruling on
 // the smuggling shapes the audit found. Each carries a NAMED expected verdict —
 // not "either way", which would let the ruling pass whichever way it was
 // implemented.
 func TestColSmugglingShapesArePinned(t *testing.T) {
 	t.Run("COUNT with an alias is tolerated", func(t *testing.T) {
 		// One item, no clause-level flag: loud, ordinary AQL that says what the
-		// caller wrote, so rule 1 keeps it (REQ-163 § `Col` stays lenient).
+		// caller wrote, so rule 1 keeps it (REQ-055 § `Col` stays lenient).
 		q, err := projectionQuery(aql.Col("COUNT(c/uid/value) AS n"))
 		if err != nil {
 			t.Fatalf("Build refused a legacy Col that re-parses as one item: %v", err)
@@ -576,7 +576,7 @@ func TestColSmugglingWasASilentSubstitution(t *testing.T) {
 	})
 }
 
-// TestProjectionAcceptRows carries the ACCEPT direction of REQ-163
+// TestProjectionAcceptRows carries the ACCEPT direction of REQ-055
 // § Acceptance, which the refusal table deliberately does not stand in for:
 // REQ-119's own record is that a corpus of refusal rows alone let THREE
 // over-refusals ship green, each refusing text the parser reads back as the
@@ -687,7 +687,7 @@ func TestProjectionAcceptRows(t *testing.T) {
 }
 
 // TestSoleStarItemReducesToTheBareForm is the named mutation target for the
-// star half of the reduction (REQ-163 § `Col` stays lenient, and `Build()`
+// star half of the reduction (REQ-055 § `Col` stays lenient, and `Build()`
 // verifies what it emitted): the builder
 // records ONE star item and the emitted text reads back as the bare `SELECT *`
 // flag with ZERO items. Drop the reduction on either side of the comparison and
@@ -841,7 +841,7 @@ func TestProjectionShapeRefusalsAgreeWithEmit(t *testing.T) {
 	}
 
 	// The ACCEPT direction. Without it the whole table passes for a pair of
-	// guards that refuse everything, which is the failure mode REQ-163
+	// guards that refuse everything, which is the failure mode REQ-055
 	// § Acceptance names for a refusal-only corpus.
 	accepted := map[string]struct {
 		built aql.SelectField
@@ -946,7 +946,7 @@ func TestProjectionRefusalsNameTheItem(t *testing.T) {
 // TestProjectionDiagnosticsAreValueFree pins that a refused projection is
 // reported without reproducing the offending text — a Build error is what a
 // consuming CDR logs, and a projection can carry an identifiable path or
-// literal (REQ-163 § `Build()` verifies the projection it emitted).
+// literal (REQ-055 § `Build()` verifies the projection it emitted).
 func TestProjectionDiagnosticsAreValueFree(t *testing.T) {
 	const secret = "9d3d1b4e-0000-0000-0000-000000000000"
 	// Each witness must BOTH refuse and carry the value: the structural defect
@@ -981,7 +981,7 @@ func TestProjectionDiagnosticsAreValueFree(t *testing.T) {
 }
 
 // TestTopDirectionIsPartOfTheComparedStructure is the named target for the TOP
-// DIRECTION half of the clause-level flag comparison (REQ-163 § `Col` stays
+// DIRECTION half of the clause-level flag comparison (REQ-055 § `Col` stays
 // lenient, and `Build()` verifies what it emitted, whose second consequence
 // makes the clause-level FLAGS part of the compared structure).
 //
@@ -1054,7 +1054,7 @@ func TestTopDirectionIsPartOfTheComparedStructure(t *testing.T) {
 	})
 }
 
-// TestProjectedLiteralRefusesAFunctionCall pins the ROUTING refusal of REQ-163
+// TestProjectedLiteralRefusesAFunctionCall pins the ROUTING refusal of REQ-055
 // § The typed projection model: `columnExpr`'s `primitive` alternative carries a
 // primitive, and [aql.Fn] is the alternative that carries a call.
 //
@@ -1189,7 +1189,7 @@ func TestAggregateArgumentIsRefused(t *testing.T) {
 	})
 }
 
-// TestClosedTopLevelCommentIsContent pins the OVER-refusal direction of REQ-163
+// TestClosedTopLevelCommentIsContent pins the OVER-refusal direction of REQ-055
 // § rule 2, which is exact in both directions: it refuses every text that
 // changes the projection's recorded structure and NOTHING that does not.
 //
@@ -1354,7 +1354,7 @@ func TestSelectFieldComparabilityClaim(t *testing.T) {
 	}()
 }
 
-// mustRoundTripToIdentity applies the REFERENCE decision procedure of REQ-163
+// mustRoundTripToIdentity applies the REFERENCE decision procedure of REQ-055
 // § rule 2 to an accepted query: the emitted string is read back once and
 // re-emitted, and the two MUST be the same bytes. Identity, not mere
 // re-parseability, is the bar (§ Read-side mirror duty).

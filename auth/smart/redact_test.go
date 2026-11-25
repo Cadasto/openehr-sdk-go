@@ -30,7 +30,7 @@ func unrequestableEndpoint(path string) *url.URL {
 
 // TestREQ060_EndpointRequestErrorMasksPassword checks the credential-bearing
 // requests of REQ-060: the code exchange (REQ-061), the refresh (REQ-063)
-// and the revocation (REQ-167). When the request to the endpoint cannot be
+// and the revocation (REQ-063). When the request to the endpoint cannot be
 // built, the error is still an *auth.ExchangeError of the request's own
 // class, and it names the endpoint's host but not the password in its
 // userinfo.

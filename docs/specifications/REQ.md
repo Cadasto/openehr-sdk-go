@@ -37,23 +37,22 @@ To change a title, a canonical link, the spec stability or the implementation st
 | REQ-052 | Canonical JSON | [wire.md](wire.md#req-052) | draft | landed |
 | REQ-053 | FLAT and STRUCTURED | [wire.md](wire.md#req-053) | draft | landed |
 | REQ-054 | Optimistic concurrency | [wire.md](wire.md#req-054) | draft | landed |
-| REQ-055 | AQL wire boundary | [wire.md](wire.md#req-055--wire-boundary) | draft | landed |
+| REQ-055 | AQL builder | [aql.md](aql.md#req-055--aql-builder) | draft | landed |
 | REQ-056 | Canonical XML | [wire.md](wire.md#req-056) | draft | landed |
-| REQ-057 | Stored AQL queries | [wire.md](wire.md#req-057) | draft | landed |
+| REQ-057 | AQL execution and stored queries | [wire.md](wire.md#req-057) | draft | landed |
 | REQ-058 | Datamap V2 | [module-layout.md](module-layout.md#req-058--datamap-v2) | draft | planned |
 | REQ-059 | openEHR custom headers | [wire.md](wire.md#req-059) | draft | landed |
 | REQ-060 | TokenSource interface | [auth.md](auth.md#req-060) | draft | landed |
 | REQ-061 | SMART-on-openEHR PKCE | [auth.md](auth.md#req-061--pkce-flow) | draft | landed |
 | REQ-062 | JWKS rotation | [auth.md](auth.md#req-062--jwks-rotation) | draft | landed |
-| REQ-063 | Token refresh | [auth.md](auth.md#req-063--token-refresh) | draft | landed |
+| REQ-063 | Token refresh and revocation | [auth.md](auth.md#req-063--token-refresh-and-revocation) | draft | landed |
 | REQ-064 | Launch context | [auth.md](auth.md#req-064--launch-context) | draft | landed |
 | REQ-066 | Caller attribution | [transport.md](transport.md#req-066--caller-attribution) | draft | landed |
 | REQ-068 | SMART flows and launch modes | [auth.md](auth.md#req-068--flow-and-launch-mode-coverage) | draft | landed |
 | REQ-069 | HTTP Basic on openEHR REST | [auth.md](auth.md#req-069) | draft | landed |
 | REQ-070 | First-class discovery | [auth.md](auth.md#req-070) | draft | landed |
 | REQ-071 | Discovery cache | [auth.md](auth.md#req-071) | draft | landed |
-| REQ-072 | Discovery validation | [auth.md](auth.md#req-072) | draft | landed |
-| REQ-073 | Discovery trust posture | [auth.md](auth.md#req-073--discovery-trust-posture) | draft | landed |
+| REQ-072 | Discovery validation and trust posture | [auth.md](auth.md#req-072) | draft | landed |
 | REQ-082 | Probe runnability | [conformance.md](conformance.md#req-082--runnability) | draft | landed |
 | REQ-083 | `cadasto/admin` health checks | [conformance.md](conformance.md#req-083--cadastoadmin-health-checks) | draft | landed |
 | REQ-090 | OpenTelemetry hooks | [transport.md](transport.md#req-090--opentelemetry-hooks) | draft | landed |
@@ -84,10 +83,8 @@ To change a title, a canonical link, the spec stability or the implementation st
 | REQ-151 | Typed 2xx decode failure | [transport.md](transport.md#req-151--typed-2xx-decode-failure) | draft | landed |
 | REQ-160 | AQL containment admissibility relation | [aql.md](aql.md#req-160--aql-containment-admissibility-relation) | draft | landed |
 | REQ-161 | AQL semantic and portability lint | [aql.md](aql.md#req-161--aql-semantic-and-portability-lint) | draft | landed |
-| REQ-163 | AQL write-side expressivity parity | [aql.md](aql.md#req-163--aql-write-side-expressivity-parity) | draft | landed |
 | REQ-165 | openEHR scope syntax | [auth.md](auth.md#req-165--openehr-scope-syntax) | draft | landed |
 | REQ-166 | Bearer challenge on 401 and 403 | [transport.md](transport.md#req-166--bearer-challenge-on-401-and-403) | draft | landed |
-| REQ-167 | Token revocation | [auth.md](auth.md#req-167--token-revocation) | draft | landed |
 | REQ-168 | Value-free validation diagnostics | [clinical-modeling.md](clinical-modeling.md#req-168--value-free-validation-diagnostics) | draft | landed |
 | REQ-169 | Interval boundary flag defaults | [wire.md](wire.md#req-169--interval-boundary-flag-defaults) | draft | landed |
 | REQ-170 | Unmatched content on decode | [wire.md](wire.md#req-170--unmatched-content-on-decode) | draft | landed |

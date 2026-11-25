@@ -1,12 +1,12 @@
 package aql
 
 // version_internal_test.go reaches the unexported containment carrier to pin
-// the one REQ-163 refusal the public API cannot put a query into: a version
+// the one REQ-055 refusal the public API cannot put a query into: a version
 // predicate on a class node that is not spelled VERSION. [Version] fixes the RM
 // type to the SDK's own spelling, so the state is unreachable from outside —
 // the guard exists so a future constructor, or a widened field, cannot regress
 // it silently. The public surface is covered from aql_test (version_test.go).
-// REQ-163 · PROBE-088
+// REQ-055 · PROBE-088
 
 import (
 	"errors"
@@ -21,7 +21,7 @@ import (
 	"testing"
 )
 
-// TestVersionPredicateRefusedOffVersionNode pins the REQ-163 rule that
+// TestVersionPredicateRefusedOffVersionNode pins the REQ-055 rule that
 // `versionPredicate` is reachable from classExprOperand's VERSION alternative
 // alone: the bracket has no position on any other class expression, so a node
 // carrying one MUST be refused rather than emitted as text the parser rejects.

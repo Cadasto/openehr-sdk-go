@@ -42,7 +42,7 @@ import (
 // interface declarations disappears (renamed without updating this list) so
 // the derivation below cannot silently go blind.
 //
-// VersionPredicate and selectOperand (REQ-163) are registered here on the SAME
+// VersionPredicate and selectOperand (REQ-055) are registered here on the SAME
 // footing as the other four, not because either has a dispatch site to police
 // today — production code calls their interface methods and never type-switches
 // on them — but because this file exists on the premise that a mutation test
@@ -301,7 +301,7 @@ func TestDerefSwitchesCoverEveryShape(t *testing.T) {
 	// The switches under coverage: function name → the vocabulary it must
 	// exhaust, and whether the pointer twin case is required too.
 	//
-	// `pointers: false` on the REQ-163 rows is the whole of what their
+	// `pointers: false` on the REQ-055 rows is the whole of what their
 	// unexported shapes buy: a caller outside openehr/aql cannot NAME
 	// latestVersion or pathItem, so it cannot form a pointer twin either, and
 	// there is no second carrier for a case to be missing on.

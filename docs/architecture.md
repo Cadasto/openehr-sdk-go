@@ -154,7 +154,7 @@ It holds:
 - `internal/noredirect` builds the HTTP client that sends a token, refresh or revocation request without following redirects, which `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` share ([credential-bearing requests](specifications/auth.md#credential-bearing-requests)).
 - `internal/urlredact` masks the password in a URL's userinfo, including in a string `url.Parse` refuses, so `smart/discovery` and the auth sources keep a configured URL's password out of error text, log lines and panic values. The transport does not need it: its errors name the route template in place of the whole URL ([REQ-093](specifications/transport.md#req-093--openehr-error-envelope-mapping)).
 - `internal/coalesce` holds the one rule for a shared refresh whose leading call gave up: when that call's context ending is all that failed the refresh, a call waiting on it with a live context tries again instead of taking that failure. `auth/smart`, `auth/clientcreds`, `auth/jwtbearer` and `smart/discovery` share it ([REQ-026](specifications/idiom.md#concurrency-req-026)).
-- `internal/expiresin` reads a token response's `expires_in` as whole seconds in any form a JSON number takes, and keeps it within 100 years so it always fits a `time.Duration`; `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` share it ([REQ-063](specifications/auth.md#req-063--token-refresh)).
+- `internal/expiresin` reads a token response's `expires_in` as whole seconds in any form a JSON number takes, and keeps it within 100 years so it always fits a `time.Duration`; `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` share it ([REQ-063](specifications/auth.md#req-063--token-refresh-and-revocation)).
 
 ## Code generation
 

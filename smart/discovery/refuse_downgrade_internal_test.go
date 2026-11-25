@@ -45,7 +45,7 @@ func sameButRedirectPolicy(t *testing.T, name string, cp *http.Client, want *htt
 	}
 }
 
-// TestRefuseDowngradeChangesOnlyTheRedirectPolicy pins REQ-021 and REQ-073 for
+// TestRefuseDowngradeChangesOnlyTheRedirectPolicy pins REQ-021 and REQ-072 for
 // the copy of the injected client that the resolver fetches with. The copy
 // keeps the injected client's Transport, Jar and Timeout. Its redirect policy
 // refuses a redirect to a URL that is not https, and otherwise applies the
@@ -54,7 +54,7 @@ func sameButRedirectPolicy(t *testing.T, name string, cp *http.Client, want *htt
 // allowInsecure the resolver still fetches with a copy of its own, which
 // keeps the injected client's redirect policy, so a later change to the
 // injected client reaches the resolver in neither mode.
-func TestRefuseDowngradeChangesOnlyTheRedirectPolicy(t *testing.T) { // REQ-021, REQ-073
+func TestRefuseDowngradeChangesOnlyTheRedirectPolicy(t *testing.T) { // REQ-021, REQ-072
 	t.Parallel()
 
 	t.Run("caller's policy", func(t *testing.T) {

@@ -7,8 +7,7 @@ kind: specification
 **Status:** Draft
 
 Normative contract for the SDK's Archetype Query Language building blocks above the wire boundary: the parsed query tree, its canonical emission, the builder's write-side parity, and the static and semantic lint.
-Covers REQ-109, REQ-113, REQ-119, REQ-160, REQ-161 and REQ-163.
-The wire boundary, the executor and stored queries are in [wire.md § REQ-055](wire.md#req-055--wire-boundary) and [§ REQ-057](wire.md#req-057).
+The executor and stored queries are in [wire.md § REQ-057](wire.md#req-057).
 
 ---
 
@@ -151,7 +150,7 @@ A deprecated but legal construct is still one the SDK reads: until the removal r
 The profile's `top` production admits no `PARAMETER`, and the [`SDK-AQL-003`](../../resources/aql/grammar/DIVERGENCES.md#sdk-aql-003--limit--offset-parameter-operands) parameter relaxation does not extend to it: the SDK does not widen a construct the specification is removing.
 The carrier therefore holds an integer count and does not reuse the `LIMIT` vocabulary (`parse.LimitExpr`), which has a parameter form and no direction.
 A count outside Go `int` is the residual above.
-The vocabulary lives in `openehr/aql` and is shared with the builder ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)), which also fixes its canonical spelling.
+The vocabulary lives in `openehr/aql` and is shared with the builder ([§ REQ-055](#req-055--aql-builder)), which also fixes its canonical spelling.
 
 ### Projection source text
 
@@ -159,7 +158,7 @@ The vocabulary lives in `openehr/aql` and is shared with the builder ([§ REQ-16
   The openEHR result schema names a projected column with no `AS` alias by its expression text, and re-rendering the typed value gives the canonical form, not the source form (`1.50` → `1.5`, `001` → `1`, `"x"` → `'x'`).
 - `parse.FunctionCall` **MUST** carry the call's source text as written (`Raw`), for a function or aggregate call in a `SELECT` projection and for a call nested as a function-call argument, for the same reason.
   Rebuilding the text from the parts gives the upper-cased name and canonical spacing (`length( c/name/value )` → `LENGTH(c/name/value)`), which is neither what the client wrote nor how a path or literal column is named.
-- Emission **MUST** render the typed value in canonical form and the call from its parts, never the source text: the canonical write form is normative ([wire.md § REQ-055](wire.md#req-055--wire-boundary)), and a `LiteralExpr` or `FunctionCall` a caller constructed has no source text, so a consumer treats `Raw` as optional.
+- Emission **MUST** render the typed value in canonical form and the call from its parts, never the source text: the canonical write form is normative ([§ REQ-055](#req-055--aql-builder)), and a `LiteralExpr` or `FunctionCall` a caller constructed has no source text, so a consumer treats `Raw` as optional.
 
 A value-position call (`aql.FuncCall`) carries no source text, as a `WHERE` literal carries none: only a projection names a result column.
 
@@ -234,7 +233,7 @@ A `$param` is not listed, and neither is an HRID inside a path operand's own pre
 - A carrier for the `VERSION` class predicate keywords (`LATEST_VERSION` / `ALL_VERSIONS`): `versionPredicate` is a different production with a different accept set.
 - Validating the predicate sub-grammar ([§ REQ-119 § Out of scope](#req-119--re-parseable-canonical-aql-emission)), since structuring what the parser accepted is not deciding what to accept.
 - Rewriting or normalising `Raw`, which stays verbatim.
-- The builder side: `aql.Builder` writes predicates from typed inputs ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)).
+- The builder side: `aql.Builder` writes predicates from typed inputs ([§ REQ-055](#req-055--aql-builder)).
 - A disclosure policy over the components: each component is individually addressable so a consumer applies its own policy, and the SDK's own diagnostics follow [§ REQ-168](clinical-modeling.md#req-168--value-free-validation-diagnostics).
 
 ### Comparability
@@ -291,7 +290,7 @@ Structured diagnostics for the simplified-format codecs ([§ REQ-053](wire.md#re
 
 ## REQ-119 — Re-parseable canonical AQL emission
 
-[PROBE-021](conformance.md#probe-021--aql-parse-error-mapping) pins that the typed builders cannot emit syntactically invalid AQL (the write-side complement of [§ REQ-055](wire.md#req-055--wire-boundary)'s canonical form), and § Round-trip property makes `(*Query).Emit` of [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s AST a fixed point of the parse/emit round trip.
+[PROBE-021](conformance.md#probe-021--aql-parse-error-mapping) pins that the typed builders cannot emit syntactically invalid AQL (the write-side complement of [§ REQ-055](#req-055--aql-builder)'s canonical form), and § Round-trip property makes `(*Query).Emit` of [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s AST a fixed point of the parse/emit round trip.
 Both are stated over the *shapes* the catalogue models.
 This requirement binds the value positions inside those shapes and the text a write path splices in verbatim, so that a consumer gets one guarantee, *what this SDK writes, it can read back*, rather than one that holds per clause and lapses per literal.
 
@@ -326,7 +325,7 @@ The validating write paths are `aql.Builder.Build`, `aql.FormatWhere` and `(*par
   The SDK **MUST** expose `aql.ValidateValue`, which refuses every value the closure refuses, a value with no wire form included, so a caller, or a write path outside `openehr/aql`, can hold the same line before calling `FormatValue`.
 - **No silent substitution.** Where a caller-supplied operand is emitted verbatim because its grammar token is unquoted, the write side refuses operand text that would change the query's structure, even when the resulting text is valid AQL.
   The accept sets that bind it are the `MATCHES {uri}` operand's ([§ Canonical value spellings](#canonical-value-spellings)) and those of [§ Single-token identifier positions](#single-token-identifier-positions).
-  The path positions REQ-055 rule 3 emits verbatim by contract are outside this rule: caller data belongs in `aql.Param` ([§ REQ-055](wire.md#req-055--wire-boundary), the injection guard).
+  The path positions REQ-055 rule 3 emits verbatim by contract are outside this rule: caller data belongs in `aql.Param` ([§ REQ-055](#req-055--aql-builder), the injection guard).
 - **Refuse, never re-spell.** A value the grammar cannot carry **MUST** fail with an error wrapping `aql.ErrInvalidQuery`, not be normalised into a spelling that parses, which would change what the query asks.
 - **Verbatim text round-trips as identity.** Text the read side captures and the write side re-emits verbatim (the class and path predicates, `aql.IdentifiedPath.Raw`, `aql.Comparison.Path`) **MUST** come back unchanged, the caller's own spacing, line breaks and comments included.
   A projected literal's or function call's source text is also read verbatim, but it is never re-emitted ([§ REQ-113 § Projection source text](#projection-source-text)).
@@ -351,7 +350,7 @@ The validating write paths are `aql.Builder.Build`, `aql.FormatWhere` and `(*par
 
 ### Canonical value spellings
 
-These value-level rules extend the canonical write form, whose home is [wire.md § REQ-055](wire.md#req-055--wire-boundary).
+These value-level rules extend the canonical write form, whose home is [§ REQ-055](#req-055--aql-builder).
 Each is derived from the vendored grammar profile (`resources/aql/grammar/active/`, ADR [0007](../adr/0007-aql-antlr-grammar-profile.md)), which is the authority ([§ REQ-109](#req-109--aql-static-lint)'s syntax floor); no rule here widens the profile.
 
 - **String literals.** Emission **MUST** use the grammar's `ESCAPE_SEQ` (a backslash before the escaped character), never the SQL-style doubled quote, and spell these characters as follows:
@@ -377,7 +376,7 @@ Each is derived from the vendored grammar profile (`resources/aql/grammar/active
     A call outside its shape is refused, never resolved by dropping a part: `COUNT(*)` emitted where the AST said `COUNT(c/x)` counts rows instead of values.
 - **`TERMINOLOGY`** **MUST** carry exactly three string-literal arguments and no `DISTINCT` or star argument, on both carriers: the read and write sides model a value-position call and a projected one as different types (`aql.FuncCall` and `parse.FunctionCall`), and checking one would leave the other emitting text the parser rejects.
 - **A parameter placeholder** **MUST** spell the grammar's `PARAMETER : '$' IDENTIFIER_CHAR` (a leading letter, then letters, digits and underscores) in every position that carries one, the in-text `LIMIT` / `OFFSET` operand included.
-  This is [§ REQ-055](wire.md#req-055--wire-boundary) rule 4's channel for caller data, so an unchecked name would let the injection guard's own recommendation emit a structure-changing query: `$p AND c/secret = 1` re-parses as two predicates where the caller wrote one.
+  This is [§ REQ-055](#req-055--aql-builder) rule 4's channel for caller data, so an unchecked name would let the injection guard's own recommendation emit a structure-changing query: `$p AND c/secret = 1` re-parses as two predicates where the caller wrote one.
   A parameter is not a projection: `columnExpr` has no `PARAMETER` alternative while a function argument (`terminal`) has, so a bare parameter as a `SELECT` item **MUST** be refused, while one inside a projected call's arguments stays legal.
   `aql.PathValue` is exempt from the closure: it is one of the identifier positions REQ-055 rule 3 emits verbatim by contract, developer-authored, and not the channel for caller data.
 - **A `MATCHES {uri}` operand** **MUST** be refused unless, lexed alone between the braces, it is the grammar's `URI` token and no token declared before `URI` claims it; `TERM_CODE` (`<term>::<code>`) is the case in force.
@@ -456,7 +455,7 @@ A shape is refused because the grammar cannot carry it as written, or because it
 
 | Refused tree shape | Reason |
 |---|---|
-| A containment junction anywhere but at the end of its chain | The grammar cannot carry it; `Build()` holds the same rule ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)). |
+| A containment junction anywhere but at the end of its chain | The grammar cannot carry it; `Build()` holds the same rule ([§ REQ-055](#req-055--aql-builder)). |
 | A class node with no RM type that is not a `VERSION` class expression, or with a child-join of its own | The grammar cannot carry it. |
 | A class expression carrying both an archetype and a predicate that is not that archetype's named form | The grammar cannot carry it: the two are the mutually exclusive spellings of its one `[...]` position, and emitting `Predicate`, which emission renders first, drops the archetype, a row filter, so the query returns more rows than the AST asked for. |
 | A `VERSION` class expression carrying an RM type other than `VERSION`, or an archetype predicate | Unrendered content: the alternative has neither slot. `RMType: "VERSION"` beside the flag is accepted, since the extractor sets the two together. |
@@ -483,7 +482,7 @@ No per-position validator decides that, and refusing `{/a\/}` outright would ref
 
 `(*parse.Query).Emit` **MUST** read the emitted text back with the parser before returning it, and refuse, with an error wrapping `aql.ErrInvalidQuery` (and `aql.ErrSyntax` as well where the parser refuses the text) and a diagnostic that follows § The emission closure property, text that does not re-parse or that re-parses as a different query.
 Emitted text nested past [§ Nesting limit](#nesting-limit) is text that does not re-parse, and its refusal wraps `aql.ErrLimitExceeded` as well: the canonical form writes two parentheses for each level of a `CONTAINS … AND … CONTAINS` chain, so such a chain more than 64 levels deep is refused however its source was written.
-`aql.Builder.Build` verifies the projection list it renders against the same definition ([§ REQ-163 § `Build()` verifies the projection it emitted](#build-verifies-the-projection-it-emitted)).
+`aql.Builder.Build` verifies the projection list it renders against the same definition ([§ REQ-055 § `Build()` verifies the projection it emitted](#build-verifies-the-projection-it-emitted)).
 A different query is one that adds or removes a class expression, a projection, a predicate leaf or a whole clause, or that changes a containment connective, a negation, or the grouping of containment operands across operators.
 A substitution confined to the text of one path position is outside the check, since REQ-055 rule 3 emits a path verbatim by contract.
 
@@ -518,9 +517,50 @@ String-literal closure is also fuzzed.
 
 ---
 
-## REQ-163 — AQL write-side expressivity parity
+## REQ-055 — AQL builder
 
-The write side of `openehr/aql` **MUST** be able to construct the vocabularies its own read side already models at the class, projection and row-bound positions:
+`openehr/aql` ships two builder styles:
+
+- **Struct-builder.**
+  Build an `aql.Query` value by composing typed structs.
+- **Verb-functions.**
+  Compose a query via top-level functions (`aql.Select(...)`, `aql.From(...)`, `aql.Where(...)`).
+
+Both styles **MUST** produce the **same**, stable and canonical **AQL string on the wire** for the same logical query (*Canonicalisation* below).
+Concrete rules:
+
+- The serialised AQL string is the wire contract.
+  Two queries that produce the same string are equivalent; two that produce different strings are different queries, even if logically equivalent.
+- Whitespace, casing, and aliasing are canonicalised in the wire-output path, so wire-output goldens are deterministic.
+- Both styles are tested against the same wire-output golden fixtures; a builder change that produces different output is a breaking change.
+
+### Canonicalisation (wire output)
+
+Built queries emit a single stable form so the goldens are deterministic.
+Changing any rule below rewrites every golden and is a **semver-major** change to `openehr/aql`:
+
+1. **Keywords** uppercase — `SELECT`, `FROM`, `WHERE`, `CONTAINS`, `AND`, `OR`, `ORDER BY`, `ASC`, `DESC`.
+   (`OFFSET` / `LIMIT` are not emitted in the string — see rule 7.)
+2. **Whitespace** — exactly one space between tokens; no leading or trailing space on the emitted string.
+3. **Paths and archetype ids** — emitted verbatim; no case folding.
+4. **Parameters** — caller values appear only as `$name` placeholders in the string, never interpolated as literals (the injection guard, below); placeholder keys carry no leading `$`.
+   A bind whose name is empty after that strip **MUST** fail at `Build()` with an error wrapping `aql.ErrInvalidQuery` — no placeholder can match an empty name, so the value would ship only as a dead key.
+5. **SELECT list** — comma-separated, one space after each comma, no trailing comma.
+6. **FROM / CONTAINS** — every class carries an alias (`EHR e`, `OBSERVATION o`); archetype predicates attach in square brackets (`OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2]`); consecutive `CONTAINS` express nested containment.
+   The builders emit EHR scoping as a `WHERE <alias>/ehr_id/value = $param` condition so it composes with other conditions in one clause.
+   The standing-predicate form (`EHR e[ehr_id/value=$param]`) is equally valid AQL, but the builders do not emit it at the FROM root; a `CONTAINS` operand carries one through its own carrier (*The standing-predicate carrier* below).
+7. **Clause order** — the AQL string emits `SELECT … FROM … WHERE … ORDER BY`; the builder is the sole author of `Query.Q` for built queries.
+   Paging (OFFSET / LIMIT) is carried in the request envelope (`Query.Offset` / `Query.Fetch`), not the string, so paging has a single channel.
+
+The carriers below (negated containment, sibling junctions, the opt-in in-text `LIMIT` / `OFFSET`, the version predicate, the class standing predicate and the typed projection) have their spellings in *Canonical spellings of the carriers*.
+In-text paging relaxes rules 1 and 7 only for a caller who asks for it: the envelope stays the default, and combining the two channels is a build-time error.
+
+The rules above are stated over clause structure and reach no further than the **shapes** a clause is built from.
+The canonical spelling of each value inside them (string escaping, a real's fractional part, the `MATCHES {uri}` operand alphabet) is specified by [§ REQ-119 § Canonical value spellings](#canonical-value-spellings) and asserted by PROBE-090.
+
+PROBE-020 checks built queries against the reference golden.
+
+The builder **MUST** also construct the vocabularies the read side models at the class, projection and row-bound positions:
 
 - the **containment algebra** (negated containment and sibling junctions) and **in-text paging**;
 - the deprecated **`TOP`** clause;
@@ -528,9 +568,9 @@ The write side of `openehr/aql` **MUST** be able to construct the vocabularies i
 - the **standing comparison** in class position;
 - and the **typed projection** (`DISTINCT`, `AS`, aggregate and function calls, literal items).
 
-Each is already parsed, structured and re-emitted by [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s AST, so what this requirement adds is the carriers, their guards, and the canonical spellings that make the mirror byte-exact, not a new model.
+Each is already parsed, structured and re-emitted by [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s AST, so the builder adds carriers, their guards and the canonical spellings that make the mirror byte-exact, not a new model.
 
-Without these carriers a caller who needs one of the constructs abandons the typed builder for a hand-assembled string, the one construction route [§ REQ-055](wire.md#req-055--wire-boundary)'s injection guard cannot cover.
+Without these carriers a caller who needs one of the constructs abandons the typed builder for a hand-assembled string, the one construction route the injection guard (*Canonicalisation* rule 4) cannot cover.
 Two shapes the SDK itself recommends depend on them: the explicit version predicate `aql_version_no_predicate` asks for ([§ REQ-161 § `aql_version_no_predicate`](#aql_version_no_predicate), [SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)), and REQ-161's suppression shape `… CONTAINS VERSIONED_COMPOSITION vo[uid/value=$vo] CONTAINS VERSION v[ALL_VERSIONS]`.
 
 Every rule below is derived from the vendored grammar profile (`resources/aql/grammar/active/`, [ADR 0007](../adr/0007-aql-antlr-grammar-profile.md)), which stays the authority.
@@ -624,9 +664,9 @@ The rules that already govern a projected item bind the builder unchanged:
 
 #### Read-side mirror duty
 
-For **every** construct this requirement adds, `Build()` → `parse.ParseQuery` → `(*parse.Query).Emit` **MUST** be **byte-identity**, not merely re-parseable.
+For **every** carrier above, `Build()` → `parse.ParseQuery` → `(*parse.Query).Emit` **MUST** be **byte-identity**, not merely re-parseable.
 Identity is the right bar: the read side re-emits a class bracket verbatim and normalises a projected function name, so anything weaker would let the two sides disagree about the canonical spelling of a construct they both model, a disagreement invisible to a parseability check.
-§ Canonical spellings for the new constructs is what makes identity reachable.
+*Canonical spellings of the carriers* is what makes identity reachable.
 
 ### `Col` stays lenient, and `Build()` verifies what it emitted
 
@@ -652,14 +692,14 @@ The compared structure **MUST** include the item count, each item's `AS` alias a
 
 A `Col` text that leaves a lexical region **open** where the clause ends (a string literal, a comment run, a bracket or a parenthesis) **MUST** be refused, even where it would read back unchanged.
 What closes the region is the text after the projection, so the same text is a loud error in one query and a silent substitution in the next.
-No typed constructor produces such a region, so the refusal reaches only a legacy `Col` carrying half a token.
+No typed constructor produces such a region, so the refusal reaches only a `Col` carrying half a token.
 
 So `Col("COUNT(c/uid/value) AS n")` and `Col("-- note\nc/uid/value")` are accepted, while `Col("DISTINCT c/uid/value")` (one item plus an unrecorded `DISTINCT`), `Col("a, b")` (two items), `Col("BACKWARD c/uid/value")` beside a recorded `Top(5)` (one item plus an unrecorded direction, a byte-stable query for the *last* five rows), `Col("-- x\n*")` (the parser reads the bare star form, the builder recorded one non-star item) and a `Col` leaving a region open are refused.
 The refusal follows the value-free rule of [§ REQ-119 § The emission closure property](#the-emission-closure-property): it names the item index and the clause, never the projection text or the parser's own message.
 
-### Canonical spellings for the new constructs
+### Canonical spellings of the carriers
 
-These spellings extend the canonical write form whose home is [§ REQ-055](wire.md#req-055--wire-boundary).
+These spellings extend *Canonicalisation* above.
 Each is what `(*parse.Query).Emit` produces at that position, and any other spelling would break the mirror duty's byte identity.
 `Build()` and `Emit` **MUST** emit the spellings in this table:
 
@@ -674,7 +714,7 @@ Each is what `(*parse.Query).Emit` produces at that position, and any other spel
 
 | Construct | Spelling |
 |---|---|
-| Version keywords | `VERSION v[LATEST_VERSION]` / `[ALL_VERSIONS]`: uppercase, no padding inside the brackets. The casing follows [§ REQ-055](wire.md#req-055--wire-boundary) rule 1's keyword *principle*, not its enumeration, which is closed over the clause keywords and names neither these nor `TOP`. The read side matches them case-insensitively and re-emits the bracket verbatim, so identity requires the write side to pick exactly one spelling. |
+| Version keywords | `VERSION v[LATEST_VERSION]` / `[ALL_VERSIONS]`: uppercase, no padding inside the brackets. The casing follows *Canonicalisation* rule 1's keyword *principle*, not its enumeration, which is closed over the clause keywords and names neither these nor `TOP`. The read side matches them case-insensitively and re-emits the bracket verbatim, so identity requires the write side to pick exactly one spelling. |
 | A comparison in either bracket | `<path> <op> <value>`, **one space each side of the comparison operator**, no padding inside the brackets: `vo[uid/value = $vo]`, `v[commit_audit/time_committed > $since]`. This is what `aql.Comparison` already renders in `WHERE`, so the builder keeps **one** comparison renderer rather than two that can drift. The path is trimmed of EDGE whitespace on intake, as `aql.Builder` already trims its identifier positions (§ REQ-119 § Single-token identifier positions): the trim widens the accept set by one harmless equivalence and cannot manufacture a splice, and without it a padded path would be a second spelling of one bracket — padding this row forbids. |
 | `DISTINCT` (clause) | Uppercase, directly after `SELECT` and **before** the deprecated `TOP` clause — `selectClause : SELECT DISTINCT? top? selectExpr …` — one space after. |
 | `AS` | Uppercase, one space each side: `COUNT(c/uid/value) AS n`. |
@@ -692,7 +732,7 @@ Each `Col` shape above has its own row with its expected verdict, one per region
 
 - **A FROM-root bracket in any spelling: standing, archetype or version predicate.**
   `Builder.From` takes an RM type and an alias and nothing else, so `FROM VERSION v` builds and stays predicate-less, and `aql.Version` places its bracket on a `CONTAINS` operand.
-  For the standing predicate, [§ REQ-055](wire.md#req-055--wire-boundary) rule 6 keeps the `WHERE <alias>/ehr_id/value = $param` form deliberately, noting the `EHR e[ehr_id/value=$param]` spelling is equally valid AQL and not what the builders emit; this requirement adds the standing predicate to `CONTAINS` operands and does not disturb that choice.
+  For the standing predicate, [§ REQ-055](#req-055--aql-builder) rule 6 keeps the `WHERE <alias>/ehr_id/value = $param` form deliberately, noting the `EHR e[ehr_id/value=$param]` spelling is equally valid AQL and not what the builders emit; this requirement adds the standing predicate to `CONTAINS` operands and does not disturb that choice.
   [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) records the root bracket as the residual unreachable shape.
 - **A FROM-root containment junction** (`FROM COMPOSITION c1 OR COMPOSITION c2`, which the read side models via `parse.FromClause.Junction`): the builder keeps a single root class until a consumer needs write-side root junctions, so `Builder.From` / `Builder.FromEHR` take one class and a builder-emitted FROM root is never parenthesised.
 - **A parameterised `TOP`.** `top : TOP INTEGER direction?` admits no `PARAMETER` ([§ REQ-113 § The `TOP` carrier](#the-top-carrier)), so there is nothing to add.
@@ -752,7 +792,7 @@ Each code in this table and in the § Layer 3 table **MUST** be raised exactly w
 | Unused parameters | `aql_unused_param` | Warning | A `Query.Parameters` key is never referenced; the code is advisory. |
 | Deprecated `TOP` | `aql_deprecated_top` | Warning | The query carries a `SELECT TOP` clause; it fires once per query. The remedy is `LIMIT` with `ORDER BY`: the modifier is deprecated from QUERY Release-1.1.0 and slated for removal ([§ REQ-113 § The `TOP` carrier](#the-top-carrier)). |
 | `TOP` with `LIMIT` | `aql_top_with_limit` | Error | The query uses `TOP` and the `LIMIT` clause together, which QUERY Release-1.1.0 § 4.4.3 forbids. Fires in addition to `aql_deprecated_top`. |
-| `TOP` with envelope `fetch` | `aql_top_with_fetch` | Error | The query carries `TOP` and the request envelope carries a row limit: the openEHR Query API's common parameters state that `fetch` cannot be combined with AQL-top. Reachable only when the caller supplies `Options.Query`, and keyed on its `Fetch` alone: an `Offset` does not fire it, the exclusion naming the row limit only. Fires in addition to `aql_deprecated_top`. `Build()` also refuses an envelope `Offset` beside a `TOP` ([§ REQ-163](#req-163--aql-write-side-expressivity-parity)), because it declines to author two row bounds; the lint reads a query it did not author, so it reports only the exclusion the Query API states. |
+| `TOP` with envelope `fetch` | `aql_top_with_fetch` | Error | The query carries `TOP` and the request envelope carries a row limit: the openEHR Query API's common parameters state that `fetch` cannot be combined with AQL-top. Reachable only when the caller supplies `Options.Query`, and keyed on its `Fetch` alone: an `Offset` does not fire it, the exclusion naming the row limit only. Fires in addition to `aql_deprecated_top`. `Build()` also refuses an envelope `Offset` beside a `TOP` ([§ REQ-055](#req-055--aql-builder)), because it declines to author two row bounds; the lint reads a query it did not author, so it reports only the exclusion the Query API states. |
 | Bare / mixed `SELECT *` | `aql_select_star` | Warning | A projection carries a `*` item; `COUNT(*)` does not fire it. A `*` item uses the [SDK-AQL-002](../../resources/aql/grammar/DIVERGENCES.md#sdk-aql-002--select-) relaxation, and official QUERY 1.1.0's only use of `*` is `COUNT(*)`. |
 
 The three `TOP` codes **MUST** key on the `TOP` clause's presence in the source, not on a decoded count: a count too large to represent leaves no bound to read ([§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)'s residual), and the query carrying it still draws them.

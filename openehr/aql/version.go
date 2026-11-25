@@ -1,6 +1,6 @@
 package aql
 
-// version.go — REQ-163 § The version-predicate carrier. The write side of the
+// version.go — REQ-055 § The version-predicate carrier. The write side of the
 // `VERSION` class expression: the sealed predicate vocabulary and the
 // VERSION-fixed containment constructor that carries it.
 //
@@ -86,7 +86,7 @@ func (allVersions) versionValidate() error { return nil }
 // one: a WHERE comparison, the parsed class predicate
 // ([parse.ClassExpr.PredicateComparison]) and this bracket then share ONE
 // comparison model and ONE renderer, which is what keeps the spacing from
-// drifting between them (REQ-163 § Canonical spellings).
+// drifting between them (REQ-055 § Canonical spellings).
 type versionComparison struct{ cmp Comparison }
 
 // versionBracket renders `<path> <op> <value>` — one space each side of the
@@ -172,12 +172,12 @@ func Version(alias string, pred VersionPredicate) Containment {
 }
 
 // validateVersionPredicate holds a VERSION bracket to its own grammar position
-// (REQ-163 § The version-predicate carrier). Four checks. Two are borrowed —
+// (REQ-055 § The version-predicate carrier). Four checks. Two are borrowed —
 // they were already in force elsewhere and are applied here rather than
 // re-invented — and two are this carrier's own machinery:
 //
 //   - the RM-type SPELLING, because `versionPredicate` is reachable from
-//     classExprOperand's VERSION alternative alone. The rule is REQ-163's; the
+//     classExprOperand's VERSION alternative alone. The rule is REQ-055's; the
 //     FOLD is new machinery, not borrowed: the landed archetype-on-VERSION
 //     refusal beside it uses the wider [strings.EqualFold], and the polarity
 //     here is the opposite one, so [asciiKeyword] is chosen for this guard

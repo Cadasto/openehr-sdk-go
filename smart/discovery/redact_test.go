@@ -300,11 +300,11 @@ func TestREQ072_ErrorTextMasksURLPassword(t *testing.T) { // REQ-072
 	runMaskCases(t, cases)
 }
 
-// TestREQ073_ErrorTextMasksURLPassword pins REQ-073: a plaintext base URL,
+// TestREQ072_TrustRefusalsMaskURLPassword pins REQ-072: a plaintext base URL,
 // a refused issuer, an issuer the OpenID configuration does not confirm
 // and a plaintext URL in a catalog renewed by 304 Not Modified are refused
 // with a DiscoveryError whose text masks each URL's password.
-func TestREQ073_ErrorTextMasksURLPassword(t *testing.T) { // REQ-073
+func TestREQ072_TrustRefusalsMaskURLPassword(t *testing.T) { // REQ-072
 	issuerCase := func(name, issuer string, reason discovery.DiscoveryErrorReason, keep string) maskCase {
 		return maskCase{
 			name: "issuer " + name,
@@ -460,11 +460,11 @@ func TestREQ071_CacheFailureLogMasksBaseURLPassword(t *testing.T) { // REQ-071
 	}
 }
 
-// TestREQ073_PlaintextWarningMasksBaseURLPassword pins the REQ-073 warning
+// TestREQ072_PlaintextWarningMasksBaseURLPassword pins the REQ-072 warning
 // on a plaintext service baseUrl: its message is the plaintext URL warning
 // and nothing more, no internal requirement id included, and it names the
 // base URL with its password masked.
-func TestREQ073_PlaintextWarningMasksBaseURLPassword(t *testing.T) { // REQ-073, REQ-092
+func TestREQ072_PlaintextWarningMasksBaseURLPassword(t *testing.T) { // REQ-072, REQ-092
 	got := logOf(t, fixed(documentWith("http://api.example.com/openehr/v1", nil)), nil, discovery.WithAllowInsecure())
 	if !strings.Contains(got, ` msg="discovery: plaintext URL in catalog" `) {
 		t.Fatalf("log = %q, want a warning with the message %q", got, "discovery: plaintext URL in catalog")

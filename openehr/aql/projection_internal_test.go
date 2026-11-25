@@ -1,7 +1,7 @@
 package aql
 
 // projection_internal_test.go reaches the unexported clause-escape scan of
-// REQ-163 § `Build()` verifies what it emitted, and pins it in the two
+// REQ-055 § `Build()` verifies what it emitted, and pins it in the two
 // directions the public surface can only sample: which characters the scan
 // treats as DELIMITERS (its lexer states), and what structure it reads back out
 // of a clause text (the reduction).
@@ -12,7 +12,7 @@ package aql
 // containment_roundtrip_test.go — which does parse — is what proves the
 // statements right. If a row here and a row there ever disagree, THIS one is
 // wrong.
-// REQ-163 · PROBE-088
+// REQ-055 · PROBE-088
 
 import (
 	"errors"
@@ -131,7 +131,7 @@ func TestProjectionScanTracksLexerStates(t *testing.T) {
 // TestProjectionKeywordMatchIsWordBounded pins the boundary rule: a path
 // segment merely CONTAINING a keyword's letters is not that keyword. Without
 // both boundaries the guard would refuse ordinary openEHR paths, which is the
-// over-refusal direction REQ-163 § Acceptance requires rows for.
+// over-refusal direction REQ-055 § Acceptance requires rows for.
 func TestProjectionKeywordMatchIsWordBounded(t *testing.T) {
 	for _, text := range []string{
 		// The RIGHT boundary: the keyword's letters begin the segment and
@@ -439,7 +439,7 @@ func TestMalformedTopDoesNotFoolTheVerification(t *testing.T) {
 
 // TestProjectionCoordinateNamesTheItem pins the diagnostic coordinate: a
 // refusal has to say WHICH item is at fault, because it may not quote any of
-// it (REQ-163 § `Build()` verifies the projection it emitted) and a caller with a ten-item projection has
+// it (REQ-055 § `Build()` verifies the projection it emitted) and a caller with a ten-item projection has
 // nothing else to go on.
 func TestProjectionCoordinateNamesTheItem(t *testing.T) {
 	a := &ast{sel: []SelectField{Col("c/a"), Col("c/b, c/c"), Col("c/d")}}
@@ -462,7 +462,7 @@ func TestProjectionCoordinateNamesTheItem(t *testing.T) {
 // [Count], [CountDistinct] and [CountStar] each build ONE admitted shape by
 // construction, and [Fn] cannot set the star or DISTINCT flags at all, so five
 // arms of the shape rule are unreachable from openehr/aql_test — including the
-// one that catches a star beside arguments, which REQ-163 names as a defect
+// one that catches a star beside arguments, which REQ-055 names as a defect
 // that must be refused rather than resolved by dropping the loser. Constructing
 // the shapes directly is the only way to hold them, and without these rows a
 // refactor could delete every one with the suite green.

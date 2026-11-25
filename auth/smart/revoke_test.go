@@ -156,12 +156,12 @@ func (f *revokeFixture) checkSignedOut(t *testing.T) {
 	}
 }
 
-// TestRevokeSendsTheTokenWithItsHint pins REQ-167: Revoke posts the refresh
+// TestRevokeSendsTheTokenWithItsHint pins REQ-063: Revoke posts the refresh
 // token with token_type_hint refresh_token when the source holds one, and
 // otherwise the access token with access_token, form-encoded; a public
 // client also sends its client_id. The tokens and the last token response
 // are dropped before the request is sent.
-func TestRevokeSendsTheTokenWithItsHint(t *testing.T) { // REQ-167
+func TestRevokeSendsTheTokenWithItsHint(t *testing.T) { // REQ-063
 	tests := []struct {
 		name      string
 		access    auth.Token
@@ -206,11 +206,11 @@ func TestRevokeSendsTheTokenWithItsHint(t *testing.T) { // REQ-167
 	}
 }
 
-// TestRevokeAuthenticatesLikeTheTokenEndpoint pins REQ-167 and REQ-068: the
+// TestRevokeAuthenticatesLikeTheTokenEndpoint pins REQ-063 and REQ-068: the
 // revocation request authenticates the client exactly as the refresh did. A
 // private_key_jwt client signs a new assertion for it, built like the token
 // endpoint's, whose aud is the token endpoint URL.
-func TestRevokeAuthenticatesLikeTheTokenEndpoint(t *testing.T) { // REQ-167 REQ-068
+func TestRevokeAuthenticatesLikeTheTokenEndpoint(t *testing.T) { // REQ-063 REQ-068
 	key := newRSAKey(t)
 	const secret = "s3cret"
 	clients := []struct {
@@ -328,12 +328,12 @@ func checkRevocationError(t *testing.T, err error, status int, code string) {
 	}
 }
 
-// TestRevokeOutcome pins REQ-167 and REQ-063: Revoke returns nil on a 200
+// TestRevokeOutcome pins REQ-063: Revoke returns nil on a 200
 // answer and otherwise an *auth.ExchangeError matching
 // auth.ErrRevocationFailed, with the status and the RFC 6749 §5.2 error
 // when the body has one; whatever the answer, the source is signed out and
 // the hook runs once with the zero TokenChange.
-func TestRevokeOutcome(t *testing.T) { // REQ-167 REQ-063
+func TestRevokeOutcome(t *testing.T) { // REQ-063
 	tests := []struct {
 		name       string
 		status     int
@@ -377,10 +377,10 @@ func TestRevokeOutcome(t *testing.T) { // REQ-167 REQ-063
 	}
 }
 
-// TestRevokeTransportFailure pins REQ-167: a revocation request that gets no
+// TestRevokeTransportFailure pins REQ-063: a revocation request that gets no
 // answer, because the endpoint cannot be reached or the context ended,
 // fails with auth.ErrRevocationFailed and signs the source out all the same.
-func TestRevokeTransportFailure(t *testing.T) { // REQ-167
+func TestRevokeTransportFailure(t *testing.T) { // REQ-063
 	t.Run("unreachable endpoint", func(t *testing.T) {
 		dead := unreachableURL(t)
 		f := newRevokeFixture(t, func(ep *discovery.AuthEndpoints) {
@@ -462,10 +462,10 @@ func (b brokenBodyTransport) RoundTrip(r *http.Request) (*http.Response, error) 
 	}, nil
 }
 
-// TestRevokeSendsBeforeTheHookRuns pins REQ-063 and REQ-167: Revoke reports
+// TestRevokeSendsBeforeTheHookRuns pins REQ-063: Revoke reports
 // its token change only after the revocation request has been sent, so a
 // hook that blocks or panics cannot stop the request.
-func TestRevokeSendsBeforeTheHookRuns(t *testing.T) { // REQ-063 REQ-167
+func TestRevokeSendsBeforeTheHookRuns(t *testing.T) { // REQ-063
 	signedOut := func(c smart.TokenChange) bool { return reflect.DeepEqual(c, smart.TokenChange{}) }
 
 	t.Run("hook that blocks", func(t *testing.T) {
@@ -523,10 +523,10 @@ func TestRevokeSendsBeforeTheHookRuns(t *testing.T) { // REQ-063 REQ-167
 	})
 }
 
-// TestRevokeWithoutEndpoint pins REQ-167: a source whose server advertises
+// TestRevokeWithoutEndpoint pins REQ-063: a source whose server advertises
 // no revocation endpoint clears its tokens and drops its last token
 // response, then fails with auth.ErrInvalidConfig, sending nothing.
-func TestRevokeWithoutEndpoint(t *testing.T) { // REQ-167
+func TestRevokeWithoutEndpoint(t *testing.T) { // REQ-063
 	f := newRevokeFixture(t, func(ep *discovery.AuthEndpoints) { ep.RevocationEndpoint = nil })
 	f.signIn(t, freshAccess("at-1"), "rt-1")
 	tokenReqs := len(f.as.tokenRequests())
@@ -540,12 +540,12 @@ func TestRevokeWithoutEndpoint(t *testing.T) { // REQ-167
 	f.checkSignedOut(t)
 }
 
-// TestRevokeWithoutToken pins REQ-167: a source that holds no token drops
+// TestRevokeWithoutToken pins REQ-063: a source that holds no token drops
 // its last token response and returns nil from Revoke without sending a
 // request or calling the hook, with or without a revocation endpoint. An
 // access token without a value counts as no token, and Revoke clears what
 // is left of it, so Token asks for re-authentication.
-func TestRevokeWithoutToken(t *testing.T) { // REQ-167
+func TestRevokeWithoutToken(t *testing.T) { // REQ-063
 	tests := []struct {
 		name  string
 		edit  func(*discovery.AuthEndpoints)
@@ -635,10 +635,10 @@ func (rt *revokingTransport) RoundTrip(r *http.Request) (*http.Response, error) 
 	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("")), Request: r}, nil
 }
 
-// TestRevokeDiscardsARefreshInFlight pins REQ-167 and REQ-063: a refresh
+// TestRevokeDiscardsARefreshInFlight pins REQ-063: a refresh
 // still running when Revoke clears the tokens has its result discarded, so
 // the source stays signed out and reports no change for it.
-func TestRevokeDiscardsARefreshInFlight(t *testing.T) { // REQ-167 REQ-063
+func TestRevokeDiscardsARefreshInFlight(t *testing.T) { // REQ-063
 	key := newRSAKey(t)
 	synctest.Test(t, func(t *testing.T) {
 		h := newHeldRefreshTransport(t, key)
@@ -695,12 +695,12 @@ func TestRevokeDiscardsARefreshInFlight(t *testing.T) { // REQ-167 REQ-063
 	})
 }
 
-// TestTokenAfterRevokeDoesNotWaitForTheInflightExchange pins REQ-167 and
+// TestTokenAfterRevokeDoesNotWaitForTheInflightExchange pins REQ-063 and
 // REQ-063: Revoke clears the exchange that is still in flight when it
 // clears the session, so a later Token returns auth.ErrReauthRequired
 // without waiting for that exchange's blocked HTTP call, and the exchange
 // does not install its tokens.
-func TestTokenAfterRevokeDoesNotWaitForTheInflightExchange(t *testing.T) { // REQ-167 REQ-063
+func TestTokenAfterRevokeDoesNotWaitForTheInflightExchange(t *testing.T) { // REQ-063
 	key := newRSAKey(t)
 	synctest.Test(t, func(t *testing.T) {
 		h := newHeldRefreshTransport(t, key)
@@ -751,11 +751,11 @@ func TestTokenAfterRevokeDoesNotWaitForTheInflightExchange(t *testing.T) { // RE
 	})
 }
 
-// TestRevokeEndsTheSessionIdentity pins REQ-167 and REQ-064: signing out
+// TestRevokeEndsTheSessionIdentity pins REQ-063 and REQ-064: signing out
 // also ends the identity of the ID token the source verified, so a refresh
 // of tokens imported afterwards may carry an ID token naming another user.
 // Without Revoke, the same refresh is refused.
-func TestRevokeEndsTheSessionIdentity(t *testing.T) { // REQ-167 REQ-064
+func TestRevokeEndsTheSessionIdentity(t *testing.T) { // REQ-063 REQ-064
 	tests := []struct {
 		name   string
 		revoke bool

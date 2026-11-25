@@ -1,6 +1,6 @@
 package aql_test
 
-// standing_test.go pins the REQ-163 standing-predicate carrier: the one
+// standing_test.go pins the REQ-055 standing-predicate carrier: the one
 // `standardPredicate` comparison an ordinary class expression can now carry in
 // class position, the canonical bracket it emits, the four refusals, and the
 // end-to-end consequence the carrier exists for — REQ-161's own documented
@@ -9,7 +9,7 @@ package aql_test
 // aql_versioned_object_unreferenced.
 //
 // The canonical strings asserted here MUST equal what openehr/aql/parse emits
-// for the same query; that is held mechanically by the REQ-163 rows in
+// for the same query; that is held mechanically by the REQ-055 rows in
 // containment_roundtrip_test.go, which re-parse and re-emit every one of them.
 // PROBE-088 · PROBE-097
 
@@ -24,7 +24,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
-// standingQuery is the shared body of the REQ-163 standing-predicate fixtures:
+// standingQuery is the shared body of the REQ-055 standing-predicate fixtures:
 // the compositions of one EHR reached through the containment term under test.
 // It mirrors versionQuery (version_test.go) so the two carriers' goldens differ
 // only in the construct they exercise.
@@ -37,7 +37,7 @@ func standingQuery(term aql.Containment) (aql.Query, error) {
 
 // versionedObjectTerm is REQ-161's motivating suppression shape as a builder
 // term: all versions of ONE versioned composition, selected by the container's
-// own uid. Before REQ-163 it was unbuildable — [aql.Containment] carried an RM
+// own uid. Before REQ-055 it was unbuildable — [aql.Containment] carried an RM
 // type, an alias and an archetype id and nothing else.
 func versionedObjectTerm() aql.Containment {
 	return aql.Class("VERSIONED_COMPOSITION", "vo").
@@ -48,7 +48,7 @@ func versionedObjectTerm() aql.Containment {
 
 // TestStandingPredicateEmission tables the canonical bracket: one space each
 // side of the comparison operator, no padding inside the brackets, and the
-// value rendered through REQ-119's canonical value spellings (REQ-163
+// value rendered through REQ-119's canonical value spellings (REQ-055
 // § Canonical spellings). It is [aql.Comparison]'s own renderer, the one a
 // WHERE comparison uses, so the two cannot drift.
 func TestStandingPredicateEmission(t *testing.T) {
@@ -124,7 +124,7 @@ func TestStandingPredicateIsImmutable(t *testing.T) {
 }
 
 // TestStandingPredicateMatchesGolden pins the committed canonical form. The
-// goldens are new files, so no existing fixture is re-baselined (REQ-163
+// goldens are new files, so no existing fixture is re-baselined (REQ-055
 // § Additivity).
 func TestStandingPredicateMatchesGolden(t *testing.T) {
 	for name, term := range map[string]aql.Containment{
@@ -154,7 +154,7 @@ func TestStandingPredicateMatchesGolden(t *testing.T) {
 
 // TestStandingPredicateRefusals pins the build-time refusals of the carrier.
 // Each MUST wrap aql.ErrInvalidQuery rather than emit text the parser rejects
-// or, worse, text that asks a different question (REQ-163 § Acceptance).
+// or, worse, text that asks a different question (REQ-055 § Acceptance).
 func TestStandingPredicateRefusals(t *testing.T) {
 	sel := func() *aql.Builder {
 		return aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e")
@@ -225,7 +225,7 @@ func TestStandingPredicateRefusals(t *testing.T) {
 	}
 }
 
-// TestStandingPredicateAcceptRows carries the ACCEPT direction of REQ-163
+// TestStandingPredicateAcceptRows carries the ACCEPT direction of REQ-055
 // § Acceptance, which the refusal table above deliberately does not stand in
 // for: REQ-119's own record is that a corpus of refusal rows alone let three
 // OVER-refusals ship green, each refusing text the parser reads back as the
@@ -310,7 +310,7 @@ func TestStandingPredicateAcceptRows(t *testing.T) {
 	}
 }
 
-// TestStandingPredicateOnVersionNamesTheCarrier is REQ-163 § One carrier per
+// TestStandingPredicateOnVersionNamesTheCarrier is REQ-055 § One carrier per
 // grammar position's own acceptance row: the VERSION-node refusal MUST name the
 // constructor that DOES carry the shape. A refusal that only cited the grammar
 // would leave the caller with a legal query they cannot write.
@@ -361,13 +361,13 @@ func TestStandingPredicateDiagnosticsAreValueFree(t *testing.T) {
 	}
 }
 
-// TestBuiltStandingPredicateSuppressesUnreferenced is the REQ-163 § Acceptance
+// TestBuiltStandingPredicateSuppressesUnreferenced is the REQ-055 § Acceptance
 // row the whole carrier exists for: REQ-161's motivating suppression shape
 // builds end to end through the builder, and aql_versioned_object_unreferenced
 // stays silent on it.
 //
 // The unpredicated control is not decoration — it pins that REQ-161's advisory
-// still FIRES on the shape it was written for (REQ-163 § Additivity: no REQ-161
+// still FIRES on the shape it was written for (REQ-055 § Additivity: no REQ-161
 // code, severity or Detail text changes), so a linter that had simply stopped
 // raising the code could not pass this test.
 func TestBuiltStandingPredicateSuppressesUnreferenced(t *testing.T) {
@@ -412,7 +412,7 @@ func TestBuiltStandingPredicateSuppressesUnreferenced(t *testing.T) {
 // (version_test.go) — one function, because the two carriers share one
 // [aql.Comparison] and a rule written twice can drift.
 //
-// The ACCEPT rows carry their own weight (REQ-163 § Acceptance): `Path` is the
+// The ACCEPT rows carry their own weight (REQ-055 § Acceptance): `Path` is the
 // `objectPath` alternative and is legal, so a guard written as "refuse anything
 // that is not a literal or a parameter" would fail here rather than on the
 // refusal rows.
@@ -482,7 +482,7 @@ func TestStandingPredicateOperandVocabulary(t *testing.T) {
 // TestPredicatedPathIsTrimmed pins the canonical spelling against edge
 // whitespace in the caller's path. Every sibling constructor trims ([aql.Col],
 // [aql.ColAs], [aql.Builder.From], [aql.Builder.OrderBy]); storing the padding
-// verbatim emitted `c[  uid/value   = $v]`, contradicting REQ-163 § Canonical
+// verbatim emitted `c[  uid/value   = $v]`, contradicting REQ-055 § Canonical
 // spellings' "no padding inside the brackets".
 func TestPredicatedPathIsTrimmed(t *testing.T) {
 	q, err := aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e").

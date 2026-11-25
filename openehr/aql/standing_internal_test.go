@@ -1,13 +1,13 @@
 package aql
 
 // standing_internal_test.go reaches the unexported containment carrier to pin
-// the REQ-163 standing-predicate guards at the BUILD seam, where the public
+// the REQ-055 standing-predicate guards at the BUILD seam, where the public
 // combinator has already refused the same shapes at call time. The duplication
 // is the point: [Containment.Predicated] is the only route in today, so without
 // these rows the Build-side checks are dead code that a refactor could delete
 // with every test still green. The public surface is covered from aql_test
 // (standing_test.go).
-// REQ-163 · PROBE-088
+// REQ-055 · PROBE-088
 
 import (
 	"errors"
@@ -138,7 +138,7 @@ func TestWithChildKeepsTheFirstDefect(t *testing.T) {
 	}
 }
 
-// TestStandingPredicateRefusedOnVersionNode pins REQ-163 § One carrier per
+// TestStandingPredicateRefusedOnVersionNode pins REQ-055 § One carrier per
 // grammar position at the Build seam: the VERSION alternative's bracket is
 // `versionPredicate`, not `pathPredicate`, so a standing predicate has no
 // position there — and the refusal names the constructor that does carry it.

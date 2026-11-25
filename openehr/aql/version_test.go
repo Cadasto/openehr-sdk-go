@@ -1,13 +1,13 @@
 package aql_test
 
-// version_test.go pins the REQ-163 version-predicate carrier: the three
+// version_test.go pins the REQ-055 version-predicate carrier: the three
 // `versionPredicate` alternatives the builder can now spell, the canonical
 // bracket text each emits, the refusals, and the end-to-end consequence the
 // carrier exists for — a builder-emitted `[LATEST_VERSION]` raises no
 // aql_version_no_predicate.
 //
 // The canonical strings asserted here MUST equal what openehr/aql/parse emits
-// for the same query; that is held mechanically by the REQ-163 rows in
+// for the same query; that is held mechanically by the REQ-055 rows in
 // containment_roundtrip_test.go, which re-parse and re-emit every one of them.
 // PROBE-088 · PROBE-097
 
@@ -21,7 +21,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 )
 
-// versionQuery is the shared body of the REQ-163 fixtures: the compositions of
+// versionQuery is the shared body of the REQ-055 fixtures: the compositions of
 // one EHR reached through a VERSION containment carrying pred (nil for the
 // predicate-less form). It is the shape containment.go already names as
 // ordinary AQL both the parser and Emit round-trip.
@@ -35,7 +35,7 @@ func versionQuery(pred aql.VersionPredicate) (aql.Query, error) {
 // TestVersionPredicateEmission tables the canonical bracket of every shape the
 // sealed vocabulary has — the two keywords uppercase with no padding, and the
 // comparison with one space each side of its operator, which is what
-// aql.Comparison already renders in WHERE (REQ-163 § Canonical spellings).
+// aql.Comparison already renders in WHERE (REQ-055 § Canonical spellings).
 func TestVersionPredicateEmission(t *testing.T) {
 	tests := []struct {
 		name string
@@ -63,7 +63,7 @@ func TestVersionPredicateEmission(t *testing.T) {
 			want: "VERSION v[commit_audit/change_type/value = 'creation']",
 		},
 		{
-			// Absence stays legal and emits the pre-REQ-163 bytes.
+			// Absence stays legal and emits the pre-REQ-055 bytes.
 			name: "no predicate",
 			pred: nil,
 			want: "VERSION v",
@@ -84,7 +84,7 @@ func TestVersionPredicateEmission(t *testing.T) {
 	}
 }
 
-// TestVersionWithoutPredicateEqualsClass pins the additivity half of REQ-163
+// TestVersionWithoutPredicateEqualsClass pins the additivity half of REQ-055
 // § The version-predicate carrier: `Version(alias, nil)` is the predicate-less
 // form, and it MUST stay identical — in behaviour and in bytes — to the
 // `Class("VERSION", …)` spelling that was the builder's only VERSION shape
@@ -109,7 +109,7 @@ func TestVersionWithoutPredicateEqualsClass(t *testing.T) {
 
 // TestVersionPredicateMatchesGolden pins the committed canonical form of each
 // predicate shape. The goldens are new files, so no existing fixture is
-// re-baselined (REQ-163 § Additivity).
+// re-baselined (REQ-055 § Additivity).
 func TestVersionPredicateMatchesGolden(t *testing.T) {
 	for name, pred := range map[string]aql.VersionPredicate{
 		"version_latest_version": aql.LatestVersion(),
@@ -213,13 +213,13 @@ func TestVersionPredicateDiagnosticsAreValueFree(t *testing.T) {
 	}
 }
 
-// TestBuiltVersionPredicateSuppressesAdvisory is the REQ-163 § Acceptance row
+// TestBuiltVersionPredicateSuppressesAdvisory is the REQ-055 § Acceptance row
 // the whole carrier exists for: a builder-emitted `… CONTAINS VERSION
 // v[LATEST_VERSION]` raises NO aql_version_no_predicate, the advisory the
 // builder could not previously satisfy at all.
 //
 // The predicate-less control is not decoration — it pins that REQ-161's
-// advisory still FIRES on the shape it was written for (REQ-163 § Additivity:
+// advisory still FIRES on the shape it was written for (REQ-055 § Additivity:
 // no REQ-161 code, severity or Detail text changes), so a linter that had
 // simply stopped raising the code could not pass this test.
 func TestBuiltVersionPredicateSuppressesAdvisory(t *testing.T) {
@@ -299,7 +299,7 @@ func TestEmbeddedVersionPredicateIsRefusedNotPanicked(t *testing.T) {
 			if !errors.Is(err, aql.ErrInvalidQuery) {
 				t.Fatalf("err = %v (query %q), want ErrInvalidQuery", err, q.String())
 			}
-			// The refusal points at the route back, as every other REQ-163
+			// The refusal points at the route back, as every other REQ-055
 			// refusal does; a bare "invalid predicate" leaves the caller with
 			// no way to spell the query they meant.
 			if !strings.Contains(err.Error(), "aql.LatestVersion") {
@@ -346,7 +346,7 @@ func TestEmbeddedVersionPredicateDoesNotPanicOnEmission(t *testing.T) {
 // which is the same shape with a fixed name — emits text the SDK's own parser
 // rejects. The bracket is NARROWER than the WHERE value position the shared
 // [aql.Comparison] otherwise serves, which is why the guard is a check at this
-// position rather than a second operand vocabulary (REQ-163 § The
+// position rather than a second operand vocabulary (REQ-055 § The
 // standing-predicate carrier makes the shared comparison a MUST).
 //
 // Both directions are pinned. The ACCEPT rows are not decoration: REQ-119's own
@@ -365,7 +365,7 @@ func TestVersionCompareOperandVocabulary(t *testing.T) {
 		for name, v := range map[string]aql.Value{
 			"a plain function call": aql.Func("LENGTH", aql.Path("x")),
 			// TERMINOLOGY is the same aql.FuncCall shape with a fixed name, so
-			// one guard covers both — the read/write asymmetry REQ-163 § The
+			// one guard covers both — the read/write asymmetry REQ-055 § The
 			// typed projection names as the reason for one shared shape.
 			"a TERMINOLOGY call": aql.Terminology("expand", "openehr", "x"),
 		} {
@@ -410,7 +410,7 @@ func TestVersionCompareOperandVocabulary(t *testing.T) {
 // TestVersionComparePathIsTrimmed pins the canonical spelling against edge
 // whitespace in the caller's path. Every sibling constructor trims ([aql.Col],
 // [aql.ColAs], [aql.Builder.From], [aql.Builder.OrderBy]); storing the padding
-// verbatim would emit `v[  uid/value   = $v]`, which contradicts REQ-163
+// verbatim would emit `v[  uid/value   = $v]`, which contradicts REQ-055
 // § Canonical spellings' "no padding inside the brackets" and is not what the
 // read side emits back — so the identity round trip would fail on an otherwise
 // correct query.

@@ -123,7 +123,7 @@ The SDK **MUST** support them via **typed per-call options**, never via raw head
 | `openehr-uri` | request / response | opaque openEHR resource pointer (selected endpoints) | typed on the affected method |
 | `openehr-item-tag` | request / response | ItemTag operations (REST 1.1.0 new resource) | exposed on `openehr/client/ehr/itemtags/` |
 | `openehr-version-item-tag` | request / response | the ItemTags of the VERSION a write commits or a read returns | `WithVersionItemTags` on the affected write; exposed on `openehr/client/ehr/itemtags/` |
-| `openehr-ehr-id` | request (AQL `POST`) | the EHR an AQL execution is scoped to | `query.WithEHRID` on a `POST` execution ([§ REQ-055](#req-055--wire-boundary) *EHR scoping*) |
+| `openehr-ehr-id` | request (AQL `POST`) | the EHR an AQL execution is scoped to | `query.WithEHRID` on a `POST` execution ([§ REQ-055](aql.md#req-055--aql-builder) *EHR scoping*) |
 
 Response headers in this family **MUST** be surfaced on the typed response metadata returned by each method (alongside `ETag`, `Location`).
 
@@ -1242,49 +1242,11 @@ Deliberate exclusions **MUST** be refused in both directions with a typed error 
 
 ## AQL
 
-### REQ-055 — Wire boundary
+The builders and the canonical AQL string they emit are [aql.md § REQ-055](aql.md#req-055--aql-builder).
 
-`openehr/aql` ships two builder styles:
+### REQ-057
 
-- **Struct-builder.**
-  Build an `aql.Query` value by composing typed structs.
-- **Verb-functions.**
-  Compose a query via top-level functions (`aql.Select(...)`, `aql.From(...)`, `aql.Where(...)`).
-
-Both styles **MUST** produce the **same**, stable and canonical **AQL string on the wire** for the same logical query (*Canonicalisation* below).
-Concrete rules:
-
-- The serialised AQL string is the wire contract.
-  Two queries that produce the same string are equivalent; two that produce different strings are different queries, even if logically equivalent.
-- Whitespace, casing, and aliasing are canonicalised in the wire-output path, so wire-output goldens are deterministic.
-- Both styles are tested against the same wire-output golden fixtures; a builder change that produces different output is a breaking change.
-
-#### Canonicalisation (wire output)
-
-Built queries emit a single stable form so the goldens are deterministic.
-Changing any rule below rewrites every golden and is a **semver-major** change to `openehr/aql`:
-
-1. **Keywords** uppercase — `SELECT`, `FROM`, `WHERE`, `CONTAINS`, `AND`, `OR`, `ORDER BY`, `ASC`, `DESC`.
-   (`OFFSET` / `LIMIT` are not emitted in the string — see rule 7.)
-2. **Whitespace** — exactly one space between tokens; no leading or trailing space on the emitted string.
-3. **Paths and archetype ids** — emitted verbatim; no case folding.
-4. **Parameters** — caller values appear only as `$name` placeholders in the string, never interpolated as literals (the injection guard, below); placeholder keys carry no leading `$`.
-   A bind whose name is empty after that strip **MUST** fail at `Build()` with an error wrapping `aql.ErrInvalidQuery` — no placeholder can match an empty name, so the value would ship only as a dead key.
-5. **SELECT list** — comma-separated, one space after each comma, no trailing comma.
-6. **FROM / CONTAINS** — every class carries an alias (`EHR e`, `OBSERVATION o`); archetype predicates attach in square brackets (`OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2]`); consecutive `CONTAINS` express nested containment.
-   The builders emit EHR scoping as a `WHERE <alias>/ehr_id/value = $param` condition so it composes with other conditions in one clause.
-   The standing-predicate form (`EHR e[ehr_id/value=$param]`) is equally valid AQL but is not what the builders emit **at the FROM root** — since [aql.md § REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) a `CONTAINS` operand does carry a standing predicate, through a carrier of its own.
-   The root's choice above is the one that stands.
-7. **Clause order** — the AQL string emits `SELECT … FROM … WHERE … ORDER BY`; the builder is the sole author of `Query.Q` for built queries.
-   Paging (OFFSET / LIMIT) is carried in the request envelope (`Query.Offset` / `Query.Fetch`), not the string, so paging has a single channel.
-
-The canonical forms for negated containment (`NOT CONTAINS`), sibling containment junctions (`AND` / `OR`, parenthesised only where precedence requires) and the opt-in in-text `LIMIT` / `OFFSET` (which relaxes rules 1 and 7 only for a caller who asks for it; the envelope stays the default, and combining the two channels is a build-time error), and the write-side constructs (the version predicate, the class standing predicate, and the typed projection: `DISTINCT`, `AS`, aggregates), are specified by [aql.md § REQ-163](aql.md#req-163--aql-write-side-expressivity-parity).
-They add to the rules above and rewrite none of them, nor any golden.
-
-The rules above are stated over clause structure and reach no further than the **shapes** a clause is built from.
-The canonical spelling of each value inside them (string escaping, a real's fractional part, the `MATCHES {uri}` operand alphabet) is specified by [aql.md § REQ-119 § Canonical value spellings](aql.md#req-119--re-parseable-canonical-aql-emission) and asserted by PROBE-090.
-
-PROBE-020 checks built queries against the reference golden.
+`openehr/client/query` executes AQL, built or raw, ad hoc or stored, and `openehr/client/definition/` registers stored queries.
 
 #### AQL executor
 
@@ -1317,9 +1279,7 @@ The rule is the **verb**, not the route: **every GET** query operation — ad-ho
 **No POST** operation declares it, and neither request body schema (`AdhocQueryExecute` for ad-hoc, `Query` for stored) carries an `ehr_id` field, so the **`openehr-ehr-id` request header** is the only channel for both POST forms.
 The SDK **MUST NOT** scope POST via the query parameter: a strict-spec server that honours only the header would otherwise run the query population-wide.
 
-### Stored AQL
-
-### REQ-057
+#### Stored queries
 
 The platform supports **stored AQL queries** — queries registered ahead of time and executed by ID.
 The SDK **MUST** support both ends:

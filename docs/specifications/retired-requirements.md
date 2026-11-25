@@ -103,6 +103,10 @@ Replaced by the one-Platform catalog of [auth.md § REQ-070](auth.md#req-070) an
 
 Its rules are now [auth.md § REQ-064](auth.md#req-064--launch-context) *[Platform principal claims](auth.md#platform-principal-claims)*.
 
+## REQ-073 — Discovery trust posture
+
+Its rules are now [auth.md § REQ-072](auth.md#req-072) *[Trust posture](auth.md#trust-posture)*.
+
 ## REQ-080 — openEHR wire conformance
 
 Its test-writing rules moved to [probe-harness.md § Writing a probe](../probe-harness.md#writing-a-probe), and the round-trip comparison it restated is [wire.md § REQ-052](wire.md#req-052)'s.
@@ -145,11 +149,11 @@ Its rules are now [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111
 
 ## REQ-117 — AQL expression-catalogue completion
 
-Its rules moved to [aql.md § REQ-113](aql.md#req-113--execution-oriented-parsed-aql-ast) (the read-side catalogue and its residual), [aql.md § REQ-109](aql.md#req-109--aql-static-lint) (alias resolution in the lint) and [aql.md § REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) (the builder's containment algebra and in-text paging).
+Its rules moved to [aql.md § REQ-113](aql.md#req-113--execution-oriented-parsed-aql-ast) (the read-side catalogue and its residual), [aql.md § REQ-109](aql.md#req-109--aql-static-lint) (alias resolution in the lint) and [aql.md § REQ-163](aql.md#req-055--aql-builder) (the builder's containment algebra and in-text paging).
 
 ## REQ-118 — Deprecated `SELECT TOP` clause and literal source text
 
-Its rules moved to [aql.md § REQ-113](aql.md#req-113--execution-oriented-parsed-aql-ast) (the `TOP` carrier and literal source text), [aql.md § REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) (the builder's `TOP` and the row-bound channels) and [aql.md § REQ-109](aql.md#req-109--aql-static-lint) (the `TOP` lint codes).
+Its rules moved to [aql.md § REQ-113](aql.md#req-113--execution-oriented-parsed-aql-ast) (the `TOP` carrier and literal source text), [aql.md § REQ-163](aql.md#req-055--aql-builder) (the builder's `TOP` and the row-bound channels) and [aql.md § REQ-109](aql.md#req-109--aql-static-lint) (the `TOP` lint codes).
 
 ## REQ-122 — Version-control derived helpers
 
@@ -167,9 +171,17 @@ The list filters are a template operation: they moved to [wire.md § REQ-177](wi
 
 Its rules moved to [aql.md § REQ-161 § Builder adapter](aql.md#builder-adapter).
 
+## REQ-163 — AQL write-side expressivity parity
+
+Its carriers and their canonical spellings are now part of [aql.md § REQ-055](aql.md#req-055--aql-builder), the AQL builder.
+
 ## REQ-164 — AQL path-shape and paging lint
 
 Its checks are now [aql.md § REQ-161](aql.md#req-161--aql-semantic-and-portability-lint) *[Path-shape checks](aql.md#path-shape-checks)*.
+
+## REQ-167 — Token revocation
+
+Its rules are now [auth.md § REQ-063](auth.md#req-063--token-refresh-and-revocation) *[Revocation](auth.md#revocation)*.
 
 ## REQ-172 — Typed 2xx body-read failure
 

@@ -7,7 +7,7 @@ kind: specification
 **Status:** Draft
 
 Normative contract for the `auth/` package family, the application-level `smart/` package and service discovery in `smart/discovery`.
-Covers REQ-060 to REQ-064, REQ-068, REQ-069, REQ-165 and REQ-167, and discovery's REQ-070 to REQ-073 ([§ Service discovery](#service-discovery)).
+Covers REQ-060 to REQ-064, REQ-068, REQ-069 and REQ-165, and discovery's REQ-070 to REQ-072 ([§ Service discovery](#service-discovery)).
 REQ-065 and REQ-067 are retired, and caller attribution (REQ-066) is in [transport.md](transport.md#req-066--caller-attribution).
 
 The SDK supports authenticated requests through a layered model:
@@ -382,7 +382,7 @@ The code exchange and the refresh verify the ID token they receive with it (§ R
 
 `IDTokenClaims.Nonce` **MUST** hold the token's own `nonce` claim, empty when the token has none, whether or not the caller expected one.
 
-### REQ-063 — Token refresh
+### REQ-063 — Token refresh and revocation
 
 An application asks for a refresh token with the SMART scope `offline_access` or `online_access`, which `auth.ScopeOfflineAccess` and `auth.ScopeOnlineAccess` name for `auth.JoinScopes`; whether the server grants one is the deployment's policy.
 
@@ -441,7 +441,7 @@ Without the option, a response without `expires_in` is cached until `Reauth`.
 `auth/smart` **MUST** provide the option `WithTokenChange(func(ctx context.Context, change TokenChange))` and call it after every successful code exchange and refresh, and never after a failed one, with the new access token, the refresh token the source now holds (after a refresh whose response carried none, the previous one; after a code exchange whose response carried none, empty) and the token response.
 The source calls it once it holds the new tokens, and **MUST** call it without holding its lock, so the hook can call the source.
 An application that keeps a session across restarts stores a rotated refresh token from it: RFC 6749 §6 has the client discard the old refresh token when a new one is issued, and RFC 9700 §4.14 makes rotation one of the two ways a public client's refresh token is protected.
-When `Revoke` (§ REQ-167) signs out a source that holds a token, the source **MUST** report one empty change, and never from `Revoke`'s own goroutine before the revocation request has been sent or has failed (when there is one to send), so a hook that panics or blocks cannot stop the request.
+When `Revoke` (*Revocation* below) signs out a source that holds a token, the source **MUST** report one empty change, and never from `Revoke`'s own goroutine before the revocation request has been sent or has failed (when there is one to send), so a hook that panics or blocks cannot stop the request.
 The source **MUST** report changes to the hook one at a time, in the order it installed them, `Revoke`'s empty change included.
 Another call that reports changes, one already reporting or one that installs new tokens while `Revoke`'s request is out, can therefore report `Revoke`'s change before the request ends, and `Revoke` can return before the hook has seen it; that hook runs apart from `Revoke` and cannot hold up its request.
 
@@ -482,7 +482,7 @@ func (f ReautherFunc) Reauth(ctx context.Context) error { return f(ctx) }
 
 It lets a closure, such as a discovery-catalog refresh ([§ REQ-071](#req-071)), serve as a `Reauther` without `transport/` importing `smart/discovery`.
 
-### REQ-167 — Token revocation
+#### Revocation
 
 `auth/smart` **MUST** provide `(*Source).Revoke(ctx)` for signing out (RFC 7009).
 When the source's catalog advertises `revocation_endpoint`, `Revoke` **MUST** POST the form-encoded `token` with its `token_type_hint` (RFC 7009 §2.1): the refresh token when the source holds one (`refresh_token`), otherwise the access token (`access_token`).
@@ -543,7 +543,7 @@ The verified claims **MUST** be returned on `TokenResponse.IDTokenClaims`, and `
 Given an `id_token` without verified claims, it **MUST** validate that token itself as § REQ-062 describes, with the nonce, signing algorithms, trusted audiences and trusted project its caller passes.
 
 A refresh response that carries an `id_token` **MUST** be validated the same way except for the nonce.
-When the source has verified an earlier ID token and has not been signed out with `Revoke` since (§ REQ-167), the new one **MUST** carry that token's `iss` and `sub` (OpenID Connect Core 1.0 §12.2).
+When the source has verified an earlier ID token and has not been signed out with `Revoke` since (§ REQ-063 *Revocation*), the new one **MUST** carry that token's `iss` and `sub` (OpenID Connect Core 1.0 §12.2).
 Unless the source names a trusted project (§ REQ-062), the new one **MUST** also list the same audiences in `aud`, in any order (OpenID Connect Core 1.0 §12.2; RFC 7519 gives `aud` no order).
 With a trusted project the set is not compared, since a client that registers between the sign-in and the refresh joins it; the new token meets the trusted-project rule as any other does.
 A failure to verify that ID token **MUST** fail the refresh with an error that matches `auth.ErrRefreshFailed` and the failure's own § REQ-062 class: `auth.ErrJWKSValidationFailed` for a token refused on its own content, otherwise `auth.ErrInvalidConfig` or the key-set fetch error.
@@ -808,7 +808,7 @@ This table is the one place that says which check reads each member; [§ Adverti
 | `token_endpoint_auth_methods_supported` | `TokenEndpointAuthMethodsSupported` | the method cross-check of `auth/smart.FromConfig`, and `auth/clientcreds.NewFromCatalog` for the configured method | [REQ-068](#method-cross-check-against-discovery) |
 | `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported` | `auth/smart.FromConfig` for the `WithClientAssertionKey` algorithm, and `auth/clientcreds.NewFromCatalog` for a client assertion the SDK's own `jwtbearer.ClaimsSigner` signs | [REQ-068](#advertised-metadata-lists) |
 | `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported` | the ID-token verifier's allowlist: `auth/smart` applies it at the code exchange and on refresh, and a caller of `smart.ValidateIDToken` passes it with `smart.WithIDTokenSigningAlgs` | [REQ-062](#id-token-verification), [REQ-064](#req-064--launch-context) |
-| `revocation_endpoint` | `RevocationEndpoint` | `(*auth/smart.Source).Revoke`, which signs out there (RFC 7009) | [REQ-167](#req-167--token-revocation) |
+| `revocation_endpoint` | `RevocationEndpoint` | `(*auth/smart.Source).Revoke`, which signs out there (RFC 7009) | [REQ-063](#revocation) |
 | `introspection_endpoint` | `IntrospectionEndpoint` | nothing: introspection (RFC 7662) is a resource-server operation, outside the SDK's client scope | |
 | `management_endpoint` | `ManagementEndpoint` | nothing: the SDK has no management client | |
 
@@ -843,9 +843,9 @@ The discovery cache **MUST**:
   A failure that only the starting caller's context caused, or a panic in the fetch or in the `Cache` call that records its result, each part of the attempt REQ-026 names, **MUST NOT** make the resolver write or drop the cached entry, since it says nothing about the Platform.
 - Key every entry by the Platform base URL the caller resolved, never by the document's `issuer` ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).
   A cached catalog whose `BaseURL` is not the base URL it is found under **MUST** be treated as absent: the resolver fetches with a plain request, as on a miss, and the result replaces the entry.
-- Return a fresh cached catalog only once it passes the calling resolver's REQ-072 checks and those REQ-073 checks that send no request (the issuer, the Platform base URL and the auth endpoints' `https` scheme), because one `Cache` may serve resolvers built with different options.
+- Return a fresh cached catalog only once it passes the calling resolver's REQ-072 checks and those *Trust posture* checks that send no request (the issuer, the Platform base URL and the auth endpoints' `https` scheme), because one `Cache` may serve resolvers built with different options.
   A catalog that fails them **MUST** produce the `DiscoveryError` a new document would and stay cached: the failure says nothing new about the Platform.
-  The OIDC cross-check is not run on a fresh hit; it runs when the document is fetched or renewed (REQ-073).
+  The OIDC cross-check is not run on a fresh hit; it runs when the document is fetched or renewed (*Trust posture*).
 
 **Known gap.** Through a shared `Cache`, a catalog that a resolver built with `WithoutOpenIDConfigurationCheck()` cached reaches a resolver that requires the OIDC cross-check unchecked, until the entry expires or is refreshed.
 Entries are keyed by the Platform base URL alone, so a catalog fetched from one resolver's `WithWellKnownPath` document likewise reaches a resolver configured with another path.
@@ -887,7 +887,7 @@ catalog, err := resolver.Refresh(ctx, baseURL) // baseURL is the Platform base U
 A refresh **MUST**:
 
 - Send a conditional request (`If-None-Match`) when the cached entry carries an `ETag`, and a plain request when it carries none, keeping that entry in place meanwhile.
-- On a `304 Not Modified` to a conditional request, re-run the REQ-072 checks and the REQ-073 trust checks, the OIDC cross-check included, on the cached document, and renew the entry as [§ REQ-071](#req-071) says.
+- On a `304 Not Modified` to a conditional request, re-run the REQ-072 checks, the trust-posture ones and the OIDC cross-check included, on the cached document, and renew the entry as [§ REQ-071](#req-071) says.
 - On a `200`, re-run the resolve / validate / cache pipeline and replace the entry.
 - On a failure, invalidate the entry, except a failure that only the caller's own cancelled or expired context caused, and a panic (REQ-071).
 - Return the current catalog (or an error if resolution fails).
@@ -929,6 +929,31 @@ SMART App Launch 2.2.0 lists `token_endpoint` as required, and requires `issuer`
 discovery.WithAcceptedSpecVersions("1.1.0", "1.1.1")
 ```
 
+##### Trust posture
+
+SMART configuration documents and their auth endpoints are untrusted input until validated.
+On every resolution and refresh the SDK **MUST** apply the rules below, except on a fresh cache hit, which runs only the checks [§ REQ-071](#req-071) names.
+The plaintext warnings are not repeated on a hit either: they are logged when the document is fetched or a cached catalog is renewed on a `304`.
+
+- **Issuer ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).** When the fetched document declares an `"issuer"` member, the SDK **MUST** accept it as the catalog's `Issuer` whether or not it equals the Platform base URL, provided it is an absolute URL with the `https` scheme, or `http` under *Plaintext URLs* below, and no query or fragment (OIDC Core 1.0 §2).
+  A malformed issuer **MUST** produce `DiscoveryError{Reason: ReasonMalformedURL}`.
+  The document's issuer **MUST NOT** replace the base URL: the base URL the caller resolved stays the catalog's `BaseURL` and its cache key.
+- **OIDC cross-check.** When the document declares an `issuer` that differs from the Platform base URL, the resolver **MUST**, whenever it fetches the document or renews a cached one on a `304`, fetch `<issuer>/.well-known/openid-configuration` (OIDC Discovery 1.0 §4, the path appended to the issuer's own path) and require:
+  - its `issuer` member to equal the catalog's `Issuer` exactly (OIDC Discovery 1.0 §4.3);
+  - when both documents declare `jwks_uri`, the two values to be equal.
+
+  A mismatch **MUST** produce `DiscoveryError{Reason: ReasonIssuerMismatch}`, and a failed fetch `DiscoveryError{Reason: ReasonFetchFailed}`; an OIDC document that does not parse, or names no `issuer`, is a failed fetch, not a mismatch.
+  The resolver **MUST NOT** fetch the OIDC document when it is constructed with `WithoutOpenIDConfigurationCheck()`, or when the document declares no `issuer` or an `issuer` equal to the base URL.
+- **Plaintext URLs.** The auth endpoints `authorization_endpoint`, `token_endpoint`, `jwks_uri` and, when present, `registration_endpoint` **MUST** use the `https` scheme, or `http` under `WithAllowInsecure()`.
+  A Platform base URL, a declared `issuer` or an auth endpoint whose scheme is `http` **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}` unless the resolver is constructed with `WithAllowInsecure()`.
+- **No downgrade on redirect.** While fetching the SMART configuration document or the OIDC document of the cross-check, the resolver **MUST NOT** follow a redirect to a URL whose scheme is not `https`, unless it is constructed with `WithAllowInsecure()`; such a redirect **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`.
+  Otherwise the injected client's own redirect policy applies.
+- **Plaintext warnings.** The resolver **SHOULD** log a warning when a catalog it resolved holds a plaintext `http` URL, a service's `services.<id>.baseUrl` or an auth endpoint accepted under `WithAllowInsecure()`, and when it fetched the SMART configuration document over `http`, a redirect to `http` included.
+  A plaintext service URL is warned about, not refused: which deployments to talk to is the consumer's decision.
+  A catalog built with `NewStaticCatalog` is not checked.
+
+The resolver does not require `jwks_uri` to share the issuer's host; the `https` scheme is the floor.
+
 ---
 
 ##### Errors
@@ -961,36 +986,11 @@ func (e *DiscoveryError) Unwrap() error
 
 Discovery errors **MUST** be distinguishable from wire errors: `errors.AsType[*discovery.DiscoveryError]` matches one, and `errors.AsType[*transport.WireError]` does not.
 
-### REQ-073 — Discovery trust posture
-
-SMART configuration documents and their auth endpoints are untrusted input until validated.
-On every resolution and refresh the SDK **MUST** apply the rules below, except on a fresh cache hit, which runs only the checks [§ REQ-071](#req-071) names.
-The plaintext warnings are not repeated on a hit either: they are logged when the document is fetched or a cached catalog is renewed on a `304`.
-
-- **Issuer ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).** When the fetched document declares an `"issuer"` member, the SDK **MUST** accept it as the catalog's `Issuer` whether or not it equals the Platform base URL, provided it is an absolute URL with the `https` scheme, or `http` under *Plaintext URLs* below, and no query or fragment (OIDC Core 1.0 §2).
-  A malformed issuer **MUST** produce `DiscoveryError{Reason: ReasonMalformedURL}`.
-  The document's issuer **MUST NOT** replace the base URL: the base URL the caller resolved stays the catalog's `BaseURL` and its cache key.
-- **OIDC cross-check.** When the document declares an `issuer` that differs from the Platform base URL, the resolver **MUST**, whenever it fetches the document or renews a cached one on a `304`, fetch `<issuer>/.well-known/openid-configuration` (OIDC Discovery 1.0 §4, the path appended to the issuer's own path) and require:
-  - its `issuer` member to equal the catalog's `Issuer` exactly (OIDC Discovery 1.0 §4.3);
-  - when both documents declare `jwks_uri`, the two values to be equal.
-
-  A mismatch **MUST** produce `DiscoveryError{Reason: ReasonIssuerMismatch}`, and a failed fetch `DiscoveryError{Reason: ReasonFetchFailed}`; an OIDC document that does not parse, or names no `issuer`, is a failed fetch, not a mismatch.
-  The resolver **MUST NOT** fetch the OIDC document when it is constructed with `WithoutOpenIDConfigurationCheck()`, or when the document declares no `issuer` or an `issuer` equal to the base URL.
-- **Plaintext URLs.** The auth endpoints `authorization_endpoint`, `token_endpoint`, `jwks_uri` and, when present, `registration_endpoint` **MUST** use the `https` scheme, or `http` under `WithAllowInsecure()`.
-  A Platform base URL, a declared `issuer` or an auth endpoint whose scheme is `http` **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}` unless the resolver is constructed with `WithAllowInsecure()`.
-- **No downgrade on redirect.** While fetching the SMART configuration document or the OIDC document of the cross-check, the resolver **MUST NOT** follow a redirect to a URL whose scheme is not `https`, unless it is constructed with `WithAllowInsecure()`; such a redirect **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`.
-  Otherwise the injected client's own redirect policy applies.
-- **Plaintext warnings.** The resolver **SHOULD** log a warning when a catalog it resolved holds a plaintext `http` URL, a service's `services.<id>.baseUrl` or an auth endpoint accepted under `WithAllowInsecure()`, and when it fetched the SMART configuration document over `http`, a redirect to `http` included.
-  A plaintext service URL is warned about, not refused: which deployments to talk to is the consumer's decision.
-  A catalog built with `NewStaticCatalog` is not checked.
-
-The resolver does not require `jwks_uri` to share the issuer's host; the `https` scheme is the floor.
-
 ## What is NOT in scope here
 
 - **OAuth2 dynamic client registration** — the SDK consumes a pre-registered client.
 - **App-side credential storage** — token storage (encrypted at rest, OS keychain, browser cookie) is application-side.
-- **Revocation policy** — when tokens expire or are revoked on the server is the deployment's decision; the SDK reacts to the resulting wire errors and offers only the client's own sign-out revocation (REQ-167).
+- **Revocation policy** — when tokens expire or are revoked on the server is the deployment's decision; the SDK reacts to the resulting wire errors and offers only the client's own sign-out revocation (REQ-063).
 - **MTLS, FAPI, JAR / PAR** — out of scope; a future provider sub-package could address them.
 - **Token introspection (RFC 7662)** — a resource-server operation, and the SDK is a client of authorization servers.
   Discovery still surfaces `introspection_endpoint` (REQ-070), but the SDK ships no introspection client.

@@ -59,7 +59,7 @@ No application-specific healthcare models live here.
 | `openehr/instance/` | Template-driven RM instance example generator (REQ-107). |
 | `openehr/template/webtemplate/` | WebTemplate JSON export of a compiled template (REQ-106). |
 | `openehr/aom/aom14/` | AOM 1.4 types (ADL 1.4) and the ADL 1.4 operational template types (REQ-176). **Generated** from the SDK-authored `openehr_operational_template_1.4.0` root, which includes `openehr_am_1.4.0` and the RM root (REQ-041), apart from `ReadOperationalTemplate`, the bounded reader of an OPT ([clinical-modeling.md § REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds)). |
-| `openehr/aql/` | AQL builders (struct-builder + verb-functions) and request / result models, independent of an executor, plus the REQ-161 opt-in containment verification over the builder's own algebra — sharing `openehr/aql/internal/semcheck` with `openehr/aql/lint` so read and write cannot drift — and the REQ-163 write-side version-predicate, standing-predicate and typed-projection carriers; `Build()` verifies its emitted `SELECT` after emission. |
+| `openehr/aql/` | AQL builders (struct-builder + verb-functions) and request / result models, independent of an executor, plus the REQ-161 opt-in containment verification over the builder's own algebra — sharing `openehr/aql/internal/semcheck` with `openehr/aql/lint` so read and write cannot drift — and the REQ-055 write-side version-predicate, standing-predicate and typed-projection carriers; `Build()` verifies its emitted `SELECT` after emission. |
 | `openehr/aql/parse/` | AQL syntax parser against the SDK grammar profile (ADR 0007) → generated-type-free AST (REQ-109). The generated ANTLR parser lives under `openehr/aql/parse/gen/`; the pure-Go ANTLR runtime is its only third-party dependency. |
 | `openehr/aql/lint/` | Three-layer AQL static lint (syntax, shape, template-aware archetype/path checks) over `parse` (REQ-109), plus the REQ-161 semantic, portability and path-shape checks over `openehr/aql/contain`'s containment relation and the always-on, Warning-only REQ-161 path-shape and paging group. Bridged into the validation model by `aqlvalidation.Validate`; never imports `openehr/validation`. |
 | `openehr/aql/contain/` | Containment admissibility relation (REQ-160): verdicts derived at runtime from the pinned BMM via `openehr/rm/rminfo` plus cited overlay edges, and the `Unavoidable` route-forcing query (REQ-161) — is every route from one class to another forced through a third — consumed by `aql_contains_redundant_step`. Sits below `openehr/aql` and `openehr/aql/lint`; imports only `openehr/rm`, `openehr/rm/rminfo`, and the standard library. |
@@ -72,7 +72,7 @@ No application-specific healthcare models live here.
 | `openehr/client/ehr/directory/` | Folder / Directory CRUD. |
 | `openehr/client/ehr/ehrstatus/` | EHR_STATUS read/update. |
 | `openehr/client/ehr/itemtags/` | ItemTag operations (REST 1.1.0 new resource — REQ-059). |
-| `openehr/client/query/` | Query API — AQL executor (ad-hoc + stored, REQ-055 / REQ-057). |
+| `openehr/client/query/` | Query API — AQL executor (ad-hoc + stored, REQ-057). |
 | `openehr/client/definition/` | Definition API — ADL 1.4 templates, stored queries, example generation. |
 | `openehr/client/demographic/` | Demographic API — parties, relationships, identities (upstream Status: development). |
 | `openehr/client/admin/` | Admin API — EHR physical delete, administrative-lifecycle operations (upstream Status: development). Distinct from `cadasto/admin/` (Cadasto-platform admin). |

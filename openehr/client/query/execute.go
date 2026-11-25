@@ -237,7 +237,7 @@ func queryParamString(val any) (string, error) {
 	return string(b), nil
 }
 
-// applyEHRScope scopes execution to one EHR per REQ-055 using the
+// applyEHRScope scopes execution to one EHR per REQ-057 using the
 // verb-appropriate mechanism from the openEHR ITS-REST OAS:
 //
 //   - GET — the `ehr_id` query parameter (declared on the GET operations).
@@ -245,7 +245,7 @@ func queryParamString(val any) (string, error) {
 //     the POST operations declare no `ehr_id` query parameter and the
 //     request bodies carry no `ehr_id` field — header is the only path).
 //
-// REQ-055 finding A: prior to this split the SDK always set the query
+// REQ-057 finding A: prior to this split the SDK always set the query
 // parameter, so a strict-spec server that scopes POST execution only via
 // the header would silently run population-wide. The header path closes
 // that gap by default; an explicit option is reserved for a future plan.

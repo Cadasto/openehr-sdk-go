@@ -986,7 +986,7 @@ func duplicateAlias(from FromClause) string {
 // that [emitContainment] would otherwise render as text the SDK's own parser
 // rejects, or nil when the tree is emittable.
 //
-// It is the read-side mirror of [aql.Containment.validateTree] (REQ-163,
+// It is the read-side mirror of [aql.Containment.validateTree] (REQ-055,
 // REQ-119) and refuses the same two things:
 //
 //   - An INCOMPLETE class node. A node that is neither a junction (operands, no

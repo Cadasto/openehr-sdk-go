@@ -234,7 +234,7 @@ Wire-equivalence is the only check on encoded JSON a probe in this catalog makes
 - **Effect:** mutating (the revoked grant).
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox).
-- **Satisfies:** REQ-167.
+- **Satisfies:** REQ-063.
 
 #### Launch-mode coverage
 
@@ -325,7 +325,7 @@ Its client scenarios map to SDK coverage as follows:
   A **501** response maps to `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)` and never `aql.ErrPathResolution`: the capability gap is read from the status alone, with an envelope or bare, never from message text (REQ-055).
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — against synthesised backend responses: a path-resolution envelope, and a 501 capability gap with an envelope and bare.
-- **Satisfies:** REQ-055.
+- **Satisfies:** REQ-057.
 
 #### PROBE-028 — AQL lint stability
 
@@ -374,15 +374,15 @@ Its client scenarios map to SDK coverage as follows:
 
 #### PROBE-088 — AQL builder containment and paging stability
 
-- **Title:** The builder's negated containment (`NOT CONTAINS`), sibling containment junctions (`AND`/`OR`, parenthesised by precedence), opt-in in-text `LIMIT`/`OFFSET`, the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause, and the write-side carriers of [REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) emit byte-stable canonical AQL, and a builder program using none of them emits what it emitted before they existed.
+- **Title:** The builder's negated containment (`NOT CONTAINS`), sibling containment junctions (`AND`/`OR`, parenthesised by precedence), opt-in in-text `LIMIT`/`OFFSET`, the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause, and the write-side carriers of [REQ-055](aql.md#req-055--aql-builder) emit byte-stable canonical AQL, and a builder program using none of them emits what it emitted before they existed.
   The write-side carriers are the `VERSION` predicate bracket, the class-position standing comparison, and the typed projection: `DISTINCT`, `AS`, aggregates, function calls, literals, star.
 - **Preconditions:** Committed goldens covering the constructs: one per `versionPredicate` alternative; one per standing-predicate operand kind the write side can express (`pathPredicateOperand`'s `primitive`, `objectPath` and `PARAMETER` alternatives; its `ID_CODE` and `AT_CODE` alternatives have no `aql.Value` shape, so the builder cannot reach them); REQ-161's suppression shape; and one per `columnExpr` alternative plus the clause-level flags; beside the unchanged PROBE-020 golden.
 - **Wire assertion:** In-repo golden comparison (no backend): built query strings match the committed goldens byte for byte, and each golden re-parses and re-emits unchanged, which ties the write-side canonical form to PROBE-087.
-  Each build-time refusal of [§ REQ-163](aql.md#req-163--aql-write-side-expressivity-parity) (a second row-bound channel, a `TOP` beside a row limit or with a negative count, a `SELECT` that does not read back as the projection the builder recorded, a typed construction the grammar does not admit where it renders) has a row that expects an error and no emission.
+  Each build-time refusal of [§ REQ-055](aql.md#req-055--aql-builder) (a second row-bound channel, a `TOP` beside a row limit or with a negative count, a `SELECT` that does not read back as the projection the builder recorded, a typed construction the grammar does not admit where it renders) has a row that expects an error and no emission.
   The check is over the class of refusal rather than a fixed count of rows, so a shape added to either class extends it without amending this entry.
 - **Modes:** In-repo (golden comparison of the SDK's own output; no backend).
 - **Status:** Implemented (inline).
-- **Satisfies:** REQ-163.
+- **Satisfies:** REQ-055.
 
 #### PROBE-090 — AQL emission round-trip closure
 
@@ -448,7 +448,7 @@ Its client scenarios map to SDK coverage as follows:
   The class-position `VERSION` predicate, the class-position standing comparison and the typed projection are builder constructs, so the corpus carries them through the same comparison; what stays unspellable is the FROM root's own bracket in every spelling (archetype, standing or version), since the write-side FROM clause carries an RM type and an alias and nothing else.
 - **Modes:** In-repo (unit-level; no backend).
 - **Status:** Implemented (inline) — PROBE-028's three fixtures gain none of the REQ-161 codes this probe pins, so arm (b) needed no re-baseline.
-- **Satisfies:** REQ-160, REQ-161, REQ-163.
+- **Satisfies:** REQ-160, REQ-161, REQ-055.
 
 #### PROBE-099 — AQL path-shape lint corpus
 
@@ -968,7 +968,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
   A backend that only honours the header would run a query lacking it population-wide — the assertion catches an SDK regression that scopes POST via the query parameter instead.
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox).
-- **Satisfies:** REQ-055.
+- **Satisfies:** REQ-057.
 
 #### PROBE-079 — `PutStoredQuery` recovers `{name, version}` from `Location`
 

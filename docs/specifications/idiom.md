@@ -54,7 +54,7 @@ The SDK allocates no `*http.Client` of its own.
 Three shallow copies of the injected client are the exceptions, each changing only its redirect policy, and each **MUST** leave the injected client unmodified:
 
 - the copy that [auth.md § Credential-bearing requests](auth.md#credential-bearing-requests) prescribes for token, refresh and revocation requests;
-- the copy the discovery resolver fetches with, to refuse a redirect to a URL that is not https ([auth.md § REQ-073](auth.md#req-073--discovery-trust-posture));
+- the copy the discovery resolver fetches with, to refuse a redirect to a URL that is not https ([auth.md § REQ-072](auth.md#trust-posture) *Trust posture*);
 - the copy the transport sends a request carrying a credential header (`Authorization`, `Proxy-Authorization`, `Cookie` or `Cookie2`) with, to refuse a redirect from https to a URL that is not https ([transport.md § REQ-092](transport.md#req-092--tls-posture)).
 
 Each copy keeps the injected client's `Transport`, `Jar` and `Timeout`.
@@ -244,7 +244,7 @@ A caller waiting on a coalesced refresh or resolution **MUST NOT** be handed the
 
 A caller whose own context ends before the coalesced attempt it started or joined has answered **MUST** get an error that `errors.Is` matches to its context's error.
 These rules hold for the token sources of `auth/smart`, `auth/clientcreds` and `auth/jwtbearer`, for the key-set (JWKS) refresh of `auth/smart`, and for discovery resolution, whose cache entry such a failure leaves in place ([auth.md § Refresh API](auth.md#refresh-api)).
-The token refresh of `auth/smart` runs on a goroutine of its own that the starting caller's context does not end ([auth.md § REQ-063](auth.md#req-063--token-refresh)), so it never fails only because that context ended.
+The token refresh of `auth/smart` runs on a goroutine of its own that the starting caller's context does not end ([auth.md § REQ-063](auth.md#req-063--token-refresh-and-revocation)), so it never fails only because that context ended.
 Its panic goes to the caller that started it while that caller waits; once that caller has returned, the panic surfaces on the refresh's goroutine after the waiters are released, as any unrecovered panic in a goroutine does.
 
 Documented exceptions:

@@ -69,7 +69,7 @@ func newRedirector(t *testing.T, status int, to string) (*httptest.Server, *atom
 }
 
 // TestREQ060_TokenPostDoesNotFollowRedirect pins REQ-060 (§ Credential-bearing
-// requests), REQ-063 and REQ-167: the code exchange, the refresh and the
+// requests), REQ-063: the code exchange, the refresh and the
 // revocation of auth/smart refuse a 3xx answer, whatever redirect policy
 // the injected client has, so a 307 or a 308 cannot carry the authorization
 // code, the refresh token or the client secret to another server. The 3xx
