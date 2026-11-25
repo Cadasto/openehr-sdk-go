@@ -639,6 +639,7 @@ requirements:
       - openehr/aom/aom14/schema_names_xml_test.go
       - openehr/aom/aom14/symbol_value_xml_test.go
       - openehr/client/demographic/corpus_xml_test.go
+      - openehr/client/demographic/format_get_test.go
       - openehr/instance/integer_draw_window_test.go
       - openehr/instance/interval_expanded_internal_test.go
       - openehr/instance/ordinal_integer_test.go
