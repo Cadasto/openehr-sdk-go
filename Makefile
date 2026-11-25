@@ -379,7 +379,7 @@ cdr-crosscheck: ## Cross-check generated documents and CDR examples against live
 ##@ Docs
 
 # Pinned: the published site is built from this image without human review.
-MKDOCS_IMAGE ?= squidfunk/mkdocs-material:9.7.6
+MKDOCS_IMAGE ?= squidfunk/mkdocs-material:9.8.2
 DOCS_BUILD   := site
 FETCHED      := .fetched
 # The release the site's `go get` lines must name: the first `## [X.Y.Z]` in
