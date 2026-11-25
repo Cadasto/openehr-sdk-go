@@ -202,19 +202,66 @@ func TestGetVersionXMLEachPartyType(t *testing.T) {
 	}
 }
 
-// TestGetVersionXMLWithoutData pins that an XML version with no data, the
-// RM's logical deletion, returns the envelope and no party, as canonical
-// JSON does.
-func TestGetVersionXMLWithoutData(t *testing.T) {
-	body := `<original_version xmlns="http://schemas.openehr.org/v1"><uid><value>` + personVersion + `</value></uid></original_version>`
-	rec := newRecorder(t, http.StatusOK, mediaXML, []byte(body))
-	pv, _, err := demographic.GetVersion(t.Context(), newClient(t, rec.srv), personVOID,
-		demographic.WithGetFormat(demographic.FormatXML))
-	if err != nil {
-		t.Fatalf("GetVersion(XML, no data) error = %v", err)
+// TestGetVersionWithoutData pins REQ-174 Responses at the versioned_party
+// version read, in both formats: a version with no data, the RM's logical
+// deletion the pin's UMOriginalVersionOfParty does not admit, returns the
+// envelope, no party and no error.
+func TestGetVersionWithoutData(t *testing.T) {
+	cases := []struct {
+		name   string
+		format demographic.Format
+		body   string
+	}{
+		{name: "JSON, data absent", format: demographic.FormatJSON, body: `{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"` + personVersion + `"}}`},
+		{name: "JSON, data null", format: demographic.FormatJSON, body: `{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"` + personVersion + `"},"data":null}`},
+		{name: "XML, data absent", format: demographic.FormatXML, body: `<original_version xmlns="http://schemas.openehr.org/v1"><uid><value>` + personVersion + `</value></uid></original_version>`},
 	}
-	if pv == nil || pv.Party != nil || pv.UID.Value != personVersion {
-		t.Errorf("GetVersion(XML, no data) = %+v, want the envelope and no party", pv)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := newRecorder(t, http.StatusOK, tc.format.MediaType(), []byte(tc.body))
+			pv, _, err := demographic.GetVersion(t.Context(), newClient(t, rec.srv), personVOID,
+				demographic.WithGetFormat(tc.format))
+			if err != nil {
+				t.Fatalf("GetVersion(%s) error = %v", tc.name, err)
+			}
+			if pv == nil || pv.Party != nil || pv.UID.Value != personVersion {
+				t.Errorf("GetVersion(%s) = %+v, want the envelope and no party", tc.name, pv)
+			}
+		})
+	}
+}
+
+// TestGetVersionImportedVersionRefused pins REQ-174 Responses at the
+// versioned_party version read, in both formats: an IMPORTED_VERSION, which
+// the pin's UVersionOfParty admits, is the typed decode failure wrapping
+// typereg.ErrTypeMismatch, with the metadata beside it and no version.
+func TestGetVersionImportedVersionRefused(t *testing.T) {
+	jsonBody := bytes.Replace(fixture(t, "original_version.json"), []byte(`"ORIGINAL_VERSION"`), []byte(`"IMPORTED_VERSION"`), 1)
+	if !bytes.Contains(jsonBody, []byte(`"IMPORTED_VERSION"`)) {
+		t.Fatal("original_version.json carries no ORIGINAL_VERSION _type to replace")
+	}
+	cases := []struct {
+		format demographic.Format
+		body   []byte
+	}{
+		{format: demographic.FormatJSON, body: jsonBody},
+		{format: demographic.FormatXML, body: withRootType(t, fixture(t, "original_version.xml"), "IMPORTED_VERSION")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.format.String(), func(t *testing.T) {
+			rec := newRecorder(t, http.StatusOK, tc.format.MediaType(), tc.body)
+			pv, meta, err := demographic.GetVersion(t.Context(), newClient(t, rec.srv), personVOID,
+				demographic.WithGetFormat(tc.format))
+			if de, ok := errors.AsType[*transport.DecodeError](err); !ok || de == nil {
+				t.Fatalf("GetVersion(%v, IMPORTED_VERSION) error = %v, want a *transport.DecodeError", tc.format, err)
+			}
+			if !errors.Is(err, typereg.ErrTypeMismatch) {
+				t.Errorf("GetVersion(%v, IMPORTED_VERSION) error = %v, want it to wrap typereg.ErrTypeMismatch", tc.format, err)
+			}
+			if pv != nil || meta == nil {
+				t.Errorf("GetVersion(%v, IMPORTED_VERSION) returned (%+v, %+v), want no version and the metadata", tc.format, pv, meta)
+			}
+		})
 	}
 }
 
