@@ -128,6 +128,7 @@ Canonical-JSON properties:
 - Every RM type instance carries `_type`.
   The encoder **MUST** emit it; the decoder resolves it through the type registry (REQ-040).
 - Numbers, booleans, strings, arrays, objects are JSON-vanilla — no openEHR-flavoured encoding tricks.
+- Encoding writes the bytes and reports the failures `encoding/json/v2` writes and reports for the same value and options, a caller's options and marshalers included ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#encode-writes-each-member-itself)).
 - `DV_QUANTITY` magnitudes, like every `Real`, `Integer` and `Integer64` value, are JSON numbers on encode ([§ Floating-point precision](#floating-point-precision)).
 - **Absent interval flags.**
   An interval that omits a boundary flag decodes by [§ REQ-169](#req-169--interval-boundary-flag-defaults), and an included open side decodes as written.
@@ -168,6 +169,7 @@ The Definition, System and AQL result surfaces are not on this codec path: they 
 #### Decode state after a failure
 
 The state a receiver is left in after a failed decode is unspecified.
+A decode is specified for a zero-value receiver: decoding into one that already holds a value is unspecified as well.
 
 #### Map-valued (`Hash`) members
 
@@ -396,7 +398,8 @@ Unlike canonical JSON, whose member order is not a contract ([§ REQ-052](#req-0
   A reader that validates against those schemas then accepts the order of the elements they declare.
   A class the schemas do not name takes the type of its nearest ancestor.
   A property neither schema set declares comes after the declared ones; `EHR.tags`, which a later RM release added, is one.
-  [ADR 0002 D10](../adr/0002-bmm-codegen-decisions.md#d10--the-generated-xml-encoders-take-their-child-order-from-the-its-xml-schemas) sets out the lookup, and where a property goes when only one of the two schema sets declares it.
+  An AOM 1.4 class is looked up in the AM schemas first.
+  The four BASE resource classes both sets declare (`AUTHORED_RESOURCE`, `RESOURCE_DESCRIPTION`, `RESOURCE_DESCRIPTION_ITEM`, `TRANSLATION_DETAILS`) have one encoder, so a property one set declares and the other does not comes right after the nearest earlier property both declare: `RESOURCE_DESCRIPTION_ITEM.copyright`, which only AM 1.4 declares, comes after `misuse` ([ADR 0002 D10](../adr/0002-bmm-codegen-decisions.md#d10--the-generated-xml-encoders-take-their-child-order-from-the-its-xml-schemas)).
   Decode accepts child elements in any order.
 - `xsi:type` is the **first attribute** on every encoded concrete RM value where a polymorphic site is being resolved; the encoder emits it on every concrete value boundary (deterministic profile), the decoder requires it at polymorphic sites.
   `canxml.WithRelaxedTypeDispatch` is accepted for parity with canonical JSON's option but does not relax this yet: a polymorphic site with no discriminator fails with `typereg.ErrMissingType` whatever the option.
@@ -907,6 +910,8 @@ The refusal wraps `simplified.ErrUnsupportedDatatype` and names the FLAT key, so
 #### Codec obligations
 
 The *Simplified Formats* spec (§Node ID Generation Rules) defines how segment identifiers are generated; the codecs take them from the Web Template projection ([REQ-106](clinical-modeling.md#req-106--webtemplate-json-export), [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)), the single source of ids.
+Where the *Simplified Formats* specification names a mechanism but not its spelling, such as a leaf datatype's suffix set, the codecs write the reference implementation's spelling, which the PROBE-086 corpus pins ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) decision 5).
+Where neither the specification nor the reference spells a case, the codec chooses within the format's conventions, records the choice in its deviation register, and follows the reference if a spelling appears there later.
 
 The codecs **MUST**:
 

@@ -50,7 +50,7 @@ No application-specific healthcare models live here.
 | `openehr/serialize/canjson/` | Canonical JSON codec (REQ-052). |
 | `openehr/serialize/canxml/` | Canonical XML codec (REQ-056). |
 | `openehr/serialize/simplified/` | FLAT and STRUCTURED codecs (REQ-053). |
-| `openehr/validation/` | Validation interfaces and implementations: Composition vs OPT, demographic structural validation. |
+| `openehr/validation/` | Validation interfaces and implementations: Composition vs OPT, demographic structural validation. The validation walk lives here, as one engine for the template and the RM rules; `internal/templatecompile/walk` imports nothing of it ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md) clause 5). |
 | `openehr/validation/aqlvalidation/` | AQL static lint reported in the validation `Issue` / `Result` model: the bridge over `openehr/aql/lint` (REQ-109), kept apart so `openehr/validation` links no AQL parser. |
 | `openehr/template/` | The ADL 1.4 operational template (OPT) path grammar (`ParsePath`) and the small types the compiled template shares (`Cardinality`, `Multiplicity`, `ArchetypeTerm`, `TermBinding`, `CodedTermRef`, the path errors), over types of its own: it imports nothing under `openehr/aom/` or `openehr/rm/` ([§ REQ-013](#req-013--building-block-independence)). OET (`.oet`) is out of scope. |
 | `openehr/template/constraints/` | Typed primitive constraint values of leaf template nodes (REQ-103). |
