@@ -88,7 +88,7 @@ Its per-endpoint **OpenAPI YAML** files are the openEHR Foundation's machine-rea
 
 **ItemTags / `openehr-item-tag`**
 A small key-value annotation surface attached to versioned resources, introduced in openEHR REST 1.1.0.
-The SDK exposes it under `openehr/client/ehr/itemtags/` and carries the `openehr-item-tag` header (REQ-059) on the relevant operations.
+The SDK exposes it under `openehr/client/ehr/itemtags/` and carries the `openehr-item-tag` header (REQ-059) on the relevant operations; the Demographic API's tags routes are in `openehr/client/demographic/`.
 
 **openEHR custom header family (`openehr-*`)**
 The openEHR-specific HTTP headers ITS-REST 1.1.0 defines, such as `openehr-version`, `openehr-audit-details` and `openehr-template-id`.

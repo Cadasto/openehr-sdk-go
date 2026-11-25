@@ -115,6 +115,9 @@ requirements:
       - openehr/aql/verify_test.go
       - openehr/aql/version_internal_test.go
       - openehr/aql/version_test.go
+      - openehr/client/demographic/party_test.go
+      - openehr/client/demographic/tags_test.go
+      - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/format_write_test.go
       - openehr/client/ehr/contribution/builder_test.go
       - openehr/client/ehr/contribution/submission_test.go
@@ -306,9 +309,11 @@ requirements:
     tests:
       - openehr/client/definition/stored_query_test.go
       - openehr/client/demographic/party_test.go
+      - openehr/client/demographic/tags_test.go
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
+      - openehr/client/ehr/stored_item_tag_test.go
       - openehr/client/query/query_encoding_test.go
       - openehr/client/system/system_test.go
       - testkit/probe/cassette_test.go
@@ -715,11 +720,13 @@ requirements:
     probes: [PROBE-062]
     tests:
       - openehr/client/demographic/party_test.go
+      - openehr/client/demographic/tags_test.go
       - openehr/client/ehr/audit_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go
       - openehr/client/ehr/itemtag_wire_test.go
       - openehr/client/ehr/itemtags/itemtags_test.go
+      - openehr/client/ehr/stored_item_tag_test.go
       - openehr/client/ehr/version_header_test.go
       - testkit/probes/rest/audit_grammar_test.go
       - testkit/probes/rest/probe_062_audit_details_header.go
@@ -1138,6 +1145,7 @@ requirements:
     probes: [PROBE-061, PROBE-065, PROBE-071]
     tests:
       - openehr/client/demographic/party_test.go
+      - openehr/client/demographic/tags_test.go
       - openehr/client/ehr/composition/body_read_error_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/decode_error_test.go
@@ -2079,6 +2087,7 @@ requirements:
     probes: [PROBE-091]
     tests:
       - openehr/client/definition/path_encoding_test.go
+      - openehr/client/demographic/tags_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/path_encoding_test.go
       - openehr/client/ehr/composition/versioned_test.go
@@ -2112,6 +2121,7 @@ requirements:
       - openehr/client/demographic/body_read_error_test.go
       - openehr/client/demographic/decode_error_test.go
       - openehr/client/demographic/null_body_test.go
+      - openehr/client/demographic/tags_test.go
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/composition/body_read_error_test.go
       - openehr/client/ehr/composition/decode_error_test.go

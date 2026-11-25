@@ -23,7 +23,7 @@ The SDK provides a typed leaf package per area under `openehr/client/`:
 | **EHR** | EHR + sub-resources: Composition, Contribution, Directory/Folder, EHR_STATUS, ItemTags | `openehr/client/ehr/` (+ sub-leaves) |
 | **Query** | ad-hoc AQL execution; stored-query invocation; `RESULT_SET` shape | `openehr/client/query/` |
 | **Definition** | ADL2/ADL1.4 archetypes, OPTs/templates, example generation, stored queries | `openehr/client/definition/` |
-| **Demographic** | parties, relationships, identities (upstream Status: development) | `openehr/client/demographic/` |
+| **Demographic** | parties, relationships, identities, ItemTags (upstream Status: development) | `openehr/client/demographic/` |
 | **Admin** | EHR physical delete, administrative lifecycle (upstream Status: development) | `openehr/client/admin/` |
 
 A consumer who needs only AQL imports `openehr/client/query/` without pulling in the EHR or Definition surface.
@@ -116,6 +116,28 @@ The grammar and worked examples are normative in the upstream contract, `resourc
 
 The SDK **MUST** refuse a request-header value of this family that contains a control character, a byte below `0x20` other than tab or the byte `DEL` (`0x7F`): an `openehr-item-tag` key, value or target path, or a value written into `openehr-audit-details` or `openehr-version`.
 A caller-supplied value with an embedded CR or LF is a caller error, not something to clean up, since it would inject a header.
+
+#### ITEM_TAG resource routes
+
+The Demographic API also carries ITEM_TAGs in request and response bodies, on routes that commit no PARTY version.
+`openehr/client/demographic` **MUST** expose one call per operation, each but `ListTags` taking the PARTY type as `Get` does:
+
+| Call | Request | Returns |
+|---|---|---|
+| `GetTags` | `GET /demographic/{type}/{uid_based_id}/tags` | the target's tags |
+| `SetTags` | `PUT /demographic/{type}/{uid_based_id}/tags` with the whole list as a JSON array of `UPDATE_ITEM_TAG`, and no `If-Match` | no list under `return=minimal`, the default; the stored list under `return=representation`, chosen with `WithTagsPrefer` ([§ REQ-094](transport.md#req-094--prefer-response-shape-negotiation)) |
+| `DeleteTag` | `DELETE /demographic/{type}/{uid_based_id}/tags/{key}`, the key encoded as [§ REQ-150](transport.md#req-150--path-parameter-encoding-and-segment-validation) says | nothing |
+| `ListTags` | `GET /demographic/tags` with `tag_key`, `tag_value` and `tag_target_path` from `WithTagKey`, `WithTagValue` and `WithTagTargetPath`; with no option it lists every tag | the matching tags |
+
+A returned tag is an `ehr.StoredItemTag`: the key, value and target path, and `target` and `owner_id` as `OBJECT_REF`s.
+The target is an `ehr.Ref` naming a version uid or a versioned-object uid.
+The SDK **MUST** refuse each of these with `transport.ErrInvalidConfig` before any request:
+
+- a Ref that carries a time, since the routes take no `version_at_time`;
+- a `SetTags` tag with an empty key, and an empty `DeleteTag` key.
+
+`SetTags` **MUST** send a nil or empty list as `[]`, which removes every tag from the target.
+The EHR-side `/tags` routes under `/ehr/{ehr_id}` have no client yet.
 
 ## Canonical JSON
 

@@ -56,7 +56,7 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Get: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
-	if ref == nil {
+	if isNilRef(ref) {
 		return nil, nil, fmt.Errorf("composition.Get: %w: nil Ref", transport.ErrInvalidConfig)
 	}
 	if err := ref.Validate(); err != nil {
@@ -110,6 +110,21 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 		})
 	}
 	return out, meta, nil
+}
+
+// isNilRef reports whether ref names no target: a nil Ref, or one holding a
+// nil pointer to one of the Ref types, whose methods panic when called.
+func isNilRef(ref openehrclient.Ref) bool {
+	switch r := ref.(type) {
+	case nil:
+		return true
+	case *openehrclient.ByVersionUID:
+		return r == nil
+	case *openehrclient.ByVersionedObjectID:
+		return r == nil
+	default:
+		return false
+	}
 }
 
 // getConfig is the resolved option set for [Get].

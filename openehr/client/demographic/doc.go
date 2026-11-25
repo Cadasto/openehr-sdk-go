@@ -19,6 +19,14 @@
 // history, and the ORIGINAL_VERSION<PARTY> envelope decoded into a
 // [PartyVersion] (envelope fields + the polymorphically-decoded payload).
 //
+// The ITEM_TAG calls read and write tags through the Demographic API's tags
+// routes, without committing a new PARTY version. [GetTags], [SetTags] and
+// [DeleteTag] address one PARTY version or its versioned party; [SetTags]
+// replaces the whole list, and an empty list clears it. [ListTags] searches
+// the tags of every party, narrowed by [WithTagKey], [WithTagValue] and
+// [WithTagTargetPath]. A returned tag is an [ehr.StoredItemTag], which names
+// the tagged object and its class.
+//
 // Maturity: draft. The upstream ITS-REST Demographic API is `x-status:
 // DEVELOPMENT` (the development/unstable companion to the EHR API), so this
 // package's surface may change between SDK minor versions until upstream
