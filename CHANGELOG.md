@@ -10,22 +10,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- **`demographic.GetTags`, `SetTags`, `DeleteTag` and `ListTags`** read, replace and delete the ITEM_TAGs on a party, or search the tags of every party by key, value or target path, and return each tag as a `client.StoredItemTag` (REQ-059).
-- **`demographic.WithFormat` and `WithGetFormat`** let `Create` and `Update` write a PARTY, and `Get` and the versioned_party reads read one, in canonical XML as well as canonical JSON; `WithRawBody` hands back a read's body as received (REQ-173, REQ-174).
-- **`openehr/client`** now holds the types every REST client shares, such as `Ref` and `VersionMetadata`, moved from `openehr/client/ehr`; its new `ValidateRef` refuses a nil Ref, a nil pointer or an empty id with `transport.ErrInvalidConfig` (REQ-025).
-- **`rminfo.BoundTypeReporter` and `AttrMeta.BoundTypeName`** give an attribute's type with the generic parameters its BMM declaration binds, `DV_INTERVAL<DV_DATE>` for `PARTY_RELATIONSHIP.time_validity` where `AttributeRMType` answers `DV_INTERVAL` (REQ-048).
+- **`demographic.GetTags`, `SetTags`, `DeleteTag` and `ListTags`** read, replace and delete the ITEM_TAGs on a party, or search the tags of every party by key, value or target path (REQ-059).
+- **`demographic.WithFormat` and `WithGetFormat`** let the PARTY writes and reads, the versioned_party reads included, use canonical XML as well as canonical JSON, and `WithRawBody` hands back a read's body as received (REQ-173, REQ-174).
+- **`openehr/client`** now holds the types every REST client shares, such as `Ref`, moved from the EHR client package; its new `ValidateRef` refuses a nil Ref, a nil pointer or an empty id with `transport.ErrInvalidConfig` (REQ-025).
+- **`rminfo.BoundTypeReporter` and `AttrMeta.BoundTypeName`** give an attribute's type with the generic parameters its BMM declaration binds, such as `DV_INTERVAL<DV_DATE>` for PARTY_RELATIONSHIP's `time_validity`, where the plain RM type is DV_INTERVAL (REQ-048).
 
 ### Changed
 
-- **Breaking: `demographic.Repository`** gains `GetTags`, `SetTags`, `DeleteTag` and `ListTags`, and its `Get` and versioned reads take options, so an implementation outside the module must add them (REQ-059, REQ-173).
+- **Breaking: `demographic.Repository`** gains the four item-tag methods, and its `Get` and versioned reads take options, so an implementation outside the module must add them (REQ-059, REQ-173).
 - **Breaking: `demographic.Get`** fails with a `*transport.DecodeError` when the body names a PARTY class other than the one the call asks for, instead of returning that party (REQ-173).
-- **Breaking: `composition.Get` and `demographic.Get`** refuse with `transport.ErrInvalidConfig` a caller's own type that embeds `ByVersionUID` or `ByVersionedObjectID`, which they accepted before, and return that error for a nil pointer instead of panicking (REQ-025).
+- **Breaking: `composition.Get` and `demographic.Get`** refuse with `transport.ErrInvalidConfig` a caller's own type that embeds one of the SDK's Ref types, which they accepted before, and a nil pointer, which panicked (REQ-025).
 - **Breaking: `demographicprobes.Probe073DemographicRoundTrip`** takes the `demographic.Format` to round-trip the party in, canonical JSON or canonical XML (REQ-173, PROBE-073).
 - **`demographic.Create` and `Update`** report a party the codec cannot serialise as a `*demographic.EncodeError`, before any request, in place of a plain error (REQ-173).
 
 ### Deprecated
 
-- **The shared names in `openehr/client/ehr`**, such as `ehr.Ref` and `ehr.VersionOf`, keep working as aliases of the same names in `openehr/client`, and the item-tag header and `NoRepresentationError` error texts start `client:` instead of `ehr:`.
+- **The shared names in `openehr/client/ehr`** keep working as deprecated aliases of the same names in `openehr/client`, and the item-tag header and no-representation error texts start `client:` instead of `ehr:`.
 
 ## [0.52.0] - 2026-11-20
 
