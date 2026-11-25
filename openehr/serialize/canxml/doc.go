@@ -135,7 +135,11 @@
 //   - A member typed by a generic parameter that is instantiated with an
 //     interface, such as the `data` of ORIGINAL_VERSION<any>, is a
 //     polymorphic site and needs `xsi:type`, even when its element is
-//     empty. With no element at all, the member stays nil.
+//     empty. With no element at all, the member stays nil. The encoder
+//     writes a class value in a member typed by a generic parameter with
+//     its `xsi:type`, whatever the instantiation, since the ITS-XML schemas
+//     leave the type of such an element open; a primitive value there is
+//     written as its text, with none.
 //
 // # Strict vs relaxed type dispatch
 //
