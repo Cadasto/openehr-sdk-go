@@ -309,6 +309,7 @@ requirements:
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
+      - openehr/client/ehr/stored_item_tag_test.go
       - openehr/client/query/query_encoding_test.go
       - openehr/client/system/system_test.go
       - testkit/probe/cassette_test.go
@@ -720,6 +721,7 @@ requirements:
       - openehr/client/ehr/directory/directory_test.go
       - openehr/client/ehr/itemtag_wire_test.go
       - openehr/client/ehr/itemtags/itemtags_test.go
+      - openehr/client/ehr/stored_item_tag_test.go
       - openehr/client/ehr/version_header_test.go
       - testkit/probes/rest/audit_grammar_test.go
       - testkit/probes/rest/probe_062_audit_details_header.go
