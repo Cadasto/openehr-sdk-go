@@ -2423,7 +2423,8 @@ Two entry points:
   `Set` **MUST** return `ErrUnknownPath` for a path the template does not have.
   `Set` **MUST** return `ErrInvalidPath` for a value it does not refuse with `ErrTypeMismatch` at a path it writes no value at:
   - the root path, which writes no attribute;
-  - a path that ends in a member of a multi-valued attribute, such as an ELEMENT under `items` or an EVENT under `events`; a path that goes on to an attribute of that member is settable.
+  - a path that ends in a member of a multi-valued attribute, such as an ELEMENT under `items` or an EVENT under `events`; a path that goes on to an attribute of that member is settable;
+  - a path through a positional segment, the `[@N]` the compile step writes for a list child with no archetype id, node id or slot predicate, where the template gives that list more than one child.
 
   `Build` **MUST** return `ErrInvalidPath`, and write the value nowhere, where the value's path runs through an item the skeleton does not hold: an attribute it leaves absent or empty, or an archetype id, node id or name no member of a multi-valued attribute carries, such as a named sibling the skeleton left out.
   Each wraps its context with `fmt.Errorf("...: %w", err)`, so a caller compares it with `errors.Is`.
