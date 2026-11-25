@@ -279,9 +279,10 @@ func canxmlImportedVersion(t *testing.T) []byte {
 	if err := canxml.Unmarshal(fixture(t, "original_version.xml"), &ov); err != nil {
 		t.Fatalf("decode original_version.xml: %v", err)
 	}
-	iv := rm.ImportedVersion[rm.Party]{Item: rm.OriginalVersion[any]{UID: ov.UID, LifecycleState: ov.LifecycleState}}
-	iv.CommitAudit = ov.CommitAudit
-	iv.Contribution = ov.Contribution
+	iv := rm.ImportedVersion[rm.Party]{
+		Version: ov.Version,
+		Item:    rm.OriginalVersion[any]{UID: ov.UID, LifecycleState: ov.LifecycleState},
+	}
 	body, err := canxml.Marshal(&iv)
 	if err != nil {
 		t.Fatalf("encode IMPORTED_VERSION: %v", err)
