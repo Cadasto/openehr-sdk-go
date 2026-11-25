@@ -1,0 +1,41 @@
+{
+    "_type": "FOLDER",
+    "name": {
+        "_type": "DV_TEXT",
+        "value": "root"
+    },
+    "archetype_node_id": "openEHR-EHR-FOLDER.generic.v1",
+    "items": [
+        {
+            "_type": "OBJECT_REF",
+            "namespace": "local",
+            "type": "VERSIONED_COMPOSITION",
+            "id": {
+                "_type": "HIER_OBJECT_ID",
+                "value": "${composition_id}"
+            }
+        }
+    ],
+    "details": {
+    "_type": "ITEM_TREE",
+    "name": {
+      "_type": "DV_TEXT",
+      "value": "Tree"
+    },
+    "archetype_node_id": "at0003",
+    "items": [
+      {
+        "_type": "ELEMENT",
+        "name": {
+          "_type": "DV_TEXT",
+          "value": "text"
+        },
+        "archetype_node_id": "at0004",
+        "value": {
+          "_type": "DV_TEXT",
+          "value": "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+        }
+      }
+    ]
+  }
+}

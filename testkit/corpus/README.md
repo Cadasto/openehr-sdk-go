@@ -255,7 +255,7 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 
 **Added at the `b4625fc` pin** (valid OPT + canonical JSON only): `family_history.v.1.2.3`, `my_spanish_template_v0`, `terminology_test.ehrbase.org.v1`, `terminology_test2.ehrbase.org.v1`.
 
-**RM JSON** (`rm/`, flat names): 8 `ehr_status_valid_*` in PROBE-030/033 (excludes ECIS alternate wire), all with the RM floor held out (`EHR_STATUS` without `archetype_details`); 11 `ehr_status_invalid_*` on disk for client/validation work but excluded from probe discovery (`ehr_status_invalid_*` prefix); 17 `folder_*` including `folder_update_*`, all with the RM floor held out (a `FOLDER` whose `archetype_node_id` is an archetype id without `archetype_details`).
+**RM JSON** (`rm/`, flat names): 8 `ehr_status_valid_*` in PROBE-030/033 (excludes ECIS alternate wire), all with the RM floor held out (`EHR_STATUS` without `archetype_details`); 11 `ehr_status_invalid_*` on disk for client/validation work but excluded from probe discovery (`ehr_status_invalid_*` prefix); 19 `folder_*` including `folder_update_*`, all with the RM floor held out (a `FOLDER` whose `archetype_node_id` is an archetype id without `archetype_details`).
 
 **Submissions** ([`submissions/`](submissions/README.md)): 47 CONTRIBUTION create payloads from `contributions/` (bulk `create_multiple_compositions` omitted). Decode them with `contribution.UnmarshalSubmission`, not into `rm.Contribution`.
 

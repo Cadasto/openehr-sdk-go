@@ -4,8 +4,8 @@
 # hand, so this pins only the upstream commit — NOT a per-file sha256 lock.
 source_repo: ehrbase/integration-tests
 source_path: tests/robot/_resources/test_data_sets
-commit: 8c737bb7b4e2157b1a6dba56e8ad7e45476b5d3e
-commit_date: 2026-11-02T11:24:34+02:00
-recorded_utc: 2026-11-05
-source_tree: https://github.com/ehrbase/integration-tests/tree/8c737bb7b4e2157b1a6dba56e8ad7e45476b5d3e/tests/robot/_resources/test_data_sets
+commit: 20812f77d98ee975ccbdb132602ecda96b58bb39
+commit_date: 2026-11-18T16:05:11+01:00
+recorded_utc: 2026-11-25
+source_tree: https://github.com/ehrbase/integration-tests/tree/20812f77d98ee975ccbdb132602ecda96b58bb39/tests/robot/_resources/test_data_sets
 license: Apache-2.0 (see THIRD_PARTY_LICENSES.md)
