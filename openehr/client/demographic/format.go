@@ -213,26 +213,44 @@ func newParty(t Type) rm.Party {
 
 // unmarshalXML decodes body, one canonical XML document, into out, the
 // class the call names. The codec matches the root element neither by name
-// nor by type, so a body of another class could decode into out without
-// complaint. The root's discriminator is read as the codec reads one at a
-// polymorphic site: a value that names no openEHR class, a namespace-prefixed
-// one included, is refused wrapping typereg.ErrUnknownType, and a class other
-// than out's wrapping typereg.ErrTypeMismatch. A root with no discriminator,
-// which is how canxml writes one, is read as out's class.
+// nor by type, so the root is checked first, before the body is decoded: a
+// root naming a class other than out's would otherwise decode into out
+// without complaint, or fail on a child with an error that hides the cause.
+// The root names its class by its discriminator, read as the codec reads one
+// at a polymorphic site, or, with none, by its element name, which canxml
+// writes as the class's lower-cased name. A discriminator that names no
+// openEHR class, a namespace-prefixed one included, is refused wrapping
+// typereg.ErrUnknownType, and another class wrapping
+// typereg.ErrTypeMismatch. A root whose name names no class, such as
+// `party` or `version`, is read as out's class.
 func unmarshalXML(body []byte, out any) error {
-	// REQ-173: the class the call names decides, and a root xsi:type that
-	// contradicts it is a decode failure (REQ-151), never a silent decode;
-	// REQ-056 decides how the xsi:type value reads.
-	if err := canxml.Unmarshal(body, out); err != nil {
-		return err
-	}
+	// REQ-173: the class the call names decides, and a root naming another
+	// is a decode failure (REQ-151), never a silent decode; REQ-056 decides
+	// how the xsi:type value reads. REQ-174 keys the IMPORTED_VERSION
+	// refusal, which an `imported_version` root names.
 	want, ok := canxml.BMMNameOf(out)
 	if !ok {
 		return fmt.Errorf("demographic: %T has no openEHR class name", out)
 	}
-	got, err := rootDiscriminator(body)
+	if err := checkRoot(body, want); err != nil {
+		return err
+	}
+	return canxml.Unmarshal(body, out)
+}
+
+// checkRoot refuses the root element of body when it names a class other
+// than want, as unmarshalXML describes.
+func checkRoot(body []byte, want string) error {
+	start, err := rootElement(body)
 	if err != nil {
 		return err
+	}
+	got, err := canxml.XSITypeOf(start)
+	if err != nil {
+		return err
+	}
+	if got == "" {
+		got = classOfRootName(start.Name.Local)
 	}
 	if got == "" || got == want {
 		return nil
@@ -240,22 +258,31 @@ func unmarshalXML(body []byte, out any) error {
 	if _, known := typereg.Default.Lookup(got); !known {
 		return fmt.Errorf("demographic: the root element's xsi:type names no openEHR class: %w", typereg.ErrUnknownType)
 	}
-	return fmt.Errorf("demographic: the root element's xsi:type names a class other than %s: %w", want, typereg.ErrTypeMismatch)
+	return fmt.Errorf("demographic: the root element names %s, not the %s the call names: %w", got, want, typereg.ErrTypeMismatch)
 }
 
-// rootDiscriminator returns the discriminator of the root element of body,
-// read by canxml.XSITypeOf as the codec reads one, or "" when the root
-// carries none. The root has no enclosing element, so the namespace
-// declarations it carries itself are all that is in scope.
-func rootDiscriminator(body []byte) (string, error) {
+// classOfRootName returns the registered class whose canonical XML root
+// element canxml names local, or "" when local names none.
+func classOfRootName(local string) string {
+	class := strings.ToUpper(local)
+	if _, known := typereg.Default.Lookup(class); !known || canxml.ElementName(class) != local {
+		return ""
+	}
+	return class
+}
+
+// rootElement returns the start tag of the root element of body. The root
+// has no enclosing element, so the namespace declarations it carries itself
+// are all that is in scope for its discriminator.
+func rootElement(body []byte) (xml.StartElement, error) {
 	dec := xml.NewDecoder(bytes.NewReader(body))
 	for {
 		tok, err := dec.Token()
 		if err != nil {
-			return "", err
+			return xml.StartElement{}, err
 		}
 		if start, ok := tok.(xml.StartElement); ok {
-			return canxml.XSITypeOf(start)
+			return start, nil
 		}
 	}
 }
@@ -379,8 +406,9 @@ type GetOption func(*getConfig)
 // whatever `Content-Type` the server labels it with. The body is decoded
 // as the class the read names: the [Type] given to [Get], or the
 // VERSIONED_PARTY, REVISION_HISTORY or ORIGINAL_VERSION a versioned_party
-// read returns. A body whose `_type`, or in canonical XML whose root
-// element's `xsi:type`, names another class does not decode. The PARTY inside an ORIGINAL_VERSION is decoded by the
+// read returns. A body that names another class does not decode: by its
+// `_type`, or in canonical XML by its root element's `xsi:type` or, with
+// none, by the element's name. The PARTY inside an ORIGINAL_VERSION is decoded by the
 // `xsi:type` of its `data` element, as canonical JSON decodes it by `_type`.
 //
 // The read fails with [transport.ErrInvalidConfig], before any request,

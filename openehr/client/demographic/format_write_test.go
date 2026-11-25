@@ -258,21 +258,53 @@ func TestWriteXMLRepresentation(t *testing.T) {
 // resource path accepts as it accepts a pointer, is written in canonical XML
 // as the pointer would be.
 func TestWriteXMLValueParty(t *testing.T) {
-	person := rm.Person{Name: &rm.DVText{Value: "Jane Doe"}, ArchetypeNodeID: "openEHR-DEMOGRAPHIC-PERSON.person.v1"}
-	rec := newRecorder(t, http.StatusCreated, "", nil)
-	if _, _, err := demographic.Create(t.Context(), newClient(t, rec.srv), person,
-		demographic.WithFormat(demographic.FormatXML)); err != nil {
-		t.Fatalf("Create(value PERSON, XML) error = %v", err)
+	for _, pf := range partyFixtures {
+		t.Run(string(pf.typ), func(t *testing.T) {
+			want := jsonParty(t, pf.json)
+			rec := newRecorder(t, http.StatusCreated, "", nil)
+			if _, _, err := demographic.Create(t.Context(), newClient(t, rec.srv), byValue(t, want),
+				demographic.WithFormat(demographic.FormatXML)); err != nil {
+				t.Fatalf("Create(value %s, XML) error = %v", pf.bmmName, err)
+			}
+			req := rec.only(t)
+			if wantPath := "/openehr/v1/demographic/" + string(pf.typ); req.path != wantPath {
+				t.Errorf("path = %q, want %q", req.path, wantPath)
+			}
+			newParty, ok := typereg.Default.Lookup(pf.bmmName)
+			if !ok {
+				t.Fatalf("typereg has no %s", pf.bmmName)
+			}
+			sent := newParty()
+			if err := canxml.Unmarshal(req.body, sent, canxml.WithStrict()); err != nil {
+				t.Fatalf("request body is not canonical XML: %v\n%s", err, req.body)
+			}
+			got, ok := sent.(rm.Party)
+			if !ok {
+				t.Fatalf("the %s constructor returned %T, not a PARTY", pf.bmmName, sent)
+			}
+			sameParty(t, "request body", got, want)
+		})
 	}
-	req := rec.only(t)
-	if req.path != "/openehr/v1/demographic/person" {
-		t.Errorf("path = %q, want the person resource", req.path)
+}
+
+// byValue returns the PARTY p points to, by value.
+func byValue(t *testing.T, p rm.Party) rm.Party {
+	t.Helper()
+	switch v := p.(type) {
+	case *rm.Person:
+		return *v
+	case *rm.Organisation:
+		return *v
+	case *rm.Group:
+		return *v
+	case *rm.Agent:
+		return *v
+	case *rm.Role:
+		return *v
+	default:
+		t.Fatalf("byValue: %T is not a pointer to one of the five PARTY classes", p)
+		return nil
 	}
-	var sent rm.Person
-	if err := canxml.Unmarshal(req.body, &sent, canxml.WithStrict()); err != nil {
-		t.Fatalf("request body is not canonical XML: %v\n%s", err, req.body)
-	}
-	sameParty(t, "request body", &sent, &person)
 }
 
 // TestWriteAcceptFollowsPrefer pins the REQ-173 response rule at the
@@ -281,6 +313,7 @@ func TestWriteXMLValueParty(t *testing.T) {
 // media type of the Identifier body; Content-Type is the format's in both.
 func TestWriteAcceptFollowsPrefer(t *testing.T) {
 	identifier := []byte(`{"uid":"` + personVersion + `"}`)
+	personXML, personJSON := fixture(t, "person.xml"), fixture(t, "person.json")
 	prefers := []struct {
 		prefer     transport.Prefer
 		body       func(f demographic.Format) []byte
@@ -290,9 +323,9 @@ func TestWriteAcceptFollowsPrefer(t *testing.T) {
 		{prefer: transport.PreferIdentifier, body: func(demographic.Format) []byte { return identifier }},
 		{prefer: transport.PreferRepresentation, wantFormat: true, body: func(f demographic.Format) []byte {
 			if f == demographic.FormatXML {
-				return fixture(t, "person.xml")
+				return personXML
 			}
-			return fixture(t, "person.json")
+			return personJSON
 		}},
 	}
 	party := jsonParty(t, "person.json")
@@ -426,6 +459,34 @@ func TestWriteTypedNilPartyRefused(t *testing.T) {
 					}
 				})
 			}
+		}
+	}
+}
+
+// embeddedPerson satisfies rm.Party through an embedded *rm.Person, so a
+// zero value is a non-nil PARTY of no supported class holding a nil pointer.
+type embeddedPerson struct{ *rm.Person }
+
+// TestWriteUnsupportedPartyTypeRefused pins that Create and Update refuse a
+// PARTY of a type outside the five, in both formats, with ErrInvalidConfig
+// and no request: a type embedding a nil *rm.Person passes the nil check,
+// and either encoder would panic on it.
+func TestWriteUnsupportedPartyTypeRefused(t *testing.T) {
+	for _, op := range partyWriteOps {
+		for _, f := range []demographic.Format{demographic.FormatJSON, demographic.FormatXML} {
+			t.Run(op.name+"/"+f.String(), func(t *testing.T) {
+				rec := newRecorder(t, http.StatusCreated, "", nil)
+				out, meta, err := op.do(t.Context(), newClient(t, rec.srv), demographic.Person, embeddedPerson{}, demographic.WithFormat(f))
+				if !errors.Is(err, transport.ErrInvalidConfig) {
+					t.Errorf("%s(embeddedPerson{}, %v) error = %v, want ErrInvalidConfig", op.name, f, err)
+				}
+				if out != nil || meta != nil {
+					t.Errorf("%s(embeddedPerson{}, %v) returned (%v, %v), want nil, nil", op.name, f, out, meta)
+				}
+				if n := rec.count(); n != 0 {
+					t.Errorf("server saw %d requests, want 0", n)
+				}
+			})
 		}
 	}
 }

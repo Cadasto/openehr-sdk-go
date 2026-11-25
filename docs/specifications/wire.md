@@ -1555,9 +1555,14 @@ On the demographic leaf `Get` and the `versioned_party` reads take `WithGetForma
 - `WithRawBody(dst)` **MUST** copy the response's `Content-Type` value and its body bytes into `dst` on a `200`, before any decode, so a body that does not decode is still in hand; on any other outcome `dst` is left as it was.
   A nil `dst` **MUST** fail with `ErrInvalidConfig` before any request.
 - The decoder **MUST** be chosen by the format the caller asked for, never by the response's `Content-Type`.
-  A body that does not decode **MUST** surface as the typed decode failure of [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) with the version metadata beside it, and an empty body and a `204` keep in every format the outcome they have in canonical JSON: `ErrInvalidShape` for an empty body, and for a `204` `ErrDeletedAtTime` on a composition `Get` and a nil PARTY on a demographic `Get`.
+  A body that does not decode **MUST** surface as the typed decode failure of [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure) with the version metadata beside it.
+  An empty body and a `204` keep in every format the outcome they have in canonical JSON:
+  - an empty body: `ErrInvalidShape`;
+  - a `204`: `ErrDeletedAtTime` on a composition `Get`, a nil PARTY on a demographic `Get`.
 - The demographic leaf **MUST** decode a body as the class the call names: the `Type` of a PARTY read or write, or the `VERSIONED_PARTY`, `REVISION_HISTORY` or `ORIGINAL_VERSION` a `versioned_party` read returns.
-  A body whose `_type`, or in canonical XML whose root element's `xsi:type` read as [§ REQ-056](#req-056) reads a discriminator, names another class **MUST** fail as the typed decode failure; canonical XML need not name its root element's class.
+  A body that names another class **MUST** fail as the typed decode failure, checked before the body is decoded.
+  A body names its class by its `_type`, or in canonical XML by its root element: by the root's `xsi:type`, read as [§ REQ-056](#req-056) reads a discriminator, or, with none, by the element name canonical XML gives a class, such as `organisation` or `imported_version`.
+  A root with no `xsi:type` whose name names no class, such as ITS-XML's `party`, is read as the class the call names.
   The PARTY inside an `ORIGINAL_VERSION` is decoded by the `xsi:type` of its `data` element, as canonical JSON decodes it by `_type`.
 
 #### Simplified decode options
@@ -1601,7 +1606,7 @@ The form is outside the pin, so both options are off by default, and their docum
 - No request the leaf sends carries a `.schema`-suffixed media type.
 - A demographic `Create` or `Update` with `WithFormat(demographic.FormatXML)` under `PreferRepresentation` sends `Content-Type` and `Accept` `application/xml` and returns the PARTY decoded from the XML body.
   A demographic `Get` and each `versioned_party` read with `WithGetFormat(demographic.FormatXML)` send `Accept: application/xml` and decode the XML body, the version's PARTY by its `xsi:type`.
-  An XML body whose root `xsi:type` names another class than the call's fails as the typed decode failure, wrapping `typereg.ErrUnknownType` for a namespace-prefixed value such as `ns2:PERSON`; a JSON PARTY whose `_type` does fails wrapping `typereg.ErrTypeMismatch`.
+  An XML body whose root `xsi:type` names another class than the call's fails as the typed decode failure, wrapping `typereg.ErrUnknownType` for a namespace-prefixed value such as `ns2:PERSON`; a JSON PARTY whose `_type` does, and an `organisation` root on a person read, fail wrapping `typereg.ErrTypeMismatch`.
 - A demographic write of a PARTY canonical JSON refuses, such as one holding a NaN magnitude, fails with a `*demographic.EncodeError` and issues no request.
 
 Out of scope: the raw body of a write's response, the other EHR leaves and the contribution envelope's inner payloads ([§ REQ-174](#req-174--versioned-object-reads) keeps the contribution read in canonical JSON), and sending the deprecated `.schema`-suffixed media types.
@@ -1656,7 +1661,7 @@ The version-at-time read **MUST** refuse a zero `time.Time` with `ErrInvalidConf
 
 #### Representation
 
-These reads, the contribution read included, **MUST** request canonical JSON (`Accept: application/json`, the pin's `Accept_canonical`).
+These reads, the contribution read included, **MUST** request canonical JSON (`Accept: application/json`, the pin's `Accept_canonical`), the `versioned_party` reads unless `WithGetFormat` names canonical XML.
 Canonical XML and the simplified formats are out of scope here; the composition leaf's formats are [§ REQ-173](#req-173--composition-and-party-representation-formats)'s, and so are the canonical JSON and canonical XML of the `versioned_party` reads.
 
 #### The `version_at_time` value

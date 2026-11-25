@@ -17,6 +17,7 @@ import (
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -234,21 +235,25 @@ func TestGetVersionWithoutData(t *testing.T) {
 // TestGetVersionImportedVersionRefused pins REQ-174 Responses at the
 // versioned_party version read, in both formats: an IMPORTED_VERSION, which
 // the pin's UVersionOfParty admits, is the typed decode failure wrapping
-// typereg.ErrTypeMismatch, with the metadata beside it and no version.
+// typereg.ErrTypeMismatch, with the metadata beside it and no version. In
+// XML the root names it by its xsi:type, or, as canxml writes one, by its
+// `imported_version` element name alone.
 func TestGetVersionImportedVersionRefused(t *testing.T) {
 	jsonBody := bytes.Replace(fixture(t, "original_version.json"), []byte(`"ORIGINAL_VERSION"`), []byte(`"IMPORTED_VERSION"`), 1)
 	if !bytes.Contains(jsonBody, []byte(`"IMPORTED_VERSION"`)) {
 		t.Fatal("original_version.json carries no ORIGINAL_VERSION _type to replace")
 	}
 	cases := []struct {
+		name   string
 		format demographic.Format
 		body   []byte
 	}{
-		{format: demographic.FormatJSON, body: jsonBody},
-		{format: demographic.FormatXML, body: withRootType(t, fixture(t, "original_version.xml"), "IMPORTED_VERSION")},
+		{name: "JSON", format: demographic.FormatJSON, body: jsonBody},
+		{name: "XML root xsi:type", format: demographic.FormatXML, body: withRootType(t, fixture(t, "original_version.xml"), "IMPORTED_VERSION")},
+		{name: "XML imported_version element", format: demographic.FormatXML, body: canxmlImportedVersion(t)},
 	}
 	for _, tc := range cases {
-		t.Run(tc.format.String(), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			rec := newRecorder(t, http.StatusOK, tc.format.MediaType(), tc.body)
 			pv, meta, err := demographic.GetVersion(t.Context(), newClient(t, rec.srv), personVOID,
 				demographic.WithGetFormat(tc.format))
@@ -265,13 +270,40 @@ func TestGetVersionImportedVersionRefused(t *testing.T) {
 	}
 }
 
+// canxmlImportedVersion returns the canonical XML canxml writes for an
+// IMPORTED_VERSION wrapping the corpus ORIGINAL_VERSION's envelope: an
+// `imported_version` root with no xsi:type.
+func canxmlImportedVersion(t *testing.T) []byte {
+	t.Helper()
+	var ov rm.OriginalVersion[rm.Party]
+	if err := canxml.Unmarshal(fixture(t, "original_version.xml"), &ov); err != nil {
+		t.Fatalf("decode original_version.xml: %v", err)
+	}
+	iv := rm.ImportedVersion[rm.Party]{Item: rm.OriginalVersion[any]{UID: ov.UID, LifecycleState: ov.LifecycleState}}
+	iv.CommitAudit = ov.CommitAudit
+	iv.Contribution = ov.Contribution
+	body, err := canxml.Marshal(&iv)
+	if err != nil {
+		t.Fatalf("encode IMPORTED_VERSION: %v", err)
+	}
+	if !bytes.HasPrefix(body, []byte("<imported_version ")) || bytes.Contains(body[:bytes.IndexByte(body, '>')], []byte("xsi:type")) {
+		t.Fatalf("canxml wrote %.80s, want an imported_version root with no xsi:type", body)
+	}
+	return body
+}
+
 // TestVersionedReadsXMLDecodeFailures pins REQ-173 with REQ-151 at the
-// versioned_party reads: an XML body that does not decode, whose root
-// xsi:type names another class than the read decodes, or whose version data
-// carries no xsi:type, is the typed decode failure with the metadata beside
-// it and no result; WithRawBody still holds the bytes.
+// versioned_party reads: an XML body that does not decode, whose root names
+// another class than the read decodes, by its xsi:type or, with none, by its
+// element name, or whose version data carries no xsi:type, is the typed
+// decode failure with the metadata beside it and no result; WithRawBody
+// still holds the bytes.
 func TestVersionedReadsXMLDecodeFailures(t *testing.T) {
 	for _, rd := range versionedReads() {
+		other := "revision_history.xml"
+		if rd.rootBMM == "REVISION_HISTORY" {
+			other = "versioned_party.xml"
+		}
 		bodies := []struct {
 			name  string
 			body  []byte
@@ -279,6 +311,7 @@ func TestVersionedReadsXMLDecodeFailures(t *testing.T) {
 		}{
 			{name: "truncated", body: []byte("<" + strings.ToLower(rd.rootBMM))},
 			{name: "root names another class", body: withRootType(t, fixture(t, rd.xml), "IMPORTED_VERSION"), cause: typereg.ErrTypeMismatch},
+			{name: "root element names another class", body: fixture(t, other), cause: typereg.ErrTypeMismatch},
 		}
 		if rd.rootBMM == "ORIGINAL_VERSION" {
 			bodies = append(bodies, struct {

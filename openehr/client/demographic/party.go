@@ -70,7 +70,9 @@ func basePath(t Type) string { return "/demographic/" + string(t) }
 //
 // With no option, Get asks for canonical JSON and decodes it.
 // [WithGetFormat] asks for canonical XML instead, and decodes the body as
-// the class t names, whatever `Content-Type` the server labels it with.
+// the class t names, whatever `Content-Type` the server labels it with; a
+// root element that names another class, by its `xsi:type` or its name,
+// does not decode.
 // [WithRawBody] hands back the body as the server sent it.
 //
 // Wire: GET /demographic/{type}/{uid_based_id} [?version_at_time=...]. A 204
@@ -228,6 +230,12 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	}
 	if party == nil || rm.IsTypedNil(party) {
 		return nil, nil, fmt.Errorf("demographic.Update: %w: nil Party", transport.ErrInvalidConfig)
+	}
+	// A type outside the five, such as a struct embedding a nil *rm.Person,
+	// passes the nil check above and would panic in the encoder (idiom.md
+	// § No panics); Create refuses it the same way.
+	if _, err := resourceType(party); err != nil {
+		return nil, nil, fmt.Errorf("demographic.Update: %w", err)
 	}
 	cfg := writeConfig{Prefer: transport.PreferMinimal}
 	for _, o := range opts {

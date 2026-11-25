@@ -5,6 +5,7 @@ package demographic_test
 // keeps in both formats.
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
@@ -97,10 +98,12 @@ func TestGetXMLRootTypeOfTheClass(t *testing.T) {
 }
 
 // TestGetXMLRootNamesOtherClass pins REQ-173 with REQ-151 at the
-// demographic leaf: a canonical XML body whose root xsi:type names another
-// class than the one the call names is the typed decode failure, with the
-// version metadata beside it and no party. The value reads as REQ-056 reads
-// a discriminator: one that names no openEHR class, a namespace-prefixed one
+// demographic leaf: a canonical XML body whose root names another class than
+// the one the call names, by its xsi:type or, with none, by its element name,
+// is the typed decode failure, with the version metadata beside it and no
+// party. The root is read before the body, so a body of another shape gets
+// this error and not a child's. The xsi:type reads as REQ-056 reads a
+// discriminator: one that names no openEHR class, a namespace-prefixed one
 // included, wraps typereg.ErrUnknownType, and another class
 // typereg.ErrTypeMismatch.
 func TestGetXMLRootNamesOtherClass(t *testing.T) {
@@ -114,6 +117,9 @@ func TestGetXMLRootNamesOtherClass(t *testing.T) {
 		{name: "PERSON root on an organisation read", typ: demographic.Organisation, body: testPersonXML(t), cause: typereg.ErrTypeMismatch},
 		{name: "prefixed PERSON root on a person read", typ: demographic.Person, body: withRootType(t, fixture(t, "person.xml"), "ns2:PERSON"), cause: typereg.ErrUnknownType},
 		{name: "unknown class root on a person read", typ: demographic.Person, body: withRootType(t, fixture(t, "person.xml"), "NOT_A_CLASS"), cause: typereg.ErrUnknownType},
+		{name: "prefixed VERSIONED_PARTY root on a person read", typ: demographic.Person, body: withRootType(t, fixture(t, "versioned_party.xml"), "ns2:VERSIONED_PARTY"), cause: typereg.ErrUnknownType},
+		{name: "VERSIONED_PARTY root on a person read", typ: demographic.Person, body: withRootType(t, fixture(t, "versioned_party.xml"), "VERSIONED_PARTY"), cause: typereg.ErrTypeMismatch},
+		{name: "organisation element with no xsi:type on a person read", typ: demographic.Person, body: fixture(t, "organisation.xml"), cause: typereg.ErrTypeMismatch},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -134,6 +140,27 @@ func TestGetXMLRootNamesOtherClass(t *testing.T) {
 				t.Errorf("metadata = %+v, want VersionUID %q", meta, personVersion)
 			}
 		})
+	}
+}
+
+// TestGetXMLRootNamedForNoClassReadsAsTheCallsClass pins the other side of
+// REQ-173's root rule: a root with no xsi:type whose element name names no
+// openEHR class, such as the ITS-XML `party` element, is read as the class
+// the call names.
+func TestGetXMLRootNamedForNoClassReadsAsTheCallsClass(t *testing.T) {
+	body := bytes.Replace(fixture(t, "person.xml"), []byte("<person "), []byte("<party "), 1)
+	body = bytes.Replace(body, []byte("</person>"), []byte("</party>"), 1)
+	if !bytes.HasPrefix(body, []byte("<party ")) || !bytes.HasSuffix(body, []byte("</party>")) {
+		t.Fatalf("person.xml did not rename to a party root: %.40s … %s", body, body[len(body)-20:])
+	}
+	rec := newRecorder(t, http.StatusOK, mediaXML, body)
+	got, _, err := demographic.Get(t.Context(), newClient(t, rec.srv), demographic.Person,
+		openehrclient.LatestOf(personVOID), demographic.WithGetFormat(demographic.FormatXML))
+	if err != nil {
+		t.Fatalf("Get(person, party root) error = %v", err)
+	}
+	if _, ok := got.(*rm.Person); !ok {
+		t.Errorf("Get(person, party root) = %T, want *rm.Person", got)
 	}
 }
 
