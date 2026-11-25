@@ -958,7 +958,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
   A body whose `_type`, or in XML whose root or `data` element's `xsi:type`, names a different concrete type is non-conformant.
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — the Demographic API is Draft upstream (ITS-REST `x-status: DEVELOPMENT`).
-- **Satisfies:** REQ-040, REQ-050.
+- **Satisfies:** REQ-040, REQ-050, REQ-173.
 
 #### PROBE-078 — verb-aware EHR scoping on query execution
 

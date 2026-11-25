@@ -2446,8 +2446,8 @@ requirements:
     canonical: docs/specifications/wire.md#req-173--composition-representation-formats
     status: draft
     implementation: landed
-    packages: [openehr/client/ehr/composition, testkit/probes/rest]
-    probes: [PROBE-108]
+    packages: [openehr/client/ehr/composition, testkit/probes/rest, openehr/client/demographic, testkit/probes/demographic]
+    probes: [PROBE-108, PROBE-073]
     tests:
       - openehr/client/demographic/format_get_test.go
       - openehr/client/demographic/format_write_test.go
