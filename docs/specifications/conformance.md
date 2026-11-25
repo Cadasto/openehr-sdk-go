@@ -1123,7 +1123,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 
 #### PROBE-094 — RM meta-model introspection equals the pinned BMM
 
-- **Title:** The compiled-in RM class graph — class universe, abstractness, immediate parents, transitive ancestors, concrete-descendant expansion, and per-attribute declaring class — equals an independent reduction of the pinned RM BMM, and every answer it gives is closed over the universe it reports.
+- **Title:** The compiled-in RM class graph — class universe, abstractness, immediate parents, transitive ancestors, concrete-descendant expansion, per-attribute declaring class and bound attribute type — equals an independent reduction of the pinned RM BMM, and every answer it gives is closed over the universe it reports.
 - **Preconditions:** The pinned primary RM schema and its includes under [`resources/bmm/`](../../resources/bmm) (REQ-041), reduced in-test through the `openehr/bmm` loader (REQ-045) — deliberately **not** through the generator's own reduction, which would make the comparison tautological and would pass on a generator whose walk is itself wrong.
 - **Wire assertion:** In-repo property, not backend-facing, over the rules of [§ REQ-048](reference-model.md#req-048--rm-meta-model-introspection-surface), which this entry does not restate; each arm compares the compiled-in answers with the independent reduction.
   (a) **Universe** — the compiled-in class set equals [§ The class universe](reference-model.md#the-class-universe), and a class on one side only fails in either direction: a missing class is an unanswerable question, an extra one a class name the pinned schemas do not define.
@@ -1136,6 +1136,8 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
   The shipped attribute-name set per class equals the BMM's effective property set minus the named exemption pins of [§ The attribute tables are complete against the BMM](reference-model.md#the-attribute-tables-are-complete-against-the-bmm), held two-sidedly: an unpinned drop fails, and so does a stale pin whose drop has since been fixed.
   (e) **Negative space** — [§ Three answers, never conflated](reference-model.md#three-answers-never-conflated) over the pinned RM.
   The shapes the pinned RM cannot supply (a dead-end abstract class with a *named* identity, a class whose parent is absent from the data set) are exercised through REQ-048's synthetic-model seam in the behaviour suite beside this probe.
+  (f) **Bound attribute type** — for every class and every attribute it carries, the bound type equals the BMM's own spelling of the type the most-derived declaration gives: its generic parameters bound, or the bare class where one is a formal parameter of the declaring class.
+  Its root is the class the attribute lookup answers, and every parameter it spells is a name the pinned schemas declare.
 - **Modes:** In-repo (unit-level property; no backend).
 - **Status:** Implemented (inline).
 - **Satisfies:** REQ-048.

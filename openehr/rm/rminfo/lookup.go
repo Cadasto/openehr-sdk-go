@@ -25,6 +25,10 @@ type Lookup interface {
 	// returned (i.e. the type inside the list). The second return
 	// is false when parentRMType is unknown or attrName is not
 	// declared on parentRMType (own or inherited).
+	//
+	// The answer is the bare class: it drops the generic parameters the
+	// declaration binds, which [BoundTypeReporter] keeps
+	// ("HISTORY<ITEM_STRUCTURE>" for the same attribute).
 	AttributeRMType(parentRMType, attrName string) (string, bool)
 
 	// IsContainer reports whether the named attribute is multi-valued
@@ -59,13 +63,50 @@ type AttributeLister interface {
 	AttributeNames(rmType string) []string
 }
 
-// Compile-time guarantee that the backing concrete type satisfies both the
-// stable Lookup interface and the optional AttributeLister. Consumers assert
-// Default.(AttributeLister) at runtime; this turns a future signature drift on
-// AttributeNames into a build break rather than a silently-failing assertion.
+// BoundTypeReporter is an optional extension of [Lookup]: it answers an
+// attribute's type with the generic parameters its BMM declaration binds,
+// where [Lookup.AttributeRMType] answers the bare class. It is kept off the
+// Lookup interface so it does not break external Lookup implementers.
+// [Default] implements it, and so does every [Lookup] returned by [New] and
+// [NewWithAbsence]. Assert for it:
+//
+//	if b, ok := rminfo.Default.(rminfo.BoundTypeReporter); ok { … }
+//
+// "Bound" means the parameters the declaration fills in. It is neither the
+// constraint a class puts on its own parameter (DV_INTERVAL's T conforms to
+// DV_ORDERED) nor an interval's lower or upper bound.
+type BoundTypeReporter interface {
+	// AttributeBoundType returns the RM type of an attribute on a parent
+	// type with the generic parameters its BMM declaration binds, spelled
+	// as ITS-JSON spells a generic instantiation:
+	// AttributeBoundType("PARTY_RELATIONSHIP", "time_validity") =
+	// "DV_INTERVAL<DV_DATE>", where AttributeRMType answers "DV_INTERVAL".
+	// Several parameters are comma-separated with no space
+	// ("Hash<String,TRANSLATION_DETAILS>"), and a generic parameter is
+	// spelled the same way, nested. For container properties the element
+	// type is returned, as AttributeRMType does: "REFERENCE_RANGE<DV_QUANTITY>"
+	// for DV_QUANTITY.other_reference_ranges.
+	//
+	// The answer equals AttributeRMType's when the declaration binds no
+	// parameter, and when it leaves one open: a formal parameter of the
+	// declaring class stays unresolved, so HISTORY.events answers "EVENT",
+	// not "EVENT<T>", and DV_INTERVAL.lower answers "T". Which class T
+	// stands for depends on the path the caller came through, and is the
+	// caller's to resolve.
+	//
+	// The second return is false exactly when AttributeRMType's is.
+	AttributeBoundType(parentRMType, attrName string) (string, bool)
+}
+
+// Compile-time guarantee that the backing concrete type satisfies the stable
+// Lookup interface and the optional AttributeLister and BoundTypeReporter.
+// Consumers assert Default.(AttributeLister) at runtime; this turns a future
+// signature drift on AttributeNames into a build break rather than a
+// silently-failing assertion.
 var (
-	_ Lookup          = (*lookup)(nil)
-	_ AttributeLister = (*lookup)(nil)
+	_ Lookup            = (*lookup)(nil)
+	_ AttributeLister   = (*lookup)(nil)
+	_ BoundTypeReporter = (*lookup)(nil)
 )
 
 // Default is the package-level Lookup populated by the generated
@@ -134,6 +175,13 @@ type AttrMeta struct {
 	// container properties this is the element type (the type
 	// inside the list). Never empty.
 	TypeName string
+	// BoundTypeName is TypeName with the generic parameters the BMM
+	// declaration binds, spelled as [BoundTypeReporter.AttributeBoundType]
+	// returns it: "DV_INTERVAL<DV_DATE>" beside a TypeName of
+	// "DV_INTERVAL". It equals TypeName when the declaration binds no
+	// parameter or leaves one open. The generated tables always set it;
+	// data that leaves it empty is answered as TypeName.
+	BoundTypeName string
 	// Required reports whether the BMM declares the attribute as
 	// mandatory (the `is_mandatory` flag, or, for containers,
 	// `cardinality.lower >= 1`).
@@ -150,8 +198,8 @@ type AttrMeta struct {
 }
 
 // lookup is the concrete Lookup backed by a data map. It also implements the
-// optional [AttributeLister], [Hierarchy] and [AbsenceReporter] capability
-// interfaces.
+// optional [AttributeLister], [BoundTypeReporter], [Hierarchy] and
+// [AbsenceReporter] capability interfaces.
 type lookup struct {
 	data map[string]ClassMeta
 	// absence records why each declared-but-omitted class is outside data —
@@ -215,6 +263,23 @@ func (l *lookup) AttributeRMType(parentRMType, attrName string) (string, bool) {
 		return "", false
 	}
 	return attr.TypeName, true
+}
+
+func (l *lookup) AttributeBoundType(parentRMType, attrName string) (string, bool) {
+	meta, ok := l.data[parentRMType]
+	if !ok {
+		return "", false
+	}
+	attr, ok := meta.Attributes[attrName]
+	if !ok {
+		return "", false
+	}
+	// Synthetic data written before the field existed leaves it empty; the
+	// bare type is then the whole answer, never "" reported as success.
+	if attr.BoundTypeName == "" {
+		return attr.TypeName, true
+	}
+	return attr.BoundTypeName, true
 }
 
 func (l *lookup) AttributeNames(rmType string) []string {

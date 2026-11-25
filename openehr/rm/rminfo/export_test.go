@@ -19,7 +19,7 @@ import (
 // invite exactly the disagreement the surface exists to prevent; a file named
 // *_test.go is compiled into this package for `go test` alone, so PROBE-098
 // gets the keys while the shipped surface stays [Lookup], [Hierarchy],
-// [AttributeLister] and [AbsenceReporter].
+// [AttributeLister], [BoundTypeReporter] and [AbsenceReporter].
 
 // AbsenceTable returns a copy of the generated absence table — every stored
 // class name with the one reason it is out of the class universe. A COPY,

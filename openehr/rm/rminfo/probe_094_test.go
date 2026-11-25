@@ -18,6 +18,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -710,6 +711,174 @@ func bmmDeclares(cls bmm.Class, attr string) bool {
 func bmmIsContainer(cls bmm.Class, attr string) bool {
 	_, ok := bmmProperties(cls)[attr].(*bmm.ContainerProperty)
 	return ok
+}
+
+// TestProbe094BoundTypesEqualThePinnedBMM — arm (f). For every class and every
+// attribute it carries, the bound type equals the BMM's own spelling of the
+// type the most-derived declaration gives the attribute: the root with the
+// generic parameters it binds, or the bare root when one of them is a formal
+// parameter of the declaring class (REQ-048). Both the fold that picks the
+// declaration and the spelling are re-derived here from the raw BMM.
+func TestProbe094BoundTypesEqualThePinnedBMM(t *testing.T) {
+	r := reducePinnedBMM(t)
+	lister, ok := rminfo.Default.(rminfo.AttributeLister)
+	if !ok {
+		t.Fatal("rminfo.Default does not implement AttributeLister")
+	}
+	reporter, ok := rminfo.Default.(rminfo.BoundTypeReporter)
+	if !ok {
+		t.Fatal("rminfo.Default does not implement BoundTypeReporter")
+	}
+
+	checked, bound := 0, 0
+	for name := range r.universe {
+		for _, attr := range lister.AttributeNames(name) {
+			site, prop := r.effectiveDeclaration(name, attr)
+			if prop == nil {
+				t.Errorf("%s carries %q but no class in its BMM chain declares it", name, attr)
+				continue
+			}
+			want := probeBoundType(prop, probeFormalParameters(r.classOf[site]))
+			got, ok := reporter.AttributeBoundType(name, attr)
+			if !ok || got != want {
+				t.Errorf("AttributeBoundType(%s, %s) = (%q, %t), but the BMM declaration on %s spells %q",
+					name, attr, got, ok, site, want)
+				continue
+			}
+			// The bound type names the class AttributeRMType does: it adds
+			// the parameters and never changes the root.
+			bare, _ := rminfo.Default.AttributeRMType(name, attr)
+			if root, _, _ := strings.Cut(got, "<"); root != bare {
+				t.Errorf("%s.%s: bound type %q has root %q, but AttributeRMType = %q", name, attr, got, root, bare)
+			}
+			// A spelled parameter is a name the pinned schemas declare, never
+			// a formal parameter that leaked through.
+			if got != bare {
+				bound++
+				for _, param := range strings.FieldsFunc(got, func(c rune) bool { return c == '<' || c == ',' || c == '>' }) {
+					if r.classOf[param] == nil {
+						t.Errorf("%s.%s: bound type %q names %q, which the pinned schemas do not declare",
+							name, attr, got, param)
+					}
+				}
+			}
+			checked++
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no attribute was checked — the bound-type arm is vacuous")
+	}
+	if bound == 0 {
+		t.Fatal("no attribute binds a generic parameter — the bound-type arm is vacuous")
+	}
+	t.Logf("checked %d attributes, %d with bound generic parameters", checked, bound)
+}
+
+// effectiveDeclaration returns the class whose declaration of attr the
+// inheritance fold keeps for name, and that declaration: ancestors are
+// visited first in BMM declaration order and a later declaration replaces an
+// earlier one, over the UNFILTERED chain.
+func (r *bmmReduction) effectiveDeclaration(name, attr string) (site string, prop bmm.Property) {
+	visited := map[string]bool{}
+	var visit func(string)
+	visit = func(n string) {
+		if visited[n] {
+			return
+		}
+		visited[n] = true
+		cls := r.classOf[n]
+		if cls == nil {
+			return
+		}
+		for _, anc := range cls.Ancestors() {
+			visit(anc)
+		}
+		if p, ok := bmmProperties(cls)[attr]; ok {
+			site, prop = n, p
+		}
+	}
+	visit(name)
+	return site, prop
+}
+
+// probeFormalParameters returns the formal generic parameters a class
+// declares (HISTORY's T).
+func probeFormalParameters(cls bmm.Class) map[string]*bmm.GenericParameterDef {
+	switch c := cls.(type) {
+	case *bmm.SimpleClass:
+		return c.GenericParameterDefs
+	case *bmm.Interface:
+		return c.GenericParameterDefs
+	default:
+		return nil
+	}
+}
+
+// probeBoundType is the bound type a BMM property declares: a container's
+// innermost element, spelled with its parameters unless one is open.
+func probeBoundType(p bmm.Property, formal map[string]*bmm.GenericParameterDef) string {
+	var t bmm.Type
+	switch v := p.(type) {
+	case *bmm.SingleProperty:
+		return v.TypeName
+	case *bmm.SinglePropertyOpen:
+		return v.TypeName
+	case *bmm.GenericProperty:
+		t = v.TypeDef
+	case *bmm.ContainerProperty:
+		t = v.TypeDef.TypeDef
+		for {
+			inner, nested := t.(*bmm.ContainerType)
+			if !nested {
+				break
+			}
+			t = inner.TypeDef
+		}
+	}
+	spelled, open := probeTypeName(t, formal)
+	if !open {
+		return spelled
+	}
+	switch v := t.(type) {
+	case *bmm.GenericType:
+		return v.RootType
+	case *bmm.SimpleType:
+		return v.TypeName
+	}
+	return spelled
+}
+
+// probeTypeName spells a BMM type reference as BMM's type_name does — the
+// root, then its parameters in angle brackets, comma-separated with no space —
+// and reports whether any parameter, at any depth, is a name in formal. The
+// keyed generic_parameter_defs form is spelled in name order.
+func probeTypeName(t bmm.Type, formal map[string]*bmm.GenericParameterDef) (spelled string, open bool) {
+	switch v := t.(type) {
+	case *bmm.SimpleType:
+		_, open = formal[v.TypeName]
+		return v.TypeName, open
+	case *bmm.ContainerType:
+		elem, open := probeTypeName(v.TypeDef, formal)
+		return v.ContainerType + "<" + elem + ">", open
+	case *bmm.GenericType:
+		params := slices.Clone(v.GenericParameters)
+		if len(params) == 0 {
+			for _, k := range slices.Sorted(maps.Keys(v.GenericParameterDefs)) {
+				params = append(params, v.GenericParameterDefs[k])
+			}
+		}
+		if len(params) == 0 {
+			return v.RootType, false
+		}
+		names := make([]string, 0, len(params))
+		for _, p := range params {
+			name, paramOpen := probeTypeName(p, formal)
+			names = append(names, name)
+			open = open || paramOpen
+		}
+		return v.RootType + "<" + strings.Join(names, ",") + ">", open
+	}
+	return "", true
 }
 
 // TestProbe094NegativeSpace — arm (e). A name outside the universe is
