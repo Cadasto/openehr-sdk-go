@@ -491,8 +491,9 @@ func marshalXMLPrimitiveSlice(recv, field, elem string) string {
 //     the element's type open (`xs:anyType`): one whose pointer or value
 //     names its BMM class (T a class, a pointer to one, or an interface
 //     holding a pointer to one), or a value of a class the type registry
-//     constructs that an interface T holds by value, which
-//     [openParamClassFunc] returns as a pointer to a copy.
+//     constructs, a generic one in any instantiation, that an interface T
+//     holds by value, which [openParamClassFunc] returns as a pointer to a
+//     copy.
 //   - Anything else [openParamTextFunc] accepts, a nil member or a primitive,
 //     goes to encoding/xml through a pointer, so a pointer-receiver
 //     MarshalXML or MarshalText on T is called, and is written as its text
@@ -532,7 +533,23 @@ func marshalXMLOpenParam(recv, field, elem, label string, pointer bool) string {
 // a class the type registry constructs, held by value in an interface, as a
 // pointer to a copy of it, the form canxml.EncodePoly writes with its
 // `xsi:type` and the decoder returns, and reports false for any other value.
+// A generic class is taken in any instantiation, through
+// [openParamPointerMethod].
 const openParamClassFunc = "xmlOpenParamClass"
+
+// openParamPointerMethod names the method, on the value receiver, that a
+// target package's generated XML encoders declare on each generic class of
+// [openParamGenericClasses]: it returns a pointer to a copy of the receiver,
+// as a canxml.BMMNamer. A type switch can list a generic class in one
+// instantiation only, so [openParamClassFunc] reaches an instantiation the
+// type registry does not construct, such as DV_INTERVAL<DV_QUANTITY>,
+// through the interface [openParamPointerType] that this method satisfies,
+// with no reflection.
+const openParamPointerMethod = "xmlClassPointer"
+
+// openParamPointerType names the interface, declared beside
+// [openParamClassFunc], whose one method is [openParamPointerMethod].
+const openParamPointerType = "xmlClassValue"
 
 // openParamTextFunc names the generic function a target package's generated
 // XML encoders call, with a pointer to the member, on the value of a member
@@ -615,6 +632,20 @@ func hasXMLOpenParam(plan *Plan, pc *PlannedClass) (bool, error) {
 	return false, nil
 }
 
+// openParamGenericClasses returns the generic classes of [anyMemberClasses]
+// the target declares itself, in their order: those that get an
+// [openParamPointerMethod], since a method is declared in the package of its
+// type.
+func openParamGenericClasses(plan *Plan) []*PlannedClass {
+	var classes []*PlannedClass
+	for _, pc := range anyMemberClasses(plan) {
+		if sc, ok := pc.Class.(*bmm.SimpleClass); ok && sc.IsGeneric() && !pc.External {
+			classes = append(classes, pc)
+		}
+	}
+	return classes
+}
+
 // xmlOpenParamPrimitives returns the Go types the BMM primitives map to
 // ([primitiveGoType]), each once and in sorted order, as the generator
 // writes the type of a primitive member; Any, which maps to any, is none.
@@ -631,26 +662,48 @@ func xmlOpenParamPrimitives() []string {
 
 // renderXMLOpenParamHelpers renders [openParamClassFunc], a closed type
 // switch with one case for each of [anyMemberClasses], held by value, that
-// returns a pointer to a copy of the value, and [openParamTextFunc], which
-// tells an interface type argument by its zero value converting to a nil any
-// and accepts, there, nil and a value of each of [xmlOpenParamPrimitives].
+// returns a pointer to a copy of the value, and a last case for
+// [openParamPointerType], which takes each of [openParamGenericClasses] in
+// any instantiation; that interface and the [openParamPointerMethod] of each
+// of those classes; and [openParamTextFunc], which tells an interface type
+// argument by its zero value converting to a nil any and accepts, there, nil
+// and a value of each of [xmlOpenParamPrimitives].
 func renderXMLOpenParamHelpers(plan *Plan) string {
+	generic := openParamGenericClasses(plan)
 	var b strings.Builder
 	fmt.Fprintf(&b, "// %s returns v, the value of a member typed by an open generic\n", openParamClassFunc)
 	b.WriteString("// parameter whose type argument is an interface, as a pointer to a copy of\n")
 	b.WriteString("// it when it is a value, held by value, of a class the type registry\n")
-	b.WriteString("// constructs: the form canxml.EncodePoly writes with its `xsi:type` and\n")
-	b.WriteString("// the decoder returns. It reports false for any other value.\n")
+	b.WriteString("// constructs, a generic one in any instantiation: the form\n")
+	b.WriteString("// canxml.EncodePoly writes with its `xsi:type` and the decoder returns. It\n")
+	b.WriteString("// reports false for any other value.\n")
 	fmt.Fprintf(&b, "func %s(v any) (canxml.BMMNamer, bool) {\n", openParamClassFunc)
-	if classes := anyMemberClasses(plan); len(classes) > 0 {
+	if classes := anyMemberClasses(plan); len(classes) > 0 || len(generic) > 0 {
 		b.WriteString("\tswitch x := v.(type) {\n")
 		for _, pc := range classes {
 			fmt.Fprintf(&b, "\tcase %s:\n\t\treturn &x, true\n", anyMemberGoType(plan, pc))
+		}
+		if len(generic) > 0 {
+			fmt.Fprintf(&b, "\tcase %s:\n\t\treturn x.%s(), true\n", openParamPointerType, openParamPointerMethod)
 		}
 		b.WriteString("\t}\n")
 	}
 	b.WriteString("\treturn nil, false\n")
 	b.WriteString("}\n\n")
+
+	if len(generic) > 0 {
+		fmt.Fprintf(&b, "// %s is a value of a generic class, in any instantiation, whose\n", openParamPointerType)
+		b.WriteString("// pointer canxml.EncodePoly writes with its `xsi:type`.\n")
+		fmt.Fprintf(&b, "type %s interface {\n\t%s() canxml.BMMNamer\n}\n\n", openParamPointerType, openParamPointerMethod)
+		for _, pc := range generic {
+			sc := pc.Class.(*bmm.SimpleClass)
+			recv := jsonmarReceiverName(pc.GoName)
+			fmt.Fprintf(&b, "// %s returns a pointer to a copy of %s, the form canxml.EncodePoly\n", openParamPointerMethod, recv)
+			b.WriteString("// writes with its `xsi:type`.\n")
+			fmt.Fprintf(&b, "func (%s %s%s) %s() canxml.BMMNamer { return &%s }\n\n",
+				recv, pc.GoName, genericTypeArgList(sc), openParamPointerMethod, recv)
+		}
+	}
 
 	fmt.Fprintf(&b, "// %s reports whether the canonical-XML encoder writes *v, the\n", openParamTextFunc)
 	b.WriteString("// value of a member typed by an open generic parameter T that holds no\n")

@@ -121,10 +121,13 @@ func openParamValue(recv string, ef emittedField) string {
 // each once, in the file xmlOpenParamFile names, and that a target that calls
 // neither declares neither, so the package compiles and lint finds no unused
 // function. xmlOpenParamClass returns a pointer to a copy of a value, held by
-// value, of each class the type registry constructs; xmlOpenParamText accepts,
-// for an interface type argument, nil and a value of each Go type a BMM
-// primitive maps to. The RM target calls them, for ORIGINAL_VERSION.data and
-// the bounds of BASE Interval; the AOM 1.4 target has no such member.
+// value, of each class the type registry constructs, and of each generic one
+// in any instantiation through xmlClassPointer, which the declaring file
+// gives each such class the target declares, and no other file and no other
+// target; xmlOpenParamText accepts, for an interface type argument, nil and a
+// value of each Go type a BMM primitive maps to. The RM target calls them,
+// for ORIGINAL_VERSION.data and the bounds of BASE Interval; the AOM 1.4
+// target has no such member.
 func TestREQ056_RenderXMLOpenParamHelpersOnce(t *testing.T) {
 	for _, tc := range []struct {
 		target Target
@@ -144,7 +147,8 @@ func TestREQ056_RenderXMLOpenParamHelpersOnce(t *testing.T) {
 			}
 			classDecl := "func " + openParamClassFunc + "(v any) (canxml.BMMNamer, bool) {"
 			textDecl := "func " + openParamTextFunc + "[T any](v *T) bool {"
-			calls, classDecls, textDecls := 0, 0, 0
+			methodDecl := ") " + openParamPointerMethod + "() canxml.BMMNamer {"
+			calls, classDecls, textDecls, methodDecls := 0, 0, 0, 0
 			var helpers string
 			for _, f := range plan.Files {
 				out, err := RenderMarshalXMLFile(plan, f)
@@ -155,6 +159,7 @@ func TestREQ056_RenderXMLOpenParamHelpersOnce(t *testing.T) {
 				calls += strings.Count(src, "= "+openParamClassFunc+"(")
 				classDecls += strings.Count(src, classDecl)
 				textDecls += strings.Count(src, textDecl)
+				methodDecls += strings.Count(src, methodDecl)
 				if strings.Contains(src, classDecl) {
 					if f != declaring {
 						t.Errorf("%s declares %s; want it declared in the file xmlOpenParamFile names", f.FileBase, openParamClassFunc)
@@ -176,12 +181,36 @@ func TestREQ056_RenderXMLOpenParamHelpersOnce(t *testing.T) {
 				if declaring != nil {
 					t.Errorf("xmlOpenParamFile = %s; want nil for a target that calls no %s", declaring.FileBase, openParamClassFunc)
 				}
+				if methodDecls != 0 {
+					t.Errorf("%d declarations of %s; want none for a target that calls no %s, which lint would report unused", methodDecls, openParamPointerMethod, openParamClassFunc)
+				}
 				return
 			}
 			for _, pc := range anyMemberClasses(plan) {
 				if c := fmt.Sprintf("\tcase %s:\n\t\treturn &x, true\n", anyMemberGoType(plan, pc)); !strings.Contains(helpers, c) {
 					t.Errorf("%s lacks %q, so a %s held by value would be refused", openParamClassFunc, c, pc.BMMName)
 				}
+			}
+			generic := openParamGenericClasses(plan)
+			if !slices.ContainsFunc(generic, func(pc *PlannedClass) bool { return pc.BMMName == "DV_INTERVAL" }) {
+				t.Fatalf("openParamGenericClasses lacks DV_INTERVAL; want every generic class the target declares")
+			}
+			if c := fmt.Sprintf("\tcase %s:\n\t\treturn x.%s(), true\n", openParamPointerType, openParamPointerMethod); !strings.Contains(helpers, c) {
+				t.Errorf("%s lacks %q, so a generic class held by value in an instantiation the registry does not construct would be refused", openParamClassFunc, c)
+			}
+			if d := fmt.Sprintf("type %s interface {\n\t%s() canxml.BMMNamer\n}\n", openParamPointerType, openParamPointerMethod); !strings.Contains(helpers, d) {
+				t.Errorf("the file declaring %s lacks %q", openParamClassFunc, d)
+			}
+			for _, pc := range generic {
+				sc := pc.Class.(*bmm.SimpleClass)
+				recv := jsonmarReceiverName(pc.GoName)
+				d := fmt.Sprintf("func (%s %s%s) %s() canxml.BMMNamer { return &%s }\n", recv, pc.GoName, genericTypeArgList(sc), openParamPointerMethod, recv)
+				if !strings.Contains(helpers, d) {
+					t.Errorf("the file declaring %s lacks %q, so a %s held by value in any instantiation would be refused", openParamClassFunc, d, pc.BMMName)
+				}
+			}
+			if methodDecls != len(generic) {
+				t.Errorf("%d declarations of %s; want one for each of the %d generic classes the target declares", methodDecls, openParamPointerMethod, len(generic))
 			}
 			if c := "\tcase nil, " + strings.Join(xmlOpenParamPrimitives(), ", ") + ":\n\t\treturn true\n"; !strings.Contains(helpers, c) {
 				t.Errorf("%s lacks %q, so a primitive an interface holds would be refused", openParamTextFunc, c)

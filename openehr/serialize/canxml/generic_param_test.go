@@ -80,10 +80,10 @@ func genericParamPerson() *rm.Person {
 // genericParamQuantityInterval returns a DV_INTERVAL instantiated with
 // DV_QUANTITY, not with DV_ORDERED as the type registry constructs it.
 func genericParamQuantityInterval() rm.DVInterval[rm.DVQuantity] {
-	return rm.DVInterval[rm.DVQuantity]{Interval: rm.Interval[rm.DVQuantity]{
+	return rm.DVInterval[rm.DVQuantity]{
 		Lower: rm.DVQuantity{Magnitude: 1.5, Units: "mm"}, LowerIncluded: true,
 		Upper: rm.DVQuantity{Magnitude: 3, Units: "mm"}, UpperIncluded: true,
-	}}
+	}
 }
 
 // genericParamComposition returns a COMPOSITION with the members the codec
