@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -14,15 +15,76 @@ import (
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ItemList.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 func (i *ItemList) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ITEM_LIST: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return i.unmarshalJSONWrapped(dec)
+	}
+	got, err := i.readJSONMembers(dec)
+	return typereg.DecodeDone("ITEM_LIST", got, err)
+}
+
+// readJSONMembers reads the members of ItemList into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (i *ItemList) readJSONMembers(dec *jsontext.Decoder) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "ITEM_LIST")
+		case "archetype_details":
+			err = json.UnmarshalDecode(dec, &i.ArchetypeDetails)
+		case "archetype_node_id":
+			err = json.UnmarshalDecode(dec, &i.ArchetypeNodeID)
+		case "feeder_audit":
+			err = json.UnmarshalDecode(dec, &i.FeederAudit)
+		case "items":
+			err = json.UnmarshalDecode(dec, &i.Items)
+		case "links":
+			err = json.UnmarshalDecode(dec, &i.Links)
+		case "name":
+			err = json.UnmarshalDecode(dec, &i.Name)
+		case "uid":
+			err = json.UnmarshalDecode(dec, &i.UID)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of ItemList.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias, so the receiver decodes in place.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (i *ItemList) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawItemList
@@ -32,15 +94,76 @@ func (i *ItemList) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ItemSingle.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 func (i *ItemSingle) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ITEM_SINGLE: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return i.unmarshalJSONWrapped(dec)
+	}
+	got, err := i.readJSONMembers(dec)
+	return typereg.DecodeDone("ITEM_SINGLE", got, err)
+}
+
+// readJSONMembers reads the members of ItemSingle into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (i *ItemSingle) readJSONMembers(dec *jsontext.Decoder) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "ITEM_SINGLE")
+		case "archetype_details":
+			err = json.UnmarshalDecode(dec, &i.ArchetypeDetails)
+		case "archetype_node_id":
+			err = json.UnmarshalDecode(dec, &i.ArchetypeNodeID)
+		case "feeder_audit":
+			err = json.UnmarshalDecode(dec, &i.FeederAudit)
+		case "item":
+			err = json.UnmarshalDecode(dec, &i.Item)
+		case "links":
+			err = json.UnmarshalDecode(dec, &i.Links)
+		case "name":
+			err = json.UnmarshalDecode(dec, &i.Name)
+		case "uid":
+			err = json.UnmarshalDecode(dec, &i.UID)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of ItemSingle.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias, so the receiver decodes in place.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (i *ItemSingle) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawItemSingle
@@ -50,15 +173,76 @@ func (i *ItemSingle) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ItemTable.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 func (i *ItemTable) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ITEM_TABLE: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return i.unmarshalJSONWrapped(dec)
+	}
+	got, err := i.readJSONMembers(dec)
+	return typereg.DecodeDone("ITEM_TABLE", got, err)
+}
+
+// readJSONMembers reads the members of ItemTable into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (i *ItemTable) readJSONMembers(dec *jsontext.Decoder) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "ITEM_TABLE")
+		case "archetype_details":
+			err = json.UnmarshalDecode(dec, &i.ArchetypeDetails)
+		case "archetype_node_id":
+			err = json.UnmarshalDecode(dec, &i.ArchetypeNodeID)
+		case "feeder_audit":
+			err = json.UnmarshalDecode(dec, &i.FeederAudit)
+		case "links":
+			err = json.UnmarshalDecode(dec, &i.Links)
+		case "name":
+			err = json.UnmarshalDecode(dec, &i.Name)
+		case "rows":
+			err = json.UnmarshalDecode(dec, &i.Rows)
+		case "uid":
+			err = json.UnmarshalDecode(dec, &i.UID)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of ItemTable.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias, so the receiver decodes in place.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (i *ItemTable) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawItemTable
@@ -68,15 +252,76 @@ func (i *ItemTable) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ItemTree.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 func (i *ItemTree) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: ITEM_TREE: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return i.unmarshalJSONWrapped(dec)
+	}
+	got, err := i.readJSONMembers(dec)
+	return typereg.DecodeDone("ITEM_TREE", got, err)
+}
+
+// readJSONMembers reads the members of ItemTree into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (i *ItemTree) readJSONMembers(dec *jsontext.Decoder) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "ITEM_TREE")
+		case "archetype_details":
+			err = json.UnmarshalDecode(dec, &i.ArchetypeDetails)
+		case "archetype_node_id":
+			err = json.UnmarshalDecode(dec, &i.ArchetypeNodeID)
+		case "feeder_audit":
+			err = json.UnmarshalDecode(dec, &i.FeederAudit)
+		case "items":
+			err = json.UnmarshalDecode(dec, &i.Items)
+		case "links":
+			err = json.UnmarshalDecode(dec, &i.Links)
+		case "name":
+			err = json.UnmarshalDecode(dec, &i.Name)
+		case "uid":
+			err = json.UnmarshalDecode(dec, &i.UID)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of ItemTree.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias, so the receiver decodes in place.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (i *ItemTree) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawItemTree

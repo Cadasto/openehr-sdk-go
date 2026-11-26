@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -14,15 +15,76 @@ import (
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVCount.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 func (d *DVCount) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_COUNT: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return d.unmarshalJSONWrapped(dec)
+	}
+	got, err := d.readJSONMembers(dec)
+	return typereg.DecodeDone("DV_COUNT", got, err)
+}
+
+// readJSONMembers reads the members of DVCount into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (d *DVCount) readJSONMembers(dec *jsontext.Decoder) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "DV_COUNT")
+		case "accuracy":
+			err = json.UnmarshalDecode(dec, &d.Accuracy)
+		case "accuracy_is_percent":
+			err = json.UnmarshalDecode(dec, &d.AccuracyIsPercent)
+		case "magnitude":
+			err = json.UnmarshalDecode(dec, &d.Magnitude)
+		case "magnitude_status":
+			err = json.UnmarshalDecode(dec, &d.MagnitudeStatus)
+		case "normal_range":
+			err = json.UnmarshalDecode(dec, &d.NormalRange)
+		case "normal_status":
+			err = json.UnmarshalDecode(dec, &d.NormalStatus)
+		case "other_reference_ranges":
+			err = json.UnmarshalDecode(dec, &d.OtherReferenceRanges)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of DVCount.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias, so the receiver decodes in place.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (d *DVCount) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawDVCount
@@ -32,11 +94,16 @@ func (d *DVCount) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVInterval.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 //
 // A boundary flag the document leaves out takes its default once the whole
 // value is read: `lower_unbounded` and `upper_unbounded` read as false on a
@@ -51,6 +118,69 @@ func (d *DVInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_INTERVAL: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return d.unmarshalJSONWrapped(dec)
+	}
+	var seen intervalFlagsSeen
+	got, err := d.readJSONMembers(dec, &seen)
+	if err != nil || got != "" {
+		return typereg.DecodeDone("DV_INTERVAL", got, err)
+	}
+	if err := seen.settle(intervalBoundHeldByValue(&d.Lower), &d.LowerIncluded, &d.LowerUnbounded, &d.UpperIncluded, &d.UpperUnbounded); err != nil {
+		return typereg.WrapShapeError("DV_INTERVAL", err)
+	}
+	return nil
+}
+
+// readJSONMembers reads the members of DVInterval into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare, and records in seen the boundary flags and bounds the document
+// carries. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (d *DVInterval[T]) readJSONMembers(dec *jsontext.Decoder, seen *intervalFlagsSeen) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "DV_INTERVAL")
+		case "lower":
+			err = decodeIntervalBoundJSON(dec, &d.Lower, &seen.lower)
+		case "lower_included":
+			err = decodeIntervalFlagJSON(dec, &d.LowerIncluded, &seen.lowerIncluded)
+		case "lower_unbounded":
+			err = decodeIntervalFlagJSON(dec, &d.LowerUnbounded, &seen.lowerUnbounded)
+		case "upper":
+			err = decodeIntervalBoundJSON(dec, &d.Upper, &seen.upper)
+		case "upper_included":
+			err = decodeIntervalFlagJSON(dec, &d.UpperIncluded, &seen.upperIncluded)
+		case "upper_unbounded":
+			err = decodeIntervalFlagJSON(dec, &d.UpperUnbounded, &seen.upperUnbounded)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of DVInterval.
+// It decodes the interval wire struct, which reaches the embedded BASE
+// Interval through its method-free alias, inside an anonymous struct that
+// reads each boundary flag and bound straight into the receiver.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (d *DVInterval[T]) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	// A null in place of the interval reads as the member left out: the
 	// receiver keeps what it holds and no flag takes a default.
 	if dec.PeekKind() == 'n' {
@@ -86,15 +216,72 @@ func (d *DVInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVOrdinal.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 func (d *DVOrdinal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_ORDINAL: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return d.unmarshalJSONWrapped(dec)
+	}
+	got, err := d.readJSONMembers(dec)
+	return typereg.DecodeDone("DV_ORDINAL", got, err)
+}
+
+// readJSONMembers reads the members of DVOrdinal into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (d *DVOrdinal) readJSONMembers(dec *jsontext.Decoder) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "DV_ORDINAL")
+		case "normal_range":
+			err = json.UnmarshalDecode(dec, &d.NormalRange)
+		case "normal_status":
+			err = json.UnmarshalDecode(dec, &d.NormalStatus)
+		case "other_reference_ranges":
+			err = json.UnmarshalDecode(dec, &d.OtherReferenceRanges)
+		case "symbol":
+			err = json.UnmarshalDecode(dec, &d.Symbol)
+		case "value":
+			err = json.UnmarshalDecode(dec, &d.Value)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of DVOrdinal.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias, so the receiver decodes in place.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (d *DVOrdinal) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawDVOrdinal
@@ -104,15 +291,82 @@ func (d *DVOrdinal) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVProportion.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 func (d *DVProportion) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_PROPORTION: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return d.unmarshalJSONWrapped(dec)
+	}
+	got, err := d.readJSONMembers(dec)
+	return typereg.DecodeDone("DV_PROPORTION", got, err)
+}
+
+// readJSONMembers reads the members of DVProportion into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (d *DVProportion) readJSONMembers(dec *jsontext.Decoder) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "DV_PROPORTION")
+		case "accuracy":
+			err = json.UnmarshalDecode(dec, &d.Accuracy)
+		case "accuracy_is_percent":
+			err = json.UnmarshalDecode(dec, &d.AccuracyIsPercent)
+		case "denominator":
+			err = json.UnmarshalDecode(dec, &d.Denominator)
+		case "magnitude_status":
+			err = json.UnmarshalDecode(dec, &d.MagnitudeStatus)
+		case "normal_range":
+			err = json.UnmarshalDecode(dec, &d.NormalRange)
+		case "normal_status":
+			err = json.UnmarshalDecode(dec, &d.NormalStatus)
+		case "numerator":
+			err = json.UnmarshalDecode(dec, &d.Numerator)
+		case "other_reference_ranges":
+			err = json.UnmarshalDecode(dec, &d.OtherReferenceRanges)
+		case "precision":
+			err = json.UnmarshalDecode(dec, &d.Precision)
+		case "type":
+			err = json.UnmarshalDecode(dec, &d.Type)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of DVProportion.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias, so the receiver decodes in place.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (d *DVProportion) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawDVProportion
@@ -122,15 +376,84 @@ func (d *DVProportion) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVQuantity.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 func (d *DVQuantity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_QUANTITY: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return d.unmarshalJSONWrapped(dec)
+	}
+	got, err := d.readJSONMembers(dec)
+	return typereg.DecodeDone("DV_QUANTITY", got, err)
+}
+
+// readJSONMembers reads the members of DVQuantity into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (d *DVQuantity) readJSONMembers(dec *jsontext.Decoder) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "DV_QUANTITY")
+		case "accuracy":
+			err = json.UnmarshalDecode(dec, &d.Accuracy)
+		case "accuracy_is_percent":
+			err = json.UnmarshalDecode(dec, &d.AccuracyIsPercent)
+		case "magnitude":
+			err = json.UnmarshalDecode(dec, &d.Magnitude)
+		case "magnitude_status":
+			err = json.UnmarshalDecode(dec, &d.MagnitudeStatus)
+		case "normal_range":
+			err = json.UnmarshalDecode(dec, &d.NormalRange)
+		case "normal_status":
+			err = json.UnmarshalDecode(dec, &d.NormalStatus)
+		case "other_reference_ranges":
+			err = json.UnmarshalDecode(dec, &d.OtherReferenceRanges)
+		case "precision":
+			err = json.UnmarshalDecode(dec, &d.Precision)
+		case "units":
+			err = json.UnmarshalDecode(dec, &d.Units)
+		case "units_display_name":
+			err = json.UnmarshalDecode(dec, &d.UnitsDisplayName)
+		case "units_system":
+			err = json.UnmarshalDecode(dec, &d.UnitsSystem)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of DVQuantity.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias, so the receiver decodes in place.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (d *DVQuantity) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawDVQuantity
@@ -140,15 +463,72 @@ func (d *DVQuantity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVScale.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 func (d *DVScale) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_SCALE: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return d.unmarshalJSONWrapped(dec)
+	}
+	got, err := d.readJSONMembers(dec)
+	return typereg.DecodeDone("DV_SCALE", got, err)
+}
+
+// readJSONMembers reads the members of DVScale into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (d *DVScale) readJSONMembers(dec *jsontext.Decoder) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "DV_SCALE")
+		case "normal_range":
+			err = json.UnmarshalDecode(dec, &d.NormalRange)
+		case "normal_status":
+			err = json.UnmarshalDecode(dec, &d.NormalStatus)
+		case "other_reference_ranges":
+			err = json.UnmarshalDecode(dec, &d.OtherReferenceRanges)
+		case "symbol":
+			err = json.UnmarshalDecode(dec, &d.Symbol)
+		case "value":
+			err = json.UnmarshalDecode(dec, &d.Value)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of DVScale.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias, so the receiver decodes in place.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (d *DVScale) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawDVScale
@@ -158,15 +538,66 @@ func (d *DVScale) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ReferenceRange.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 func (r *ReferenceRange[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if r == nil {
 		return fmt.Errorf("canjson: REFERENCE_RANGE: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return r.unmarshalJSONWrapped(dec)
+	}
+	got, err := r.readJSONMembers(dec)
+	return typereg.DecodeDone("REFERENCE_RANGE", got, err)
+}
+
+// readJSONMembers reads the members of ReferenceRange into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (r *ReferenceRange[T]) readJSONMembers(dec *jsontext.Decoder) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "REFERENCE_RANGE")
+		case "meaning":
+			err = json.UnmarshalDecode(dec, &r.Meaning)
+		case "range":
+			err = json.UnmarshalDecode(dec, &r.Range)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of ReferenceRange.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias, so the receiver decodes in place.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (r *ReferenceRange[T]) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	w := struct {
 		Type string `json:"_type"`
 		*rawReferenceRange[T]

@@ -427,9 +427,10 @@ func failurePointer(enc *jsontext.Encoder, where int) jsontext.Pointer {
 	return ptr
 }
 
-// DecodeInto is the shared decode body for a concrete type's
-// UnmarshalJSONFrom. It decodes the next value straight into out in one pass,
-// then refuses a _type that names a different concrete type: gotType points at
+// DecodeInto is the wrapper decode of a concrete type's UnmarshalJSONFrom:
+// the body a generated method runs where [DirectDecode] is false. It decodes
+// the next value straight into out in one pass, then refuses a _type that
+// names a different concrete type: gotType points at
 // the wrapper's declared _type field, which the same single decode populates,
 // so the discriminator is read once rather than by a separate peek. The
 // mismatch carries [ErrTypeMismatch] inside a [DecodeError] on "/_type". A
@@ -468,9 +469,10 @@ func DecodeInto(dec *jsontext.Decoder, rmType string, out any, gotType *string) 
 		return nilArgument("DecodeInto", "gotType", rmType)
 	}
 	// Bound recursion the same way [Registry.Decode] and [DecodePolymorphic]
-	// do (REQ-108). This is the shared body of every generated
-	// UnmarshalJSONFrom, so the check reaches every canonical-JSON decode
-	// route, a bare v2/v1 caller included. With no buffered value to measure,
+	// do (REQ-108). Every generated UnmarshalJSONFrom runs this body for a
+	// value past the bound, since [DirectDecode] refuses it the direct read,
+	// so the check reaches every canonical-JSON decode route, a bare v2/v1
+	// caller included. With no buffered value to measure,
 	// the decoder's own stack depth says where this value opens in the
 	// document, and each nested RM value re-checks on entry. A buffered
 	// polymorphic slot is decoded on a fresh decoder, so [DecodePolymorphic]
@@ -487,10 +489,139 @@ func DecodeInto(dec *jsontext.Decoder, rmType string, out any, gotType *string) 
 		return classifyDecode(rmType, err)
 	}
 	if *gotType != "" && *gotType != rmType {
-		return &DecodeError{
-			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", rmType, *gotType, ErrTypeMismatch),
+		return typeMismatch(rmType, *gotType)
+	}
+	return nil
+}
+
+// typeMismatch is the refusal of a `_type` member that names got, where the
+// value being decoded is of class rmType.
+func typeMismatch(rmType, got string) error {
+	return &DecodeError{
+		Path:  typeMemberPath,
+		Inner: fmt.Errorf("canjson: expected %q, got %q: %w", rmType, got, ErrTypeMismatch),
+	}
+}
+
+// DirectDecode reports whether a generated UnmarshalJSONFrom may read its
+// class's members from dec itself, each into the receiver's own field,
+// instead of decoding a wrapper struct through [DecodeInto]. The two read the
+// same tokens and settle a failure the same, except where json/v2's struct
+// decode would read a member another way. DirectDecode is false when:
+//
+//   - dec is nil, or the next value is not an object: the wrapper settles a
+//     null, a value of another kind and malformed input as it always has.
+//   - the value opens past the nesting-depth bound, which [DecodeInto]
+//     refuses.
+//   - dec carries no SDK hooks, or a caller's own json.WithUnmarshalers: a
+//     caller's hook can take any member's type, the `_type` string included,
+//     and the direct read would bypass it. A bare v2 call takes the wrapper
+//     for the outermost value only; [DecodeInto] then puts the SDK hooks on
+//     the decoder for every value inside it.
+//   - json.MatchCaseInsensitiveNames, which v1's defaults set: json/v2 then
+//     matches a member name without regard to case.
+//   - json.RejectUnknownMembers: json/v2 then refuses a member the class does
+//     not declare, with an error naming the wrapper struct.
+//   - json.StringifyNumbers, which json.GetOption also reports while json/v2
+//     decodes a caller's struct field tagged with the `string` option: json/v2
+//     refuses that option on the wrapper struct.
+//   - The error reporting of encoding/json (v1): json/v2 then keeps decoding
+//     past a member's failure and reports the first.
+//
+// Any other option reads a member the same either way: the decoder's own,
+// such as duplicate names or invalid UTF-8 allowed, apply to the tokens, and
+// each member decodes through json/v2 under the decoder's options, as it does
+// inside the wrapper.
+func DirectDecode(dec *jsontext.Decoder) bool {
+	if dec == nil || dec.PeekKind() != '{' {
+		return false
+	}
+	if dec.StackDepth()+1 > maxDecodeDepth {
+		return false
+	}
+	opts := dec.Options()
+	if hooks, _ := json.GetOption(opts, json.WithUnmarshalers); !unmarshalerAgg.Load().sdkHooks(hooks) {
+		return false
+	}
+	if v, _ := json.GetOption(opts, json.MatchCaseInsensitiveNames); v {
+		return false
+	}
+	if v, _ := json.GetOption(opts, json.RejectUnknownMembers); v {
+		return false
+	}
+	if v, _ := json.GetOption(opts, json.StringifyNumbers); v {
+		return false
+	}
+	if v, _ := json.GetOption(opts, jsonv1.ReportErrorsWithLegacySemantics); v {
+		return false
+	}
+	return true
+}
+
+// DecodeTypeMember reads the value of a `_type` member for a generated
+// UnmarshalJSONFrom of class rmType that reads its members itself, as the
+// wrapper's string field reads it: a JSON null reads as empty, and a value
+// of any other kind but a string fails as it fails there. It returns the
+// class the member names when that is neither rmType nor empty, for
+// [DecodeDone] to refuse once the whole value is read.
+func DecodeTypeMember(dec *jsontext.Decoder, rmType string) (string, error) {
+	if dec.PeekKind() != '"' {
+		var s string
+		if err := json.UnmarshalDecode(dec, &s); err != nil {
+			return "", err
 		}
+		return otherClass(rmType, s), nil
+	}
+	tok, err := dec.ReadToken()
+	if err != nil {
+		return "", err
+	}
+	// The comparison reads the token's bytes in place; only a class that
+	// differs is copied out.
+	if s := tok.String(); s == "" || s == rmType {
+		return "", nil
+	}
+	return tok.String(), nil
+}
+
+// otherClass returns got, a class a `_type` member names, when it is neither
+// rmType nor empty, and "" otherwise.
+func otherClass(rmType, got string) string {
+	if got == rmType {
+		return ""
+	}
+	return got
+}
+
+// MemberNameFailure settles err, the failure of a generated UnmarshalJSONFrom
+// to read one of its member names, as json/v2's struct decode reports it.
+// The tokenizer refuses a duplicate name as it reads the name, where json/v2's
+// struct decode reads the name and then refuses it. json/v2 places a method's
+// failure from where the decoder stands, so the refusal is returned already
+// placed at the name, with the offset and JSON Pointer the tokenizer gives it,
+// which json/v2 keeps, and with the shape classification the wrapper's
+// [ClassifyDuplicate] gives it. Any other failure is returned as it is.
+func MemberNameFailure(err error) error {
+	syn, ok := err.(*jsontext.SyntacticError) //nolint:errorlint // the tokenizer returns its refusal unwrapped
+	if !ok || syn == nil || !errors.Is(syn, jsontext.ErrDuplicateName) {
+		return err
+	}
+	return &json.SemanticError{ByteOffset: syn.ByteOffset, JSONPointer: syn.JSONPointer, Err: ClassifyDuplicate(syn)}
+}
+
+// DecodeDone settles the outcome of a generated UnmarshalJSONFrom of class
+// rmType that read its members itself: err, a failure, classified as
+// [DecodeInto] classifies one; otherwise the refusal of got, the class a
+// `_type` member named when that was not rmType ([DecodeTypeMember]);
+// otherwise nil. A member's failure is reported ahead of a `_type` that
+// names another class, wherever the two stand in the value, as the wrapper
+// reports them.
+func DecodeDone(rmType, got string, err error) error {
+	if err != nil {
+		return classifyDecode(rmType, err)
+	}
+	if got != "" {
+		return typeMismatch(rmType, got)
 	}
 	return nil
 }
@@ -676,7 +807,8 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 		// shape failure (it already carries ErrInvalidShape from the concrete's
 		// own funnel); wrapping it in a DecodeError adds the slot classification
 		// so both hold at once: the path from the envelope (filled by the
-		// enclosing DecodeInto), the kind from the sentinel (REQ-052).
+		// enclosing decoder's classifyDecode), the kind from the sentinel
+		// (REQ-052).
 		return &DecodeError{Type: name, Inner: err}
 	}
 	tv, ok := v.(T)
@@ -799,9 +931,10 @@ func (f *inPlaceFailure) Unwrap() error { return f.err }
 
 // settleSlotError gives err, the failure of a slot's decode, the positions a
 // decoder of the slot's own gives it. The positions it settles are the ones
-// above the first [DecodeError] that marks a slot beneath (every one but
-// [DecodeInto]'s refusal of a `_type`, the envelopes the entry points' own walk
-// treats as slots): beneath that, the slot below settled its own.
+// above the first [DecodeError] that marks a slot beneath (every one but the
+// refusal of a `_type` that names another class, [typeMismatch], the
+// envelopes the entry points' own walk treats as slots): beneath that, the
+// slot below settled its own.
 //
 // Where the slot beneath was decoded in place, every failure json/v2 placed
 // above it was placed inside it, where the decode stopped, rather than where a
@@ -881,8 +1014,8 @@ func settleLinks(err error, above []*json.SemanticError, prefix string, start in
 	rebase()
 }
 
-// typeMemberPath is the Path of [DecodeInto]'s refusal of a `_type` that names
-// another class: the member of the value being decoded, not a slot.
+// typeMemberPath is the Path of the refusal of a `_type` that names another
+// class ([typeMismatch]): the member of the value being decoded, not a slot.
 const typeMemberPath = "/_type"
 
 // trimPointer returns p without the leading prefix, the pointer of the value

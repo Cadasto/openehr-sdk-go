@@ -382,6 +382,7 @@ requirements:
       - openehr/rm/quoted_literal_test.go
       - openehr/rm/real_test.go
       - openehr/rm/typereg/decodeerror_chain_test.go
+      - openehr/rm/typereg/direct_decode_test.go
       - openehr/rm/typereg/inplace_test.go
       - openehr/rm/typereg/nildecodeerror_test.go
       - openehr/rm/typereg/registry_test.go

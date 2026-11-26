@@ -144,8 +144,10 @@ func unmarshalXMLIntervalFlag(recv, prop string) string {
 		prop, recv, FieldName(prop), seenFlagField(prop))
 }
 
-// renderIntervalFlagJSONDecode renders the body of the UnmarshalJSONFrom of a
-// class that carries the four boundary flags, after the nil-receiver check.
+// renderIntervalFlagJSONDecode renders the body of the unmarshalJSONWrapped of
+// a class that carries the four boundary flags, the wrapper decode its
+// UnmarshalJSONFrom takes after the nil-receiver check where it does not read
+// the members itself.
 //
 // The decode target is an anonymous wrapper that embeds the class's wire value
 // (embedType, set to embedValue) and declares the four flags and the two
@@ -298,11 +300,20 @@ type intervalBoundJSON struct {
 // UnmarshalJSONFrom decodes one bound into its field and records whether the
 // document carried a value for it.
 func (f intervalBoundJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	return decodeIntervalBoundJSON(dec, f.field, f.seen)
+}
+
+// decodeIntervalBoundJSON decodes one interval bound into field, a pointer to
+// the interval's own bound field, as the field's own decoder would, and sets
+// seen when the member is not null. The wrapper decode reads a bound through
+// intervalBoundJSON, and the direct decode calls it itself, so seen can stay
+// a local of its caller.
+func decodeIntervalBoundJSON(dec *jsontext.Decoder, field any, seen *bool) error {
 	null := dec.PeekKind() == 'n'
-	if err := json.UnmarshalDecode(dec, f.field, dec.Options()); err != nil {
+	if err := json.UnmarshalDecode(dec, field, dec.Options()); err != nil {
 		return err
 	}
-	*f.seen = !null
+	*seen = !null
 	return nil
 }
 
@@ -332,14 +343,22 @@ func renderIntervalFlagHelpers() string {
 	b.WriteString("// UnmarshalJSONFrom decodes one boundary flag into its field and records that\n")
 	b.WriteString("// the document carried it.\n")
 	b.WriteString("func (f intervalFlagJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {\n")
+	b.WriteString("\treturn decodeIntervalFlagJSON(dec, f.field, f.seen)\n")
+	b.WriteString("}\n\n")
+	b.WriteString("// decodeIntervalFlagJSON decodes one boundary flag into field, the\n")
+	b.WriteString("// interval's own flag field, and sets seen once it is read. A null member\n")
+	b.WriteString("// reads as an absent one. The wrapper decode reads a flag through\n")
+	b.WriteString("// intervalFlagJSON, and the direct decode calls it itself, so seen can stay\n")
+	b.WriteString("// a local of its caller.\n")
+	b.WriteString("func decodeIntervalFlagJSON(dec *jsontext.Decoder, field, seen *bool) error {\n")
 	b.WriteString("\tif dec.PeekKind() == 'n' {\n")
 	b.WriteString("\t\t_, err := dec.ReadToken()\n")
 	b.WriteString("\t\treturn err\n")
 	b.WriteString("\t}\n")
-	b.WriteString("\tif err := json.UnmarshalDecode(dec, f.field, dec.Options()); err != nil {\n")
+	b.WriteString("\tif err := json.UnmarshalDecode(dec, field, dec.Options()); err != nil {\n")
 	b.WriteString("\t\treturn err\n")
 	b.WriteString("\t}\n")
-	b.WriteString("\t*f.seen = true\n")
+	b.WriteString("\t*seen = true\n")
 	b.WriteString("\treturn nil\n")
 	b.WriteString("}\n\n")
 
@@ -369,29 +388,25 @@ func renderIntervalFlagHelpers() string {
 	return b.String()
 }
 
-// renderUnmarshalIntervalBase renders the UnmarshalJSONFrom of BASE Interval.
-// The class is abstract and writes no `_type`, so its decoder reads none: the
-// wrapper declares no `_type` field, a `_type` member is skipped like any
-// other member the class does not declare, and the discriminator target
-// handed to typereg.DecodeInto stays empty, which leaves its check out. The
-// shared helper still bounds the depth, threads the decode hooks and
-// classifies a shape failure.
+// renderUnmarshalIntervalBase renders the unmarshalJSONWrapped of BASE
+// Interval, the wrapper decode its UnmarshalJSONFrom takes where it does not
+// read the members itself ([renderDirectDecode]). The class is abstract and
+// writes no `_type`, so its decoder reads none: the wrapper declares no
+// `_type` field, a `_type` member is skipped like any other member the class
+// does not declare, and the discriminator target handed to
+// typereg.DecodeInto stays empty, which leaves its check out. The shared
+// helper still bounds the depth, threads the decode hooks and classifies a
+// shape failure.
 func renderUnmarshalIntervalBase(pc *PlannedClass, recv, typeArgs string) string {
 	alias := aliasTypeName(pc.GoName)
 	var b strings.Builder
-	fmt.Fprintf(&b, "// UnmarshalJSONFrom decodes canonical openEHR JSON into %s, which is abstract\n", pc.GoName)
-	b.WriteString("// and so reads no `_type`: a `_type` member is skipped like any other member\n")
-	b.WriteString("// the class does not declare. A nil receiver is refused with\n")
-	b.WriteString("// typereg.ErrNilReceiver rather than dereferenced. The shared helper threads\n")
-	b.WriteString("// the polymorphic decode hooks and wraps a shape failure through\n")
-	b.WriteString("// typereg.WrapShapeError. The receiver is a pointer, so an Interval held by\n")
-	b.WriteString("// value in a struct field takes this decoder.\n")
-	b.WriteString("//\n")
-	b.WriteString(intervalFlagDecodeDoc())
-	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalJSONFrom(dec *jsontext.Decoder) error {\n", recv, pc.GoName, typeArgs)
-	fmt.Fprintf(&b, "\tif %s == nil {\n", recv)
-	fmt.Fprintf(&b, "\t\treturn fmt.Errorf(\"canjson: %s: %%w\", typereg.ErrNilReceiver)\n", pc.BMMName)
-	b.WriteString("\t}\n")
+	b.WriteString(unmarshalWrappedDoc(pc.GoName,
+		"// It decodes an anonymous struct that embeds the receiver through its\n"+
+			"// method-free alias and reads each boundary flag and bound straight into\n"+
+			"// the receiver. typereg.DecodeInto threads the polymorphic decode hooks\n"+
+			"// and wraps a shape failure through typereg.WrapShapeError; it checks no\n"+
+			"// `_type`, which the class does not declare.\n"))
+	fmt.Fprintf(&b, "func (%s *%s%s) unmarshalJSONWrapped(dec *jsontext.Decoder) error {\n", recv, pc.GoName, typeArgs)
 	typeDecl := "\t// No `_type` is declared, so the discriminator stays empty and is not checked.\n" +
 		"\tvar noType string\n"
 	renderIntervalFlagJSONDecode(&b, recv, pc.BMMName,

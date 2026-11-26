@@ -19,16 +19,26 @@ import (
 //
 // # Strategy
 //
-// Each method refuses a nil receiver, then hands the decoder to the
-// shared [typereg.DecodeInto] helper, which decodes the value in one pass,
-// enforces the `_type` discipline by reading the discriminator from the
-// wire struct's declared _type field that same decode populated, threads the
-// polymorphic decode hooks and classifies a shape failure. The decode target
-// is the receiver viewed through its method-free alias (zero-copy) for most
-// classes, or a flat wire struct copied
-// back field by field for a class that embeds a marshaler-bearing concrete
-// ancestor (see the promotion note at [effectiveFields]). Polymorphic interface
-// fields resolve through the registered hooks, with no per-field
+// Each method refuses a nil receiver, then reads the class's members itself
+// unless the decoder carries an option under which json/v2's struct decode
+// would read a member otherwise (typereg.DirectDecode): readJSONMembers reads
+// the object token by token, decodes each member it knows into the
+// receiver's own field through json.UnmarshalDecode, skips any other, and
+// returns the class a `_type` member names, which typereg.DecodeDone refuses
+// when it is another class, after any member's failure
+// ([renderDirectDecode]).
+//
+// Otherwise the method takes its wrapper decode, unmarshalJSONWrapped, which
+// hands the decoder to the shared [typereg.DecodeInto] helper. That helper
+// decodes the value in one pass, enforces the `_type` discipline by reading
+// the discriminator from the wire struct's declared _type field that same
+// decode populated, threads the polymorphic decode hooks and classifies a
+// shape failure. The decode target is the receiver viewed through its
+// method-free alias (zero-copy) for most classes, or a flat wire struct
+// copied back field by field for a class that embeds a marshaler-bearing
+// concrete ancestor (see the promotion note at [effectiveFields]). Both
+// reads give the same value and the same failure. Polymorphic interface
+// fields resolve through the registered hooks either way, with no per-field
 // typereg.DecodeAs dispatch or json.RawMessage staging.
 func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting, err := codecClassesIn(plan, file)
@@ -57,6 +67,9 @@ func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	body.WriteString("\n")
 	body.WriteString("import (\n")
 	body.WriteString("\t\"encoding/json/jsontext\"\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "json.UnmarshalDecode(") }) {
+		body.WriteString("\tjson \"encoding/json/v2\"\n")
+	}
 	body.WriteString("\t\"fmt\"\n\n")
 	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "xmlschema.") }) {
 		fmt.Fprintf(&body, "\t%q\n", xmlschemaImportPath)
@@ -85,8 +98,10 @@ func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	return formatted, nil
 }
 
-// renderUnmarshalJSON emits the UnmarshalJSONFrom method for a single class.
-// The wire type it decodes into is defined in the sibling _jsonmar_gen.go: a
+// renderUnmarshalJSON emits the UnmarshalJSONFrom method for a single class,
+// the readJSONMembers its direct read goes through ([renderDirectDecode]) and
+// the wrapper decode it takes otherwise, unmarshalJSONWrapped. The wire type
+// the wrapper decodes into is defined in the sibling _jsonmar_gen.go: a
 // method-free alias (zero-copy), a flat wire struct (copied back) or an
 // interval wire struct, chosen by [classJSONWireShape] exactly as for the
 // marshaller. A class that carries the four boundary flags reads them
@@ -117,7 +132,11 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 			"whose decoder cannot give an absent flag its default", pc.BMMName, shape)
 	}
 	if shape == shapeIntervalBase {
-		return renderUnmarshalIntervalBase(pc, recv, typeArgs), nil
+		direct, err := renderDirectDecode(plan, pc, fields, shape, nil, nil, flagged, recv, typeArgs)
+		if err != nil {
+			return "", fmt.Errorf("direct decode: %w", err)
+		}
+		return direct + renderUnmarshalIntervalBase(pc, recv, typeArgs), nil
 	}
 	anyMembers, err := jsonAnyMembers(plan, pc, fields)
 	if err != nil {
@@ -135,24 +154,23 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 		fmt.Fprintf(&b, "// %s lists the classes the canonical JSON of %s.%s may name in its `_type`: the shapes its canonical XML takes.\n", m.typesVar, pc.BMMName, m.name)
 		fmt.Fprintf(&b, "var %s = %s\n\n", m.typesVar, stringSliceLiteral(m.types))
 	}
-	fmt.Fprintf(&b, "// UnmarshalJSONFrom decodes canonical openEHR JSON into %s.\n", pc.GoName)
-	b.WriteString("// A nil receiver is refused with typereg.ErrNilReceiver rather than\n")
-	b.WriteString("// dereferenced. The shared helper checks the `_type`\n")
-	b.WriteString("// discriminator, threads the polymorphic decode hooks so every nested\n")
-	b.WriteString("// slot resolves, and wraps a whole-value shape failure through\n")
-	b.WriteString("// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and\n")
-	b.WriteString("// adding typereg.ErrInvalidShape.\n")
-	if flagged {
-		b.WriteString("//\n")
-		b.WriteString(intervalFlagDecodeDoc())
+	direct, err := renderDirectDecode(plan, pc, fields, shape, base, anyMembers, flagged, recv, typeArgs)
+	if err != nil {
+		return "", fmt.Errorf("direct decode: %w", err)
 	}
-	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalJSONFrom(dec *jsontext.Decoder) error {\n", recv, pc.GoName, typeArgs)
-	fmt.Fprintf(&b, "\tif %s == nil {\n", recv)
-	fmt.Fprintf(&b, "\t\treturn fmt.Errorf(\"canjson: %s: %%w\", typereg.ErrNilReceiver)\n", pc.BMMName)
-	b.WriteString("\t}\n")
+	b.WriteString(direct)
 
+	const checks = "// typereg.DecodeInto checks the `_type` discriminator, threads the\n" +
+		"// polymorphic decode hooks and wraps a shape failure through\n" +
+		"// typereg.WrapShapeError.\n"
+	header := fmt.Sprintf("func (%s *%s%s) unmarshalJSONWrapped(dec *jsontext.Decoder) error {\n", recv, pc.GoName, typeArgs)
 	switch shape {
 	case shapeIntervalDerived:
+		b.WriteString(unmarshalWrappedDoc(pc.GoName,
+			"// It decodes the interval wire struct, which reaches the embedded BASE\n"+
+				"// Interval through its method-free alias, inside an anonymous struct that\n"+
+				"// reads each boundary flag and bound straight into the receiver.\n"+checks))
+		b.WriteString(header)
 		own, err := intervalDecodeOwnFields(plan, pc)
 		if err != nil {
 			return "", err
@@ -172,6 +190,10 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 		wireValue := intervalDerivedWireValue(pc, base, recv, typeArgs, own)
 		renderIntervalFlagJSONDecode(&b, recv, pc.BMMName, wireType, wireValue, "", "&wire.Type", copyBack)
 	case shapeFlat:
+		b.WriteString(unmarshalWrappedDoc(pc.GoName,
+			"// It decodes the flat wire struct and copies each field back once the\n"+
+				"// decode succeeds.\n"+checks))
+		b.WriteString(header)
 		wire := flatWireTypeName(pc.GoName)
 		fmt.Fprintf(&b, "\tvar wire %s%s\n", wire, typeArgs)
 		fmt.Fprintf(&b, "\tif err := typereg.DecodeInto(dec, %q, &wire, &wire.Class); err != nil {\n", pc.BMMName)
@@ -183,10 +205,13 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 		}
 		b.WriteString("\treturn nil\n")
 	case shapeIntervalBase:
-		// Rendered by renderUnmarshalIntervalBase above, before the shared
-		// doc comment and nil-receiver check.
+		// Rendered by renderUnmarshalIntervalBase above.
 		return "", fmt.Errorf("%s: BASE Interval's decoder has its own renderer", pc.BMMName)
 	case shapeAlias, shapeIntervalAlias:
+		b.WriteString(unmarshalWrappedDoc(pc.GoName,
+			"// It decodes an anonymous struct that embeds the receiver through its\n"+
+				"// method-free alias, so the receiver decodes in place.\n"+checks))
+		b.WriteString(header)
 		alias := aliasTypeName(pc.GoName)
 		b.WriteString("\tw := struct {\n")
 		b.WriteString("\t\tType string `json:\"_type\"`\n")
@@ -209,6 +234,13 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	}
 	b.WriteString("}\n")
 	return b.String(), nil
+}
+
+// unmarshalWrappedDoc renders the doc comment of a class's
+// unmarshalJSONWrapped: a line naming the class, then body, whose lines each
+// start with "// ".
+func unmarshalWrappedDoc(goName, body string) string {
+	return fmt.Sprintf("// unmarshalJSONWrapped is the wrapper decode of %s.\n", goName) + body
 }
 
 // jsonAnyMember is a member typed by the BMM root type Any, which canonical

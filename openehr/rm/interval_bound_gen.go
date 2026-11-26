@@ -90,11 +90,20 @@ type intervalBoundJSON struct {
 // UnmarshalJSONFrom decodes one bound into its field and records whether the
 // document carried a value for it.
 func (f intervalBoundJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	return decodeIntervalBoundJSON(dec, f.field, f.seen)
+}
+
+// decodeIntervalBoundJSON decodes one interval bound into field, a pointer to
+// the interval's own bound field, as the field's own decoder would, and sets
+// seen when the member is not null. The wrapper decode reads a bound through
+// intervalBoundJSON, and the direct decode calls it itself, so seen can stay
+// a local of its caller.
+func decodeIntervalBoundJSON(dec *jsontext.Decoder, field any, seen *bool) error {
 	null := dec.PeekKind() == 'n'
-	if err := json.UnmarshalDecode(dec, f.field, dec.Options()); err != nil {
+	if err := json.UnmarshalDecode(dec, field, dec.Options()); err != nil {
 		return err
 	}
-	*f.seen = !null
+	*seen = !null
 	return nil
 }
 
@@ -110,14 +119,23 @@ type intervalFlagJSON struct {
 // UnmarshalJSONFrom decodes one boundary flag into its field and records that
 // the document carried it.
 func (f intervalFlagJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	return decodeIntervalFlagJSON(dec, f.field, f.seen)
+}
+
+// decodeIntervalFlagJSON decodes one boundary flag into field, the
+// interval's own flag field, and sets seen once it is read. A null member
+// reads as an absent one. The wrapper decode reads a flag through
+// intervalFlagJSON, and the direct decode calls it itself, so seen can stay
+// a local of its caller.
+func decodeIntervalFlagJSON(dec *jsontext.Decoder, field, seen *bool) error {
 	if dec.PeekKind() == 'n' {
 		_, err := dec.ReadToken()
 		return err
 	}
-	if err := json.UnmarshalDecode(dec, f.field, dec.Options()); err != nil {
+	if err := json.UnmarshalDecode(dec, field, dec.Options()); err != nil {
 		return err
 	}
-	*f.seen = true
+	*seen = true
 	return nil
 }
 

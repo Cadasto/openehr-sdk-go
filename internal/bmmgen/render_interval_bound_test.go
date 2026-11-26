@@ -561,11 +561,13 @@ func TestIntervalBaseReadsLegacyXMLNames(t *testing.T) {
 
 // TestREQ169IntervalDecodeReadsFlagsInPlace pins the generator side of the
 // flag defaults (REQ-169) and of the failed-decode state (REQ-052) on
-// Point_interval, whose own members are the four flags. Its decoder reads each
-// flag straight into the receiver's own field through an intervalFlagJSON, so
-// nothing is copied back from the wire, and it gives the absent flags their
-// defaults only after a decode that succeeds: a failed decode returns first
-// and leaves what was read, as an in-place decode does.
+// Point_interval, whose own members are the four flags, on both of its
+// decodes. The wrapper decode reads each flag straight into the receiver's
+// own field through an intervalFlagJSON, and the direct decode through
+// decodeIntervalFlagJSON, so nothing is copied back from a wire struct. Each
+// gives the absent flags their defaults only after a decode that succeeds: a
+// failed decode returns first and leaves what was read, as an in-place decode
+// does.
 func TestREQ169IntervalDecodeReadsFlagsInPlace(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
 	if err != nil {
@@ -580,11 +582,19 @@ func TestREQ169IntervalDecodeReadsFlagsInPlace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("renderUnmarshalJSON: %v", err)
 	}
+	direct, wrapped, ok := strings.Cut(src, ") unmarshalJSONWrapped(dec *jsontext.Decoder) error {\n")
+	if !ok {
+		t.Fatalf("Point_interval has no wrapper decode:\n%s", src)
+	}
 	for _, prop := range intervalFlagProps {
 		fn := FieldName(prop)
 		want := fmt.Sprintf("%s: intervalFlagJSON{field: &p.%s, seen: &seen.%s}", fn, fn, seenFlagField(prop))
-		if !strings.Contains(src, want) {
-			t.Errorf("Point_interval decoder does not read %s in place, want %q:\n%s", prop, want, src)
+		if !strings.Contains(wrapped, want) {
+			t.Errorf("Point_interval wrapper decode does not read %s in place, want %q:\n%s", prop, want, wrapped)
+		}
+		want = fmt.Sprintf("err = decodeIntervalFlagJSON(dec, &p.%s, &seen.%s)", fn, seenFlagField(prop))
+		if !strings.Contains(direct, want) {
+			t.Errorf("Point_interval direct decode does not read %s in place, want %q:\n%s", prop, want, direct)
 		}
 		if copyBack := "p." + fn + " = wire." + fn; strings.Contains(src, copyBack) {
 			t.Errorf("Point_interval decoder still copies %s back from the wire (%q):\n%s", prop, copyBack, src)
@@ -592,11 +602,19 @@ func TestREQ169IntervalDecodeReadsFlagsInPlace(t *testing.T) {
 	}
 	// The error branch that follows the decode; the null branch before it
 	// returns too, so the search starts at the decode.
-	decode := strings.Index(src, "typereg.DecodeInto(")
-	ret := indexFrom(src, "\t\treturn err\n", decode)
-	defaults := strings.Index(src, intervalFlagSettle("seen", "p"))
+	decode := strings.Index(wrapped, "typereg.DecodeInto(")
+	ret := indexFrom(wrapped, "\t\treturn err\n", decode)
+	defaults := strings.Index(wrapped, intervalFlagSettle("seen", "p"))
 	if decode < 0 || ret < 0 || defaults < 0 || ret >= defaults {
-		t.Errorf("Point_interval decoder does not return a decode error before it gives the defaults (positions %d, %d, %d):\n%s", decode, ret, defaults, src)
+		t.Errorf("Point_interval wrapper decode does not return a decode error before it gives the defaults (positions %d, %d, %d):\n%s", decode, ret, defaults, wrapped)
+	}
+	// The direct decode returns a failure, or a `_type` naming another
+	// class, through DecodeDone before it gives the defaults.
+	read := strings.Index(direct, "got, err := p.readJSONMembers(dec, &seen)\n\tif err != nil || got != \"\" {\n")
+	ret = indexFrom(direct, "\t\treturn typereg.DecodeDone(", read)
+	defaults = strings.Index(direct, intervalFlagSettle("seen", "p"))
+	if read < 0 || ret < 0 || defaults < 0 || ret >= defaults {
+		t.Errorf("Point_interval direct decode does not return a failure before it gives the defaults (positions %d, %d, %d):\n%s", read, ret, defaults, direct)
 	}
 }
 

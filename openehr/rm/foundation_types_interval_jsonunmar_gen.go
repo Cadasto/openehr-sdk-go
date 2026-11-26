@@ -15,10 +15,16 @@ import (
 // UnmarshalJSONFrom decodes canonical openEHR JSON into Interval, which is abstract
 // and so reads no `_type`: a `_type` member is skipped like any other member
 // the class does not declare. A nil receiver is refused with
-// typereg.ErrNilReceiver rather than dereferenced. The shared helper threads
-// the polymorphic decode hooks and wraps a shape failure through
-// typereg.WrapShapeError. The receiver is a pointer, so an Interval held by
-// value in a struct field takes this decoder.
+// typereg.ErrNilReceiver rather than dereferenced. It reads each member
+// into the receiver's own field under the decoder's options. The receiver
+// is a pointer, so an Interval held by value in a struct field takes this
+// decoder.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 //
 // A boundary flag the document leaves out takes its default once the whole
 // value is read: `lower_unbounded` and `upper_unbounded` read as false on a
@@ -33,6 +39,64 @@ func (i *Interval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if i == nil {
 		return fmt.Errorf("canjson: Interval: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return i.unmarshalJSONWrapped(dec)
+	}
+	var seen intervalFlagsSeen
+	if err := i.readJSONMembers(dec, &seen); err != nil {
+		return typereg.DecodeDone("Interval", "", err)
+	}
+	if err := seen.settle(intervalBoundHeldByValue(&i.Lower), &i.LowerIncluded, &i.LowerUnbounded, &i.UpperIncluded, &i.UpperUnbounded); err != nil {
+		return typereg.WrapShapeError("Interval", err)
+	}
+	return nil
+}
+
+// readJSONMembers reads the members of Interval into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare, `_type` among them, and records in seen the boundary flags and
+// bounds the document carries. It returns a failure as it meets it, for
+// UnmarshalJSONFrom to settle.
+func (i *Interval[T]) readJSONMembers(dec *jsontext.Decoder, seen *intervalFlagsSeen) error {
+	if _, err := dec.ReadToken(); err != nil {
+		return err
+	}
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "lower":
+			err = decodeIntervalBoundJSON(dec, &i.Lower, &seen.lower)
+		case "lower_included":
+			err = decodeIntervalFlagJSON(dec, &i.LowerIncluded, &seen.lowerIncluded)
+		case "lower_unbounded":
+			err = decodeIntervalFlagJSON(dec, &i.LowerUnbounded, &seen.lowerUnbounded)
+		case "upper":
+			err = decodeIntervalBoundJSON(dec, &i.Upper, &seen.upper)
+		case "upper_included":
+			err = decodeIntervalFlagJSON(dec, &i.UpperIncluded, &seen.upperIncluded)
+		case "upper_unbounded":
+			err = decodeIntervalFlagJSON(dec, &i.UpperUnbounded, &seen.upperUnbounded)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return err
+		}
+	}
+	_, err := dec.ReadToken()
+	return err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of Interval.
+// It decodes an anonymous struct that embeds the receiver through its
+// method-free alias and reads each boundary flag and bound straight into
+// the receiver. typereg.DecodeInto threads the polymorphic decode hooks
+// and wraps a shape failure through typereg.WrapShapeError; it checks no
+// `_type`, which the class does not declare.
+func (i *Interval[T]) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	// A null in place of the interval reads as the member left out: the
 	// receiver keeps what it holds and no flag takes a default.
 	if dec.PeekKind() == 'n' {
@@ -70,11 +134,16 @@ func (i *Interval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into PointInterval.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 //
 // A boundary flag the document leaves out takes its default once the whole
 // value is read: `lower_unbounded` and `upper_unbounded` read as false on a
@@ -89,6 +158,69 @@ func (p *PointInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: Point_interval: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return p.unmarshalJSONWrapped(dec)
+	}
+	var seen intervalFlagsSeen
+	got, err := p.readJSONMembers(dec, &seen)
+	if err != nil || got != "" {
+		return typereg.DecodeDone("Point_interval", got, err)
+	}
+	if err := seen.settle(intervalBoundHeldByValue(&p.Lower), &p.LowerIncluded, &p.LowerUnbounded, &p.UpperIncluded, &p.UpperUnbounded); err != nil {
+		return typereg.WrapShapeError("Point_interval", err)
+	}
+	return nil
+}
+
+// readJSONMembers reads the members of PointInterval into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare, and records in seen the boundary flags and bounds the document
+// carries. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (p *PointInterval[T]) readJSONMembers(dec *jsontext.Decoder, seen *intervalFlagsSeen) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "Point_interval")
+		case "lower":
+			err = decodeIntervalBoundJSON(dec, &p.Lower, &seen.lower)
+		case "upper":
+			err = decodeIntervalBoundJSON(dec, &p.Upper, &seen.upper)
+		case "lower_included":
+			err = decodeIntervalFlagJSON(dec, &p.LowerIncluded, &seen.lowerIncluded)
+		case "lower_unbounded":
+			err = decodeIntervalFlagJSON(dec, &p.LowerUnbounded, &seen.lowerUnbounded)
+		case "upper_included":
+			err = decodeIntervalFlagJSON(dec, &p.UpperIncluded, &seen.upperIncluded)
+		case "upper_unbounded":
+			err = decodeIntervalFlagJSON(dec, &p.UpperUnbounded, &seen.upperUnbounded)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of PointInterval.
+// It decodes the interval wire struct, which reaches the embedded BASE
+// Interval through its method-free alias, inside an anonymous struct that
+// reads each boundary flag and bound straight into the receiver.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (p *PointInterval[T]) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	// A null in place of the interval reads as the member left out: the
 	// receiver keeps what it holds and no flag takes a default.
 	if dec.PeekKind() == 'n' {
@@ -124,11 +256,16 @@ func (p *PointInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ProperInterval.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
-// dereferenced. The shared helper checks the `_type`
-// discriminator, threads the polymorphic decode hooks so every nested
-// slot resolves, and wraps a whole-value shape failure through
-// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
-// adding typereg.ErrInvalidShape.
+// dereferenced. It reads each member into the receiver's own field under
+// the decoder's options, so a nested slot resolves through the polymorphic
+// decode hooks, skips a member the class does not declare, and refuses a
+// `_type` that names another class once the whole value is read.
+//
+// Under a decoder option that changes how json/v2 reads a member, such as
+// a caller's unmarshalers, and for a value that is not an object, it
+// decodes a wrapper struct through typereg.DecodeInto instead. Both read the
+// same value and word a failure the same, a shape failure wrapping
+// typereg.ErrInvalidShape behind the `canjson: <RM_TYPE>:` text.
 //
 // A boundary flag the document leaves out takes its default once the whole
 // value is read: `lower_unbounded` and `upper_unbounded` read as false on a
@@ -143,6 +280,69 @@ func (p *ProperInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: Proper_interval: %w", typereg.ErrNilReceiver)
 	}
+	if !typereg.DirectDecode(dec) {
+		return p.unmarshalJSONWrapped(dec)
+	}
+	var seen intervalFlagsSeen
+	got, err := p.readJSONMembers(dec, &seen)
+	if err != nil || got != "" {
+		return typereg.DecodeDone("Proper_interval", got, err)
+	}
+	if err := seen.settle(intervalBoundHeldByValue(&p.Lower), &p.LowerIncluded, &p.LowerUnbounded, &p.UpperIncluded, &p.UpperUnbounded); err != nil {
+		return typereg.WrapShapeError("Proper_interval", err)
+	}
+	return nil
+}
+
+// readJSONMembers reads the members of ProperInterval into the receiver, from the
+// opening brace to the closing one, skipping a member the class does not
+// declare, and records in seen the boundary flags and bounds the document
+// carries. It returns the class a `_type` member names when that is another
+// class, and a failure as it meets it, for UnmarshalJSONFrom to settle.
+func (p *ProperInterval[T]) readJSONMembers(dec *jsontext.Decoder, seen *intervalFlagsSeen) (string, error) {
+	if _, err := dec.ReadToken(); err != nil {
+		return "", err
+	}
+	var got string
+	for dec.PeekKind() != '}' {
+		name, err := dec.ReadToken()
+		if err != nil {
+			return "", typereg.MemberNameFailure(err)
+		}
+		switch name.String() {
+		case "_type":
+			got, err = typereg.DecodeTypeMember(dec, "Proper_interval")
+		case "lower":
+			err = decodeIntervalBoundJSON(dec, &p.Lower, &seen.lower)
+		case "lower_included":
+			err = decodeIntervalFlagJSON(dec, &p.LowerIncluded, &seen.lowerIncluded)
+		case "lower_unbounded":
+			err = decodeIntervalFlagJSON(dec, &p.LowerUnbounded, &seen.lowerUnbounded)
+		case "upper":
+			err = decodeIntervalBoundJSON(dec, &p.Upper, &seen.upper)
+		case "upper_included":
+			err = decodeIntervalFlagJSON(dec, &p.UpperIncluded, &seen.upperIncluded)
+		case "upper_unbounded":
+			err = decodeIntervalFlagJSON(dec, &p.UpperUnbounded, &seen.upperUnbounded)
+		default:
+			err = dec.SkipValue()
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	_, err := dec.ReadToken()
+	return got, err
+}
+
+// unmarshalJSONWrapped is the wrapper decode of ProperInterval.
+// It decodes the interval wire struct, which reaches the embedded BASE
+// Interval through its method-free alias, inside an anonymous struct that
+// reads each boundary flag and bound straight into the receiver.
+// typereg.DecodeInto checks the `_type` discriminator, threads the
+// polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError.
+func (p *ProperInterval[T]) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	// A null in place of the interval reads as the member left out: the
 	// receiver keeps what it holds and no flag takes a default.
 	if dec.PeekKind() == 'n' {

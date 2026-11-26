@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -329,8 +330,11 @@ func TestRenderIntervalEncodersCopyTheReceiverOnce(t *testing.T) {
 // TestRenderFlatDecodeDropPropertyLosesCopy is the generator-side can-fail
 // control for TestRoundTripStructuralEquivalence
 // (openehr/serialize/canjson/roundtrip_test.go): a flat-shape decode copies
-// every wire field back to the receiver, so dropping one property from the plan
-// drops its copy: the field would then be silently lost on the round trip.
+// every wire field back to the receiver, and its direct decode starts from the
+// zero value of the class, so a property dropped from the wire fields would be
+// silently lost on the round trip. The generator refuses that render instead:
+// the direct decode checks that every member of the Go struct is a wire
+// field, so the dropped property is named at generation time.
 //
 // DV_CODED_TEXT is flat-shape (it embeds the marshaler-bearing DVText, so it
 // cannot use the alias shape, ruling R19), which is exactly the shape whose
@@ -354,23 +358,27 @@ func TestRenderFlatDecodeDropPropertyLosesCopy(t *testing.T) {
 	if len(fields) < 2 {
 		t.Fatalf("DV_CODED_TEXT has %d effective fields; need at least 2 to drop one", len(fields))
 	}
-	dropped := fields[len(fields)-1]
-	droppedCopy := "d." + FieldName(dropped.Prop.PropertyName()) + " = wire." + FieldName(dropped.Prop.PropertyName())
-
 	full, err := renderUnmarshalJSON(plan, pc, fields)
 	if err != nil {
 		t.Fatalf("renderUnmarshalJSON (full): %v", err)
 	}
-	if !strings.Contains(full, droppedCopy) {
-		t.Fatalf("baseline decode does not copy %q; the control cannot demonstrate the loss", droppedCopy)
+	for _, f := range fields {
+		fn := FieldName(f.Prop.PropertyName())
+		if copyBack := "d." + fn + " = wire." + fn; !strings.Contains(full, copyBack) {
+			t.Errorf("the wrapper decode does not copy %q back", copyBack)
+		}
+		if read := fmt.Sprintf("case %q:\n\t\t\terr = json.UnmarshalDecode(dec, &d.%s)\n", f.Prop.PropertyName(), fn); !strings.Contains(full, read) {
+			t.Errorf("the direct decode does not read %q into d.%s", f.Prop.PropertyName(), fn)
+		}
 	}
 
+	dropped := fields[len(fields)-1]
 	trimmed, err := renderUnmarshalJSON(plan, pc, fields[:len(fields)-1])
-	if err != nil {
-		t.Fatalf("renderUnmarshalJSON (dropped): %v", err)
+	if err == nil {
+		t.Fatalf("dropping %s from the wire fields still rendered a decoder, which loses it on the round trip:\n%s", dropped.Prop.PropertyName(), trimmed)
 	}
-	if strings.Contains(trimmed, droppedCopy) {
-		t.Errorf("dropping %s from the plan still emitted its copy %q: a lost property would go unnoticed on the round trip", dropped.Prop.PropertyName(), droppedCopy)
+	if !strings.Contains(err.Error(), strconv.Quote(dropped.Prop.PropertyName())) {
+		t.Errorf("renderUnmarshalJSON (dropped) = %v, want the refusal to name %q", err, dropped.Prop.PropertyName())
 	}
 }
 
