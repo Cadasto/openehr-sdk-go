@@ -65,7 +65,7 @@ The generated `MarshalJSONTo` writes `{`, `_type` and each member in struct decl
 - a value in an interface slot, through the `json.MarshalerTo` it implements;
 - a `Hash` map, an `Any` member, `[]byte`, `rm.Character`, an AOM 1.4 number and an integer enumeration, through `json.MarshalEncode`, so `json.Deterministic` still sorts `Hash` keys and json/v2 names the type in a failure.
 
-It applies each member's omit option as json/v2 applies the tag, a typed-nil pointer in an interface slot included, and leaves out a mandatory member held by value as a struct when every field of it is empty ([wire.md § An absent mandatory member](../specifications/wire.md#an-absent-mandatory-member)).
+It applies each member's omit option as json/v2 applies the tag, a typed-nil pointer in an interface slot included, and leaves out a mandatory member held by value as a struct when it is its type's zero value, as [REQ-171 *Structural access*](../specifications/clinical-modeling.md#structural-access) reads one ([wire.md § An absent mandatory member](../specifications/wire.md#an-absent-mandatory-member)).
 It marshals the wrapper instead, the alias or the flat struct with `_type` leading, through `json.MarshalEncode`, so the output and the error are json/v2's.
 A tag cannot leave out a struct by its value, so when such a member is empty the wrapper is an anonymous struct that declares each member in the same order, the members that may be empty as an `any` left nil when they are.
 The wrapper is taken:

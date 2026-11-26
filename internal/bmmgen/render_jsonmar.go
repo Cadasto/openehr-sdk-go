@@ -639,8 +639,8 @@ func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs,
 
 // omittingDoc is the doc comment line a wrapper encode carries when the
 // class has a member [renderMarshalOmitting] may leave out.
-const omittingDoc = "// A mandatory member that holds a class by value whose every field is\n" +
-	"// empty is left out, through marshalJSONOmitting.\n"
+const omittingDoc = "// A mandatory member that holds a class by value that is its type's\n" +
+	"// zero value is left out, through marshalJSONOmitting.\n"
 
 // renderMarshalOmitting renders, for a class with a mandatory member the
 // encoders leave out when empty ([emptyMember]), the guard its wrapper encode

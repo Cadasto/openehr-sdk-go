@@ -84,7 +84,7 @@ A BMM version bump is one pull request. The new schema is added beside the old o
 
 ### D12 — One zero test per class held by value, shared by the encoders and the floor
 
-The canonical JSON and XML encoders leave out a mandatory member held by value as a struct when every field of it is empty ([REQ-052](../specifications/wire.md#an-absent-mandatory-member)), and the RM validation floor reads such a member as absent ([REQ-171 *Structural access*](../specifications/clinical-modeling.md#structural-access)).
+The canonical JSON and XML encoders leave out a mandatory member held by value as a struct when it is its type's zero value, as [REQ-171 *Structural access*](../specifications/clinical-modeling.md#structural-access) reads one ([REQ-052](../specifications/wire.md#an-absent-mandatory-member)), and the RM validation floor reads such a member as absent ([REQ-171 *Structural access*](../specifications/clinical-modeling.md#structural-access)).
 Both read it through a zero test, one function per class that compares every field with its zero value; at a DV_TEXT, DV_CODED_TEXT or CODE_PHRASE the floor reads a content rule instead, which reads the zero value as absent too, and more besides.
 Two copies of the test could drift apart, and the floor would then accept a member the encoders leave out, or report one missing that they write.
 

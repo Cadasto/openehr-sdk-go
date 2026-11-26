@@ -24,8 +24,8 @@ func relationshipXML(source string) string {
 // an empty one is left out, and one with a part set is written in full.
 //
 // REQ-056: canonical XML writes no element for a mandatory member held by
-// value as a struct whose every field is empty (REQ-052 § An absent mandatory
-// member).
+// value as a struct that is its type's zero value (REQ-052 § An absent
+// mandatory member).
 func TestREQ056_EmptyMandatoryStructMemberWritesNoElement(t *testing.T) {
 	for _, tc := range []struct {
 		name string

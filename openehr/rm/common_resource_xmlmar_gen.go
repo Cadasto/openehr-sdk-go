@@ -97,8 +97,9 @@ func (r *ResourceDescriptionItem) BMMName() string { return "RESOURCE_DESCRIPTIO
 // are appended to start.Attr before the start token is written.
 // A Hash member writes one element per entry, in ascending key order.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (r *ResourceDescriptionItem) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("RESOURCE_DESCRIPTION_ITEM")}
@@ -171,8 +172,9 @@ func (t *TranslationDetails) BMMName() string { return "TRANSLATION_DETAILS" }
 // are appended to start.Attr before the start token is written.
 // A Hash member writes one element per entry, in ascending key order.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (t *TranslationDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("TRANSLATION_DETAILS")}

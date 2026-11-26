@@ -177,7 +177,7 @@ Compared with the input, the output matches the input's *expected form*, the inp
   - a `null` member as absent;
   - an elided `_type` as present (§ Polymorphic substitution);
   - an empty bound beside its open flag as absent;
-  - an empty value at a mandatory member held as a struct as absent (§ *An absent mandatory member* below);
+  - an empty value at a mandatory member of an RM class held as a struct, which § *An absent mandatory member* below leaves out, as absent;
   - an empty list an optional attribute holds as absent, such as `mappings`, `LOCATABLE.links` or the base64 `DV_MULTIMEDIA.data` and `integrity_check` (the item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` stay, and so does an empty optional map, which the SDK holds through a pointer: the encoder writes a present one, as § *An absent mandatory member* below says);
   - a `null` mandatory primitive member as the zero the encoder writes for it (the empty string for a `String`, `0` for an `Integer`, `Integer64`, `Real` or `Double` and `false` for a `Boolean`, since a Go value of those types holds no null), except an interval boundary flag, which takes its default as above;
   - a number, quoted or not, as the literal the encoder writes for its value ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers)).

@@ -25,8 +25,8 @@ type rawDVGeneralTimeSpecification DVGeneralTimeSpecification
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
-// A mandatory member that holds a class by value whose every field is
-// empty is left out, through marshalJSONOmitting.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (d *DVGeneralTimeSpecification) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	if isZeroDVParsable(d.Value) {
 		return d.marshalJSONOmitting(enc)
@@ -65,7 +65,8 @@ func (d *DVGeneralTimeSpecification) marshalJSONOmitting(enc *jsontext.Encoder) 
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
 // A mandatory member that holds a class by value is left out too when
-// every field of that value is empty.
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -119,8 +120,8 @@ type rawDVPeriodicTimeSpecification DVPeriodicTimeSpecification
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
-// A mandatory member that holds a class by value whose every field is
-// empty is left out, through marshalJSONOmitting.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (d *DVPeriodicTimeSpecification) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	if isZeroDVParsable(d.Value) {
 		return d.marshalJSONOmitting(enc)
@@ -159,7 +160,8 @@ func (d *DVPeriodicTimeSpecification) marshalJSONOmitting(enc *jsontext.Encoder)
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
 // A mandatory member that holds a class by value is left out too when
-// every field of that value is empty.
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through

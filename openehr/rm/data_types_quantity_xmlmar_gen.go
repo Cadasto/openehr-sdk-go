@@ -135,8 +135,9 @@ func (d *DVOrdinal) BMMName() string { return "DV_ORDINAL" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (d *DVOrdinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("DV_ORDINAL")}
@@ -334,8 +335,9 @@ func (d *DVScale) BMMName() string { return "DV_SCALE" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (d *DVScale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("DV_SCALE")}
@@ -386,8 +388,9 @@ func (r *ReferenceRange[T]) BMMName() string { return "REFERENCE_RANGE" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (r *ReferenceRange[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("REFERENCE_RANGE")}

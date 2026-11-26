@@ -25,8 +25,8 @@ type rawHistory[T ItemStructure] History[T]
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
-// A mandatory member that holds a class by value whose every field is
-// empty is left out, through marshalJSONOmitting.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (h *History[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	if isZeroDVDateTime(h.Origin) {
 		return h.marshalJSONOmitting(enc)
@@ -85,7 +85,8 @@ func (h *History[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
 // A mandatory member that holds a class by value is left out too when
-// every field of that value is empty.
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -237,8 +238,8 @@ type rawIntervalEvent[T ItemStructure] IntervalEvent[T]
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
-// A mandatory member that holds a class by value whose every field is
-// empty is left out, through marshalJSONOmitting.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (i *IntervalEvent[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	if isEmptyHeld(i.Data) ||
 		isZeroDVCodedText(i.MathFunction) ||
@@ -308,7 +309,8 @@ func (i *IntervalEvent[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
 // A mandatory member that holds a class by value is left out too when
-// every field of that value is empty.
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -465,8 +467,8 @@ type rawPointEvent[T ItemStructure] PointEvent[T]
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
-// A mandatory member that holds a class by value whose every field is
-// empty is left out, through marshalJSONOmitting.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (p *PointEvent[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	if isEmptyHeld(p.Data) ||
 		isZeroDVDateTime(p.Time) {
@@ -524,7 +526,8 @@ func (p *PointEvent[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
 // A mandatory member that holds a class by value is left out too when
-// every field of that value is empty.
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through

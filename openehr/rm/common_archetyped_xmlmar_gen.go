@@ -62,8 +62,9 @@ func (f *FeederAudit) BMMName() string { return "FEEDER_AUDIT" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (f *FeederAudit) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("FEEDER_AUDIT")}
@@ -175,8 +176,9 @@ func (l *Link) BMMName() string { return "LINK" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (l *Link) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("LINK")}

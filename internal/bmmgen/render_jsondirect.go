@@ -541,7 +541,8 @@ func renderDirectDoc(b *strings.Builder, pc *PlannedClass, shape jsonWireShape, 
 	b.WriteString("// interface holding nil or a nil pointer to a class.\n")
 	if empties {
 		b.WriteString("// A mandatory member that holds a class by value is left out too when\n")
-		b.WriteString("// every field of that value is empty.\n")
+		b.WriteString("// that value is its type's zero value, every field unset; a present\n")
+		b.WriteString("// list, even an empty one, is a set field.\n")
 	}
 	if shape == shapeIntervalBase || shape == shapeIntervalAlias || shape == shapeIntervalDerived {
 		fmt.Fprintf(b, "// An open side (`%s` or `%s` set) whose bound is empty\n", propLowerUnbounded, propUpperUnbounded)

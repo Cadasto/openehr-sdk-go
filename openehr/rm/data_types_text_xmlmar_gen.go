@@ -25,8 +25,9 @@ func (c *CodePhrase) BMMName() string { return "CODE_PHRASE" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (c *CodePhrase) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("CODE_PHRASE")}
@@ -67,8 +68,9 @@ func (d *DVCodedText) BMMName() string { return "DV_CODED_TEXT" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (d *DVCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("DV_CODED_TEXT")}
@@ -217,8 +219,9 @@ func (t *TermMapping) BMMName() string { return "TERM_MAPPING" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (t *TermMapping) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("TERM_MAPPING")}

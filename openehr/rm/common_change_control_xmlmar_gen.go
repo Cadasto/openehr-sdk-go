@@ -26,8 +26,9 @@ func (c *Contribution) BMMName() string { return "CONTRIBUTION" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (c *Contribution) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("CONTRIBUTION")}
@@ -73,8 +74,9 @@ func (i *ImportedVersion[T]) BMMName() string { return "IMPORTED_VERSION" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (i *ImportedVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("IMPORTED_VERSION")}
@@ -122,8 +124,9 @@ func (o *OriginalVersion[T]) BMMName() string { return "ORIGINAL_VERSION" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (o *OriginalVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ORIGINAL_VERSION")}
@@ -210,8 +213,9 @@ func (v *VersionedObject[T]) BMMName() string { return "VERSIONED_OBJECT" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 //
-// A mandatory member that holds a class by value whose every field is
-// empty emits no element.
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (v *VersionedObject[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("VERSIONED_OBJECT")}

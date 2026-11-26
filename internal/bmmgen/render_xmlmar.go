@@ -224,8 +224,9 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	}
 	if len(empties) > 0 {
 		b.WriteString("//\n")
-		b.WriteString("// A mandatory member that holds a class by value whose every field is\n")
-		b.WriteString("// empty emits no element.\n")
+		b.WriteString("// A mandatory member that holds a class by value that is its type's\n")
+		b.WriteString("// zero value, every field unset, emits no element; a present list, even\n")
+		b.WriteString("// an empty one, is a set field.\n")
 	}
 	fmt.Fprintf(&b, "func (%s *%s%s) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString("\tif _start.Name.Local == \"\" {\n")
