@@ -4409,7 +4409,7 @@ func singleRole(x *rm.Role, attr string, peek bool) (any, bool, bool) {
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "performer":
-		return &x.Performer, !isZeroPartyRef(x.Performer), true
+		return x.Performer, x.Performer != nil, true
 	case "time_validity":
 		return x.TimeValidity, x.TimeValidity != nil, true
 	case "uid":

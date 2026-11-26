@@ -1672,11 +1672,13 @@ func (r *Role) writeJSONMembers(enc *jsontext.Encoder, detailsSlot uint8, nameSl
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "performer"); err != nil {
-		return err
-	}
-	if err := r.Performer.MarshalJSONTo(enc); err != nil {
-		return err
+	if r.Performer != nil {
+		if err := writeJSONName(enc, "performer"); err != nil {
+			return err
+		}
+		if err := r.Performer.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if len(r.Relationships) > 0 {
 		if err := writeJSONName(enc, "relationships"); err != nil {

@@ -3,7 +3,7 @@
     "rm_publisher": "openehr",
     "schema_name": "reference_model",
     "rm_release": "1.2.0",
-    "schema_revision": "1.2.0.1",
+    "schema_revision": "1.2.0.2",
     "schema_lifecycle_state": "stable",
     "schema_description": "The openEHR Reference Model 1.2.0 as openehr-sdk-go generates it: the pinned openehr_rm_1.2.0 schema, with the corrections it lacks until a re-pin carries them.",
     "schema_author": "openehr-sdk-go maintainers <https://github.com/cadasto/openehr-sdk-go>",
@@ -23,6 +23,12 @@
                     ]
                 }
             }
+        },
+        "org.openehr.rm.demographic": {
+            "name": "org.openehr.rm.demographic",
+            "classes": [
+                "ROLE"
+            ]
         }
     },
     "class_definitions": {
@@ -71,6 +77,48 @@
             },
             "invariants": {
                 "Language_valid": "code_set (Code_set_id_languages).has_code (language)"
+            }
+        },
+        "ROLE": {
+            "name": "ROLE",
+            "documentation": "Generic description of a role performed by an Actor. The role corresponds to a competency of the Party. Roles are used to define the responsibilities undertaken by a Party for a purpose. Roles should have credentials qualifying the performer to perform the role. A Role without a performer is a generic role: a kind of role, or a post, that any number of Actors may play.\n\nReason: the RM schema makes performer mandatory, so a role that many Actors share cannot be recorded; the class is declared again whole with performer optional. Upstream: https://openehr.atlassian.net/browse/SPECRM-134, https://github.com/openEHR/specifications-RM/pull/48.",
+            "ancestors": [
+                "PARTY"
+            ],
+            "properties": {
+                "time_validity": {
+                    "_type": "P_BMM_GENERIC_PROPERTY",
+                    "name": "time_validity",
+                    "documentation": "Valid time interval for this role.\n\nReason: unchanged; declared again with its class. Upstream: openehr_rm_1.2.0.",
+                    "type_def": {
+                        "root_type": "DV_INTERVAL",
+                        "generic_parameters": [
+                            "DV_DATE"
+                        ]
+                    }
+                },
+                "performer": {
+                    "_type": "P_BMM_SINGLE_PROPERTY",
+                    "name": "performer",
+                    "documentation": "Reference to Version container of Actor playing the role. Void if the role is generic, i.e. not bound to one Actor; the Actors playing a generic role refer to it through ACTOR.roles.\n\nReason: the RM schema makes this property mandatory; a generic role has no single performer. Upstream: https://openehr.atlassian.net/browse/SPECRM-134, https://github.com/openEHR/specifications-RM/pull/48.",
+                    "type": "PARTY_REF"
+                },
+                "capabilities": {
+                    "_type": "P_BMM_CONTAINER_PROPERTY",
+                    "name": "capabilities",
+                    "documentation": "The capabilities of this role.\n\nReason: unchanged; declared again with its class. Upstream: openehr_rm_1.2.0.",
+                    "type_def": {
+                        "container_type": "List",
+                        "type": "CAPABILITY"
+                    },
+                    "cardinality": {
+                        "lower": 0,
+                        "upper_unbounded": true
+                    }
+                }
+            },
+            "invariants": {
+                "Capabilities_valid": "capabilities /= Void implies not capabilities.empty"
             }
         }
     }

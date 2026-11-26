@@ -1920,7 +1920,7 @@ func (p *Person) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 var xmlClassRole = xmlunmatched.Class{
 	Name:     "ROLE",
 	Attrs:    []string{"archetype_node_id"},
-	Required: []string{"name", "archetype_node_id", "identities", "performer"},
+	Required: []string{"name", "archetype_node_id", "identities"},
 	Items:    []string{"identities", "contacts", "relationships", "links", "capabilities"},
 }
 
@@ -2141,12 +2141,14 @@ func (r *Role) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				if _nil, _err := xmlunmatched.SkipNil(_dec, _t); _err != nil {
 					return _err
 				} else if _nil {
-					xmlunmatched.Zero(&r.Performer)
+					r.Performer = nil
 					break
 				}
-				if _err := _dec.DecodeElement(&r.Performer, &_t); _err != nil {
+				_v := new(PartyRef)
+				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
 					return _err
 				}
+				r.Performer = _v
 			case "capabilities":
 				var _v Capability
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {

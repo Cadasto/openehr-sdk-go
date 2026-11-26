@@ -268,7 +268,7 @@ func TestREQ107_PerformerIDTakesAValueFromUIDSource(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s returned %T, want *rm.Role", call, out)
 		}
-		if got, want := refString(&role.Performer), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0001"; got != want {
+		if got, want := refString(role.Performer), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0001"; got != want {
 			t.Errorf("%s: performer = %s, want %s", call, got, want)
 		}
 	})
@@ -284,7 +284,7 @@ func TestREQ107_PerformerWithoutIDTakesOneFromUIDSource(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s returned %T, want *rm.Role", call, out)
 		}
-		if got, want := refString(&role.Performer), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0001"; got != want {
+		if got, want := refString(role.Performer), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0001"; got != want {
 			t.Errorf("%s: performer = %s, want %s", call, got, want)
 		}
 	})
@@ -471,7 +471,7 @@ var idHolders = []idHolder{
 			if !ok {
 				t.Fatalf("%s returned %T, want *rm.Role", call, out)
 			}
-			return &role.Performer, "PARTY_REF local::PERSON id "
+			return role.Performer, "PARTY_REF local::PERSON id "
 		},
 	},
 	{

@@ -326,9 +326,11 @@ func TestAccess_REQ102_REQ110_REQ112_ReadsTheContainers(t *testing.T) {
 // own UID_BASED_ID field, not the OBJECT_REF id it embeds, and its optional
 // path reads present only when set. The value of every OBJECT_ID a
 // reference's id can hold reads present when set and absent when empty. A
-// ROLE's performer and a PARTY_RELATIONSHIP's source and target read as the
-// PARTY_REF they hold, present unless it is the zero PARTY_REF, so a walk
-// enters one with a part missing and the reference entry reports the part.
+// PARTY_RELATIONSHIP's source and target read as the PARTY_REF they hold,
+// present unless it is the zero PARTY_REF, so a walk enters one with a part
+// missing and the reference entry reports the part. A ROLE's performer,
+// optional (REQ-041 root), reads as the PARTY_REF it points to, present once
+// set, an empty one included, and absent when nil.
 func TestAccess_REQ102_REQ112_ReadsReferenceParts(t *testing.T) {
 	id := &rm.HierObjectID{Value: "6f1d3a52-9c0e-4b7a-8f21-3d5e7a9b1c04"}
 	path := "/content[at0001]"
@@ -381,7 +383,6 @@ func TestAccess_REQ102_REQ112_ReadsReferenceParts(t *testing.T) {
 		attr    string
 		holding func(rm.PartyRef) any
 	}{
-		{name: "ROLE", attr: "performer", holding: func(ref rm.PartyRef) any { return rm.Role{Performer: ref} }},
 		{name: "PARTY_RELATIONSHIP", attr: "source", holding: func(ref rm.PartyRef) any { return rm.PartyRelationship{Source: ref, Target: full} }},
 		{name: "PARTY_RELATIONSHIP", attr: "target", holding: func(ref rm.PartyRef) any { return rm.PartyRelationship{Source: full, Target: ref} }},
 	}
@@ -394,6 +395,12 @@ func TestAccess_REQ102_REQ112_ReadsReferenceParts(t *testing.T) {
 			checkSingle(t, readCase{attr: h.attr}, bothForms(h.holding(rm.PartyRef{})))
 		})
 	}
+	t.Run("ROLE performer", func(t *testing.T) {
+		for _, ref := range append([]rm.PartyRef{full, {}}, partial...) {
+			checkSingle(t, readCase{attr: "performer", present: true, want: ref, byAddress: true}, bothForms(rm.Role{Performer: &ref}))
+		}
+		checkSingle(t, readCase{attr: "performer"}, bothForms(rm.Role{}))
+	})
 }
 
 // TestAccess_REQ112_ReadsPartyProxiesAndParticipation pins the party proxies

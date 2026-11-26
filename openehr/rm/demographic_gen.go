@@ -346,7 +346,7 @@ type Person struct {
 	UID UIDBasedID `json:"uid,omitempty"`
 }
 
-// Role Generic description of a role performed by an Actor. The role corresponds to a competency of the Party. Roles are used to define the responsibilities undertaken by a Party for a purpose. Roles should have credentials qualifying the performer to perform the role.
+// Role Generic description of a role performed by an Actor. The role corresponds to a competency of the Party. Roles are used to define the responsibilities undertaken by a Party for a purpose. Roles should have credentials qualifying the performer to perform the role. A Role without a performer is a generic role: a kind of role, or a post, that any number of Actors may play.
 type Role struct {
 	// ArchetypeDetails Details of archetyping used on this node.
 	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
@@ -368,8 +368,8 @@ type Role struct {
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
 	Name DVTextLike `json:"name,omitempty"`
-	// Performer Reference to Version container of Actor playing the role.
-	Performer PartyRef `json:"performer"`
+	// Performer Reference to Version container of Actor playing the role. Void if the role is generic, i.e. not bound to one Actor; the Actors playing a generic role refer to it through ACTOR.roles.
+	Performer *PartyRef `json:"performer,omitzero"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// TimeValidity Valid time interval for this role.

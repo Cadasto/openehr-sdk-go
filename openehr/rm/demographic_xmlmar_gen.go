@@ -733,8 +733,10 @@ func (r *Role) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&r.Performer, xml.StartElement{Name: xml.Name{Local: "performer"}}); err != nil {
-		return err
+	if r.Performer != nil {
+		if err := _e.EncodeElement(r.Performer, xml.StartElement{Name: xml.Name{Local: "performer"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

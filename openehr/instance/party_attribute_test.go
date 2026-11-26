@@ -87,6 +87,29 @@ func TestREQ107_RolePerformerPassesBothValidators(t *testing.T) {
 	}
 }
 
+// TestREQ107_RoleWithoutPerformerInTemplateHasNone is the REQ-107 check that
+// a ROLE whose template does not name performer, optional in the RM root
+// (REQ-041), generates with no performer, a generic role, at every policy and
+// either value fill, and passes both validators.
+func TestREQ107_RoleWithoutPerformerInTemplateHasNone(t *testing.T) {
+	c := compileOPTText(t, guardRootOPT("ROLE", "openEHR-DEMOGRAPHIC-ROLE.example.v1"), true)
+	for _, opts := range guardOptions() {
+		call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+		out, err := instance.Generate(t.Context(), c, opts)
+		if err != nil {
+			t.Fatalf("%s: %v, want a root", call, err)
+		}
+		role, ok := out.(*rm.Role)
+		if !ok {
+			t.Fatalf("%s returned %T, want *rm.Role", call, out)
+		}
+		if role.Performer != nil {
+			t.Errorf("%s: performer = %+v, want none", call, role.Performer)
+		}
+		checkBothValidators(t, call, out, c)
+	}
+}
+
 // guardDateInterval is a time_validity attribute the template requires,
 // holding a DV_INTERVAL<DV_DATE>.
 func guardDateInterval() string {

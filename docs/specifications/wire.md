@@ -77,6 +77,7 @@ A departure this list does not name is a defect, not an exception, and a new one
 | A composition write or read carries the `format` and `templateId` query parameters, which the pin does not define on those operations, when the caller opts in | [§ REQ-173](#req-173--composition-and-party-representation-formats) *The format query parameters* | a deployment extension, off by default |
 | A version read of a composition, an EHR_STATUS or a PARTY refuses an `IMPORTED_VERSION` body, which the pin's `UVersionOfComposition`, `UVersionOfEhrStatus` and `UVersionOfParty` admit | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | imported versions come with the EHR Extract, out of scope |
 | A version read of a composition, an EHR_STATUS or a PARTY accepts an `ORIGINAL_VERSION` without `data`, which the pin's `UMOriginalVersionOfComposition`, `UMOriginalVersionOfEhrStatus` and `UMOriginalVersionOfParty` list as required | [§ REQ-174](#req-174--versioned-object-reads) *Responses* | the RM's logical deletion has no `data` |
+| A ROLE with no performer, a generic role, is written without `performer`, which the pin's `Role` schema lists as required | [reference-model.md § SDK-authored root schemas](reference-model.md#sdk-authored-root-schemas) *The RM root* | in the owning section |
 
 #### ITS-REST envelopes
 

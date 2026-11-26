@@ -223,7 +223,7 @@ How the SDK keeps that correspondence:
   `Character` is the one primitive whose canonical JSON spelling (a one-character string) disagrees with a numeric Go `rune`, so it maps to a named type carrying its own codec.
 - **The BMM wins.** Where a BMM file declares a class, property or cardinality that contradicts a statement elsewhere in the openEHR specifications, the SDK follows the BMM.
   The BMM is the computable form the openEHR ecosystem uses for validation, AQL path typing and tooling, so diverging from it would make archetype validation disagree with templates compiled from it, and it is the form the openEHR Foundation actively maintains while spec prose lags.
-  A suspected bug in a BMM file is raised upstream, in the openEHR specifications repository, and until the corrected schema is pinned the target's root schema carries the correction ([§ SDK-authored root schemas](#sdk-authored-root-schemas)); it is never worked around in Go.
+  A suspected bug in a BMM file, or a model change the maintainer adopts before its openEHR release, is raised upstream, in the openEHR specifications repository, and until the corrected schema is pinned the target's root schema carries the correction ([§ SDK-authored root schemas](#sdk-authored-root-schemas)); it is never worked around in Go.
   Where an ITS-XML schema and the BMM disagree on the wire form of an ADL 1.4 artefact, the schema is what the documents follow, and the root schema declares the schema's form.
   A deviation from the mapping rules takes an ADR and an update to [§ Mapping rules](#mapping-rules).
 
@@ -248,8 +248,12 @@ A pinned file is never edited.
   It also declares each AOM 1.4 class whose AM Release-1.4 schema type differs from the pinned schema, in the schema type's form.
   `AUTHORED_RESOURCE` takes the form of the RM `common.resource` package in place of the BASE form the pinned AOM 1.4 schema inherits ([ADR 0034](../adr/0034-sdk-authored-root-schemas.md) gives the reason): the merge's rule for an include diamond gives the root the RM form of each class BASE and RM both declare.
   Where the schema names a class otherwise than the BMM (`C_CODE_PHRASE`, `C_DV_ORDINAL` and `C_DV_QUANTITY` for `C_CODED_TEXT`, `C_ORDINAL` and `C_QUANTITY`), the root declares the schema's name and the target leaves the BMM's class out, so each generated type, its `_type` and its `xsi:type` carry one name.
-- **The RM root**, under an id of its own, includes `openehr_rm_1.2.0`, keeps its `rm_release`, and corrects `TRANSLATION_DETAILS.accreditation`, the spelling the openEHR ITS-XML schemas and ITS-JSON use and the RM schema misspells, until the RM schema is re-pinned with the upstream fix.
-- **Observable.** A generated type **MUST** carry the names its root declares, in Go, canonical JSON and canonical XML alike, `rm.TranslationDetails.Accreditation` and `aom14.CCodePhrase` among them.
+- **The RM root**, under an id of its own, includes `openehr_rm_1.2.0` and keeps its `rm_release`.
+  Until the RM schema is re-pinned with the upstream change, it:
+  - corrects `TRANSLATION_DETAILS.accreditation`, the spelling the openEHR ITS-XML schemas and ITS-JSON use and the RM schema misspells;
+  - makes `ROLE.performer` optional, as the openEHR change request SPECRM-134 does for RM 1.2.0, so a ROLE with no performer is a generic role, which the Actors playing it list in `ACTOR.roles`.
+    The REST 1.1.0 pin still requires `performer` until the matching ITS-REST change is pinned, so a server that enforces the pin can refuse a ROLE written without one ([wire.md § Keyed exceptions](wire.md#keyed-exceptions)).
+- **Observable.** A generated type **MUST** carry the names and optionality its root declares, in Go, canonical JSON and canonical XML alike, `rm.TranslationDetails.Accreditation`, the optional `rm.Role.Performer` and `aom14.CCodePhrase` among them.
   A document that writes a property in the pinned schema's spelling instead is unmatched content ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)); one that names a class by the pinned schema's name in `_type` or `xsi:type` names an unknown type and fails in every mode, as REQ-170 says.
 - **Gate.** The build gate runs the root check on every root with its includes, and the check fails unless:
   - every type name resolves after the merge;

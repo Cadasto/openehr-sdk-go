@@ -259,9 +259,12 @@ requirements:
       - internal/bmmgen/sdk_extensions_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/bmmgen/target_test.go
+      - internal/rmaccess/presence_test.go
+      - internal/rmaccess/reads_test.go
       - openehr/aom/aom14/integer_enumeration_test.go
       - openehr/aom/aom14/operational_template_shapes_xml_test.go
       - openehr/aom/aom14/primitive_profile_shapes_xml_test.go
+      - openehr/instance/party_attribute_test.go
       - openehr/internal/xmlunmatched/choice_internal_test.go
       - openehr/internal/xmlunmatched/drop_internal_test.go
       - openehr/rm/character_test.go
@@ -269,6 +272,7 @@ requirements:
       - openehr/rm/rminfo/hierarchy_test.go
       - openehr/rm/rminfo/probe_094_test.go
       - openehr/serialize/canjson/edgecases_test.go
+      - openehr/validation/role_performer_test.go
 
   - id: REQ-045
     title: BMM loader building block
@@ -1873,6 +1877,7 @@ requirements:
       - openehr/validation/rmfloor_reference_part_internal_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
       - openehr/validation/rmfloor_test.go
+      - openehr/validation/role_performer_test.go
       - openehr/validation/temporal_constraint_test.go
       - openehr/validation/validator_test.go
       - sandbox/rmvalid_test.go

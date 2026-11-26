@@ -1386,7 +1386,7 @@ var defaultData = map[string]ClassMeta{
 			"identities":        {TypeName: "PARTY_IDENTITY", BoundTypeName: "PARTY_IDENTITY", Required: true, Container: true, DeclaredIn: "PARTY"},
 			"links":             {TypeName: "LINK", BoundTypeName: "LINK", Required: false, Container: true, DeclaredIn: "LOCATABLE"},
 			"name":              {TypeName: "DV_TEXT", BoundTypeName: "DV_TEXT", Required: true, Container: false, DeclaredIn: "LOCATABLE"},
-			"performer":         {TypeName: "PARTY_REF", BoundTypeName: "PARTY_REF", Required: true, Container: false, DeclaredIn: "ROLE"},
+			"performer":         {TypeName: "PARTY_REF", BoundTypeName: "PARTY_REF", Required: false, Container: false, DeclaredIn: "ROLE"},
 			"relationships":     {TypeName: "PARTY_RELATIONSHIP", BoundTypeName: "PARTY_RELATIONSHIP", Required: false, Container: true, DeclaredIn: "PARTY"},
 			"time_validity":     {TypeName: "DV_INTERVAL", BoundTypeName: "DV_INTERVAL<DV_DATE>", Required: false, Container: false, DeclaredIn: "ROLE"},
 			"uid":               {TypeName: "UID_BASED_ID", BoundTypeName: "UID_BASED_ID", Required: false, Container: false, DeclaredIn: "LOCATABLE"},

@@ -104,14 +104,20 @@ func TestPresence_REQ171_EachReading(t *testing.T) {
 
 		// An object reference held by value is present unless it is its zero
 		// value, so the walk enters one with a part missing and the reference
-		// entry reports the part. PARTY_REF (ROLE performer):
-		{reading: "PARTY_REF complete", parent: &rm.Role{Performer: partyRef(hierID, "local", "PERSON")}, attr: "performer", want: true},
-		{reading: "PARTY_REF zero", parent: &rm.Role{}, attr: "performer", want: false},
-		{reading: "PARTY_REF holding only a nil-pointer id", parent: &rm.Role{Performer: partyRef((*rm.HierObjectID)(nil), "", "")}, attr: "performer", want: false},
-		{reading: "PARTY_REF without an id", parent: &rm.Role{Performer: partyRef(nil, "local", "PERSON")}, attr: "performer", want: true},
-		{reading: "PARTY_REF with a nil-pointer id", parent: &rm.Role{Performer: partyRef((*rm.HierObjectID)(nil), "local", "PERSON")}, attr: "performer", want: true},
-		{reading: "PARTY_REF without a namespace", parent: &rm.Role{Performer: partyRef(hierID, "", "PERSON")}, attr: "performer", want: true},
-		{reading: "PARTY_REF without a type", parent: &rm.Role{Performer: partyRef(hierID, "local", "")}, attr: "performer", want: true},
+		// entry reports the part. PARTY_REF (PARTY_RELATIONSHIP source):
+		{reading: "PARTY_REF complete", parent: &rm.PartyRelationship{Source: partyRef(hierID, "local", "PERSON")}, attr: "source", want: true},
+		{reading: "PARTY_REF zero", parent: &rm.PartyRelationship{}, attr: "source", want: false},
+		{reading: "PARTY_REF holding only a nil-pointer id", parent: &rm.PartyRelationship{Source: partyRef((*rm.HierObjectID)(nil), "", "")}, attr: "source", want: false},
+		{reading: "PARTY_REF without an id", parent: &rm.PartyRelationship{Source: partyRef(nil, "local", "PERSON")}, attr: "source", want: true},
+		{reading: "PARTY_REF with a nil-pointer id", parent: &rm.PartyRelationship{Source: partyRef((*rm.HierObjectID)(nil), "local", "PERSON")}, attr: "source", want: true},
+		{reading: "PARTY_REF without a namespace", parent: &rm.PartyRelationship{Source: partyRef(hierID, "", "PERSON")}, attr: "source", want: true},
+		{reading: "PARTY_REF without a type", parent: &rm.PartyRelationship{Source: partyRef(hierID, "local", "")}, attr: "source", want: true},
+		// An optional object reference is held by pointer (ROLE performer, which
+		// the RM root makes optional, REQ-041): absent when nil, present
+		// otherwise, an empty reference included, so the walk enters it.
+		{reading: "optional PARTY_REF nil", parent: &rm.Role{}, attr: "performer", want: false},
+		{reading: "optional PARTY_REF empty", parent: &rm.Role{Performer: &rm.PartyRef{}}, attr: "performer", want: true},
+		{reading: "optional PARTY_REF complete", parent: &rm.Role{Performer: new(partyRef(hierID, "local", "PERSON"))}, attr: "performer", want: true},
 		// LOCATABLE_REF (INSTRUCTION_DETAILS instruction_id), which redefines id
 		// as a UID_BASED_ID beside the OBJECT_REF id it embeds:
 		{reading: "LOCATABLE_REF complete", parent: &rm.InstructionDetails{InstructionID: locatableRef(versionID, "local", "INSTRUCTION")}, attr: "instruction_id", want: true},
@@ -504,7 +510,7 @@ func TestPresence_REQ171_ReferencesHeldByValue(t *testing.T) {
 			}
 		}
 	}
-	for _, pair := range []string{"ROLE.performer", "PARTY_RELATIONSHIP.source", "PARTY_RELATIONSHIP.target", "INSTRUCTION_DETAILS.instruction_id"} {
+	for _, pair := range []string{"PARTY_RELATIONSHIP.source", "PARTY_RELATIONSHIP.target", "INSTRUCTION_DETAILS.instruction_id"} {
 		if !slices.Contains(checked, pair) {
 			t.Errorf("the references held by value checked, %q, lack %s", checked, pair)
 		}
