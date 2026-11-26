@@ -52,8 +52,9 @@ func (d *DVInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return fmt.Errorf("canjson: DV_INTERVAL: %w", typereg.ErrNilReceiver)
 	}
 	// A null in place of the interval reads as the member left out: the
-	// receiver keeps what it holds and no flag takes a default.
-	if dec.PeekKind() == 'n' {
+	// receiver keeps what it holds and no flag takes a default. A nil dec
+	// goes on to typereg.DecodeInto, which refuses it.
+	if dec != nil && dec.PeekKind() == 'n' {
 		_, err := dec.ReadToken()
 		return err
 	}
