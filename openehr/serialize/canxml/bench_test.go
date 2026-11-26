@@ -48,24 +48,33 @@ func BenchmarkMarshalComposition(b *testing.B) {
 	}
 }
 
-// TestEncodePolyCopiesNoAttributes pins EncodePoly, which the generated
-// encoders call at each polymorphic member, to allocating nothing for the
-// attributes it hands a MarshalXML, once the encoder has grown its stacks: a
-// polymorphic ELEMENT, with its archetype_node_id, and its DV_TEXT name, each
-// with its `xsi:type`.
-func TestEncodePolyCopiesNoAttributes(t *testing.T) {
-	if raceEnabled {
-		t.Skip("the race detector drops pooled values at random")
-	}
+// keepsStart is a caller's class whose MarshalXML keeps the start element
+// EncodePoly hands it, as encoding/xml lets any MarshalXML do.
+type keepsStart struct{ kept *xml.StartElement }
+
+func (*keepsStart) BMMName() string { return "KEEPS_START" }
+
+func (k *keepsStart) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	*k.kept = start
+	return e.EncodeElement("", start)
+}
+
+// TestEncodePolyLeavesAttributesToMarshalXML pins the start element EncodePoly
+// hands a MarshalXML as that method's own: its `xsi:type` still reads the
+// class after EncodePoly returns and another element is encoded. Can-fail:
+// handing out attribute slots that EncodePoly reuses clears or overwrites the
+// kept one.
+func TestEncodePolyLeavesAttributesToMarshalXML(t *testing.T) {
 	e := xml.NewEncoder(io.Discard)
-	element := &rm.Element{ArchetypeNodeID: "at0004", Name: &rm.DVText{}}
-	n := testing.AllocsPerRun(100, func() {
-		if err := canxml.EncodePoly(e, "items", element); err != nil {
-			t.Fatalf("EncodePoly: %v", err)
-		}
-	})
-	if n != 0 {
-		t.Errorf("EncodePoly of an ELEMENT allocates %v times; want 0", n)
+	var kept xml.StartElement
+	if err := canxml.EncodePoly(e, "first", &keepsStart{kept: &kept}); err != nil {
+		t.Fatalf("EncodePoly: %v", err)
+	}
+	if err := canxml.EncodePoly(e, "items", &rm.Element{ArchetypeNodeID: "at0004", Name: &rm.DVText{}}); err != nil {
+		t.Fatalf("EncodePoly: %v", err)
+	}
+	if len(kept.Attr) != 1 || kept.Attr[0].Name != canxml.XSITypeAttrName() || kept.Attr[0].Value != "KEEPS_START" {
+		t.Errorf("kept start element's attributes = %v, want the one xsi:type KEEPS_START", kept.Attr)
 	}
 }
 
