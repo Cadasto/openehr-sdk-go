@@ -839,12 +839,12 @@ func (g *rmaccessGen) writeZeroTestLookups(b *bytes.Buffer) {
 }
 
 // writeZeroTests writes every registered zero test, and those they call,
-// sorted by name. The tests are
-// written for package rm, which declares the types they read. A zero test compares every field of the Go struct with its
-// zero value: an embedded struct through its own test, a pointer, slice or
-// map with nil, an interface with nil or a nil pointer, which § REQ-171
-// *Structural access* counts as zero, a string with "", a boolean with false,
-// a number with 0, and a struct held by value through its own test.
+// sorted by name, for package rm, which declares the types they read. A zero
+// test compares every field of the Go struct with its zero value: an embedded
+// struct through its own test, a pointer, slice or map with nil, an interface
+// with nil or a nil pointer, which § REQ-171 *Structural access* counts as
+// zero, a string with "", a boolean with false, a number with 0, and a struct
+// held by value through its own test.
 func (g *rmaccessGen) writeZeroTests(b *bytes.Buffer) error {
 	rendered := map[string]string{}
 	for {

@@ -26,10 +26,11 @@
 //     side that is not unbounded and false on a side that is;
 //   - an empty bound on a side marked unbounded is removed;
 //   - an object at a mandatory attribute the SDK holds as a struct by value
-//     is removed when it is empty: every member other than "_type" is a
-//     mandatory attribute holding a zero literal, once the changes here are
-//     made inside it. EHR_STATUS "subject" and ARCHETYPED "archetype_id"
-//     stay, as the encoder writes them whatever they hold;
+//     is removed when it is empty: it holds no list, empty or not, and every
+//     member other than "_type" is a mandatory attribute holding a zero
+//     literal, once the changes here are made inside it. EHR_STATUS "subject"
+//     and ARCHETYPED "archetype_id" stay, as the encoder writes them whatever
+//     they hold;
 //   - an empty list an optional attribute holds is removed, such as DV_TEXT
 //     "mappings", LOCATABLE "links", or DV_MULTIMEDIA "data" or
 //     "integrity_check", whose bytes are written as one base64 string. An
@@ -303,7 +304,7 @@ func (w walker) object(obj map[string]any, declared, boundType, ptr string) (map
 			w.settleInterval(out, boundType)
 		}
 		for _, name := range required {
-			if v, ok := out[name].(map[string]any); ok && w.heldByValue(rmType, name) && w.isEmptyHeld(v) {
+			if v, ok := out[name].(map[string]any); ok && w.heldByValue(rmType, name) && w.isEmptyHeld(v) && !w.holdsList(obj[name], ptr+"/"+escapeToken(name)) {
 				delete(out, name)
 			}
 		}
@@ -581,6 +582,28 @@ func (w walker) isEmptyHeld(obj map[string]any) bool {
 		}
 	}
 	return true
+}
+
+// holdsList reports whether v, the input value at ptr, holds a list at any
+// depth, outside the members the shared walker reported as naming no
+// attribute. The SDK decodes a present list, even an empty one, to a list
+// that is not nil, which makes the struct holding it, and each struct holding
+// that, not empty in the encoder's sense, though the expected form removes an
+// empty optional list; so a value the SDK holds by value is empty only when
+// it holds none.
+func (w walker) holdsList(v any, ptr string) bool {
+	switch x := v.(type) {
+	case []any:
+		return true
+	case map[string]any:
+		for k, m := range x {
+			child := ptr + "/" + escapeToken(k)
+			if !w.unmatched[child] && w.holdsList(m, child) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isZeroLiteral reports whether v is the JSON spelling of a primitive zero

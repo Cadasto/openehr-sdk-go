@@ -6,8 +6,9 @@ package rm
 import "github.com/cadasto/openehr-sdk-go/internal/rmzero"
 
 // init hands the validation floor the zero tests it reads a member held
-// by value through, so it reads such a member as absent exactly when the
-// canonical encoders leave it out.
+// by value through, so where it reads a mandatory member by its zero
+// value, it reads it as absent exactly when the canonical encoders leave
+// it out.
 func init() {
 	rmzero.Register(
 		isZeroDVDateTime,

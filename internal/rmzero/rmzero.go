@@ -2,11 +2,11 @@
 // when it is initialised: for an RM class held by value, whether a value of it
 // is empty, every field its zero value. The canonical encoders of openehr/rm
 // leave out a mandatory member whose value is empty, and the validation floor
-// in internal/rmaccess reads such a member as absent through the same tests,
-// so the two cannot disagree on what is absent. The floor cannot call the
-// tests itself, as they are unexported, and openehr/rm cannot import the floor
-// back. The package uses only the standard library, so importing it costs
-// openehr/rm nothing.
+// in internal/rmaccess reads a member held by value through the same tests
+// wherever it reads one by its zero value, so the two cannot disagree there.
+// The floor cannot call the tests itself, as they are unexported, and
+// openehr/rm cannot import the floor back. The package uses only the standard
+// library, so importing it costs openehr/rm nothing.
 package rmzero
 
 // tests holds the registered zero tests, each a func(T) bool for one type T.

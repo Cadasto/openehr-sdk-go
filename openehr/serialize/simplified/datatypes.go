@@ -676,8 +676,10 @@ func capturedFully(rmType string, m canonValue, captured map[string]bool) bool {
 				return false
 			}
 		}
+		// A symbol whose defining code is empty has none in its canonical
+		// form, as above, and its code is the empty one.
 		dc := sym.member("defining_code")
-		if !codePhraseCaptured(dc) {
+		if !dc.isNil() && !codePhraseCaptured(dc) {
 			return false
 		}
 		// Encode writes no |terminology, and decode of a symbol without one

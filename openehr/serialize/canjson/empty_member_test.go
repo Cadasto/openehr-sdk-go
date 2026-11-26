@@ -67,6 +67,19 @@ var emptyMemberCases = []emptyMemberCase{
 		written: []string{"performer"},
 	},
 	{
+		// A present list, empty or not, is a field the zero test reads as set.
+		name:    "a DV_CODED_TEXT whose only member is an empty mappings list in COMPOSITION.category",
+		in:      `{"_type":"COMPOSITION","archetype_node_id":"openEHR-EHR-COMPOSITION.report.v1","name":{"_type":"DV_TEXT","value":"r"},` + `"category":{"_type":"DV_CODED_TEXT","value":"","mappings":[]}}`,
+		target:  func() any { return new(rm.Composition) },
+		written: []string{"category"},
+	},
+	{
+		name:    "a HISTORY whose only member is an empty events list in OBSERVATION.data",
+		in:      `{"_type":"OBSERVATION","archetype_node_id":"openEHR-EHR-OBSERVATION.o.v1","name":{"_type":"DV_TEXT","value":"o"},` + `"data":{"_type":"HISTORY","archetype_node_id":"","events":[]}}`,
+		target:  func() any { return new(rm.Observation) },
+		written: []string{"data"},
+	},
+	{
 		name:    "a CODE_PHRASE with only its terminology set in COMPOSITION.language",
 		in:      `{"_type":"COMPOSITION","archetype_node_id":"openEHR-EHR-COMPOSITION.report.v1","name":{"_type":"DV_TEXT","value":"r"},` + `"language":{"_type":"CODE_PHRASE","code_string":"","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"}}}`,
 		target:  func() any { return new(rm.Composition) },

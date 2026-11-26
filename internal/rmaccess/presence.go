@@ -10,8 +10,9 @@ import (
 // registeredZeroTest returns the zero test of T that package rm generated and
 // registered with internal/rmzero when it was initialised, which is before
 // this package is. The canonical encoders of package rm leave out a mandatory
-// member held by value when the same test holds, so the access reads that
-// member as absent exactly when the encoders leave it out.
+// member held by value when the same test holds, so where the access reads a
+// member by this test, it reads it as absent exactly when the encoders leave
+// it out.
 //
 // It panics when package rm registered no test of T: the generator emits each
 // test the access names, so a missing one is a broken generator invariant no

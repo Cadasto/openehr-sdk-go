@@ -307,8 +307,9 @@ func (g *rmaccessGen) renderZeroFile(floor []string) ([]byte, error) {
 	if len(floor) > 0 {
 		fmt.Fprintf(&b, "\nimport %q\n", rmzeroImport)
 		b.WriteString("\n// init hands the validation floor the zero tests it reads a member held\n")
-		b.WriteString("// by value through, so it reads such a member as absent exactly when the\n")
-		b.WriteString("// canonical encoders leave it out.\n")
+		b.WriteString("// by value through, so where it reads a mandatory member by its zero\n")
+		b.WriteString("// value, it reads it as absent exactly when the canonical encoders leave\n")
+		b.WriteString("// it out.\n")
 		b.WriteString("func init() {\n\trmzero.Register(\n")
 		for _, name := range floor {
 			fmt.Fprintf(&b, "\t\t%s,\n", name)

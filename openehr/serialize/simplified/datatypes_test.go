@@ -1199,3 +1199,32 @@ func TestUnsetCodedTextWritesNoKeys(t *testing.T) {
 		})
 	}
 }
+
+// TestCapturedFullyReadsAnOmittedEmptyCodeAsEmpty — REQ-053. Canonical JSON
+// leaves out an empty mandatory member held by value (REQ-052 § An absent
+// mandatory member), so a coded text whose code is empty has no
+// defining_code in its canonical rendering, and an ordinal or a scale whose
+// symbol or symbol code is empty has none there either. FLAT reads such a
+// value as it did while the empty member was written: in the suffix form.
+func TestCapturedFullyReadsAnOmittedEmptyCodeAsEmpty(t *testing.T) {
+	for name, tc := range map[string]struct {
+		v      any
+		rmType string
+	}{
+		"DV_CODED_TEXT with a value and an empty code":          {v: rm.DVCodedText{Value: "v"}, rmType: "DV_CODED_TEXT"},
+		"DV_ORDINAL whose symbol has a value and an empty code": {v: rm.DVOrdinal{Value: 1, Symbol: rm.DVCodedText{Value: "x"}}, rmType: "DV_ORDINAL"},
+		"DV_SCALE whose symbol has a value and an empty code":   {v: rm.DVScale{Value: 1.5, Symbol: rm.DVCodedText{Value: "x"}}, rmType: "DV_SCALE"},
+		"DV_ORDINAL with an empty symbol":                       {v: rm.DVOrdinal{Value: 1}, rmType: "DV_ORDINAL"},
+		"DV_SCALE whose symbol has a code and no terminology":   {v: rm.DVScale{Value: 2, Symbol: rm.DVCodedText{Value: "x", DefiningCode: rm.CodePhrase{CodeString: "at1"}}}, rmType: "DV_SCALE"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m, err := canonicalObject(tc.v)
+			if err != nil {
+				t.Fatalf("canonicalObject(%#v): %v", tc.v, err)
+			}
+			if !capturedFully(tc.rmType, m, capturedKeys[tc.rmType]) {
+				t.Errorf("capturedFully(%s, %s) = false, want the suffix form", tc.rmType, m)
+			}
+		})
+	}
+}
