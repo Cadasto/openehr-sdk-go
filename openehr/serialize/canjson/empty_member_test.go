@@ -28,6 +28,12 @@ func relationship(source string) string {
 		`"target":{"_type":"PARTY_REF","namespace":"local","type":"PERSON"}}`
 }
 
+// pointEvent is a POINT_EVENT whose time is set and whose data is data.
+func pointEvent(data string) string {
+	return `{"_type":"POINT_EVENT","archetype_node_id":"at0002","name":{"_type":"DV_TEXT","value":"e"},` +
+		`"time":{"_type":"DV_DATE_TIME","value":"2026-11-27T10:00:00Z"},"data":` + data + `}`
+}
+
 // emptyEvent is an OBSERVATION whose one POINT_EVENT has time, a DV_DATE_TIME
 // the SDK holds by value, set to time.
 func emptyEvent(time string) string {
@@ -78,6 +84,26 @@ var emptyMemberCases = []emptyMemberCase{
 		name:    "a HISTORY whose only member is an empty events list in OBSERVATION.data",
 		in:      `{"_type":"OBSERVATION","archetype_node_id":"openEHR-EHR-OBSERVATION.o.v1","name":{"_type":"DV_TEXT","value":"o"},` + `"data":{"_type":"HISTORY","archetype_node_id":"","events":[]}}`,
 		target:  func() any { return new(rm.Observation) },
+		written: []string{"data"},
+	},
+	{
+		// The target binds the event's type parameter to a struct, so the
+		// SDK holds the data by value.
+		name:   "an empty ITEM_TREE in POINT_EVENT[ItemTree].data",
+		in:     pointEvent(`{"_type":"ITEM_TREE","archetype_node_id":""}`),
+		target: func() any { return new(rm.PointEvent[rm.ItemTree]) },
+		absent: []string{"data"},
+	},
+	{
+		name:    "an empty ITEM_TREE in POINT_EVENT[*ItemTree].data, held through a pointer",
+		in:      pointEvent(`{"_type":"ITEM_TREE","archetype_node_id":""}`),
+		target:  func() any { return new(rm.PointEvent[*rm.ItemTree]) },
+		written: []string{"data"},
+	},
+	{
+		name:    "an empty ITEM_TREE in POINT_EVENT[ItemStructure].data, held through an interface",
+		in:      pointEvent(`{"_type":"ITEM_TREE","archetype_node_id":""}`),
+		target:  func() any { return new(rm.PointEvent[rm.ItemStructure]) },
 		written: []string{"data"},
 	},
 	{

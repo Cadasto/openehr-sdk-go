@@ -19,6 +19,9 @@ type (
 		Lower rm.DVQuantity `json:"lower"`
 		Upper rm.DVCount    `json:"upper"`
 	}
+	valueBound struct {
+		Data rm.DVQuantity `json:"data"`
+	}
 	interfaceBound struct {
 		Data rm.DataValue `json:"data"`
 	}
@@ -57,8 +60,11 @@ func TestBoundOfMapsTheTypeParameterField(t *testing.T) {
 		goTyp reflect.Type
 		class string
 		want  string
+		// byValue is the second result: every field holds a struct.
+		byValue bool
 	}{
 		{name: "fields agree, a pointer peeled", goTyp: reflect.TypeFor[agreeingBounds](), class: "PAIR", want: "DV_QUANTITY"},
+		{name: "one field, held by value", goTyp: reflect.TypeFor[valueBound](), class: "HOLDER", want: "DV_QUANTITY", byValue: true},
 		{name: "fields disagree", goTyp: reflect.TypeFor[disagreeingBounds](), class: "PAIR"},
 		{name: "two parameters", goTyp: reflect.TypeFor[agreeingBounds](), class: "TWO_PARAMS"},
 		{name: "polymorphic RM interface", goTyp: reflect.TypeFor[interfaceBound](), class: "HOLDER", want: "DATA_VALUE"},
@@ -67,8 +73,8 @@ func TestBoundOfMapsTheTypeParameterField(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := m.boundOf(tc.goTyp, tc.class); got != tc.want {
-				t.Errorf("boundOf(%s, %s) = %q, want %q", tc.goTyp, tc.class, got, tc.want)
+			if got, byValue := m.boundOf(tc.goTyp, tc.class); got != tc.want || byValue != tc.byValue {
+				t.Errorf("boundOf(%s, %s) = %q, %v, want %q, %v", tc.goTyp, tc.class, got, byValue, tc.want, tc.byValue)
 			}
 		})
 	}

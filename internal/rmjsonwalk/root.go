@@ -74,7 +74,8 @@ func (m *Model) readRoot(t reflect.Type) (Root, bool) {
 	if !ok {
 		return Root{}, false
 	}
-	return Root{Nest: nest.String(), Type: declared, Bound: m.boundOf(t, declared)}, true
+	bound, byValue := m.boundOf(t, declared)
+	return Root{Nest: nest.String(), Type: declared, Bound: bound, BoundByValue: byValue}, true
 }
 
 // declaredOf returns the RM class a Go type is declared as, under any
@@ -113,12 +114,16 @@ func (m *Model) declaredOf(t reflect.Type) (string, bool) {
 // payload as plain JSON, and when the fields disagree: two attributes of one
 // parameter held as different classes, or attributes of two parameters. With
 // no binding, the walk reads such values by their own "_type", or not at all.
-func (m *Model) boundOf(t reflect.Type, class string) string {
+//
+// The second result reports that every such field holds its value as a
+// struct, not behind a pointer or an interface; it is false with no binding,
+// and a binding some field holds through a pointer stands.
+func (m *Model) boundOf(t reflect.Type, class string) (string, bool) {
 	lister, ok := m.lookup.(rminfo.AttributeLister)
 	if !ok || t.Kind() != reflect.Struct {
-		return ""
+		return "", false
 	}
-	bound, param := "", ""
+	bound, param, byValue := "", "", true
 	for _, attr := range lister.AttributeNames(class) {
 		typ, _ := m.lookup.AttributeRMType(class, attr)
 		if m.kindOf(typ) != KindParameter {
@@ -130,11 +135,12 @@ func (m *Model) boundOf(t reflect.Type, class string) string {
 			}
 			b, _ := m.declaredOf(f.Type)
 			if param != "" && (typ != param || b != bound) {
-				return ""
+				return "", false
 			}
 			bound, param = b, typ
+			byValue = byValue && f.Type.Kind() == reflect.Struct
 			break
 		}
 	}
-	return bound
+	return bound, bound != "" && byValue
 }

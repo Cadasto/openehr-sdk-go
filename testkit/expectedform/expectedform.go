@@ -187,6 +187,7 @@ func transform(input []byte, rootShape rmjsonwalk.Root, full bool) ([]byte, erro
 		return nil, errors.New("expectedform: the document is not a JSON object")
 	}
 	w.unmatched = map[string]bool{}
+	w.rootByValue = rootShape.BoundByValue
 	err = w.model.Unmatched(input, rootShape, func(pointer *reportpath.Node) error {
 		w.unmatched[pointer.String()] = true
 		return nil
@@ -234,6 +235,9 @@ type walker struct {
 	hier      rminfo.Hierarchy
 	full      bool
 	unmatched map[string]bool
+	// rootByValue reports that the decode target holds the values of its
+	// root class's type parameter as structs (rmjsonwalk.Root.BoundByValue).
+	rootByValue bool
 }
 
 // newWalker builds the shared RM model over l, which asserts the optional
@@ -304,7 +308,7 @@ func (w walker) object(obj map[string]any, declared, boundType, ptr string) (map
 			w.settleInterval(out, boundType)
 		}
 		for _, name := range required {
-			if v, ok := out[name].(map[string]any); ok && w.heldByValue(rmType, name) && w.isEmptyHeld(v) && !w.holdsList(obj[name], ptr+"/"+escapeToken(name)) {
+			if v, ok := out[name].(map[string]any); ok && w.heldByValue(rmType, name, boundType, ptr == "" && w.rootByValue) && w.isEmptyHeld(v) && !w.holdsList(obj[name], ptr+"/"+escapeToken(name)) {
 				delete(out, name)
 			}
 		}
@@ -543,9 +547,15 @@ var writtenWhenEmpty = map[string]string{
 // attribute name of rmType as a struct by value, which the encoder leaves out
 // when it is empty: its declared type is a class the BMM does not mark
 // abstract and nothing concrete extends, so the generator holds it as a
-// struct, not behind an interface. A type parameter is held by whatever its
-// instantiation binds, which a walk from the wire cannot see, and is not.
-func (w walker) heldByValue(rmType, name string) bool {
+// struct, not behind an interface.
+//
+// A type parameter is held as its instantiation binds it, which a walk from
+// the wire sees only at the root of a decode target that names it: byValue
+// reports that the target holds the parameter's values as structs, such as
+// the data of an rm.PointEvent[rm.ItemTree], and boundType is the class they
+// are. An interval bound and a generic payload are not held this way: the
+// bound has its own rule (settleInterval), and the payload is plain JSON.
+func (w walker) heldByValue(rmType, name, boundType string, byValue bool) bool {
 	if writtenWhenEmpty[rmType] == name {
 		return false
 	}
@@ -555,6 +565,12 @@ func (w walker) heldByValue(rmType, name string) bool {
 	t, ok := w.lookup.AttributeRMType(rmType, name)
 	if !ok {
 		return false
+	}
+	if attr, _ := w.model.Attribute(rmType, name, ""); attr.Kind == rmjsonwalk.KindParameter {
+		if !byValue || attr.Payload || w.isInterval(rmType) {
+			return false
+		}
+		t = boundType
 	}
 	if abstract, known := w.hier.IsAbstract(t); !known || abstract {
 		return false

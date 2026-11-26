@@ -30,6 +30,11 @@ type Root struct {
 	// the abstract DATA_VALUE for an rm.OriginalVersion[rm.DataValue], or
 	// empty.
 	Bound string
+	// BoundByValue reports that the target holds the values of its class's
+	// type parameter as structs, not behind a pointer or an interface, such
+	// as the data of an rm.PointEvent[rm.ItemTree] or the bounds of an
+	// rm.DVInterval[rm.DVQuantity]. It is false when Bound is empty.
+	BoundByValue bool
 }
 
 // Hooks are the functions a [Model.Walk] calls for what it finds. Each takes
