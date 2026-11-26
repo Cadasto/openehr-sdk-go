@@ -16,6 +16,7 @@ package canjson_test
 
 import (
 	"bytes"
+	jsonv1 "encoding/json"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
@@ -566,6 +567,50 @@ func TestREQ052DirectDecodeRoots(t *testing.T) {
 		}
 	}
 	t.Logf("%d comparisons, %d of them failures both ways", tally.compared, tally.failed)
+}
+
+// TestREQ052DirectDecodeGatedOptions holds the direct read to the wrapper's
+// value and failure under each decoder option that changes how json/v2's
+// struct decode reads a member, each case on an input whose decode the option
+// changes. typereg.DirectDecode sends each such decode to the wrapper; a
+// check it dropped would let the direct read, which knows nothing of the
+// option, read the value its own way, and the case fails. A caller's hooks
+// reach the outermost value only through the wrapper, which passes them on to
+// every value inside it.
+func TestREQ052DirectDecodeGatedOptions(t *testing.T) {
+	t.Parallel()
+	upper := json.WithUnmarshalers(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, s *string) error {
+		tok, err := dec.ReadToken()
+		if err != nil {
+			return err
+		}
+		*s = strings.ToUpper(tok.String())
+		return nil
+	}))
+	failing := strings.Replace(directDecodeDoc, `"archetype_node_id":"openEHR-EHR-COMPOSITION.encounter.v1"`, `"archetype_node_id":5`, 1)
+	newComposition := func() any { return new(rm.Composition) }
+	for _, tc := range []struct {
+		name string
+		doc  string
+		newV func() any
+		opt  json.Options
+	}{
+		{"MatchCaseInsensitiveNames", `{"_type":"CODE_PHRASE","Code_String":"en"}`, func() any { return new(rm.CodePhrase) }, json.MatchCaseInsensitiveNames(true)},
+		{"RejectUnknownMembers", `{"_type":"CODE_PHRASE","code_string":"en","zz":1}`, func() any { return new(rm.CodePhrase) }, json.RejectUnknownMembers(true)},
+		{"ReportErrorsWithLegacySemantics", failing, newComposition, jsonv1.ReportErrorsWithLegacySemantics(true)},
+		{"encoding/json defaults", failing, newComposition, jsonv1.DefaultOptionsV1()},
+		{"a caller's hooks", `{"_type":"code_phrase","code_string":"en"}`, func() any { return new(rm.CodePhrase) }, upper},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var tally decodeTally
+			sameDecode(t, tc.name, []byte(tc.doc), tc.newV, &tally, tc.opt)
+			with := decodeOnce([]byte(tc.doc), tc.newV, false, tc.opt, forceDecodeWrapper)
+			without := decodeOnce([]byte(tc.doc), tc.newV, false, forceDecodeWrapper)
+			if fmt.Sprint(with.err) == fmt.Sprint(without.err) && reflect.DeepEqual(with.v, without.v) {
+				t.Errorf("%s changes nothing the wrapper reads from this input, so the case checks nothing", tc.name)
+			}
+		})
+	}
 }
 
 // TestREQ052DirectDecodeAllocatesLess holds canjson.Unmarshal to fewer
