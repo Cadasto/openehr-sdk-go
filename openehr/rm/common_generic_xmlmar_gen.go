@@ -31,7 +31,7 @@ func (a *Attestation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(a.SystemID, xml.StartElement{Name: xml.Name{Local: "system_id"}}); err != nil {
+	if err := canxml.EncodeString(_e, "system_id", a.SystemID); err != nil {
 		return err
 	}
 	if a.Committer != nil {
@@ -56,7 +56,7 @@ func (a *Attestation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		}
 	}
 	if a.Proof != nil {
-		if err := _e.EncodeElement(*a.Proof, xml.StartElement{Name: xml.Name{Local: "proof"}}); err != nil {
+		if err := canxml.EncodeString(_e, "proof", *a.Proof); err != nil {
 			return err
 		}
 	}
@@ -99,7 +99,7 @@ func (a *AuditDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(a.SystemID, xml.StartElement{Name: xml.Name{Local: "system_id"}}); err != nil {
+	if err := canxml.EncodeString(_e, "system_id", a.SystemID); err != nil {
 		return err
 	}
 	if a.Committer != nil {
@@ -196,7 +196,7 @@ func (p *PartyIdentified) MarshalXML(_e *xml.Encoder, _start xml.StartElement) e
 		}
 	}
 	if p.Name != nil {
-		if err := _e.EncodeElement(*p.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
+		if err := canxml.EncodeString(_e, "name", *p.Name); err != nil {
 			return err
 		}
 	}
@@ -237,7 +237,7 @@ func (p *PartyRelated) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 		}
 	}
 	if p.Name != nil {
-		if err := _e.EncodeElement(*p.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
+		if err := canxml.EncodeString(_e, "name", *p.Name); err != nil {
 			return err
 		}
 	}

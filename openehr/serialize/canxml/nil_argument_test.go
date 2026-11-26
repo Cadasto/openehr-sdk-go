@@ -14,7 +14,7 @@ import (
 
 // TestREQ056_NilEncoderOrDecoderIsRefused pins the no-panic rule (REQ-056,
 // idiom.md § No panics) on the helpers the generated XML codecs call: a nil
-// *xml.Encoder handed to EncodePoly, and a nil
+// *xml.Encoder handed to EncodeString, EncodeText or EncodePoly, and a nil
 // *xml.Decoder handed to DecodeAs or DecodeAsOrDefault, is refused with an
 // error wrapping typereg.ErrNilArgument that names the helper and the element,
 // a decode helper's inside a DecodeError on the element. EncodePoly refuses a
@@ -36,6 +36,8 @@ func TestREQ056_NilEncoderOrDecoderIsRefused(t *testing.T) {
 		decode bool
 		call   func() error
 	}{
+		{name: "EncodeString", helper: "EncodeString", call: func() error { return canxml.EncodeString(nil, "value", "x") }},
+		{name: "EncodeText", helper: "EncodeText", call: func() error { return canxml.EncodeText(nil, "value", rm.Real(1)) }},
 		{name: "EncodePoly", helper: "EncodePoly", call: func() error { return canxml.EncodePoly(nil, "value", &rm.DVText{Value: "x"}) }},
 		{name: "EncodePoly of an absent value", helper: "EncodePoly", call: func() error { return canxml.EncodePoly(nil, "value", nil) }},
 		{name: "DecodeAs, xsi:type", helper: "DecodeAs", decode: true, call: func() error {

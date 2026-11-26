@@ -304,12 +304,12 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 			if isClass {
 				return marshalXMLStructMandatory(recv, goField, elemName), nil
 			}
-			return marshalXMLPrimitiveMandatory(recv, goField, elemName), nil
+			return marshalXMLPrimitiveMandatory(recv, goField, elemName, p.TypeName), nil
 		}
 		if isClass {
 			return marshalXMLStructOptional(recv, goField, elemName), nil
 		}
-		return marshalXMLPrimitiveOptional(recv, goField, elemName), nil
+		return marshalXMLPrimitiveOptional(recv, goField, elemName, p.TypeName), nil
 
 	case *bmm.SinglePropertyOpen:
 		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
@@ -343,7 +343,7 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 			// JSON writes.
 			return marshalXMLBase64(recv, goField, elemName), nil
 		}
-		return marshalXMLPrimitiveSlice(recv, goField, elemName), nil
+		return marshalXMLPrimitiveSlice(recv, goField, elemName, containerInnerName(p.TypeDef)), nil
 
 	case *bmm.GenericProperty:
 		// Concrete generic (e.g. DVInterval[DVCount]) — emit as a
@@ -421,14 +421,33 @@ func marshalXMLAny(recv, field, elem, label string, mandatory bool) string {
 	return b.String()
 }
 
-func marshalXMLPrimitiveMandatory(recv, field, elem string) string {
-	return fmt.Sprintf("\tif err := _e.EncodeElement(%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)
+// marshalXMLPrimitive returns the call that writes value, of the BMM
+// primitive typeName, as one element named elem: a Go string through
+// canxml.EncodeString, which writes the bytes encoding/xml writes for it
+// without copying it into an interface, and any other primitive through
+// encoding/xml.
+func marshalXMLPrimitive(value, elem, typeName string) string {
+	if primitiveGoType[typeName] == "string" {
+		return fmt.Sprintf("canxml.EncodeString(_e, %q, %s)", elem, value)
+	}
+	if xmlTextPrimitives[typeName] {
+		return fmt.Sprintf("canxml.EncodeText(_e, %q, %s)", elem, value)
+	}
+	return fmt.Sprintf("_e.EncodeElement(%s, xml.StartElement{Name: xml.Name{Local: %q}})", value, elem)
 }
 
-func marshalXMLPrimitiveOptional(recv, field, elem string) string {
+// xmlTextPrimitives are the BMM primitives whose Go type marshals itself to
+// text, which encoding/xml writes as the element's text.
+var xmlTextPrimitives = map[string]bool{"Real": true, "Character": true}
+
+func marshalXMLPrimitiveMandatory(recv, field, elem, typeName string) string {
+	return fmt.Sprintf("\tif err := %s; err != nil {\n\t\treturn err\n\t}\n", marshalXMLPrimitive(recv+"."+field, elem, typeName))
+}
+
+func marshalXMLPrimitiveOptional(recv, field, elem, typeName string) string {
 	return fmt.Sprintf(
-		"\tif %s.%s != nil {\n\t\tif err := _e.EncodeElement(*%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
-		recv, field, recv, field, elem)
+		"\tif %s.%s != nil {\n\t\tif err := %s; err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
+		recv, field, marshalXMLPrimitive("*"+recv+"."+field, elem, typeName))
 }
 
 func marshalXMLStructMandatory(recv, field, elem string) string {
@@ -474,10 +493,10 @@ func marshalXMLBase64(recv, field, elem string) string {
 		recv, field, recv, field, elem)
 }
 
-func marshalXMLPrimitiveSlice(recv, field, elem string) string {
+func marshalXMLPrimitiveSlice(recv, field, elem, typeName string) string {
 	return fmt.Sprintf(
-		"\tfor _, _item := range %s.%s {\n\t\tif err := _e.EncodeElement(_item, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
-		recv, field, elem)
+		"\tfor _, _item := range %s.%s {\n\t\tif err := %s; err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
+		recv, field, marshalXMLPrimitive("_item", elem, typeName))
 }
 
 // marshalXMLOpenParam emits the encoding of a member typed by an open generic

@@ -1,8 +1,11 @@
 package canxml_test
 
 import (
+	"bytes"
 	"encoding/xml"
 	"errors"
+	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -111,6 +114,79 @@ func TestEncoderEmptyElementShapeDocumented(t *testing.T) {
 	if strings.Contains(string(got), `<composer xsi:type="PARTY_SELF"/>`) {
 		t.Errorf("encoder must not emit self-closing form: %s", got)
 	}
+}
+
+// TestREQ056_EncodeStringWritesWhatEncodeElementWrites pins the bytes
+// canxml.EncodeString writes, which the generated encoders call for each
+// string member, to those encoding/xml's EncodeElement writes for the same
+// string, inside an element, compact and indented: for text to escape, a
+// newline, which character data written as a token would keep as it is,
+// invalid UTF-8, and text on both sides of the length the helper copies.
+func TestREQ056_EncodeStringWritesWhatEncodeElementWrites(t *testing.T) {
+	t.Parallel()
+	for _, s := range []string{
+		"", "plain", `a<b>&c"d'e`, "tab\there", "line\nbreak", "\n", "cr\rreturn", "crlf\r\n",
+		"bad\xffbyte", "�", "ctl\x01", "Ünïcødé 日本語",
+		strings.Repeat("x", 1024), strings.Repeat("x", 1025), strings.Repeat("é", 600),
+	} {
+		got := encodeNested(func(e *xml.Encoder) error { return canxml.EncodeString(e, "value", s) })
+		want := encodeNested(func(e *xml.Encoder) error {
+			return e.EncodeElement(s, xml.StartElement{Name: xml.Name{Local: "value"}})
+		})
+		if got != want {
+			t.Errorf("EncodeString(%q) wrote\n%s\nwant what EncodeElement writes\n%s", s, got, want)
+		}
+	}
+}
+
+// TestREQ056_EncodeTextWritesWhatEncodeElementWrites pins the bytes
+// canxml.EncodeText writes, which the generated encoders call for each Real
+// and Character member, and the failure it reports, to those of
+// encoding/xml's EncodeElement for the same value, inside an element,
+// compact and indented: for a number in each form, a character to escape, a
+// newline, and a Character that refuses to marshal.
+func TestREQ056_EncodeTextWritesWhatEncodeElementWrites(t *testing.T) {
+	t.Parallel()
+	start := xml.StartElement{Name: xml.Name{Local: "magnitude"}}
+	for _, r := range []rm.Real{0, 0.1, -1.5, 1e21, 1.25e-7, rm.Real(math.Copysign(0, -1)), rm.Real(math.NaN()), rm.Real(math.Inf(1)), rm.Real(math.Inf(-1))} {
+		got := encodeNested(func(e *xml.Encoder) error { return canxml.EncodeText(e, "magnitude", r) })
+		want := encodeNested(func(e *xml.Encoder) error { return e.EncodeElement(r, start) })
+		if got != want {
+			t.Errorf("EncodeText(Real %v) wrote\n%s\nwant what EncodeElement writes\n%s", float64(r), got, want)
+		}
+	}
+	start = xml.StartElement{Name: xml.Name{Local: "match"}}
+	for _, c := range []rm.Character{"x", "<", "&", "\t", "\n", "", "ab"} {
+		got := encodeNested(func(e *xml.Encoder) error { return canxml.EncodeText(e, "match", c) })
+		want := encodeNested(func(e *xml.Encoder) error { return e.EncodeElement(c, start) })
+		if got != want {
+			t.Errorf("EncodeText(Character %q) wrote\n%s\nwant what EncodeElement writes\n%s", string(c), got, want)
+		}
+	}
+}
+
+// encodeNested writes an element inside an `item` element, compact, indented,
+// and indented with a prefix, and returns what each layout wrote, with the
+// failure write reported, if any.
+func encodeNested(write func(*xml.Encoder) error) string {
+	var out strings.Builder
+	for _, layout := range []struct{ prefix, indent string }{{"", ""}, {"", "  "}, {"\t", "\t"}} {
+		var buf bytes.Buffer
+		e := xml.NewEncoder(&buf)
+		e.Indent(layout.prefix, layout.indent)
+		item := xml.StartElement{Name: xml.Name{Local: "item"}}
+		err := e.EncodeToken(item)
+		if err == nil {
+			if err = write(e); err == nil {
+				err = e.EncodeToken(item.End())
+			}
+		}
+		if flushErr := e.Flush(); err == nil {
+			err = flushErr
+		}
+		fmt.Fprintf(&out, "%q: %s (error: %v)\n", layout.indent, buf.String(), err)
+	}
+	return out.String()
 }
 
 // TestDeepFolderTreeStackSafe exercises a deep FOLDER nesting to

@@ -34,11 +34,11 @@ func (c *CodePhrase) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 	if err := _e.EncodeElement(&c.TerminologyID, xml.StartElement{Name: xml.Name{Local: "terminology_id"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(c.CodeString, xml.StartElement{Name: xml.Name{Local: "code_string"}}); err != nil {
+	if err := canxml.EncodeString(_e, "code_string", c.CodeString); err != nil {
 		return err
 	}
 	if c.PreferredTerm != nil {
-		if err := _e.EncodeElement(*c.PreferredTerm, xml.StartElement{Name: xml.Name{Local: "preferred_term"}}); err != nil {
+		if err := canxml.EncodeString(_e, "preferred_term", *c.PreferredTerm); err != nil {
 			return err
 		}
 	}
@@ -68,7 +68,7 @@ func (d *DVCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", d.Value); err != nil {
 		return err
 	}
 	if d.Hyperlink != nil {
@@ -77,7 +77,7 @@ func (d *DVCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		}
 	}
 	if d.Formatting != nil {
-		if err := _e.EncodeElement(*d.Formatting, xml.StartElement{Name: xml.Name{Local: "formatting"}}); err != nil {
+		if err := canxml.EncodeString(_e, "formatting", *d.Formatting); err != nil {
 			return err
 		}
 	}
@@ -159,7 +159,7 @@ func (d *DVText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", d.Value); err != nil {
 		return err
 	}
 	if d.Hyperlink != nil {
@@ -168,7 +168,7 @@ func (d *DVText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if d.Formatting != nil {
-		if err := _e.EncodeElement(*d.Formatting, xml.StartElement{Name: xml.Name{Local: "formatting"}}); err != nil {
+		if err := canxml.EncodeString(_e, "formatting", *d.Formatting); err != nil {
 			return err
 		}
 	}
@@ -213,7 +213,7 @@ func (t *TermMapping) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(t.Match, xml.StartElement{Name: xml.Name{Local: "match"}}); err != nil {
+	if err := canxml.EncodeText(_e, "match", t.Match); err != nil {
 		return err
 	}
 	if t.Purpose != nil {

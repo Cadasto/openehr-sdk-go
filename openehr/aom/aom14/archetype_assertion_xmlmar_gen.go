@@ -34,12 +34,12 @@ func (a *Assertion) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		return err
 	}
 	if a.Tag != nil {
-		if err := _e.EncodeElement(*a.Tag, xml.StartElement{Name: xml.Name{Local: "tag"}}); err != nil {
+		if err := canxml.EncodeString(_e, "tag", *a.Tag); err != nil {
 			return err
 		}
 	}
 	if a.StringExpression != nil {
-		if err := _e.EncodeElement(*a.StringExpression, xml.StartElement{Name: xml.Name{Local: "string_expression"}}); err != nil {
+		if err := canxml.EncodeString(_e, "string_expression", *a.StringExpression); err != nil {
 			return err
 		}
 	}
@@ -79,10 +79,10 @@ func (a *AssertionVariable) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(a.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
+	if err := canxml.EncodeString(_e, "name", a.Name); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(a.Definition, xml.StartElement{Name: xml.Name{Local: "definition"}}); err != nil {
+	if err := canxml.EncodeString(_e, "definition", a.Definition); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -111,7 +111,7 @@ func (e *ExprBinaryOperator) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(e.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
+	if err := canxml.EncodeString(_e, "type", e.Type); err != nil {
 		return err
 	}
 	if err := _e.EncodeElement(&e.Operator, xml.StartElement{Name: xml.Name{Local: "operator"}}); err != nil {
@@ -156,7 +156,7 @@ func (e *ExprLeaf) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(e.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
+	if err := canxml.EncodeString(_e, "type", e.Type); err != nil {
 		return err
 	}
 	switch _v := e.Item.(type) {
@@ -174,7 +174,7 @@ func (e *ExprLeaf) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(e.ReferenceType, xml.StartElement{Name: xml.Name{Local: "reference_type"}}); err != nil {
+	if err := canxml.EncodeString(_e, "reference_type", e.ReferenceType); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -203,7 +203,7 @@ func (e *ExprUnaryOperator) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(e.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
+	if err := canxml.EncodeString(_e, "type", e.Type); err != nil {
 		return err
 	}
 	if err := _e.EncodeElement(&e.Operator, xml.StartElement{Name: xml.Name{Local: "operator"}}); err != nil {
