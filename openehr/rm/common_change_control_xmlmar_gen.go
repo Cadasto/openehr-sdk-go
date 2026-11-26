@@ -219,8 +219,9 @@ func (v *VersionedObject[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 // xmlOpenParamClass returns v, the value of a member typed by an open generic
 // parameter whose type argument is an interface, as a pointer to a copy of
 // it when it is a value, held by value, of a class the type registry
-// constructs: the form canxml.EncodePoly writes with its `xsi:type` and
-// the decoder returns. It reports false for any other value.
+// constructs, a generic one in any instantiation: the form
+// canxml.EncodePoly writes with its `xsi:type` and the decoder returns. It
+// reports false for any other value.
 func xmlOpenParamClass(v any) (canxml.BMMNamer, bool) {
 	switch x := v.(type) {
 	case AccessGroupRef:
@@ -443,9 +444,57 @@ func xmlOpenParamClass(v any) (canxml.BMMNamer, bool) {
 		return &x, true
 	case VersionTreeID:
 		return &x, true
+	case xmlClassValue:
+		return x.xmlClassPointer(), true
 	}
 	return nil, false
 }
+
+// xmlClassValue is a value of a generic class, in any instantiation, whose
+// pointer canxml.EncodePoly writes with its `xsi:type`.
+type xmlClassValue interface {
+	xmlClassPointer() canxml.BMMNamer
+}
+
+// xmlClassPointer returns a pointer to a copy of d, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (d DVInterval[T]) xmlClassPointer() canxml.BMMNamer { return &d }
+
+// xmlClassPointer returns a pointer to a copy of h, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (h History[T]) xmlClassPointer() canxml.BMMNamer { return &h }
+
+// xmlClassPointer returns a pointer to a copy of i, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (i ImportedVersion[T]) xmlClassPointer() canxml.BMMNamer { return &i }
+
+// xmlClassPointer returns a pointer to a copy of i, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (i IntervalEvent[T]) xmlClassPointer() canxml.BMMNamer { return &i }
+
+// xmlClassPointer returns a pointer to a copy of o, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (o OriginalVersion[T]) xmlClassPointer() canxml.BMMNamer { return &o }
+
+// xmlClassPointer returns a pointer to a copy of p, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (p PointEvent[T]) xmlClassPointer() canxml.BMMNamer { return &p }
+
+// xmlClassPointer returns a pointer to a copy of p, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (p PointInterval[T]) xmlClassPointer() canxml.BMMNamer { return &p }
+
+// xmlClassPointer returns a pointer to a copy of p, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (p ProperInterval[T]) xmlClassPointer() canxml.BMMNamer { return &p }
+
+// xmlClassPointer returns a pointer to a copy of r, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (r ReferenceRange[T]) xmlClassPointer() canxml.BMMNamer { return &r }
+
+// xmlClassPointer returns a pointer to a copy of v, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (v VersionedObject[T]) xmlClassPointer() canxml.BMMNamer { return &v }
 
 // xmlOpenParamText reports whether the canonical-XML encoder writes *v, the
 // value of a member typed by an open generic parameter T that holds no
