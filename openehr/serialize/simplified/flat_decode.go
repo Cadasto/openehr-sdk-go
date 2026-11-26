@@ -364,7 +364,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, tmpl *template
 	// Every key is placed, so each rebuilt ISM transition can now get the careflow
 	// step its node names, or have the body's checked against it, and a current
 	// state that names no terminology gets `openehr` (REQ-053).
-	if err := settleIsmTransitions(compJSON, wt, sib); err != nil {
+	if err := settleIsmTransitions(compJSON, wt); err != nil {
 		return nil, err
 	}
 	// A sparse :index (":0" and ":2" with no ":1") would have gap-filled an
@@ -2054,11 +2054,12 @@ type ismNodes struct {
 	merged map[string]mergedIsmNode
 }
 
-// ismTransitionNodes indexes the Web Template's ISM_TRANSITION nodes
-// ([ismNodes]). found reports whether it has an ISM_TRANSITION node of any
-// kind, an in-context `ism_transition` node that merges no archetyped one
-// included.
-func ismTransitionNodes(wt *webtemplate.WebTemplate, sib *reusedSiblings) (nodes ismNodes, found bool) {
+// ismTransitionNodes indexes the ISM_TRANSITION nodes of tree, a Web
+// Template's tree ([ismNodes]). found reports whether it has an ISM_TRANSITION
+// node of any kind, an in-context `ism_transition` node that merges no
+// archetyped one included. Decode reads the index kept for its Web Template
+// ([tablesFor]).
+func ismTransitionNodes(tree *webtemplate.Node, sib *reusedSiblings) (nodes ismNodes, found bool) {
 	nodes = ismNodes{archetyped: make(map[string]ismNode), merged: make(map[string]mergedIsmNode)}
 	// flat holds the FLAT path of the node being walked; a string is made of it
 	// only for an ISM_TRANSITION node.
@@ -2080,8 +2081,8 @@ func ismTransitionNodes(wt *webtemplate.WebTemplate, sib *reusedSiblings) (nodes
 		}
 		return flat[:base]
 	}
-	if wt.Tree != nil {
-		walk(wt.Tree, append(make([]byte, 0, 256), wt.Tree.ID...))
+	if tree != nil {
+		walk(tree, append(make([]byte, 0, 256), tree.ID...))
 	}
 	return nodes, found
 }
@@ -2116,12 +2117,12 @@ func codeInputList(leaf *webtemplate.Node) []webtemplate.InputListItem {
 // (REQ-111) each settle against their own node. That record and the node id
 // [walkAQL] recorded on a per-step transition are removed, so neither reaches
 // canjson.
-func settleIsmTransitions(compJSON map[string]any, wt *webtemplate.WebTemplate, sib *reusedSiblings) error {
-	nodes, found := ismTransitionNodes(wt, sib)
-	if !found {
+func settleIsmTransitions(compJSON map[string]any, wt *webtemplate.WebTemplate) error {
+	ism := tablesFor(wt).ism()
+	if !ism.found {
 		return nil
 	}
-	return settleIsmTransitionsUnder(compJSON, nodes)
+	return settleIsmTransitionsUnder(compJSON, ism.nodes)
 }
 
 // holdsNested reports whether a member of obj is an object or a list.
@@ -3999,7 +4000,7 @@ func phantomKeysOnly(m map[string]any) bool {
 // their pinned names tell apart (sib, REQ-111) each take their own place, and a
 // member stands for one of them by its name.
 func orderByTemplate(compJSON map[string]any, wt *webtemplate.WebTemplate, sib *reusedSiblings) {
-	rank := templateRanks(wt, sib)
+	rank := tablesFor(wt).ranks()
 	named := len(sib.kept) > 0
 	memberPath := func(path []byte, attr string, m map[string]any) []byte {
 		path = appendMemberPath(path, attr, m)
@@ -4100,14 +4101,15 @@ func appendMemberName[V any](path []byte, m map[string]any, known map[string]V) 
 	return append(path[:end], ']')
 }
 
-// templateRanks maps the resolution path ([reusedSiblings]) of every Web
-// Template node, the bare spelling of its aqlPath with only the names that tell
-// reused siblings apart, and every prefix of it that ends at a segment, to the
-// position at which a pre-order walk of the Web Template first reaches it. A
+// templateRanks maps the resolution path ([reusedSiblings]) of every node of
+// tree, a Web Template's tree, the bare spelling of its aqlPath with only the
+// names that tell reused siblings apart, and every prefix of it that ends at a
+// segment, to the position at which a pre-order walk of the tree first reaches
+// it. Decode reads the ranks kept for its Web Template ([tablesFor]). A
 // prefix stands for a node the Web Template folds away, such as the ELEMENT a
 // collapsed leaf at `…/items[at0004]/value` stands for at `…/items[at0004]`:
 // that ELEMENT takes its leaf's place.
-func templateRanks(wt *webtemplate.WebTemplate, sib *reusedSiblings) map[string]int {
+func templateRanks(tree *webtemplate.Node, sib *reusedSiblings) map[string]int {
 	// Each node adds its own path; the prefixes it adds are mostly the paths
 	// of nodes above it, and the rest stand for folded nodes.
 	rank := make(map[string]int, sib.nodes+sib.nodes/2)
@@ -4125,8 +4127,8 @@ func templateRanks(wt *webtemplate.WebTemplate, sib *reusedSiblings) map[string]
 			walk(ch)
 		}
 	}
-	if wt.Tree != nil {
-		walk(wt.Tree)
+	if tree != nil {
+		walk(tree)
 	}
 	return rank
 }
