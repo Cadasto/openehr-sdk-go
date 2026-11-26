@@ -252,6 +252,7 @@ A pinned file is never edited.
   Until the RM schema is re-pinned with the upstream change, it:
   - corrects `TRANSLATION_DETAILS.accreditation`, the spelling the openEHR ITS-XML schemas and ITS-JSON use and the RM schema misspells;
   - makes `ROLE.performer` optional, as the openEHR change request SPECRM-134 does for RM 1.2.0, so a ROLE with no performer is a generic role, which the Actors playing it list in `ACTOR.roles`.
+    The REST 1.1.0 pin still requires `performer` until the matching ITS-REST change is pinned, so a server that enforces the pin can refuse a ROLE written without one ([wire.md § Keyed exceptions](wire.md#keyed-exceptions)).
 - **Observable.** A generated type **MUST** carry the names and optionality its root declares, in Go, canonical JSON and canonical XML alike, `rm.TranslationDetails.Accreditation`, the optional `rm.Role.Performer` and `aom14.CCodePhrase` among them.
   A document that writes a property in the pinned schema's spelling instead is unmatched content ([wire.md § REQ-170](wire.md#req-170--unmatched-content-on-decode)); one that names a class by the pinned schema's name in `_type` or `xsi:type` names an unknown type and fails in every mode, as REQ-170 says.
 - **Gate.** The build gate runs the root check on every root with its includes, and the check fails unless:
