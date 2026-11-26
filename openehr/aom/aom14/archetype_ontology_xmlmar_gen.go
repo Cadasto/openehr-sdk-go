@@ -146,7 +146,7 @@ func (c *ConstraintBindingItem) MarshalXML(_e *xml.Encoder, _start xml.StartElem
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(c.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", c.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {

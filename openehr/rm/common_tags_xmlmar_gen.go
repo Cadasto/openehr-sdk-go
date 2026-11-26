@@ -31,11 +31,11 @@ func (i *ItemTag) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(i.Key, xml.StartElement{Name: xml.Name{Local: "key"}}); err != nil {
+	if err := canxml.EncodeString(_e, "key", i.Key); err != nil {
 		return err
 	}
 	if i.Value != nil {
-		if err := _e.EncodeElement(*i.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+		if err := canxml.EncodeString(_e, "value", *i.Value); err != nil {
 			return err
 		}
 	}
@@ -45,7 +45,7 @@ func (i *ItemTag) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if i.TargetPath != nil {
-		if err := _e.EncodeElement(*i.TargetPath, xml.StartElement{Name: xml.Name{Local: "target_path"}}); err != nil {
+		if err := canxml.EncodeString(_e, "target_path", *i.TargetPath); err != nil {
 			return err
 		}
 	}

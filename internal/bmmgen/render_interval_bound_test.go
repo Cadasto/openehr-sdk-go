@@ -691,8 +691,9 @@ func TestREQ169IntervalFlaggedDecoderCensus(t *testing.T) {
 					}
 					// A null in place of the interval reads as the member
 					// left out (REQ-052): it is consumed before the decode,
-					// so no default is given.
-					null := strings.Index(jsonSrc, "if dec.PeekKind() == 'n' {")
+					// so no default is given. The peek is skipped for a nil
+					// dec, which the decode refuses.
+					null := strings.Index(jsonSrc, "if dec != nil && dec.PeekKind() == 'n' {")
 					decode := strings.Index(jsonSrc, "typereg.DecodeInto(")
 					if null < 0 || decode < 0 || null >= decode {
 						t.Errorf("%s JSON decoder does not consume a null interval before the decode (positions %d, %d):\n%s", pc.BMMName, null, decode, jsonSrc)

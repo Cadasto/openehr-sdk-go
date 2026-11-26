@@ -73,11 +73,11 @@ func (a *Archetype) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		return err
 	}
 	if a.AdlVersion != nil {
-		if err := _e.EncodeElement(*a.AdlVersion, xml.StartElement{Name: xml.Name{Local: "adl_version"}}); err != nil {
+		if err := canxml.EncodeString(_e, "adl_version", *a.AdlVersion); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(a.Concept, xml.StartElement{Name: xml.Name{Local: "concept"}}); err != nil {
+	if err := canxml.EncodeString(_e, "concept", a.Concept); err != nil {
 		return err
 	}
 	if a.ParentArchetypeID != nil {

@@ -43,7 +43,7 @@ func (d *DVMultimedia) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 		}
 	}
 	if d.AlternateText != nil {
-		if err := _e.EncodeElement(*d.AlternateText, xml.StartElement{Name: xml.Name{Local: "alternate_text"}}); err != nil {
+		if err := canxml.EncodeString(_e, "alternate_text", *d.AlternateText); err != nil {
 			return err
 		}
 	}
@@ -119,10 +119,10 @@ func (d *DVParsable) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", d.Value); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(d.Formalism, xml.StartElement{Name: xml.Name{Local: "formalism"}}); err != nil {
+	if err := canxml.EncodeString(_e, "formalism", d.Formalism); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {

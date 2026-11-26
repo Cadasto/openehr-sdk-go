@@ -117,6 +117,49 @@ func TestNilReceiverUnmarshalJSONCensus(t *testing.T) { // REQ-025
 	}
 }
 
+// TestNilDecoderUnmarshalJSONFromCensus holds every library class's generated
+// UnmarshalJSONFrom to refusing a nil decoder with typereg.ErrNilArgument, a
+// caller's misuse it must not dereference (REQ-025). It runs over the same
+// registry as the nil-receiver census, plus BASE's interval classes, which the
+// registry does not hold. Can-fail: the interval decoders peeked at the
+// decoder for a null before any nil check, and panicked here.
+func TestNilDecoderUnmarshalJSONFromCensus(t *testing.T) { // REQ-025
+	decoders := map[string]jsonv2.UnmarshalerFrom{
+		"Interval":       &rm.Interval[rm.Integer]{},
+		"PointInterval":  &rm.PointInterval[rm.Integer]{},
+		"ProperInterval": &rm.ProperInterval[rm.Integer]{},
+	}
+	const (
+		libraryPrefix = "github.com/cadasto/openehr-sdk-go/openehr/"
+		fixturePkg    = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+	)
+	for _, name := range typereg.Default.Names() {
+		ctor, _ := typereg.Default.Lookup(name)
+		v := ctor()
+		rt := reflect.TypeOf(v)
+		for rt.Kind() == reflect.Pointer {
+			rt = rt.Elem()
+		}
+		if !strings.HasPrefix(rt.PkgPath(), libraryPrefix) || rt.PkgPath() == fixturePkg {
+			continue // a fixture another test registered
+		}
+		if u, ok := v.(jsonv2.UnmarshalerFrom); ok {
+			decoders[name] = u
+		}
+	}
+	if len(decoders) < 100 {
+		t.Fatalf("census covers %d classes; expected the full RM + AOM 1.4 inventory", len(decoders))
+	}
+	for name, u := range decoders {
+		t.Run(name, func(t *testing.T) {
+			err := callWithoutPanicking(t, func() error { return u.UnmarshalJSONFrom(nil) })
+			if !errors.Is(err, typereg.ErrNilArgument) {
+				t.Errorf("UnmarshalJSONFrom(nil) = %v, want errors.Is(err, typereg.ErrNilArgument)", err)
+			}
+		})
+	}
+}
+
 // codecNilGuard reports whether typedNil carries a decode method this census
 // can drive with a nil receiver, and returns a closure invoking it. It is
 // interface-agnostic: the streaming pair (ADR 0022) emits UnmarshalJSONFrom

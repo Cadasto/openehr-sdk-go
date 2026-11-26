@@ -47,12 +47,12 @@ func (d *DVCount) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if d.MagnitudeStatus != nil {
-		if err := _e.EncodeElement(*d.MagnitudeStatus, xml.StartElement{Name: xml.Name{Local: "magnitude_status"}}); err != nil {
+		if err := canxml.EncodeString(_e, "magnitude_status", *d.MagnitudeStatus); err != nil {
 			return err
 		}
 	}
 	if d.Accuracy != nil {
-		if err := _e.EncodeElement(*d.Accuracy, xml.StartElement{Name: xml.Name{Local: "accuracy"}}); err != nil {
+		if err := canxml.EncodeText(_e, "accuracy", *d.Accuracy); err != nil {
 			return err
 		}
 	}
@@ -204,12 +204,12 @@ func (d *DVProportion) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 		}
 	}
 	if d.MagnitudeStatus != nil {
-		if err := _e.EncodeElement(*d.MagnitudeStatus, xml.StartElement{Name: xml.Name{Local: "magnitude_status"}}); err != nil {
+		if err := canxml.EncodeString(_e, "magnitude_status", *d.MagnitudeStatus); err != nil {
 			return err
 		}
 	}
 	if d.Accuracy != nil {
-		if err := _e.EncodeElement(*d.Accuracy, xml.StartElement{Name: xml.Name{Local: "accuracy"}}); err != nil {
+		if err := canxml.EncodeText(_e, "accuracy", *d.Accuracy); err != nil {
 			return err
 		}
 	}
@@ -218,10 +218,10 @@ func (d *DVProportion) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
-	if err := _e.EncodeElement(d.Numerator, xml.StartElement{Name: xml.Name{Local: "numerator"}}); err != nil {
+	if err := canxml.EncodeText(_e, "numerator", d.Numerator); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(d.Denominator, xml.StartElement{Name: xml.Name{Local: "denominator"}}); err != nil {
+	if err := canxml.EncodeText(_e, "denominator", d.Denominator); err != nil {
 		return err
 	}
 	if err := _e.EncodeElement(d.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
@@ -274,12 +274,12 @@ func (d *DVQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 		}
 	}
 	if d.MagnitudeStatus != nil {
-		if err := _e.EncodeElement(*d.MagnitudeStatus, xml.StartElement{Name: xml.Name{Local: "magnitude_status"}}); err != nil {
+		if err := canxml.EncodeString(_e, "magnitude_status", *d.MagnitudeStatus); err != nil {
 			return err
 		}
 	}
 	if d.Accuracy != nil {
-		if err := _e.EncodeElement(*d.Accuracy, xml.StartElement{Name: xml.Name{Local: "accuracy"}}); err != nil {
+		if err := canxml.EncodeText(_e, "accuracy", *d.Accuracy); err != nil {
 			return err
 		}
 	}
@@ -288,10 +288,10 @@ func (d *DVQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(d.Magnitude, xml.StartElement{Name: xml.Name{Local: "magnitude"}}); err != nil {
+	if err := canxml.EncodeText(_e, "magnitude", d.Magnitude); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(d.Units, xml.StartElement{Name: xml.Name{Local: "units"}}); err != nil {
+	if err := canxml.EncodeString(_e, "units", d.Units); err != nil {
 		return err
 	}
 	if d.Precision != nil {
@@ -300,12 +300,12 @@ func (d *DVQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 		}
 	}
 	if d.UnitsSystem != nil {
-		if err := _e.EncodeElement(*d.UnitsSystem, xml.StartElement{Name: xml.Name{Local: "units_system"}}); err != nil {
+		if err := canxml.EncodeString(_e, "units_system", *d.UnitsSystem); err != nil {
 			return err
 		}
 	}
 	if d.UnitsDisplayName != nil {
-		if err := _e.EncodeElement(*d.UnitsDisplayName, xml.StartElement{Name: xml.Name{Local: "units_display_name"}}); err != nil {
+		if err := canxml.EncodeString(_e, "units_display_name", *d.UnitsDisplayName); err != nil {
 			return err
 		}
 	}
@@ -350,7 +350,7 @@ func (d *DVScale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeText(_e, "value", d.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeElement(&d.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {

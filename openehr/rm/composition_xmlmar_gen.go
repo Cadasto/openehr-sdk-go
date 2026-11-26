@@ -119,7 +119,7 @@ func (e *EventContext) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 		}
 	}
 	if e.Location != nil {
-		if err := _e.EncodeElement(*e.Location, xml.StartElement{Name: xml.Name{Local: "location"}}); err != nil {
+		if err := canxml.EncodeString(_e, "location", *e.Location); err != nil {
 			return err
 		}
 	}

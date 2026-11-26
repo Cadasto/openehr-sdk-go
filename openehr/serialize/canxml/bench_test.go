@@ -3,6 +3,7 @@ package canxml_test
 import (
 	"bufio"
 	"bytes"
+	"encoding/xml"
 	"io"
 	"os"
 	"strings"
@@ -44,6 +45,67 @@ func BenchmarkMarshalComposition(b *testing.B) {
 		if _, err := canxml.Marshal(c); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// keepsStart is a caller's class whose MarshalXML keeps the start element
+// EncodePoly hands it, as encoding/xml lets any MarshalXML do.
+type keepsStart struct{ kept *xml.StartElement }
+
+func (*keepsStart) BMMName() string { return "KEEPS_START" }
+
+func (k *keepsStart) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	*k.kept = start
+	return e.EncodeElement("", start)
+}
+
+// TestEncodePolyLeavesAttributesToMarshalXML pins the start element EncodePoly
+// hands a MarshalXML as that method's own: its `xsi:type` still reads the
+// class after EncodePoly returns and another element is encoded. Can-fail:
+// handing out attribute slots that EncodePoly reuses clears or overwrites the
+// kept one.
+func TestEncodePolyLeavesAttributesToMarshalXML(t *testing.T) {
+	e := xml.NewEncoder(io.Discard)
+	var kept xml.StartElement
+	if err := canxml.EncodePoly(e, "first", &keepsStart{kept: &kept}); err != nil {
+		t.Fatalf("EncodePoly: %v", err)
+	}
+	if err := canxml.EncodePoly(e, "items", &rm.Element{ArchetypeNodeID: "at0004", Name: &rm.DVText{}}); err != nil {
+		t.Fatalf("EncodePoly: %v", err)
+	}
+	if len(kept.Attr) != 1 || kept.Attr[0].Name != canxml.XSITypeAttrName() || kept.Attr[0].Value != "KEEPS_START" {
+		t.Errorf("kept start element's attributes = %v, want the one xsi:type KEEPS_START", kept.Attr)
+	}
+}
+
+// TestEncodeStringAndTextCopyNoValue pins the helpers the generated encoders
+// call for primitive members, once the encoder has grown its stacks:
+// EncodeString writes a string allocating nothing, and EncodeText a Real
+// allocating less than EncodeElement, which copies the Real into an
+// interface.
+func TestEncodeStringAndTextCopyNoValue(t *testing.T) {
+	if raceEnabled {
+		t.Skip("the race detector drops pooled values at random")
+	}
+	e := xml.NewEncoder(io.Discard)
+	allocs := func(write func() error) float64 {
+		return testing.AllocsPerRun(100, func() {
+			if err := write(); err != nil {
+				t.Fatalf("write: %v", err)
+			}
+		})
+	}
+	// Members, as the generated encoders read them: a constant converts to
+	// an interface without a copy.
+	q := &rm.DVQuantity{Magnitude: 80.5, Units: "kg"}
+	if n := allocs(func() error { return canxml.EncodeString(e, "units", q.Units) }); n != 0 {
+		t.Errorf("EncodeString allocates %v times; want 0", n)
+	}
+	start := xml.StartElement{Name: xml.Name{Local: "magnitude"}}
+	text := allocs(func() error { return canxml.EncodeText(e, "magnitude", q.Magnitude) })
+	boxed := allocs(func() error { return e.EncodeElement(q.Magnitude, start) })
+	if text >= boxed {
+		t.Errorf("EncodeText of a Real allocates %v times, EncodeElement %v; want fewer", text, boxed)
 	}
 }
 

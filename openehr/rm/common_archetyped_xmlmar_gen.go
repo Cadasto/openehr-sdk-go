@@ -39,7 +39,7 @@ func (a *Archetyped) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(a.RMVersion, xml.StartElement{Name: xml.Name{Local: "rm_version"}}); err != nil {
+	if err := canxml.EncodeString(_e, "rm_version", a.RMVersion); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -117,7 +117,7 @@ func (f *FeederAuditDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(f.SystemID, xml.StartElement{Name: xml.Name{Local: "system_id"}}); err != nil {
+	if err := canxml.EncodeString(_e, "system_id", f.SystemID); err != nil {
 		return err
 	}
 	if f.Location != nil {
@@ -141,7 +141,7 @@ func (f *FeederAuditDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 		}
 	}
 	if f.VersionID != nil {
-		if err := _e.EncodeElement(*f.VersionID, xml.StartElement{Name: xml.Name{Local: "version_id"}}); err != nil {
+		if err := canxml.EncodeString(_e, "version_id", *f.VersionID); err != nil {
 			return err
 		}
 	}

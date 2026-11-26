@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // Canonical XML namespaces.
@@ -169,7 +171,13 @@ func ElementName(bmmName string) string {
 // are emitted as absent (no element written). A nil-interface that
 // boxes a typed-nil pointer (`var p *T = nil; var i I = p`) is also
 // treated as absent.
+//
+// A nil e is refused, whatever v is, with an error wrapping
+// [typereg.ErrNilArgument] that names the element.
 func EncodePoly(e *xml.Encoder, name string, v any) error {
+	if e == nil {
+		return nilArgument("EncodePoly", "e", name)
+	}
 	if isNilValue(v) {
 		return nil
 	}
@@ -178,6 +186,7 @@ func EncodePoly(e *xml.Encoder, name string, v any) error {
 		return fmt.Errorf("canxml: EncodePoly %s: %T does not implement BMMNamer/xml.Marshaler", name, v)
 	}
 	// A LOCATABLE's MarshalXML appends its archetype_node_id: leave it room.
+	// The slice is v's to keep, as encoding/xml's own start elements are.
 	n := 1
 	if _, ok := m.(locatable); ok {
 		n = 2
@@ -186,6 +195,14 @@ func EncodePoly(e *xml.Encoder, name string, v any) error {
 	attrs[0] = xml.Attr{Name: XSITypeAttrName(), Value: bn.BMMName()}
 	start := xml.StartElement{Name: xml.Name{Local: name}, Attr: attrs}
 	return m.MarshalXML(e, start)
+}
+
+// nilArgument is the refusal of a nil arg, an encoder or a decoder, handed to
+// the helper fn for the element named name. It wraps [typereg.ErrNilArgument],
+// so a caller matches it with errors.Is instead of recovering a panic. Its
+// text takes forms a [DecodeError] writes out, which leaves out any other.
+func nilArgument(fn, arg, name string) error {
+	return fmt.Errorf("canxml: <%s>: %w: %s for canxml.%s", name, typereg.ErrNilArgument, arg, fn)
 }
 
 // locatable is implemented by every generated LOCATABLE class, whose

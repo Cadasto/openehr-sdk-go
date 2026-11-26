@@ -69,7 +69,7 @@ func (c *CDate) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		return err
 	}
 	if c.Pattern != nil {
-		if err := _e.EncodeElement(*c.Pattern, xml.StartElement{Name: xml.Name{Local: "pattern"}}); err != nil {
+		if err := canxml.EncodeString(_e, "pattern", *c.Pattern); err != nil {
 			return err
 		}
 	}
@@ -84,7 +84,7 @@ func (c *CDate) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+		if err := canxml.EncodeString(_e, "assumed_value", *c.AssumedValue); err != nil {
 			return err
 		}
 	}
@@ -115,7 +115,7 @@ func (c *CDateTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		return err
 	}
 	if c.Pattern != nil {
-		if err := _e.EncodeElement(*c.Pattern, xml.StartElement{Name: xml.Name{Local: "pattern"}}); err != nil {
+		if err := canxml.EncodeString(_e, "pattern", *c.Pattern); err != nil {
 			return err
 		}
 	}
@@ -130,7 +130,7 @@ func (c *CDateTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+		if err := canxml.EncodeString(_e, "assumed_value", *c.AssumedValue); err != nil {
 			return err
 		}
 	}
@@ -161,7 +161,7 @@ func (c *CDuration) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		return err
 	}
 	if c.Pattern != nil {
-		if err := _e.EncodeElement(*c.Pattern, xml.StartElement{Name: xml.Name{Local: "pattern"}}); err != nil {
+		if err := canxml.EncodeString(_e, "pattern", *c.Pattern); err != nil {
 			return err
 		}
 	}
@@ -171,7 +171,7 @@ func (c *CDuration) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+		if err := canxml.EncodeString(_e, "assumed_value", *c.AssumedValue); err != nil {
 			return err
 		}
 	}
@@ -243,7 +243,7 @@ func (c *CReal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		return err
 	}
 	for _, _item := range c.List {
-		if err := _e.EncodeElement(_item, xml.StartElement{Name: xml.Name{Local: "list"}}); err != nil {
+		if err := canxml.EncodeText(_e, "list", _item); err != nil {
 			return err
 		}
 	}
@@ -253,7 +253,7 @@ func (c *CReal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+		if err := canxml.EncodeText(_e, "assumed_value", *c.AssumedValue); err != nil {
 			return err
 		}
 	}
@@ -284,12 +284,12 @@ func (c *CString) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		return err
 	}
 	if c.Pattern != nil {
-		if err := _e.EncodeElement(*c.Pattern, xml.StartElement{Name: xml.Name{Local: "pattern"}}); err != nil {
+		if err := canxml.EncodeString(_e, "pattern", *c.Pattern); err != nil {
 			return err
 		}
 	}
 	for _, _item := range c.List {
-		if err := _e.EncodeElement(_item, xml.StartElement{Name: xml.Name{Local: "list"}}); err != nil {
+		if err := canxml.EncodeString(_e, "list", _item); err != nil {
 			return err
 		}
 	}
@@ -299,7 +299,7 @@ func (c *CString) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+		if err := canxml.EncodeString(_e, "assumed_value", *c.AssumedValue); err != nil {
 			return err
 		}
 	}
@@ -330,7 +330,7 @@ func (c *CTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		return err
 	}
 	if c.Pattern != nil {
-		if err := _e.EncodeElement(*c.Pattern, xml.StartElement{Name: xml.Name{Local: "pattern"}}); err != nil {
+		if err := canxml.EncodeString(_e, "pattern", *c.Pattern); err != nil {
 			return err
 		}
 	}
@@ -345,7 +345,7 @@ func (c *CTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if c.AssumedValue != nil {
-		if err := _e.EncodeElement(*c.AssumedValue, xml.StartElement{Name: xml.Name{Local: "assumed_value"}}); err != nil {
+		if err := canxml.EncodeString(_e, "assumed_value", *c.AssumedValue); err != nil {
 			return err
 		}
 	}

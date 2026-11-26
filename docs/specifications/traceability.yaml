@@ -665,6 +665,7 @@ requirements:
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
       - openehr/serialize/canxml/edgecases_test.go
+      - openehr/serialize/canxml/encode_text_test.go
       - openehr/serialize/canxml/generic_param_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_nil_bound_test.go
@@ -672,6 +673,7 @@ requirements:
       - openehr/serialize/canxml/max_depth_test.go
       - openehr/serialize/canxml/missing_test.go
       - openehr/serialize/canxml/names_test.go
+      - openehr/serialize/canxml/nil_argument_test.go
       - openehr/serialize/canxml/not_well_formed_test.go
       - openehr/serialize/canxml/oneroot_test.go
       - openehr/serialize/canxml/optional_nil_test.go
