@@ -16,6 +16,13 @@ var keyedParticipationConstraint = strings.Replace(participationConstraint,
 	"<rm_type_name>PARTICIPATION</rm_type_name><node_id></node_id>",
 	"<rm_type_name>PARTICIPATION</rm_type_name><node_id>at0001</node_id>", 1)
 
+// prohibitedParticipationConstraint is participationConstraint with
+// occurrences 0..0: the template prohibits it, so the skeleton builds no
+// participation from it, yet it keeps its positional key.
+var prohibitedParticipationConstraint = strings.Replace(participationConstraint,
+	"<rm_type_name>PARTICIPATION</rm_type_name><node_id></node_id>",
+	"<rm_type_name>PARTICIPATION</rm_type_name>"+occurrences("0", "0")+"<node_id></node_id>", 1)
+
 // mappingConstraint is a TERM_MAPPING child constraint with a required
 // CODE_PHRASE target. A TERM_MAPPING is no LOCATABLE and carries no node
 // id, so its compiled path takes a positional key.
@@ -166,9 +173,11 @@ func TestREQ101_SetRefusesAPositionalSegmentOfSeveralChildren(t *testing.T) {
 
 // TestREQ101_SetWritesThroughASolePositionalChild checks, for REQ-101, that a
 // path through positional segments each of which is the only child the
-// template lists for its multi-valued attribute is settable: every member
+// template allows for its multi-valued attribute is settable: every member
 // the skeleton holds there was built from that child, so Set writes the
-// value into the first, and Build returns it with no error.
+// value into the first, and Build returns it with no error. A sibling the
+// template prohibits, with occurrences 0..0, adds no member and does not
+// count, wherever it stands.
 func TestREQ101_SetWritesThroughASolePositionalChild(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -185,6 +194,18 @@ func TestREQ101_SetWritesThroughASolePositionalChild(t *testing.T) {
 			opt:  participationsOPT(mappedParticipation(1)),
 			path: "/context/participations[@1]/function/mappings[@1]/target",
 			want: "participations[0].function.mappings[0].target",
+		},
+		{
+			name: "the only allowed PARTICIPATION, before a prohibited one",
+			opt:  participationsOPT(participationConstraint, prohibitedParticipationConstraint),
+			path: "/context/participations[@1]/function",
+			want: "participations[0].function",
+		},
+		{
+			name: "the only allowed PARTICIPATION, after a prohibited one",
+			opt:  participationsOPT(prohibitedParticipationConstraint, participationConstraint),
+			path: "/context/participations[@2]/function",
+			want: "participations[0].function",
 		},
 	}
 	for _, tc := range cases {
@@ -207,6 +228,61 @@ func TestREQ101_SetWritesThroughASolePositionalChild(t *testing.T) {
 			}
 			if writes := positionalWrites(comp); len(writes) != 1 || writes[0] != tc.want {
 				t.Errorf("Build after Set(%s) wrote the value at %v, want [%s]", tc.path, writes, tc.want)
+			}
+			if n := len(comp.Context.Participations); n != 1 {
+				t.Errorf("Build after Set(%s) holds %d participations, want the 1 the allowed child builds", tc.path, n)
+			}
+		})
+	}
+}
+
+// TestREQ101_SetRefusesAPositionalSegmentTheTemplateProhibits checks, for
+// REQ-101, that Set returns ErrInvalidPath, Build carries it and nothing is
+// written, for a path through a positional segment that names a list child
+// the template prohibits, with occurrences 0..0, beside the one child it
+// allows. The skeleton holds no item built from the prohibited child, so
+// writing into the one it holds would put the value where the path does not
+// name.
+func TestREQ101_SetRefusesAPositionalSegmentTheTemplateProhibits(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, opt, path string
+	}{
+		{
+			name: "prohibited PARTICIPATION after the allowed one",
+			opt:  participationsOPT(participationConstraint, prohibitedParticipationConstraint),
+			path: "/context/participations[@2]/function",
+		},
+		{
+			name: "prohibited PARTICIPATION before the allowed one",
+			opt:  participationsOPT(prohibitedParticipationConstraint, participationConstraint),
+			path: "/context/participations[@1]/function",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b, err := composition.NewBuilder(t.Context(), compileInline(t, tc.opt),
+				composition.WithTerritory("NL"),
+				composition.WithComposer(testComposer()),
+			)
+			if err != nil {
+				t.Fatalf("NewBuilder: %v", err)
+			}
+			v := positionalValue(tc.path)
+			setErr := b.Set(tc.path, v)
+			if !errors.Is(setErr, composition.ErrInvalidPath) {
+				t.Errorf("Set(%s, %T) = %v, want ErrInvalidPath", tc.path, v, setErr)
+			}
+			if setErr != nil && !strings.Contains(setErr.Error(), tc.path) {
+				t.Errorf("Set(%s) error %q, want it to name the path", tc.path, setErr)
+			}
+			comp, err := b.Build()
+			if !errors.Is(err, composition.ErrInvalidPath) {
+				t.Errorf("Build after Set(%s) = %v, want ErrInvalidPath", tc.path, err)
+			}
+			if writes := positionalWrites(comp); len(writes) > 0 {
+				t.Errorf("Build after Set(%s) wrote the value at %v, want it written nowhere", tc.path, writes)
 			}
 		})
 	}
