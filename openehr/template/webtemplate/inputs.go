@@ -214,9 +214,9 @@ const proportionKindPercent = 100
 // kindDenominatorValidation derives the fixed denominator bound implied
 // by a single-valued proportion-kind constraint, or nil. Only the percent
 // kind (2) is mirrored — the only kind the reference fixture pins
-// (deviations.md lists the rest). Min and Max are distinct allocations:
-// Build returns a mutable tree for post-processing, so the bounds must
-// not alias.
+// (deviations.md lists the rest). Each call allocates its bounds afresh:
+// a built tree is read-only, and fresh bounds keep a caller who edits one
+// tree anyway from reaching any other Build's.
 func kindDenominatorValidation(kinds []int64) *Validation {
 	if len(kinds) != 1 || kinds[0] != 2 {
 		return nil

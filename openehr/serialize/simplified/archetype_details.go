@@ -72,9 +72,18 @@ func archetypedJSON(archetypeID string) map[string]any {
 //   - The id must have the ARCHETYPE_ID lexical form ([rm.ParseArchetypeID]).
 //     The Web Template has no archetype-root flag, so the lexical form is what
 //     tells an archetype id from an at-code or id-code, which never qualifies.
+//
+// The set is the one kept for wt ([tablesFor]) and shared by every call with
+// it, so a caller only reads it.
 func archetypeRootIDs(wt *webtemplate.WebTemplate) map[string]bool {
+	return tablesFor(wt).archetypeIDs()
+}
+
+// readArchetypeRootIDs reads the archetype ids by which tree, a Web Template's
+// tree, which may be nil, identifies a node ([archetypeRootIDs]).
+func readArchetypeRootIDs(tree *webtemplate.Node) map[string]bool {
 	ids := make(map[string]bool)
-	if wt == nil || wt.Tree == nil {
+	if tree == nil {
 		return ids
 	}
 	// Every node's path repeats its parent's predicates, and most ids are
@@ -97,7 +106,7 @@ func archetypeRootIDs(wt *webtemplate.WebTemplate) map[string]bool {
 		}
 		refused[id] = struct{}{}
 	}
-	stack := []*webtemplate.Node{wt.Tree}
+	stack := []*webtemplate.Node{tree}
 	for len(stack) > 0 {
 		n := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]

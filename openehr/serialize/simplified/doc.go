@@ -23,7 +23,10 @@
 // with [ErrUnknownPath] where they differ.
 //
 // The codecs take an *rm.Composition and a *webtemplate.WebTemplate and
-// return bytes (or the reverse). They import only openehr/rm (+ rmpath /
+// return bytes (or the reverse). They keep what they derive from a Web
+// Template for later calls with it, so a Web Template, built or decoded or
+// assembled by hand, is not changed once made, as [webtemplate.WebTemplate]
+// says. They import only openehr/rm (+ rmpath /
 // rminfo / typereg), openehr/terminology, openehr/template (+ constraints /
 // webtemplate), openehr/templatecompile (the WithTemplate name/default
 // source), openehr/serialize/canjson, module-internal helpers, and the

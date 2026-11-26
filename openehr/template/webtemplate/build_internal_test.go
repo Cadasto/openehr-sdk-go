@@ -29,9 +29,11 @@ func TestRangeValidationUnconstrained(t *testing.T) {
 	}
 }
 
-// Build returns a mutable tree for post-processing, so the percent
-// denominator's Min and Max must be independent allocations — mutating
-// one bound must not move the other (REQ-106).
+// kindDenominatorValidation allocates the percent denominator's bounds
+// afresh on each call: a built tree is read-only, and fresh bounds keep a
+// caller who edits one tree anyway from reaching another Build's. Min and
+// Max are separate allocations too, so editing one leaves the other
+// (REQ-106).
 func TestKindDenominatorValidationBoundsNotAliased(t *testing.T) {
 	v := kindDenominatorValidation([]int64{2})
 	if v == nil || v.Range.Min == nil || v.Range.Max == nil {
@@ -39,6 +41,9 @@ func TestKindDenominatorValidationBoundsNotAliased(t *testing.T) {
 	}
 	if *v.Range.Min != 100 || *v.Range.Max != 100 {
 		t.Fatalf("bounds = [%v,%v], want [100,100]", *v.Range.Min, *v.Range.Max)
+	}
+	if again := kindDenominatorValidation([]int64{2}); again.Range.Min == v.Range.Min || again.Range.Max == v.Range.Max {
+		t.Errorf("two calls of kindDenominatorValidation([2]) share a bound — every tree built would share it")
 	}
 	*v.Range.Min = 0
 	if *v.Range.Max != 100 {
@@ -50,9 +55,11 @@ func TestKindDenominatorValidationBoundsNotAliased(t *testing.T) {
 	}
 }
 
-// cloneInputs deep-copies a list item's current states: the merged ISM
-// transition's careflow step carries them, and Build returns a mutable tree,
-// so a consumer editing one copy must not reach the other (REQ-106).
+// cloneInputs deep-copies a list item's current states, which the merged ISM
+// transition's careflow step carries, as it does every slice and pointer of
+// an input: it copies the package's input prototypes into each tree, and a
+// built tree is read-only, but a caller who edits one tree anyway must not
+// reach the prototypes and so every later Build (REQ-106).
 func TestCloneInputsCopiesCurrentStates(t *testing.T) {
 	in := []Input{{Suffix: "code", Type: "CODED_TEXT", List: []InputListItem{{Value: "at0003", CurrentStates: []string{"526"}}}}}
 	out := cloneInputs(in)
@@ -90,9 +97,8 @@ func TestMergedIsmTransitionEmptyListIsOpen(t *testing.T) {
 }
 
 // mergedIsmTransition copies the first step's own transition leaf rather than
-// sharing it: the step stays beside the merged node, and Build returns a
-// mutable tree, so a consumer editing the merged leaf must not reach the
-// step's (REQ-106).
+// sharing it with the step, which stays beside the merged node, so editing
+// the merged leaf leaves the step's (REQ-106).
 func TestMergedIsmTransitionCopiesTheStepsTransition(t *testing.T) {
 	const action = "/content[openEHR-EHR-ACTION.a.v1]"
 	const base = action + "/ism_transition[at0003]"

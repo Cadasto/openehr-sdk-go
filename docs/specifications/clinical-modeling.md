@@ -2467,7 +2467,8 @@ func Marshal(c *templatecompile.Compiled, opts ...Option) ([]byte, error)
 type Option func(*config) // reserved: takes no options yet (single-language compiled input; fixed schema version)
 ```
 
-`Build` returns the typed tree for callers that post-process before encoding; `Marshal` is the common path.
+`Build` returns the typed tree; `Marshal` is the common path.
+A WebTemplate is read-only once made, by `Build` or by a caller who decodes or assembles one: its nodes may share maps and slices, and the codecs of [§ REQ-053](wire.md#req-053) keep what they derive from it, so a caller that needs a different tree makes a new one.
 A nil or empty compiled input, or an unresolvable default language, **MUST** return an error (never panic).
 
 ### Output shape

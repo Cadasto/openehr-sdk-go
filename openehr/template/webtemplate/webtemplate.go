@@ -11,7 +11,15 @@ import (
 // this package mirrors (REQ-106, ADR-0014).
 const defaultVersion = "2.3"
 
-// WebTemplate is the root of the exported document.
+// WebTemplate is the root of the exported document. A WebTemplate is
+// read-only once made, by [Build] or by a caller who decodes or assembles
+// one: its nodes may share maps and slices, and the FLAT and STRUCTURED
+// codecs keep what they derive from it, so a caller that needs a different
+// tree makes a new one, for a built tree by changing the template and
+// building again. The codecs hold its nodes for as long as it lives, so a
+// WebTemplate that shares one struct value with one of its own nodes is never
+// freed once a codec has read it; [Build], decoding, and nodes made with
+// &Node{...} never put them together.
 type WebTemplate struct {
 	TemplateID      string   `json:"templateId"`
 	Version         string   `json:"version"`

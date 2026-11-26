@@ -34,6 +34,9 @@ import (
 // whose stored name differs from the name the template models it with (see
 // deviations.md § Conformance). Siblings spelled alike share their resolution
 // path, and no name tells them apart.
+//
+// One is kept per Web Template ([tablesFor]) and shared by every call with it,
+// on any goroutine: it is written only while [readReusedSiblings] builds it.
 type reusedSiblings struct {
 	// kept holds the aqlPath prefix, as the Web Template spells it, that ends
 	// at a segment whose name stays in the resolution path.
@@ -159,13 +162,20 @@ func rawSegments(p string) iter.Seq[rawSegment] {
 	}
 }
 
-// reusedSiblingsOf reads the reused siblings of wt.
+// reusedSiblingsOf returns the reused siblings of wt: the ones kept for wt
+// ([tablesFor]) and shared by every call with it, so a caller only reads them.
 func reusedSiblingsOf(wt *webtemplate.WebTemplate) *reusedSiblings {
+	return tablesFor(wt).sib
+}
+
+// readReusedSiblings reads the reused siblings of tree, a Web Template's tree,
+// which may be nil.
+func readReusedSiblings(tree *webtemplate.Node) *reusedSiblings {
 	s := &reusedSiblings{shared: make(map[string]bool)}
-	if wt == nil || wt.Tree == nil {
+	if tree == nil {
 		return s
 	}
-	nodes := make([]*webtemplate.Node, 0, countNodes(wt.Tree))
+	nodes := make([]*webtemplate.Node, 0, countNodes(tree))
 	named := false
 	var collect func(n *webtemplate.Node)
 	collect = func(n *webtemplate.Node) {
@@ -182,7 +192,7 @@ func reusedSiblingsOf(wt *webtemplate.WebTemplate) *reusedSiblings {
 			collect(ch)
 		}
 	}
-	collect(wt.Tree)
+	collect(tree)
 	if named {
 		s.readSiblings(nodes)
 	}
