@@ -766,7 +766,9 @@ Its client scenarios map to SDK coverage as follows:
 
 - **Title:** `canjson.Unmarshal[Composition]` decodes every BMM-admissible `_type` discriminator at every substitutable slot — including (a) substitutable subtypes in concrete-typed slots (e.g. `LOCATABLE.name` carrying `DV_CODED_TEXT`) per openEHR RM Liskov substitution, and (b) generic types with abstract type parameters (e.g. `DV_INTERVAL[T: DV_ORDERED]`).
 - **Preconditions:** Vendored RM fixtures under `testkit/corpus/rm/polymorphic/` covering both failure modes.
-- **Wire assertion:** Decode succeeds; the recovered value preserves every original `_type` discriminator that sits on a member the RM defines, counted as a multiset, so a lost substitution fails while an elided duplicate does not, and a `_type` inside a member the decoder ignores ([§ REQ-052](wire.md#req-052)) is not counted; re-marshalling produces a document [wire-equivalent](#terms) to the same logical content.
+- **Wire assertion:** Decode succeeds, and re-marshalling produces a document [wire-equivalent](#terms) to the same logical content.
+  The recovered value preserves every `_type` discriminator of the input's [expected form](wire.md#round-trip-comparison), counted as a multiset, so a lost substitution fails while an elided duplicate does not.
+  A `_type` the expected form does not carry is not counted: one inside a member the decoder ignores, or inside a value the round trip leaves out, such as an empty mandatory member held by value.
   No member order is asserted.
 - **Modes:** In-repo (decode property against vendored fixtures; no backend).
 - **Status:** Implemented (inline) — canonical JSON only.

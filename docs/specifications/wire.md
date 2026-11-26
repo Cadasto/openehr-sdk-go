@@ -397,7 +397,7 @@ canonical JSON carries `_type` everywhere in principle, but real-world fixtures 
 The decoder falls back to the **declared parent's concrete type** when the wire omits `_type` on a narrow-interface slot; this preserves backward compatibility with permissive producers without compromising the strict-abstract-slot rule (`DATA_VALUE`, `DV_ORDERED`, `ITEM_STRUCTURE`, `PARTY_PROXY` still require `_type`).
 
 The full substitution semantics are pinned by [PROBE-038](conformance.md#probe-038--rm-polymorphic-decode-coverage) (decode + re-marshal preserves every input `_type` discriminator on a member the RM defines).
-An empty bound beside an open flag is dropped on re-encode by [§ REQ-052](#req-052), which is outside that probe.
+A value [§ REQ-052](#req-052) drops on re-encode, such as an empty bound beside an open flag or an empty mandatory member held by value, is not in the input's expected form, so that probe does not count its discriminators.
 What a BMM bump that adds a subtype owes the codec is step 10 of [`resources/bmm/README.md` § Updating](../../resources/bmm/README.md#updating).
 
 ## Canonical XML
