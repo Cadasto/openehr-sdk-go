@@ -109,7 +109,7 @@ Every REST call flows through three layers:
 
 1. **Service catalog** (`smart/discovery`) says where the openEHR REST base URL lives.
 2. **Transport client** (`transport`) injects your `*http.Client`, attaches auth, and handles retries and OpenTelemetry (OTel) tracing.
-3. **Leaf client** gives typed methods per REST resource (`openehr/client/ehr`, `query`, `definition`, …).
+3. **Leaf client** gives typed methods per REST resource (`openehr/client/ehr`, `query`, `definition`, `demographic`, …).
 
 ### Minimal wiring (in-process sandbox)
 
