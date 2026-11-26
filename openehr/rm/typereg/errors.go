@@ -15,7 +15,8 @@ import (
 )
 
 // Sentinel errors returned by [Registry.Decode], [DecodeAs] and the decode
-// helpers the generated codec calls ([DecodeInto], [DecodePolymorphic]). They
+// helpers the generated codec calls ([DecodeInto], [DecodeDone],
+// [DecodePolymorphic]). They
 // are unwrap-compatible (errors.Is) so call sites such as the canjson
 // codec can wrap them in a richer [DecodeError] without losing the
 // classification.
@@ -30,7 +31,7 @@ var (
 	// not satisfy the target interface or type parameter T at a
 	// [DecodeAs] call site, or when the concrete value selected at a
 	// polymorphic slot does not satisfy the slot's interface
-	// ([DecodePolymorphic]). [DecodeInto] also raises it, inside a
+	// ([DecodePolymorphic]). [DecodeInto] and [DecodeDone] also raise it, inside a
 	// [DecodeError] on "/_type", when a whole value's `_type` names a
 	// different concrete type than the one being decoded.
 	ErrTypeMismatch = errors.New("typereg: decoded type does not satisfy target")
@@ -80,8 +81,9 @@ var (
 // errors.AsType[*DecodeError] finds one on any such failure, and a
 // polymorphic slot that fails adds one of its own beneath it.
 // [DecodeInto] also returns it for a whole-value `_type` mismatch on
-// "/_type", for a depth refusal ([ErrMaxDepthExceeded]) and for a nil
-// argument ([ErrNilArgument]), as does [DecodePolymorphic] for the last two.
+// "/_type", as [DecodeDone] does, for a depth refusal ([ErrMaxDepthExceeded])
+// and for a nil argument ([ErrNilArgument]), as does [DecodePolymorphic] for
+// the last two.
 // It lives here in typereg (rather than in a codec-specific package) so
 // the generator-emitted UnmarshalJSONFrom methods on the generated RM
 // types can construct it without forming an `openehr/rm →
@@ -284,7 +286,9 @@ func ClassifyShape(err error) error {
 //
 // It is the single gate every canonical-JSON decode route shares: the
 // generated decode bodies apply it, [DecodeInto] in classifyDecode after its
-// single json.UnmarshalDecode and [DecodePolymorphic] at its
+// single json.UnmarshalDecode, [DecodeDone] in classifyDecode after a direct
+// read, [MemberNameFailure] to a duplicate of the class's own member name,
+// and [DecodePolymorphic] at its
 // [jsontext.Decoder.ReadValue] site, so a caller driving a generated method
 // through bare encoding/json/v2 still gets the sentinel; [Registry.Decode]
 // applies it at both of its failure sites; and the canjson entry points apply

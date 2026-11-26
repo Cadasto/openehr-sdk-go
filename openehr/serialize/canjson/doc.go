@@ -110,7 +110,7 @@
 //     18446744073709551616 (2^64), and 0.10000000000000001, the 17-digit
 //     spelling of 0.1. An out-of-range magnitude (e.g. 1e400) fails with
 //     its own typed error, a *json.SemanticError, reachable with
-//     errors.As through the generated decode-method wrapper. A malformed
+//     errors.As through the generated decode method. A malformed
 //     or out-of-range literal reports its own parse/range error first, so
 //     the lossy test applies only once a literal has parsed.
 //
