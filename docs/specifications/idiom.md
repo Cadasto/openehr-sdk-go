@@ -213,8 +213,10 @@ In particular:
 - A nil variadic option: skipped rather than invoked.
   `f(..., opts ...Option)` invites a caller to build one conditionally, so a nil element is caller input, not a programmer error.
 - A nil receiver on a decode method, whether every generated `UnmarshalJSONFrom` or the hand-written primitive codecs' `UnmarshalJSON` / `UnmarshalText` (`rm.Real`, `rm.Integer`, `rm.Integer64`, `rm.Character`): an error carrying `typereg.ErrNilReceiver`.
-  A census over the type registry checks every registered library type for this guard.
+  A nil decoder handed to a generated `UnmarshalJSONFrom`: an error carrying `typereg.ErrNilArgument`.
+  A census over the type registry checks every registered library type for both guards.
 - A nil decoder or target handed to `typereg.DecodeInto` or `typereg.DecodePolymorphic`, or a nil `gotType` handed to `DecodeInto`: a `typereg.DecodeError` carrying `typereg.ErrNilArgument`.
+  A nil encoder or decoder handed to `canxml.EncodePoly`, `EncodeString`, `EncodeText`, `DecodeAs` or `DecodeAsOrDefault`: an error carrying `typereg.ErrNilArgument`, inside a `canxml.DecodeError` from the two decoders.
   A typed nil inside a non-nil target is not caught up front; it reaches the decode and fails there.
 - A nil receiver on an exported method of an SDK error type (`Error`, `Unwrap` and any accessor) — the typed nil a failed `errors.As` / `errors.AsType` match leaves behind — and on the accessors of `transport.Client` (`Do`, `Catalog`, `HTTPClient`): an answer.
   An error type answers with the text its zero value produces unless its godoc documents a different nil-receiver text.
