@@ -1,6 +1,6 @@
 ---
 kind: plan
-harvested_through: 2026-11-25T22:27:17Z
+harvested_through: 2026-11-26T00:51:01Z
 ---
 # Backlog
 
@@ -15,7 +15,7 @@ Code in internal/templatecompile and openehr/serialize/simplified where a compil
 
 ## Builder: a positional path to the Nth list item (REQ-101, REQ-107)
 Code in openehr/composition, openehr/instance and internal/templateinstance/builderseed, where Set refuses a positional segment it cannot route to the item the skeleton built for it. Lane: full (REQ-101 first). Size: M.
-- openehr/composition/builder.go:539 · Set refuses with ErrInvalidPath a positional [@N] segment whose list the template gives more than one child, a 0..0 one included, because the skeleton's list order does not follow the template's child order (planMembers skips slots, ownMemberSkipped, max(lower,1) members, the cap, top-ups at the end) and PARTICIPATION, LINK or CODE_PHRASE items carry no node id; routing [@N] to its own item needs the generator to record each list's member plan for the builder; no corpus template has such a list · from: fix/builder-paths-canxml-type
+- openehr/composition/builder.go:552 · Set refuses with ErrInvalidPath a positional [@N] segment whose list the template gives more than one allowed child, or which the template prohibits, because the skeleton's list order does not follow the template's child order (planMembers skips slots, ownMemberSkipped, max(lower,1) members, the cap, top-ups at the end) and PARTICIPATION, LINK or CODE_PHRASE items carry no node id; routing [@N] to its own item needs the generator to record each list's member plan for the builder; no corpus template has such a list · from: fix/builder-paths-canxml-type
 
 ## Failures a caller sees: typed errors and readable reasons (REQ-173, REQ-130, REQ-093, REQ-177)
 Code in openehr/client/ehr, openehr/client/definition and transport/ where a call fails in a form the caller cannot act on, or succeeds where it should fail: a write leaf's body-encode failure is untyped, a submission refusal's Error() loses its reason, Client.Do's network failure carries net/http's cause, and a Web Template read returns whatever body the server sent. Lane: maintenance. Size: S each.
