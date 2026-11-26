@@ -158,10 +158,10 @@ func TestREQ053WebTemplateTablesFollowEachWebTemplate(t *testing.T) {
 
 // TestREQ053WebTemplateTablesFollowAReplacedTree pins that a call whose Web
 // Template had its tree replaced after an earlier call reads the tree it is
-// given. Replacing it breaks the read-only rule webtemplate.Build states, but
-// it is the most visible way to, so the tables kept for the old tree are not
-// read for the new one. Leave out the check of the tree and the decode
-// infers the old tree's careflow step.
+// given. Replacing it breaks the read-only rule webtemplate.WebTemplate
+// states, but it is the most visible way to, so the tables kept for the old
+// tree are not read for the new one. Leave out the check of the tree and the
+// decode infers the old tree's careflow step.
 func TestREQ053WebTemplateTablesFollowAReplacedTree(t *testing.T) {
 	t.Parallel()
 	wt, _ := conformanceWT(t)

@@ -1,8 +1,8 @@
 package simplified
 
 // REQ-053 — what the codecs derive from a Web Template alone is built once per
-// Web Template and kept for every later call with it. REQ-106 makes the tree
-// webtemplate.Build returns read-only, which is what lets calls share it.
+// Web Template and kept for every later call with it. REQ-106 makes a Web
+// Template read-only once made, which is what lets calls share it.
 
 import (
 	"runtime"
@@ -16,7 +16,11 @@ import (
 // alone. Each table is written while it is built and only read after, so the
 // calls that share a Web Template, on any goroutine, read the same tables. It
 // holds the tree's nodes but no pointer to the Web Template itself, so the
-// weak key of [webTemplateTablesCache] can die.
+// weak key of [webTemplateTablesCache] can die, unless the Web Template shares
+// one allocation with one of its nodes: the entry then keeps it alive for
+// good. Holding no node would make each node lookup a weak one, about 20 times
+// slower (macOS arm64), so the webtemplate.WebTemplate doc names that layout
+// instead.
 type webTemplateTables struct {
 	// tree is the tree the tables were built from.
 	tree *webtemplate.Node
@@ -63,10 +67,10 @@ var webTemplateTablesCache sync.Map // weak.Pointer[webtemplate.WebTemplate] →
 // ([webTemplateTablesCache]). Two first calls at once may both build them; the
 // one stored first wins, and the other is discarded.
 //
-// A built Web Template is read-only. Where wt's tree is no longer the one its
-// tables were built from, the tree was replaced against that rule: the tables
-// are built again for this call alone and not stored, so the call still reads
-// the tree it is given.
+// A Web Template is read-only once made. Where wt's tree is no longer the one
+// its tables were built from, the tree was replaced against that rule: the
+// tables are built again for this call alone and not stored, so the call
+// still reads the tree it is given.
 func tablesFor(wt *webtemplate.WebTemplate) *webTemplateTables {
 	if wt == nil {
 		return newWebTemplateTables(nil)
