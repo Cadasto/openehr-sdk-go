@@ -85,8 +85,8 @@ A BMM version bump is one pull request. The new schema is added beside the old o
 ### D12 — One zero test per class held by value, shared by the encoders and the floor
 
 The canonical JSON and XML encoders leave out a mandatory member held by value as a struct when every field of it is empty ([REQ-052](../specifications/wire.md#an-absent-mandatory-member)), and the RM validation floor reads such a member as absent ([REQ-171 *Structural access*](../specifications/clinical-modeling.md#structural-access)).
-Both read it through a zero test, one function per class that compares every field with its zero value.
-Two copies of the test could drift apart, and the floor would then report a member missing that the encoders write, or accept one they leave out.
+Both read it through a zero test, one function per class that compares every field with its zero value; at a DV_TEXT, DV_CODED_TEXT or CODE_PHRASE the floor reads a content rule instead, which reads the zero value as absent too, and more besides.
+Two copies of the test could drift apart, and the floor would then accept a member the encoders leave out, or report one missing that they write.
 
 The generator therefore emits one zero test per class, into `zero_gen.go` of the target package, for the classes the encoders, the interval-bound emptiness test and the floor read.
 The floor's access in `internal/rmaccess` cannot call an unexported function of `openehr/rm`, and `openehr/rm` cannot import the access, so the file's `init` registers the tests the floor reads with `internal/rmzero`, a package that uses only the standard library.
@@ -103,6 +103,7 @@ The JSON wrapper cannot leave out a struct by its value, so a class with such a 
 - Generated files are never edited by hand. `make test` runs `make codegen-check`, which holds every `*_gen.go` file to the generator, and the weekly [`codegen-drift`](../../.github/workflows/codegen-drift.yml) workflow re-runs it on a clean checkout and tracks a failure in one `bmm-drift` issue.
 - A BMM version bump is one reviewable pull request with one pinned version per schema id (D11).
 - D10 makes the vendored ITS-XML schemas a second pinned input to the generator: a re-pin can re-order the generated XML encoders, and `make codegen-check` fails until `make codegen` is rerun.
+- D12 costs each class with a mandatory member held by value a second JSON wrapper, and `internal/rmaccess` a lookup of each zero test when it is initialised, which stops the program at start-up if `openehr/rm` registered none for a class it reads.
 
 ## References
 
