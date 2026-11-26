@@ -98,8 +98,9 @@ func (i *Interval[T]) readJSONMembers(dec *jsontext.Decoder, seen *intervalFlags
 // `_type`, which the class does not declare.
 func (i *Interval[T]) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	// A null in place of the interval reads as the member left out: the
-	// receiver keeps what it holds and no flag takes a default.
-	if dec.PeekKind() == 'n' {
+	// receiver keeps what it holds and no flag takes a default. A nil dec
+	// goes on to typereg.DecodeInto, which refuses it.
+	if dec != nil && dec.PeekKind() == 'n' {
 		_, err := dec.ReadToken()
 		return err
 	}
@@ -222,8 +223,9 @@ func (p *PointInterval[T]) readJSONMembers(dec *jsontext.Decoder, seen *interval
 // typereg.WrapShapeError.
 func (p *PointInterval[T]) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	// A null in place of the interval reads as the member left out: the
-	// receiver keeps what it holds and no flag takes a default.
-	if dec.PeekKind() == 'n' {
+	// receiver keeps what it holds and no flag takes a default. A nil dec
+	// goes on to typereg.DecodeInto, which refuses it.
+	if dec != nil && dec.PeekKind() == 'n' {
 		_, err := dec.ReadToken()
 		return err
 	}
@@ -344,8 +346,9 @@ func (p *ProperInterval[T]) readJSONMembers(dec *jsontext.Decoder, seen *interva
 // typereg.WrapShapeError.
 func (p *ProperInterval[T]) unmarshalJSONWrapped(dec *jsontext.Decoder) error {
 	// A null in place of the interval reads as the member left out: the
-	// receiver keeps what it holds and no flag takes a default.
-	if dec.PeekKind() == 'n' {
+	// receiver keeps what it holds and no flag takes a default. A nil dec
+	// goes on to typereg.DecodeInto, which refuses it.
+	if dec != nil && dec.PeekKind() == 'n' {
 		_, err := dec.ReadToken()
 		return err
 	}

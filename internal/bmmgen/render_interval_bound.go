@@ -174,8 +174,9 @@ func renderIntervalFlagJSONDecode(b *strings.Builder, recv, rmType, embedType, e
 		embedField = embedField[:i]
 	}
 	b.WriteString("\t// A null in place of the interval reads as the member left out: the\n")
-	b.WriteString("\t// receiver keeps what it holds and no flag takes a default.\n")
-	b.WriteString("\tif dec.PeekKind() == 'n' {\n")
+	b.WriteString("\t// receiver keeps what it holds and no flag takes a default. A nil dec\n")
+	b.WriteString("\t// goes on to typereg.DecodeInto, which refuses it.\n")
+	b.WriteString("\tif dec != nil && dec.PeekKind() == 'n' {\n")
 	b.WriteString("\t\t_, err := dec.ReadToken()\n")
 	b.WriteString("\t\treturn err\n")
 	b.WriteString("\t}\n")
