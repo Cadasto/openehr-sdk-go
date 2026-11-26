@@ -51,23 +51,39 @@ var textBufs = sync.Pool{New: func() any {
 	return &b
 }}
 
-// EncodeText writes the text v marshals to as one element named name, the
-// bytes e.EncodeElement(v, …) writes, without the copy of v that passing it
-// as an any makes. Generator-emitted MarshalXML methods call it for each
-// member of a primitive type that marshals itself to text, such as a Real;
-// consumers rarely need it. A nil e is refused with an error wrapping
-// [typereg.ErrNilArgument] that names the element.
-func EncodeText[T encoding.TextMarshaler](e *xml.Encoder, name string, v T) error {
+// EncodeText writes the text v's MarshalText method returns as one element
+// named name, the bytes e.EncodeElement(v, …) writes for a value that
+// marshals itself to text, without the copy of v that passing it as an any
+// makes. Generator-emitted MarshalXML methods call it for each member of a
+// primitive type that marshals itself to text, a Real or a Character;
+// consumers rarely need it.
+//
+// T's underlying type is float64 or string, so v is never a nil pointer,
+// which EncodeElement writes nothing for. A MarshalXML method of T's own is
+// not called: for such a type EncodeElement writes what MarshalXML writes,
+// where EncodeText still writes MarshalText's text. A nil e is refused with
+// an error wrapping [typereg.ErrNilArgument] that names the element.
+func EncodeText[T interface {
+	~float64 | ~string
+	encoding.TextMarshaler
+}](e *xml.Encoder, name string, v T) error {
 	if e == nil {
 		return nilArgument("EncodeText", "e", name)
 	}
 	start := xml.StartElement{Name: xml.Name{Local: name}}
 	text, err := v.MarshalText()
-	// EncodeElement writes the start tag before it reports the failure, and
-	// a newline as `&#xA;`, which character data written as a token keeps as
-	// it is.
-	if err != nil || bytes.IndexByte(text, '\n') >= 0 {
-		return e.EncodeElement(v, start)
+	if err != nil {
+		// EncodeElement writes the start tag before it reports the failure.
+		if startErr := e.EncodeToken(start); startErr != nil {
+			return startErr
+		}
+		return err
+	}
+	// EncodeElement writes a newline as `&#xA;`, which character data written
+	// as a token keeps as it is; given the text itself, it writes it as it
+	// writes a value that marshals itself to text.
+	if bytes.IndexByte(text, '\n') >= 0 {
+		return e.EncodeElement(text, start)
 	}
 	if err := e.EncodeToken(start); err != nil {
 		return err
