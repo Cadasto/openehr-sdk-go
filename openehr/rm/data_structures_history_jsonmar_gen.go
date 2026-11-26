@@ -41,7 +41,8 @@ func (h *History[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // that holds a class by value is empty: it marshals an anonymous struct
 // that declares every member marshalJSONWrapped writes, in the same order,
 // each such member as an any that holds its value unless the value is
-// empty, so that an empty one is left out.
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
 func (h *History[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
 	w := &struct {
 		Class            string        `json:"_type"`
@@ -255,13 +256,14 @@ func (i *IntervalEvent[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // that holds a class by value is empty: it marshals an anonymous struct
 // that declares every member marshalJSONWrapped writes, in the same order,
 // each such member as an any that holds its value unless the value is
-// empty, so that an empty one is left out.
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
 func (i *IntervalEvent[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
 	w := &struct {
 		Class            string        `json:"_type"`
 		ArchetypeDetails *Archetyped   `json:"archetype_details,omitzero"`
 		ArchetypeNodeID  string        `json:"archetype_node_id"`
-		Data             any           `json:"data,omitzero"`
+		Data             any           `json:"data,omitempty"`
 		FeederAudit      *FeederAudit  `json:"feeder_audit,omitzero"`
 		Links            []Link        `json:"links,omitempty"`
 		MathFunction     any           `json:"math_function,omitzero"`
@@ -282,7 +284,7 @@ func (i *IntervalEvent[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
 		State:            i.State,
 		UID:              i.UID,
 	}
-	if !isEmptyHeld(i.Data) && jsonParam(any(i.Data)) != jsonSlotAbsent {
+	if !isEmptyHeld(i.Data) {
 		w.Data = i.Data
 	}
 	if !isZeroDVCodedText(i.MathFunction) {
@@ -480,13 +482,14 @@ func (p *PointEvent[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // that holds a class by value is empty: it marshals an anonymous struct
 // that declares every member marshalJSONWrapped writes, in the same order,
 // each such member as an any that holds its value unless the value is
-// empty, so that an empty one is left out.
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
 func (p *PointEvent[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
 	w := &struct {
 		Class            string        `json:"_type"`
 		ArchetypeDetails *Archetyped   `json:"archetype_details,omitzero"`
 		ArchetypeNodeID  string        `json:"archetype_node_id"`
-		Data             any           `json:"data,omitzero"`
+		Data             any           `json:"data,omitempty"`
 		FeederAudit      *FeederAudit  `json:"feeder_audit,omitzero"`
 		Links            []Link        `json:"links,omitempty"`
 		Name             DVTextLike    `json:"name,omitempty"`
@@ -503,7 +506,7 @@ func (p *PointEvent[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
 		State:            p.State,
 		UID:              p.UID,
 	}
-	if !isEmptyHeld(p.Data) && jsonParam(any(p.Data)) != jsonSlotAbsent {
+	if !isEmptyHeld(p.Data) {
 		w.Data = p.Data
 	}
 	if !isZeroDVDateTime(p.Time) {

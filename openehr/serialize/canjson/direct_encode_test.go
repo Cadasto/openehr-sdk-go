@@ -678,3 +678,49 @@ func TestREQ052DirectEncodeLeavesOutEmptyMembersAsTheWrapperDoes(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ052WrapperLeavesTheOtherMembersAsTheirTagsDo holds the wrapper that
+// leaves out an empty member to the omit option of every other member: the
+// data of an event is written, or left out, the same whether or not the
+// event's time is empty, which alone decides which wrapper encodes it. The
+// data's own tag is omitempty, which writes a nil pointer behind the
+// interface as null under encoding/json's legacy rule, and leaves out a value
+// a caller's marshaler writes as an empty object.
+//
+// REQ-052 § An absent mandatory member.
+func TestREQ052WrapperLeavesTheOtherMembersAsTheirTagsDo(t *testing.T) {
+	t.Parallel()
+	emptyObject := json.WithMarshalers(json.MarshalToFunc(func(enc *jsontext.Encoder, _ rm.ItemTree) error {
+		return enc.WriteValue(jsontext.Value(`{}`))
+	}))
+	for _, tc := range []struct {
+		name string
+		data rm.ItemStructure
+		opt  json.Options
+	}{
+		{name: "a nil pointer under encoding/json's defaults", data: (*rm.ItemTree)(nil), opt: jsonv1.DefaultOptionsV1()},
+		{name: "a caller's marshaler writing an empty object", data: rm.ItemTree{ArchetypeNodeID: "at0003"}, opt: emptyObject},
+	} {
+		event := func(at string) *rm.PointEvent[rm.ItemStructure] {
+			return &rm.PointEvent[rm.ItemStructure]{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "e"}, Data: tc.data, Time: rm.DVDateTime{Value: at}}
+		}
+		var data [2]string
+		for i, at := range []string{"2026-11-27T10:00:00Z", ""} {
+			got := encode(event(at), tc.opt)
+			if got.err != "" {
+				t.Fatalf("%s, time %q: encode: %s", tc.name, at, got.err)
+			}
+			var members map[string]jsonv1.RawMessage
+			if err := jsonv1.Unmarshal(got.out, &members); err != nil {
+				t.Fatalf("%s, time %q: read %s: %v", tc.name, at, got.out, err)
+			}
+			data[i] = "left out"
+			if raw, ok := members["data"]; ok {
+				data[i] = string(raw)
+			}
+		}
+		if data[0] != data[1] {
+			t.Errorf("%s: data is %s beside a time and %s beside an empty time, want the same", tc.name, data[0], data[1])
+		}
+	}
+}

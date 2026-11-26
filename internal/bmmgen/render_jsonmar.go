@@ -2,6 +2,7 @@ package bmmgen
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"go/format"
 	"regexp"
@@ -681,7 +682,8 @@ func renderMarshalOmitting(pc *PlannedClass, shape jsonWireShape, recv, typeArgs
 	b.WriteString("// that holds a class by value is empty: it marshals an anonymous struct\n")
 	b.WriteString("// that declares every member marshalJSONWrapped writes, in the same order,\n")
 	b.WriteString("// each such member as an any that holds its value unless the value is\n")
-	b.WriteString("// empty, so that an empty one is left out.\n")
+	b.WriteString("// empty, so that an empty one is left out. Each member keeps the omit\n")
+	b.WriteString("// option of its field's tag, omitzero standing in where the tag has none.\n")
 	fmt.Fprintf(&b, "func (%s *%s%s) marshalJSONOmitting(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	// The discriminator field is named Class, as in the flat wire struct; no
 	// member's field may take the name.
@@ -692,7 +694,12 @@ func renderMarshalOmitting(pc *PlannedClass, shape jsonWireShape, recv, typeArgs
 	b.WriteString("\t\tClass string `json:\"_type\"`\n")
 	for _, m := range members {
 		if m.empty != nil {
-			fmt.Fprintf(&b, "\t\t%s any `json:%q`\n", m.field, m.name+",omitzero")
+			// An any left nil is left out by either option, and a value
+			// it holds is left out as the field's own tag leaves it out:
+			// omitempty drops a value that encodes as null or {}, which a
+			// caller's marshaler or encoding/json's legacy rule may write.
+			omit := cmp.Or(m.omit, "omitzero")
+			fmt.Fprintf(&b, "\t\t%s any `json:%q`\n", m.field, m.name+","+omit)
 			continue
 		}
 		b.WriteString("\t" + m.decl)
@@ -707,7 +714,7 @@ func renderMarshalOmitting(pc *PlannedClass, shape jsonWireShape, recv, typeArgs
 	for _, m := range empty {
 		v := recv + "." + m.field
 		if m.empty.param {
-			fmt.Fprintf(&b, "\tif !%s(%s) && jsonParam(any(%s)) != jsonSlotAbsent {\n", emptyHeldFunc, v, v)
+			fmt.Fprintf(&b, "\tif !%s(%s) {\n", emptyHeldFunc, v)
 		} else {
 			fmt.Fprintf(&b, "\tif !%s(%s) {\n", m.empty.test, v)
 		}

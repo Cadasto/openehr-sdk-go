@@ -297,7 +297,8 @@ func (d *DVOrdinal) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // that holds a class by value is empty: it marshals an anonymous struct
 // that declares every member marshalJSONWrapped writes, in the same order,
 // each such member as an any that holds its value unless the value is
-// empty, so that an empty one is left out.
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
 func (d *DVOrdinal) marshalJSONOmitting(enc *jsontext.Encoder) error {
 	w := &struct {
 		Class                string                      `json:"_type"`
@@ -727,7 +728,8 @@ func (d *DVScale) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // that holds a class by value is empty: it marshals an anonymous struct
 // that declares every member marshalJSONWrapped writes, in the same order,
 // each such member as an any that holds its value unless the value is
-// empty, so that an empty one is left out.
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
 func (d *DVScale) marshalJSONOmitting(enc *jsontext.Encoder) error {
 	w := &struct {
 		Class                string                      `json:"_type"`
@@ -866,7 +868,8 @@ func (r *ReferenceRange[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // that holds a class by value is empty: it marshals an anonymous struct
 // that declares every member marshalJSONWrapped writes, in the same order,
 // each such member as an any that holds its value unless the value is
-// empty, so that an empty one is left out.
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
 func (r *ReferenceRange[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
 	w := &struct {
 		Class   string     `json:"_type"`

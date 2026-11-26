@@ -43,7 +43,8 @@ func (e *EHR) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // that holds a class by value is empty: it marshals an anonymous struct
 // that declares every member marshalJSONWrapped writes, in the same order,
 // each such member as an any that holds its value unless the value is
-// empty, so that an empty one is left out.
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
 func (e *EHR) marshalJSONOmitting(enc *jsontext.Encoder) error {
 	w := &struct {
 		Class         string          `json:"_type"`
@@ -540,7 +541,8 @@ func (v *VersionedComposition) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // that holds a class by value is empty: it marshals an anonymous struct
 // that declares every member marshalJSONWrapped writes, in the same order,
 // each such member as an any that holds its value unless the value is
-// empty, so that an empty one is left out.
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
 func (v *VersionedComposition) marshalJSONOmitting(enc *jsontext.Encoder) error {
 	w := &struct {
 		Class       string        `json:"_type"`
@@ -667,7 +669,8 @@ func (v *VersionedEHRAccess) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // that holds a class by value is empty: it marshals an anonymous struct
 // that declares every member marshalJSONWrapped writes, in the same order,
 // each such member as an any that holds its value unless the value is
-// empty, so that an empty one is left out.
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
 func (v *VersionedEHRAccess) marshalJSONOmitting(enc *jsontext.Encoder) error {
 	w := &struct {
 		Class       string        `json:"_type"`
@@ -794,7 +797,8 @@ func (v *VersionedEHRStatus) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // that holds a class by value is empty: it marshals an anonymous struct
 // that declares every member marshalJSONWrapped writes, in the same order,
 // each such member as an any that holds its value unless the value is
-// empty, so that an empty one is left out.
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
 func (v *VersionedEHRStatus) marshalJSONOmitting(enc *jsontext.Encoder) error {
 	w := &struct {
 		Class       string        `json:"_type"`
