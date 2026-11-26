@@ -8,12 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-11-26
+
+Fifty-third `v0.x` minor: the demographic client gains item tags and canonical XML, the types every REST client shares move to `openehr/client`, the composition builder refuses early the paths it cannot write, and canonical XML types a generic member's class value. **Breaking:** the demographic repository gains methods and checks the party class, the reads refuse a caller's embedded Ref, probe 073 takes a format, and `Set` and `canxml.Marshal` refuse inputs they accepted.
+
 ### Added
 
 - **`demographic.GetTags`, `SetTags`, `DeleteTag` and `ListTags`** read, replace and delete the ITEM_TAGs on a party, or search the tags of every party by key, value or target path (REQ-059).
 - **`demographic.WithFormat` and `WithGetFormat`** let the PARTY writes and reads, the versioned_party reads included, use canonical XML as well as canonical JSON, and `WithRawBody` hands back a read's body as received (REQ-173, REQ-174).
 - **`openehr/client`** now holds the types every REST client shares, such as `Ref`, moved from the EHR client package; its new `ValidateRef` refuses a nil Ref, a nil pointer or an empty id with `transport.ErrInvalidConfig` (REQ-025).
 - **`rminfo.BoundTypeReporter` and `AttrMeta.BoundTypeName`** give an attribute's type with the generic parameters its BMM declaration binds, such as `DV_INTERVAL<DV_DATE>` for PARTY_RELATIONSHIP's `time_validity`, where the plain RM type is DV_INTERVAL (REQ-048).
+- **`cmd/examples/demographic-crud`** runs the demographic client offline: it creates a PERSON, reads it in canonical JSON and XML, updates and tags it, and reads an earlier version.
 
 ### Changed
 
@@ -21,7 +26,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Breaking: `demographic.Get`** fails with a `*transport.DecodeError` when the body names a PARTY class other than the one the call asks for, instead of returning that party (REQ-173).
 - **Breaking: `composition.Get` and `demographic.Get`** refuse with `transport.ErrInvalidConfig` a caller's own type that embeds one of the SDK's Ref types, which they accepted before, and a nil pointer, which panicked (REQ-025).
 - **Breaking: `demographicprobes.Probe073DemographicRoundTrip`** takes the `demographic.Format` to round-trip the party in, canonical JSON or canonical XML (REQ-173, PROBE-073).
+- **Breaking: `composition.Builder.Set`** refuses with `ErrInvalidPath` the root, a path ending in one list member and an ambiguous positional `[@N]` path, which before `Build` refused or, for `[@N]`, wrote into the list's first item (REQ-101).
+- **Breaking: `canxml.Marshal`** writes `xsi:type` on a class value in a member typed by a generic parameter, such as ORIGINAL_VERSION data or an Interval bound, and refuses a value that is neither RM class nor primitive (REQ-056).
 - **`demographic.Create` and `Update`** report a party the codec cannot serialise as a `*demographic.EncodeError`, before any request, in place of a plain error (REQ-173).
+- **`testkit/corpus`** re-pins the EHRbase integration tests and reference content v0.3.0, where `PERSON-PatientIdentity.v1` folds into `PERSON-Patient.v1`, and two FOLDER samples join the round-trip hold-out set (PROBE-030).
 
 ### Deprecated
 
