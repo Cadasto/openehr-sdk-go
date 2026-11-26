@@ -391,6 +391,7 @@ requirements:
       - openehr/serialize/canjson/bare_v2_decode_test.go
       - openehr/serialize/canjson/corpus_parity_test.go
       - openehr/serialize/canjson/decode_test.go
+      - openehr/serialize/canjson/direct_decode_test.go
       - openehr/serialize/canjson/direct_encode_test.go
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/serialize/canjson/encode_test.go

@@ -19,8 +19,8 @@ import (
 // generated-UnmarshalJSONFrom cost. For HISTORY/EVENT-bearing inputs see
 // the fixture round-trip benchmarks (TestRoundTripFixtures
 // fixtures decode through the same code path).
-func benchCompositionPayload(b *testing.B, width int) []byte {
-	b.Helper()
+func benchCompositionPayload(tb testing.TB, width int) []byte {
+	tb.Helper()
 	var sb strings.Builder
 	sb.WriteString(`{
 		"_type": "COMPOSITION",
