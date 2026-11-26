@@ -2467,7 +2467,7 @@ func Marshal(c *templatecompile.Compiled, opts ...Option) ([]byte, error)
 type Option func(*config) // reserved: takes no options yet (single-language compiled input; fixed schema version)
 ```
 
-`Build` returns the typed tree for callers that post-process before encoding; `Marshal` is the common path.
+`Build` returns the typed tree, which is read-only: its nodes may share maps and slices, and a caller that needs a different tree changes the template and builds again; `Marshal` is the common path.
 A nil or empty compiled input, or an unresolvable default language, **MUST** return an error (never panic).
 
 ### Output shape

@@ -11,7 +11,9 @@ import (
 // this package mirrors (REQ-106, ADR-0014).
 const defaultVersion = "2.3"
 
-// WebTemplate is the root of the exported document.
+// WebTemplate is the root of the exported document. A built WebTemplate is
+// read-only: its nodes may share maps and slices, so a caller that needs a
+// different tree changes the template and builds it again.
 type WebTemplate struct {
 	TemplateID      string   `json:"templateId"`
 	Version         string   `json:"version"`

@@ -12,7 +12,9 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
-// Build projects a compiled OPT into the typed WebTemplate tree.
+// Build projects a compiled OPT into the typed WebTemplate tree. The tree is
+// read-only: its nodes may share maps and slices, and to get a different
+// tree a caller changes the template and builds again.
 //
 // The transform follows the EHRbase v2.3 node model: it keeps
 // COMPOSITION / ENTRY / EVENT / EVENT_CONTEXT / CLUSTER, drops the pure
@@ -382,7 +384,8 @@ func codeInput(leaf *Node) ([]InputListItem, bool) {
 // cloneInputs deep-copies an in-context input set. The table prototypes now
 // carry Validation/Range pointers (unconstrainedDurationInputs), so a
 // shallow slice clone would share them across every tree ever built — a
-// consumer mutating one WebTemplate would corrupt all subsequent Builds.
+// caller who edits one WebTemplate despite its being read-only would
+// corrupt all subsequent Builds.
 func cloneInputs(in []Input) []Input {
 	out := slices.Clone(in)
 	for i := range out {
@@ -631,11 +634,13 @@ var anyValueIDs = func() []string {
 
 // valueChild returns the child of ELEMENT node el for a value of rmType, at
 // path, el's aqlPath extended by /value, named as el is, with id, the id of
-// rmType ([choiceID]). v is the value alternative the template constrains,
-// whose occurrences and constraint the child carries, along with el's nodeId;
-// with v nil, for an ELEMENT that constrains no value, the child has no
-// nodeId, occurs 0..1, and carries the inputs of an unconstrained value of
-// rmType, as the reference's are.
+// rmType ([choiceID]). The child holds el's own localized name and
+// description maps, not copies: [setNames] has filled them, nothing writes
+// them after, and the built tree is read-only. v is the value alternative
+// the template constrains, whose occurrences and constraint the child
+// carries, along with el's nodeId; with v nil, for an ELEMENT that
+// constrains no value, the child has no nodeId, occurs 0..1, and carries
+// the inputs of an unconstrained value of rmType, as the reference's are.
 func valueChild(el *Node, rmType, id, path string, v *templatecompile.CompiledNode) *Node {
 	child := &Node{
 		ID:                    id,
@@ -644,8 +649,8 @@ func valueChild(el *Node, rmType, id, path string, v *templatecompile.CompiledNo
 		RMType:                rmType,
 		Min:                   0,
 		Max:                   1,
-		LocalizedNames:        maps.Clone(el.LocalizedNames),
-		LocalizedDescriptions: maps.Clone(el.LocalizedDescriptions),
+		LocalizedNames:        el.LocalizedNames,
+		LocalizedDescriptions: el.LocalizedDescriptions,
 		AQLPath:               path,
 		Inputs:                valueInputs(rmType, v),
 	}
