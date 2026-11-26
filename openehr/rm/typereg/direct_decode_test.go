@@ -29,6 +29,9 @@ func TestREQ052DirectDecodeGate(t *testing.T) {
 	if set == nil {
 		t.Fatal("unmarshalerAgg.Load() = nil: this test needs the rm package's interface hooks, which the typereg_test files import")
 	}
+	if set.typeHook {
+		t.Fatal("the generated interface hooks mark the SDK aggregate as holding a hook that may take `_type`'s string: they register through RegisterUnmarshaler, not RegisterInterfaceUnmarshaler")
+	}
 	sdk := json.WithUnmarshalers(set.all)
 	caller := json.WithUnmarshalers(json.JoinUnmarshalers(set.all, json.UnmarshalFromFunc(func(dec *jsontext.Decoder, _ *fakeBox) error { return dec.SkipValue() })))
 	const object = `{"a":"x"}`
@@ -134,6 +137,65 @@ func (p *directProbe) readJSONMembers(dec *jsontext.Decoder) (string, error) {
 	_, err := dec.ReadToken()
 	return got, err
 }
+
+// TestREQ052RegisteredTypeHookSeesTypeMember pins a hook registered through
+// RegisterUnmarshaler as one every decode offers `_type` to: a caller's
+// string hook that maps a legacy class name to the probe's lets the probe
+// decode, where a read of `_type` from the tokens refuses the legacy name.
+// A hook registered for an interface type leaves the direct read and the raw
+// `_type` reads on. Can-fail: drop typeHook from hookSet.sdkHooks and the
+// probe reads `_type` itself and refuses LEGACY_PROBE.
+//
+// It registers into the process-wide aggregate, so it does not run in
+// parallel, and it restores the aggregate before any parallel test resumes.
+func TestREQ052RegisteredTypeHookSeesTypeMember(t *testing.T) {
+	unmarshalerRegMu.Lock()
+	saved, savedSet := unmarshalerHooks, unmarshalerAgg.Load()
+	unmarshalerRegMu.Unlock()
+	t.Cleanup(func() {
+		unmarshalerRegMu.Lock()
+		defer unmarshalerRegMu.Unlock()
+		unmarshalerHooks = saved
+		unmarshalerAgg.Store(savedSet)
+	})
+	decode := func() error {
+		var p directProbe
+		return json.Unmarshal([]byte(`{"_type":"LEGACY_PROBE","a":"x"}`), &p, json.WithUnmarshalers(unmarshalerAgg.Load().all))
+	}
+	plain := func() bool { return plainTypeMember(json.WithUnmarshalers(unmarshalerAgg.Load().all)) }
+
+	RegisterInterfaceUnmarshaler(func(dec *jsontext.Decoder, _ *fakeIface) error { return dec.SkipValue() })
+	if set := unmarshalerAgg.Load(); set.typeHook || !plain() {
+		t.Fatalf("after an interface hook: typeHook = %v, plainTypeMember = %v; want false, true", set.typeHook, plain())
+	}
+	if err := decode(); !errors.Is(err, ErrTypeMismatch) {
+		t.Fatalf("decode with no string hook = %v, want ErrTypeMismatch: nothing maps LEGACY_PROBE", err)
+	}
+
+	RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, s *string) error {
+		tok, err := dec.ReadToken()
+		if err != nil {
+			return err
+		}
+		if *s = tok.String(); *s == "LEGACY_PROBE" {
+			*s = directProbeType
+		}
+		return nil
+	}))
+	if err := decode(); err != nil {
+		t.Errorf("decode with a string hook mapping LEGACY_PROBE = %v, want nil: the hook sees `_type`", err)
+	}
+	if set := unmarshalerAgg.Load(); !set.typeHook || plain() {
+		t.Errorf("after RegisterUnmarshaler: typeHook = %v, plainTypeMember = %v; want true, false", set.typeHook, plain())
+	}
+	RegisterInterfaceUnmarshaler(func(dec *jsontext.Decoder, _ *fakeIface) error { return dec.SkipValue() })
+	if !unmarshalerAgg.Load().typeHook {
+		t.Error("an interface hook registered after a string hook cleared typeHook")
+	}
+}
+
+// fakeIface is an interface a test registers a hook for.
+type fakeIface interface{ isFakeIface() }
 
 // probeFailure describes err as a caller reads it: the text, the position and
 // Go type json/v2 gives it, the path of a DecodeError in it, and the

@@ -5,7 +5,6 @@ package aom14
 
 import (
 	"encoding/json/jsontext"
-	json "encoding/json/v2"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
@@ -16,25 +15,25 @@ import (
 // interface falls back to its parent concrete type when the wire omits
 // the discriminator.
 func init() {
-	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *ArchetypeOntologyLike) error {
+	typereg.RegisterInterfaceUnmarshaler(func(dec *jsontext.Decoder, out *ArchetypeOntologyLike) error {
 		return typereg.DecodePolymorphic(dec, out, func() any { return &ArchetypeOntology{} })
-	}))
-	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *CAttribute) error {
+	})
+	typereg.RegisterInterfaceUnmarshaler(func(dec *jsontext.Decoder, out *CAttribute) error {
 		return typereg.DecodePolymorphic(dec, out, nil)
-	}))
-	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *CComplexObjectLike) error {
+	})
+	typereg.RegisterInterfaceUnmarshaler(func(dec *jsontext.Decoder, out *CComplexObjectLike) error {
 		return typereg.DecodePolymorphic(dec, out, func() any { return &CComplexObject{} })
-	}))
-	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *CObject) error {
+	})
+	typereg.RegisterInterfaceUnmarshaler(func(dec *jsontext.Decoder, out *CObject) error {
 		return typereg.DecodePolymorphic(dec, out, nil)
-	}))
-	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *CPrimitive) error {
+	})
+	typereg.RegisterInterfaceUnmarshaler(func(dec *jsontext.Decoder, out *CPrimitive) error {
 		return typereg.DecodePolymorphic(dec, out, nil)
-	}))
-	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *ExprItem) error {
+	})
+	typereg.RegisterInterfaceUnmarshaler(func(dec *jsontext.Decoder, out *ExprItem) error {
 		return typereg.DecodePolymorphic(dec, out, nil)
-	}))
-	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *State) error {
+	})
+	typereg.RegisterInterfaceUnmarshaler(func(dec *jsontext.Decoder, out *State) error {
 		return typereg.DecodePolymorphic(dec, out, nil)
-	}))
+	})
 }

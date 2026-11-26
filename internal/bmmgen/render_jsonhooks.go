@@ -26,11 +26,13 @@ type polyInterface struct {
 	Class string
 }
 
-// RenderJSONHooksFile renders <pkg>/jsonhooks_gen.go: one json.UnmarshalFromFunc
-// per polymorphic interface owned by the target, registered into the typereg
-// aggregate at init. Every nested decode threads the
-// aggregate through [typereg.Unmarshalers], so a polymorphic slot resolves from
-// any entry point, including a bare encoding/json/v2 Unmarshal with no options.
+// RenderJSONHooksFile renders <pkg>/jsonhooks_gen.go: one decode hook per
+// polymorphic interface owned by the target, registered into the typereg
+// aggregate at init through typereg.RegisterInterfaceUnmarshaler, which tells
+// the aggregate the hook takes only that interface. Every nested decode
+// threads the aggregate through [typereg.Unmarshalers], so a polymorphic slot
+// resolves from any entry point, including a bare encoding/json/v2 Unmarshal
+// with no options.
 //
 // For the RM target it also renders polymorphicClass, an unexported type
 // switch naming the BMM class each interface stands for, and registers it
@@ -55,8 +57,7 @@ func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
 	b.WriteString(renderGeneratedHeader(plan))
 	b.WriteString("\n")
 	b.WriteString("import (\n")
-	b.WriteString("\t\"encoding/json/jsontext\"\n")
-	b.WriteString("\tjson \"encoding/json/v2\"\n\n")
+	b.WriteString("\t\"encoding/json/jsontext\"\n\n")
 	walkerTable := plan.Target.GoPackage == "rm"
 	if walkerTable {
 		fmt.Fprintf(&b, "\t%q\n", polyregImport)
@@ -70,13 +71,13 @@ func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
 	b.WriteString("// the discriminator.\n")
 	b.WriteString("func init() {\n")
 	for _, pi := range ifaces {
-		fmt.Fprintf(&b, "\ttypereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *%s) error {\n", pi.GoName)
+		fmt.Fprintf(&b, "\ttypereg.RegisterInterfaceUnmarshaler(func(dec *jsontext.Decoder, out *%s) error {\n", pi.GoName)
 		if pi.Narrow {
 			fmt.Fprintf(&b, "\t\treturn typereg.DecodePolymorphic(dec, out, func() any { return &%s{} })\n", pi.ParentGo)
 		} else {
 			b.WriteString("\t\treturn typereg.DecodePolymorphic(dec, out, nil)\n")
 		}
-		b.WriteString("\t}))\n")
+		b.WriteString("\t})\n")
 	}
 	if walkerTable {
 		b.WriteString("\tpolyreg.Register(polymorphicClass)\n")

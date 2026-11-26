@@ -153,8 +153,8 @@ func joinCallerUnmarshalers(hooks, caller *json.Unmarshalers) *json.Unmarshalers
 }
 
 // The process-wide aggregate of per-interface decode hooks. The rm and aom14
-// packages each register their json.UnmarshalFromFunc hooks into it at package
-// init. Registration serialises through unmarshalerRegMu (init-time only); the
+// packages each register their hooks into it at package init, through
+// [RegisterInterfaceUnmarshaler]. Registration serialises through unmarshalerRegMu (init-time only); the
 // joined aggregate is published in an atomic.Pointer so [decodeOptions] reads
 // it lock-free on the decode hot path.
 var (
@@ -169,36 +169,65 @@ var (
 // runs: [DecodePolymorphic] decodes a slot it buffered with buffered in place of
 // all, so a slot nested in that buffer finds buffered on its decoder and knows
 // the bytes ahead were already read whole (see [decodeSlotInPlace]). bufferedOpt
-// is the option that installs it, built once.
+// is the option that installs it, built once. typeHook is set once a hook in
+// the set may take a Go type other than a pointer to an interface, the string
+// a `_type` member decodes into among them.
 type hookSet struct {
 	all, buffered *json.Unmarshalers
 	bufferedOpt   json.Options
+	typeHook      bool
 }
 
 // sdkHooks reports whether hooks is the SDK aggregate under either identity of
-// set.
+// set, with no hook in it that may take a `_type` member's string: only then
+// may a decode read `_type` from the tokens without offering it to a hook.
 func (set *hookSet) sdkHooks(hooks *json.Unmarshalers) bool {
-	return set != nil && (hooks == set.all || hooks == set.buffered)
+	return set != nil && !set.typeHook && (hooks == set.all || hooks == set.buffered)
 }
 
-// RegisterUnmarshaler adds one per-interface decode hook to the aggregate.
-// The generator emits one call per polymorphic interface from the owning
-// package's init(); the interface's dispatch runs through [DecodePolymorphic].
-// A nil hook is ignored so a partially generated tree cannot panic here.
-// Registration is expected only at package init; it is safe for concurrent use
-// but is not part of any hot path.
+// RegisterInterfaceUnmarshaler adds fn to the aggregate as the decode hook of
+// the interface type T. The generator emits one call per polymorphic interface
+// from the owning package's init(); the interface's dispatch runs through
+// [DecodePolymorphic]. A nil fn is ignored so a partially generated tree cannot
+// panic here. A T that is not an interface type registers fn as
+// [RegisterUnmarshaler] does. Registration is expected only at package init; it
+// is safe for concurrent use but is not part of any hot path.
+func RegisterInterfaceUnmarshaler[T any](fn func(*jsontext.Decoder, *T) error) {
+	if fn == nil {
+		return
+	}
+	var zero T
+	registerUnmarshaler(json.UnmarshalFromFunc(fn), any(zero) != nil)
+}
+
+// RegisterUnmarshaler adds hook to the aggregate, for every decode the SDK
+// runs. hook may take any Go type, the string a `_type` member decodes into
+// among them, so from then on each generated decoder offers each of its
+// members to it through json/v2's struct decode, and reads none from the
+// tokens itself. A nil hook is ignored. Registration is expected only at
+// package init; it is safe for concurrent use but is not part of any hot path.
 func RegisterUnmarshaler(hook *json.Unmarshalers) {
+	registerUnmarshaler(hook, true)
+}
+
+// registerUnmarshaler adds hook to the aggregate; typeHook says it may take a
+// `_type` member's string ([hookSet]).
+func registerUnmarshaler(hook *json.Unmarshalers, typeHook bool) {
 	if hook == nil {
 		return
 	}
 	unmarshalerRegMu.Lock()
 	defer unmarshalerRegMu.Unlock()
+	if prev := unmarshalerAgg.Load(); prev != nil && prev.typeHook {
+		typeHook = true
+	}
 	unmarshalerHooks = append(unmarshalerHooks, hook)
 	buffered := json.JoinUnmarshalers(unmarshalerHooks...)
 	unmarshalerAgg.Store(&hookSet{
 		all:         json.JoinUnmarshalers(unmarshalerHooks...),
 		buffered:    buffered,
 		bufferedOpt: json.WithUnmarshalers(buffered),
+		typeHook:    typeHook,
 	})
 }
 
@@ -513,7 +542,8 @@ func typeMismatch(rmType, got string) error {
 //     null, a value of another kind and malformed input as it always has.
 //   - the value opens past the nesting-depth bound, which [DecodeInto]
 //     refuses.
-//   - dec carries no SDK hooks, or a caller's own json.WithUnmarshalers: a
+//   - dec carries no SDK hooks, or a caller's own json.WithUnmarshalers, or
+//     SDK hooks that include one registered through [RegisterUnmarshaler]: a
 //     caller's hook can take any member's type, the `_type` string included,
 //     and the direct read would bypass it. A bare v2 call takes the wrapper
 //     for the outermost value only; [DecodeInto] then puts the SDK hooks on
@@ -1102,8 +1132,9 @@ func peekType(raw jsontext.Value, opts ...json.Options) (string, error) {
 // ok is false for any other shape, and also whenever opts could make the full
 // decode read a different member as _type, or run a caller's code on it:
 // duplicate names allowed (a later _type wins), case-insensitive name matching
-// (a later _TYPE matches too), or a hook set other than the SDK aggregate (a
-// caller's string hook runs on _type during the peek). The caller then falls
+// (a later _TYPE matches too), or a hook set other than the SDK aggregate, or
+// one holding a hook registered through [RegisterUnmarshaler] (a caller's
+// string hook runs on _type during the peek). The caller then falls
 // back to peekType, so a document that puts _type elsewhere still decodes,
 // through the peek.
 //
@@ -1150,7 +1181,8 @@ func leadingType(raw jsontext.Value, opts json.Options) (name string, ok bool) {
 // plainTypeMember reports whether, under opts, a decode reads `_type` from the
 // one member whose name is spelled exactly so and runs no caller code on it:
 // duplicate names are refused, names match case-sensitively, and the hook set
-// is the SDK aggregate under either identity. [leadingType] and
+// is the SDK aggregate under either identity, with no hook in it that may take
+// `_type`'s string ([hookSet.sdkHooks]). [leadingType] and
 // [lacksTypeMember] read raw bytes in place of that decode only then.
 func plainTypeMember(opts json.Options) bool {
 	if dup, _ := json.GetOption(opts, jsontext.AllowDuplicateNames); dup {
