@@ -2405,8 +2405,8 @@ Two entry points:
 
 - **Path-first API** — `Set(path string, v any) error` looks up the compiled node via `Compiled.NodeAt(path)` and routes the assignment through the parent attribute.
   Typed helpers `SetText`, `SetQuantity`, `SetCodedText` wrap the most common DV shapes.
-  A path is a canonical OPT path as the compile step produces it, predicate-bracketed segments included where the OPT pins archetype roots or at-codes.
-- **Type enforcement** — `Set` **MUST** accept a value:
+  A path is a canonical OPT path as the compile step produces it, predicate-bracketed segments included where the OPT pins archetype roots or at-codes, and a positional `[@N]` segment for the Nth list child that has neither and no slot predicate.
+- **Type enforcement** — `Set` **MUST NOT** refuse with `ErrTypeMismatch` a value:
   - whose type the binding tiers of [§ REQ-102](#req-102--composition-validation) *Structural — alternatives* bind to a node the template allows at the path, one whose occurrences are not 0..0:
     - the node `Compiled.NodeAt(path)` returns;
     - or another alternative the OPT lists at the same path under the same attribute (the tiers bind by the type alone, to the first node of the first tier that admits it; the trial within a tier is the validator's);
@@ -2421,7 +2421,12 @@ Two entry points:
   - and a nil or typed-nil value.
 
   `Set` **MUST** return `ErrUnknownPath` for a path the template does not have.
-  The root path writes no attribute and is not settable: `Build` **MUST** refuse a value set there with `ErrInvalidPath`.
+  `Set` **MUST** return `ErrInvalidPath` for a value it does not refuse with `ErrTypeMismatch` at a path it writes no value at:
+  - the root path, which writes no attribute;
+  - a path that ends in a member of a multi-valued attribute, such as an ELEMENT under `items` or an EVENT under `events`; a path that goes on to an attribute of that member is settable;
+  - a path through a positional segment, the `[@N]` the compile step writes for a list child with no archetype id, node id or slot predicate, where the template gives that list more than one child it allows, or prohibits that child.
+
+  `Build` **MUST** return `ErrInvalidPath`, and write the value nowhere, where the value's path runs through an item the skeleton does not hold: an attribute it leaves absent or empty, or an archetype id, node id or name no member of a multi-valued attribute carries, such as a named sibling the skeleton left out.
   Each wraps its context with `fmt.Errorf("...: %w", err)`, so a caller compares it with `errors.Is`.
 - **Aggregated errors** — `Set` records errors against the builder but does NOT short-circuit; subsequent assignments still attempt.
   `Build()` returns the populated `*rm.Composition` plus the aggregated error (joined via `errors.Join`) so callers can recover every faulty path in one round-trip rather than chasing one error at a time.

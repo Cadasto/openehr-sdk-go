@@ -663,6 +663,7 @@ requirements:
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
       - openehr/serialize/canxml/edgecases_test.go
+      - openehr/serialize/canxml/generic_param_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_nil_bound_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
@@ -1226,6 +1227,7 @@ requirements:
       - openehr/composition/coded_name_path_test.go
       - openehr/composition/named_sibling_test.go
       - openehr/composition/optional_content_test.go
+      - openehr/composition/positional_path_test.go
       - openehr/composition/set_binding_test.go
       - openehr/composition/skeleton_policy_test.go
       - openehr/composition/typecheck_test.go

@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/xml"
+	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -136,7 +137,21 @@ func (o *OriginalVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 		return err
 	}
 	if o.Data != nil {
-		if err := _e.EncodeElement(o.Data, xml.StartElement{Name: xml.Name{Local: "data"}}); err != nil {
+		if _c, _ok := any(o.Data).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "data", _c); err != nil {
+				return err
+			}
+		} else if _c, _ok = any(*o.Data).(canxml.BMMNamer); _ok {
+			if err := canxml.EncodePoly(_e, "data", _c); err != nil {
+				return err
+			}
+		} else if _c, _ok = xmlOpenParamClass(*o.Data); _ok {
+			if err := canxml.EncodePoly(_e, "data", _c); err != nil {
+				return err
+			}
+		} else if !xmlOpenParamText(o.Data) {
+			return fmt.Errorf("%w: ORIGINAL_VERSION.data holds %T, which is no registered class or primitive", canxml.ErrInvalidShape, *o.Data)
+		} else if err := _e.EncodeElement(o.Data, xml.StartElement{Name: xml.Name{Local: "data"}}); err != nil {
 			return err
 		}
 	}
@@ -199,4 +214,302 @@ func (v *VersionedObject[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 		return err
 	}
 	return nil
+}
+
+// xmlOpenParamClass returns v, the value of a member typed by an open generic
+// parameter whose type argument is an interface, as a pointer to a copy of
+// it when it is a value, held by value, of a class the type registry
+// constructs, a generic one in any instantiation: the form
+// canxml.EncodePoly writes with its `xsi:type` and the decoder returns. It
+// reports false for any other value.
+func xmlOpenParamClass(v any) (canxml.BMMNamer, bool) {
+	switch x := v.(type) {
+	case AccessGroupRef:
+		return &x, true
+	case Action:
+		return &x, true
+	case Activity:
+		return &x, true
+	case Address:
+		return &x, true
+	case AdminEntry:
+		return &x, true
+	case Agent:
+		return &x, true
+	case Archetyped:
+		return &x, true
+	case ArchetypeID:
+		return &x, true
+	case Attestation:
+		return &x, true
+	case AuditDetails:
+		return &x, true
+	case BasicDefinitions:
+		return &x, true
+	case Capability:
+		return &x, true
+	case Cluster:
+		return &x, true
+	case CodePhrase:
+		return &x, true
+	case Composition:
+		return &x, true
+	case Contact:
+		return &x, true
+	case Contribution:
+		return &x, true
+	case DVBoolean:
+		return &x, true
+	case DVCodedText:
+		return &x, true
+	case DVCount:
+		return &x, true
+	case DVDate:
+		return &x, true
+	case DVDateTime:
+		return &x, true
+	case DVDuration:
+		return &x, true
+	case DVEHRURI:
+		return &x, true
+	case DVGeneralTimeSpecification:
+		return &x, true
+	case DVIdentifier:
+		return &x, true
+	case DVInterval[DVOrdered]:
+		return &x, true
+	case DVMultimedia:
+		return &x, true
+	case DVOrdinal:
+		return &x, true
+	case DVParagraph:
+		return &x, true
+	case DVParsable:
+		return &x, true
+	case DVPeriodicTimeSpecification:
+		return &x, true
+	case DVProportion:
+		return &x, true
+	case DVQuantity:
+		return &x, true
+	case DVScale:
+		return &x, true
+	case DVState:
+		return &x, true
+	case DVText:
+		return &x, true
+	case DVTime:
+		return &x, true
+	case DVURI:
+		return &x, true
+	case EHR:
+		return &x, true
+	case EHRAccess:
+		return &x, true
+	case EHRStatus:
+		return &x, true
+	case Element:
+		return &x, true
+	case Evaluation:
+		return &x, true
+	case EventContext:
+		return &x, true
+	case FeederAudit:
+		return &x, true
+	case FeederAuditDetails:
+		return &x, true
+	case Folder:
+		return &x, true
+	case GenericEntry:
+		return &x, true
+	case GenericID:
+		return &x, true
+	case Group:
+		return &x, true
+	case HierObjectID:
+		return &x, true
+	case History[ItemStructure]:
+		return &x, true
+	case ImportedVersion[any]:
+		return &x, true
+	case Instruction:
+		return &x, true
+	case InstructionDetails:
+		return &x, true
+	case InternetID:
+		return &x, true
+	case IntervalEvent[ItemStructure]:
+		return &x, true
+	case IsmTransition:
+		return &x, true
+	case ISOOID:
+		return &x, true
+	case ItemList:
+		return &x, true
+	case ItemSingle:
+		return &x, true
+	case ItemTable:
+		return &x, true
+	case ItemTag:
+		return &x, true
+	case ItemTree:
+		return &x, true
+	case ISO8601Timezone:
+		return &x, true
+	case Link:
+		return &x, true
+	case LocatableRef:
+		return &x, true
+	case MeasurementService:
+		return &x, true
+	case ObjectRef:
+		return &x, true
+	case ObjectVersionID:
+		return &x, true
+	case Observation:
+		return &x, true
+	case OpenehrCodeSetIdentifiers:
+		return &x, true
+	case OpenehrDefinitions:
+		return &x, true
+	case OpenehrTerminologyGroupIdentifiers:
+		return &x, true
+	case Organisation:
+		return &x, true
+	case OriginalVersion[any]:
+		return &x, true
+	case Participation:
+		return &x, true
+	case PartyIdentified:
+		return &x, true
+	case PartyIdentity:
+		return &x, true
+	case PartyRef:
+		return &x, true
+	case PartyRelated:
+		return &x, true
+	case PartyRelationship:
+		return &x, true
+	case PartySelf:
+		return &x, true
+	case Person:
+		return &x, true
+	case PointEvent[ItemStructure]:
+		return &x, true
+	case PointInterval[any]:
+		return &x, true
+	case ProperInterval[any]:
+		return &x, true
+	case ReferenceRange[DVOrdered]:
+		return &x, true
+	case ResourceAnnotations:
+		return &x, true
+	case ResourceDescription:
+		return &x, true
+	case ResourceDescriptionItem:
+		return &x, true
+	case RevisionHistory:
+		return &x, true
+	case RevisionHistoryItem:
+		return &x, true
+	case Role:
+		return &x, true
+	case Section:
+		return &x, true
+	case TemplateID:
+		return &x, true
+	case TerminologyID:
+		return &x, true
+	case TerminologyService:
+		return &x, true
+	case TermMapping:
+		return &x, true
+	case TranslationDetails:
+		return &x, true
+	case TimeDefinitions:
+		return &x, true
+	case Uuid:
+		return &x, true
+	case VersionedComposition:
+		return &x, true
+	case VersionedEHRAccess:
+		return &x, true
+	case VersionedEHRStatus:
+		return &x, true
+	case VersionedFolder:
+		return &x, true
+	case VersionedObject[any]:
+		return &x, true
+	case VersionedParty:
+		return &x, true
+	case VersionTreeID:
+		return &x, true
+	case xmlClassValue:
+		return x.xmlClassPointer(), true
+	}
+	return nil, false
+}
+
+// xmlClassValue is a value of a generic class, in any instantiation, whose
+// pointer canxml.EncodePoly writes with its `xsi:type`.
+type xmlClassValue interface {
+	xmlClassPointer() canxml.BMMNamer
+}
+
+// xmlClassPointer returns a pointer to a copy of d, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (d DVInterval[T]) xmlClassPointer() canxml.BMMNamer { return &d }
+
+// xmlClassPointer returns a pointer to a copy of h, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (h History[T]) xmlClassPointer() canxml.BMMNamer { return &h }
+
+// xmlClassPointer returns a pointer to a copy of i, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (i ImportedVersion[T]) xmlClassPointer() canxml.BMMNamer { return &i }
+
+// xmlClassPointer returns a pointer to a copy of i, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (i IntervalEvent[T]) xmlClassPointer() canxml.BMMNamer { return &i }
+
+// xmlClassPointer returns a pointer to a copy of o, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (o OriginalVersion[T]) xmlClassPointer() canxml.BMMNamer { return &o }
+
+// xmlClassPointer returns a pointer to a copy of p, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (p PointEvent[T]) xmlClassPointer() canxml.BMMNamer { return &p }
+
+// xmlClassPointer returns a pointer to a copy of p, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (p PointInterval[T]) xmlClassPointer() canxml.BMMNamer { return &p }
+
+// xmlClassPointer returns a pointer to a copy of p, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (p ProperInterval[T]) xmlClassPointer() canxml.BMMNamer { return &p }
+
+// xmlClassPointer returns a pointer to a copy of r, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (r ReferenceRange[T]) xmlClassPointer() canxml.BMMNamer { return &r }
+
+// xmlClassPointer returns a pointer to a copy of v, the form canxml.EncodePoly
+// writes with its `xsi:type`.
+func (v VersionedObject[T]) xmlClassPointer() canxml.BMMNamer { return &v }
+
+// xmlOpenParamText reports whether the canonical-XML encoder writes *v, the
+// value of a member typed by an open generic parameter T that holds no
+// class value, as its text: always where T is no interface type, and,
+// where T is one, when *v is nil or a value of a Go type a BMM primitive
+// maps to. Any other value an interface holds there would need an
+// `xsi:type` the decoder reads back. The zero value of T converts to a
+// nil any exactly when T is an interface type.
+func xmlOpenParamText[T any](v *T) bool {
+	if any(*new(T)) != nil {
+		return true
+	}
+	switch any(*v).(type) {
+	case nil, Character, Integer, Integer64, Real, bool, byte, float64, string:
+		return true
+	}
+	return false
 }

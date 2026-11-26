@@ -11,7 +11,12 @@ import (
 // participationOPT is a COMPOSITION whose EVENT_CONTEXT holds one
 // PARTICIPATION, with a DV_TEXT function and a DV_CODED_TEXT mode, each
 // required.
-const participationOPT = `<?xml version="1.0" encoding="utf-8"?>
+const participationOPT = participationsOPTHead + participationConstraint + participationsOPTTail
+
+// participationsOPTHead and participationsOPTTail enclose the child
+// constraints of EVENT_CONTEXT.participations in a COMPOSITION template.
+const (
+	participationsOPTHead = `<?xml version="1.0" encoding="utf-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
 <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
 <template_id><value>participation</value></template_id><concept>participation</concept>
@@ -19,16 +24,23 @@ const participationOPT = `<?xml version="1.0" encoding="utf-8"?>
 <attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>context</rm_attribute_name>` + requiredExistence + `
 <children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>EVENT_CONTEXT</rm_type_name><node_id></node_id>
 <attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>participations</rm_attribute_name>
-<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>PARTICIPATION</rm_type_name><node_id></node_id>
+`
+	participationsOPTTail = `<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality>
+</attributes></children></attributes>
+<archetype_id><value>openEHR-EHR-COMPOSITION.participation.v1</value></archetype_id></definition>
+</template>`
+)
+
+// participationConstraint is a PARTICIPATION child constraint with a
+// required DV_TEXT function and DV_CODED_TEXT mode. It carries no node id,
+// so its compiled path takes a positional key.
+const participationConstraint = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>PARTICIPATION</rm_type_name><node_id></node_id>
 <attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>function</rm_attribute_name>` + requiredExistence + `
 <children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_TEXT</rm_type_name><node_id></node_id></children></attributes>
 <attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>mode</rm_attribute_name>` + requiredExistence + `
 <children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_CODED_TEXT</rm_type_name><node_id></node_id></children></attributes>
 </children>
-<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality>
-</attributes></children></attributes>
-<archetype_id><value>openEHR-EHR-COMPOSITION.participation.v1</value></archetype_id></definition>
-</template>`
+`
 
 // requiredExistence is the existence of an attribute the template requires.
 const requiredExistence = `<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +

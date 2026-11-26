@@ -166,6 +166,22 @@ func (b *Builder) TemplateID() string {
 // DV_PROPORTION.is_integral), one that is not an RM value (a Go string,
 // even at a DURATION node), nil, and a nil pointer.
 //
+// Set returns ErrInvalidPath for a value it does not refuse with
+// ErrTypeMismatch at a path it writes no value at:
+//
+//   - the composition root;
+//   - a path that ends in a member of a multi-valued attribute, such as an
+//     ELEMENT under ITEM_TREE.items or an EVENT under HISTORY.events; a path
+//     that goes on to an attribute of such a member, such as the ELEMENT's
+//     value, is one Set writes;
+//   - a path through a positional segment, the [@N] the compiled template
+//     gives a list member with no archetype id, node id or slot predicate,
+//     such as a PARTICIPATION, where the template allows more than one child
+//     for that list, or prohibits the child the segment names: no list item
+//     says which child it was built from. Where the template allows that
+//     child alone, the path is one Set writes, whatever children with
+//     occurrences 0..0 stand beside it.
+//
 // Errors are accumulated and surfaced from Build. Set never
 // short-circuits the builder so the caller can stack assignments and
 // recover every faulty path in one round-trip.
@@ -216,6 +232,13 @@ func (b *Builder) Set(path string, v any) error {
 		b.errs = append(b.errs, wrapped)
 		return wrapped
 	}
+	// A path Set writes no value at is refused after the type checks, so a
+	// value of the wrong type there keeps its ErrTypeMismatch (REQ-101 Type
+	// enforcement).
+	if err := checkWritable(path, bound); err != nil {
+		b.errs = append(b.errs, err)
+		return err
+	}
 	b.pending = append(b.pending, pendingAssignment{
 		path:     path,
 		rawValue: v,
@@ -257,7 +280,11 @@ func (b *Builder) SetCodedText(path, terminology, code, display string) error {
 // Build finalises the graph. Pending assignments are applied in
 // order against the skeleton; per-path failures accumulate via
 // errors.Join. The returned *rm.Composition is the same skeleton
-// instance: Build mutates it in place.
+// instance: Build mutates it in place. A value whose path runs through an
+// item the skeleton does not hold is written nowhere, and Build reports
+// ErrInvalidPath for it: an attribute the skeleton leaves absent or empty,
+// or an archetype id, node id or name that no member of a multi-valued
+// attribute carries, such as a named sibling the skeleton left out.
 //
 // Build is repeatable: pending Set calls and accumulated errors are
 // consumed by each invocation. A second Build with no intervening Set
@@ -298,18 +325,73 @@ func (b *Builder) Build() (*rm.Composition, error) {
 	return b.skeleton, nil
 }
 
+// checkWritable returns an error wrapping ErrInvalidPath when node, the
+// node a value set at path binds, is one the builder writes no value at:
+//
+//   - the composition root, which sits under no attribute and which the
+//     builder does not replace;
+//   - a member of a multi-valued attribute, which a value would replace or
+//     add to; a node below such a member is writable;
+//   - a node below a positional member of a multi-valued attribute that
+//     the template prohibits, with occurrences 0..0, or for which it allows
+//     more than one child. A positional member ([positional]) carries
+//     nothing to match a list item by, and the skeleton's list order need
+//     not follow the template's, so the builder cannot tell which item the
+//     position names. Where the template allows that child alone, every
+//     item the skeleton holds there was built from it, and the first
+//     serves; a prohibited sibling builds no item. Where it prohibits the
+//     child, the skeleton holds no item built from it, and the first item
+//     is another child's. The type tiers do not refuse such a path, since
+//     they bind the node the path ends at, which a prohibited ancestor
+//     leaves allowed.
+func checkWritable(path string, node *tcimpl.CompiledNode) error {
+	parent := node.Parent()
+	if parent == nil {
+		return fmt.Errorf("%w: %s: the composition root takes no value", ErrInvalidPath, path)
+	}
+	if attr := findAttributeContaining(parent, node); attr != nil && attr.Cardinality() == template.Multiple {
+		return fmt.Errorf("%w: %s ends in a member of the multi-valued attribute %q: extend the path to an attribute of that member",
+			ErrInvalidPath, path, attr.Name())
+	}
+	// Every positional segment on the path counts, not only the nearest.
+	for cur := parent; cur.Parent() != nil; cur = cur.Parent() {
+		attr := findAttributeContaining(cur.Parent(), cur)
+		if attr == nil || attr.Cardinality() != template.Multiple || !positional(cur) {
+			continue
+		}
+		allowed := tcimpl.AllowedChildNodes(attr)
+		if !slices.Contains(allowed, cur) {
+			return fmt.Errorf("%w: %s: the positional segment %s names a child of the multi-valued attribute %q that the template prohibits: the skeleton holds no list item built from it",
+				ErrInvalidPath, path, cur.AQLPath(), attr.Name())
+		}
+		if len(allowed) > 1 {
+			return fmt.Errorf("%w: %s: the positional segment %s sits under the multi-valued attribute %q, for which the template allows more than one child: the builder cannot tell which list item it names",
+				ErrInvalidPath, path, cur.AQLPath(), attr.Name())
+		}
+	}
+	return nil
+}
+
+// positional reports whether the compile step keys n, a child of a
+// multi-valued attribute, by its position among its siblings ([@N]), as it
+// does a child with no archetype id, no node id and, for a slot, no include
+// pattern to put in the path. A slot holds no attributes, so a slot is never
+// a node on the way to the one a path binds.
+func positional(n *tcimpl.CompiledNode) bool {
+	return n.ArchetypeID() == "" && n.NodeID() == "" && (!n.IsSlot() || len(n.SlotIncludes()) == 0)
+}
+
 // applyAssignment navigates the skeleton along the compiled path's
-// parent chain, then routes the assignment through rmwrite.EnsureSingle
-// when the path's last attribute is single-valued. A path that resolves
-// to a member of a multi-valued attribute returns ErrInvalidPath: v1
-// leaves container assignment to a future follow-up, since the common
-// authoring case is leaf assignment.
+// parent chain, then routes the assignment through rmwrite.EnsureSingle,
+// since the path's last attribute is single-valued: Set refuses the root
+// and a path that ends in a member of a multi-valued attribute
+// (checkWritable), and applyAssignment refuses either again with
+// ErrInvalidPath rather than index past its segments or write nothing.
 func (b *Builder) applyAssignment(p pendingAssignment) error {
 	parent := p.node.Parent()
 	if parent == nil {
-		// Root assignment — supplied value replaces the composition.
-		// v1 does not support this (the skeleton root is the
-		// builder's invariant); error rather than silently swap.
+		// Set refuses the root (checkWritable); with no segment to write
+		// through, refuse it here too.
 		return fmt.Errorf("%w: cannot Set the composition root", ErrInvalidPath)
 	}
 	// Walk the parent chain from compiled root → parent collecting
@@ -330,30 +412,15 @@ func (b *Builder) applyAssignment(p pendingAssignment) error {
 		return err
 	}
 	leaf := segs[len(segs)-1]
-	// Single attrs → EnsureSingle. A path ending in a multi-valued
-	// attribute is refused with ErrInvalidPath (below). For the common
-	// leaf assignment (DV_QUANTITY at ELEMENT.value) the parent is
-	// single, so this path is the routine case.
 	switch leaf.cardinality {
 	case template.Single:
 		if err := rmwrite.EnsureSingle(rmParent, leaf.attrName, p.rawValue); err != nil {
 			return fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 	case template.Multiple:
-		// Replace-vs-append on multi-valued attrs is ambiguous from a
-		// bare path; v1 surfaces this as ErrInvalidPath and asks the
-		// caller to address a specific child slot (predicate-bearing
-		// path) which Set already resolved. Implementation note: the
-		// leaf node ALREADY identifies one specific child (predicates
-		// in the path narrow it to one CompiledNode); the assignment
-		// should walk to that child's index and overwrite. Phase 2
-		// scope: only leaf-DV assignments are guaranteed, multi-attr
-		// container assignment is a follow-up. Return a descriptive
-		// error so the caller knows this is an intentional v1 gap;
-		// the leaf-DV path (extending the path with .value or
-		// .magnitude / .units for DV_QUANTITY) covers the common
-		// authoring case end-to-end today.
-		return fmt.Errorf("%w: multi-attribute container assignment not supported in v1 (path: %s) — use a leaf path (e.g. extend with /value or /magnitude for DV_QUANTITY) to address the primitive directly", ErrInvalidPath, p.path)
+		// Set refuses such a path (checkWritable), so a pending assignment
+		// never ends here; refuse one rather than write nothing.
+		return fmt.Errorf("%w: %s ends in a member of the multi-valued attribute %q", ErrInvalidPath, p.path, leaf.attrName)
 	}
 	return nil
 }
@@ -478,6 +545,10 @@ func descendOne(cur any, s pathSegment) (any, error) {
 			return nil, fmt.Errorf("%w: multi-attribute %q empty on %T (NewSkeleton should have seeded at least one child)", ErrInvalidPath, s.attrName, cur)
 		}
 		if s.matchID == "" {
+			// A positional segment: Set refuses one whose list the template
+			// allows more than one child, or that names a child it prohibits
+			// (checkWritable), so every item here was built from the one
+			// child it allows, and the first serves.
 			return items[0], nil
 		}
 		for _, it := range items {

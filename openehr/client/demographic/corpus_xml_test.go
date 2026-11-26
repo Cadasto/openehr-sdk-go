@@ -19,16 +19,13 @@ import (
 // testkit/corpus/its_rest/demographic: each holds the bytes canxml writes
 // for the value its JSON twin decodes to, and decodes back, strictly, to a
 // value whose canonical JSON equals the JSON twin's, as the cross-format
-// round trip of the codec compares them.
-//
-// The ORIGINAL_VERSION twin differs from what canxml writes by one
-// attribute: the xsi:type the ITS-XML schemas need on the generic `data`,
-// which the encoder does not write.
+// round trip of the codec compares them. The ORIGINAL_VERSION twin's generic
+// `data` carries the xsi:type the ITS-XML schemas need, which canxml writes
+// for the PERSON it holds.
 func TestCorpusXMLTwins(t *testing.T) { // REQ-056
 	twins := []struct {
-		name  string
-		new   func() any
-		fixup func([]byte) []byte
+		name string
+		new  func() any
 	}{
 		{name: "person", new: func() any { return new(rm.Person) }},
 		{name: "organisation", new: func() any { return new(rm.Organisation) }},
@@ -37,13 +34,7 @@ func TestCorpusXMLTwins(t *testing.T) { // REQ-056
 		{name: "role", new: func() any { return new(rm.Role) }},
 		{name: "versioned_party", new: func() any { return new(rm.VersionedParty) }},
 		{name: "revision_history", new: func() any { return new(rm.RevisionHistory) }},
-		{
-			name: "original_version",
-			new:  func() any { return new(rm.OriginalVersion[*rm.Person]) },
-			fixup: func(b []byte) []byte {
-				return bytes.Replace(b, []byte("<data "), []byte(`<data xsi:type="PERSON" `), 1)
-			},
-		},
+		{name: "original_version", new: func() any { return new(rm.OriginalVersion[*rm.Person]) }},
 	}
 	for _, tw := range twins {
 		t.Run(tw.name, func(t *testing.T) {
@@ -54,9 +45,6 @@ func TestCorpusXMLTwins(t *testing.T) { // REQ-056
 			wantXML, err := canxml.Marshal(fromJSON)
 			if err != nil {
 				t.Fatalf("encode %s as XML: %v", tw.name, err)
-			}
-			if tw.fixup != nil {
-				wantXML = tw.fixup(wantXML)
 			}
 			gotXML := fixture(t, tw.name+".xml")
 			if !bytes.Equal(gotXML, wantXML) {

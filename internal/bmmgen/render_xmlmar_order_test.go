@@ -49,7 +49,8 @@ func emittedXMLChildren(t *testing.T, dir string) map[string][]string {
 
 // marshalXMLChildren reads one generated MarshalXML body: the BMM name its
 // canxml.ElementName call carries, and the element name of each
-// EncodeElement and canxml.EncodePoly call, in source order.
+// EncodeElement and canxml.EncodePoly call, in source order, once for a run
+// of calls that write the same element, as the alternatives of one member do.
 func marshalXMLChildren(body *ast.BlockStmt) (class string, children []string) {
 	ast.Inspect(body, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
@@ -74,7 +75,7 @@ func marshalXMLChildren(body *ast.BlockStmt) (class string, children []string) {
 		}
 		return true
 	})
-	return class, children
+	return class, slices.Compact(children)
 }
 
 // keyedValue returns the value of the field key in e, a composite literal, or
