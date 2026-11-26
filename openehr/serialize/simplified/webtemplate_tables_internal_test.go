@@ -129,7 +129,10 @@ func careflowStepOf(t *testing.T, wt *webtemplate.WebTemplate) string {
 // same template id that an earlier call used. The edited copy lists the
 // current state under both careflow steps, so decode infers none there, where
 // the template it was copied from infers at0005. Key the cache by the
-// template id and the copy reads the template's ISM transition nodes.
+// template id and drop the replaced-tree check in tablesFor, and the copy
+// reads the template's ISM transition nodes; with that check kept, the
+// copy's new root still gets its own tables, and
+// TestREQ053WebTemplateTablesBuiltOncePerWebTemplate is what pins the key.
 func TestREQ053WebTemplateTablesFollowEachWebTemplate(t *testing.T) {
 	t.Parallel()
 	wt, _ := conformanceWT(t)
