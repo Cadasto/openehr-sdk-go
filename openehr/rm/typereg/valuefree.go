@@ -467,7 +467,7 @@ var (
 		`typereg\.Decode: (?:read _type: )?`,
 		`typereg\.Decode `+formQuoted+`: `,
 		`typereg\.DecodeAs: decoded `+formGoType+`: `,
-		`typereg\.(?:DecodeInto|DecodePolymorphic): `,
+		`typereg\.(?:DecodeInto|DecodePolymorphic|DecodeTypeMember): `,
 	)
 	betweenForms = anchoredForms(
 		`: `,

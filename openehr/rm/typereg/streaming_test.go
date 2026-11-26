@@ -203,4 +203,9 @@ func TestREQ052DecodeTypeMemberNilDecoder(t *testing.T) {
 	if got != "" {
 		t.Errorf("%s = %q; want no class beside the refusal", call, got)
 	}
+	// The value-free text keeps only the prefixes it knows, so the helper's
+	// name survives only while valuefree.go lists it.
+	if !strings.Contains(err.Error(), "typereg.DecodeTypeMember: ") {
+		t.Errorf("%s err = %q; want the text to name the helper", call, err)
+	}
 }
