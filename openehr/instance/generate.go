@@ -4074,10 +4074,6 @@ func (g *generator) finishValue(opt *tcimpl.CompiledNode, rmValue any) {
 		g.ensureItems(&v.Items)
 	case *rm.PartyRelationship:
 		g.fillPartyRelationship(v)
-	case *rm.Role:
-		// Its walked performer settled itself; this fills one the walk did
-		// not write.
-		g.fillReference(&v.Performer, "performer")
 	case *rm.ObjectRef, *rm.PartyRef, *rm.AccessGroupRef, *rm.LocatableRef:
 		g.fillReference(v, holdingAttribute(opt))
 	case *rm.PartyIdentified:

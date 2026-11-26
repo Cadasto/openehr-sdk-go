@@ -11,7 +11,6 @@ node /
   attr "relationships" rm_type="PARTY_RELATIONSHIP" cardinality=multiple existence=0..0 child_multiplicity=0..* implicit=false not_in_rm=false required=false children=0
   attr "name" rm_type="DV_TEXT" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
   attr "archetype_node_id" rm_type="String" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
-  attr "performer" rm_type="PARTY_REF" cardinality=single existence=none child_multiplicity=none implicit=true not_in_rm=false required=true children=0
 
 node /details
   rm_type="ITEM_TREE" node_id="at0001" archetype_id="" node_name="" occurrences=1..1 slot=false

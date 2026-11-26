@@ -74,8 +74,8 @@ func TestValidateRM_REQ171_OptionalTextEntered(t *testing.T) {
 }
 
 // TestValidateRM_REQ112_ReferenceHeldByValueReportsItsMissingPart pins the
-// OBJECT_REF entry of REQ-112 on a reference held by value (ROLE performer,
-// PARTY_RELATIONSHIP source): a reference with one part missing is present
+// OBJECT_REF entry of REQ-112 on a reference held by value (PARTY_RELATIONSHIP
+// source and target): a reference with one part missing is present
 // (REQ-171 Structural access), so the walk enters it and the part is reported
 // once, as rm_invariant, rule mandatory, at its own path, and nothing is
 // reported at the attribute; the zero reference is absent and reported once
@@ -96,11 +96,11 @@ func TestValidateRM_REQ112_ReferenceHeldByValueReportsItsMissingPart(t *testing.
 		at      string // the reference's path
 		holding func(rm.PartyRef) any
 	}{
-		{name: "ROLE performer", at: "/performer", holding: func(ref rm.PartyRef) any {
-			return &rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", Name: rm.DVText{Value: "GP"}, Performer: ref}
-		}},
 		{name: "PARTY_RELATIONSHIP source", at: "/source", holding: func(ref rm.PartyRef) any {
 			return &rm.PartyRelationship{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.relation.v1", Name: rm.DVText{Value: "relation"}, Source: ref, Target: full}
+		}},
+		{name: "PARTY_RELATIONSHIP target", at: "/target", holding: func(ref rm.PartyRef) any {
+			return &rm.PartyRelationship{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.relation.v1", Name: rm.DVText{Value: "relation"}, Source: full, Target: ref}
 		}},
 	}
 	// at returns the issues at or below path, as identityKeys writes them.

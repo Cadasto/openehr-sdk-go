@@ -1348,12 +1348,12 @@ func writePartyMultiple(f partyFields, attr string, child any, hint int) error {
 }
 
 // writeRoleSingle adds the single attributes ROLE declares beyond PARTY.
-// A PARTY_REF performer is stored as given; the generator fills one the
-// template leaves empty.
+// A PARTY_REF performer is stored as given; a ROLE the template gives no
+// performer has none, as a generic role.
 func writeRoleSingle(r *rm.Role, attr string, child any) error {
 	switch attr {
 	case "performer":
-		return assignVia(child, func(v rm.PartyRef) { r.Performer = v }, attr, "PARTY_REF")
+		return assignVia(child, func(v rm.PartyRef) { r.Performer = &v }, attr, "PARTY_REF")
 	case "time_validity":
 		return assignVia(child, func(v rm.DVInterval[rm.DVDate]) { r.TimeValidity = &v }, attr, "DV_INTERVAL<DV_DATE>")
 	}

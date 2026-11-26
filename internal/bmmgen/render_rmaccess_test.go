@@ -228,7 +228,7 @@ func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 		{"singleComposition", "language", "return &x.Language, presentCodePhrase(x.Language), true"},
 		{"singleElement", "null_reason", "return x.NullReason, x.NullReason != nil && !rm.IsTypedNil(x.NullReason), true"},
 		{"singleAuditDetails", "description", "return x.Description, x.Description != nil && !rm.IsTypedNil(x.Description), true"},
-		{"singleRole", "performer", "return &x.Performer, !isZeroPartyRef(x.Performer), true"},
+		{"singleRole", "performer", "return x.Performer, x.Performer != nil, true"},
 		{"singlePartyRelationship", "source", "return &x.Source, !isZeroPartyRef(x.Source), true"},
 		{"singleInstructionDetails", "instruction_id", "return &x.InstructionID, !isZeroLocatableRef(x.InstructionID), true"},
 		{"singleEventContext", "start_time", "return &x.StartTime, !isZeroDVDateTime(x.StartTime), true"},
@@ -418,7 +418,7 @@ func TestRenderRMAccessFile_REQ171_ReferencesReadByTheirZeroTest(t *testing.T) {
 		}
 	}
 	slices.Sort(checked)
-	if want := []string{"INSTRUCTION_DETAILS.instruction_id", "PARTY_RELATIONSHIP.source", "PARTY_RELATIONSHIP.target", "ROLE.performer"}; !slices.Equal(checked, want) {
+	if want := []string{"INSTRUCTION_DETAILS.instruction_id", "PARTY_RELATIONSHIP.source", "PARTY_RELATIONSHIP.target"}; !slices.Equal(checked, want) {
 		t.Errorf("checked the references held by value %q, want %q", checked, want)
 	}
 }
