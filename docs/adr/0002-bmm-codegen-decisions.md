@@ -9,8 +9,8 @@ date: 2026-05-16
 # ADR 0002 — BMM code generator structural decisions
 
 - **Status:** Accepted, 2026-05-16.
-- **Amended:** 2026-11-25: D4 states which abstract generics become interfaces, D11 states the version-bump rule, and the JSON encoder design, D8 until now, is [ADR 0022](0022-canonical-json-encoding-json-v2.md)'s.
-- **Requirements:** [REQ-041](../specifications/reference-model.md#req-041--pinned-bmm-sources) (the pinned sources, the mapping rules the generator applies and its drift check), [REQ-056](../specifications/wire.md#req-056) (the canonical-XML child order D10 supplies); the type shape D4 sets is summarised in [reference-model.md § The shape of the RM in Go](../specifications/reference-model.md#the-shape-of-the-rm-in-go).
+- **Amended:** 2026-11-26: D12 gives the canonical encoders and the RM validation floor one zero test per class held by value; 2026-11-25: D4 states which abstract generics become interfaces, D11 states the version-bump rule, and the JSON encoder design, D8 until now, is [ADR 0022](0022-canonical-json-encoding-json-v2.md)'s.
+- **Requirements:** [REQ-041](../specifications/reference-model.md#req-041--pinned-bmm-sources) (the pinned sources, the mapping rules the generator applies and its drift check), [REQ-056](../specifications/wire.md#req-056) (the canonical-XML child order D10 supplies), [REQ-052](../specifications/wire.md#req-052) and [REQ-171](../specifications/clinical-modeling.md#req-171--validation-engine) (the empty member D12 reads one way); the type shape D4 sets is summarised in [reference-model.md § The shape of the RM in Go](../specifications/reference-model.md#the-shape-of-the-rm-in-go).
 - **Related:** [ADR 0022](0022-canonical-json-encoding-json-v2.md) (the JSON codec the generator emits), [ADR 0034](0034-sdk-authored-root-schemas.md) (the SDK-authored root schemas D2, D5 and D10 serve).
 
 ## Context
@@ -82,6 +82,20 @@ The generator therefore reads a second pinned input beside `resources/bmm/`: the
 
 A BMM version bump is one pull request. The new schema is added beside the old one and the old one removed in the same commit, so the diff shows the pair and the SDK pins one version per schema id. The steps are in [`resources/bmm/README.md` § Updating](../../resources/bmm/README.md#updating), and [`internal/bmmgen/sim_bump_test.go`](../../internal/bmmgen/sim_bump_test.go) runs a simulated bump on every CI run.
 
+### D12 — One zero test per class held by value, shared by the encoders and the floor
+
+The canonical JSON and XML encoders leave out a mandatory member held by value as a struct when every field of it is empty ([REQ-052](../specifications/wire.md#an-absent-mandatory-member)), and the RM validation floor reads such a member as absent ([REQ-171 *Structural access*](../specifications/clinical-modeling.md#structural-access)).
+Both read it through a zero test, one function per class that compares every field with its zero value.
+Two copies of the test could drift apart, and the floor would then report a member missing that the encoders write, or accept one they leave out.
+
+The generator therefore emits one zero test per class, into `zero_gen.go` of the target package, for the classes the encoders, the interval-bound emptiness test and the floor read.
+The floor's access in `internal/rmaccess` cannot call an unexported function of `openehr/rm`, and `openehr/rm` cannot import the access, so the file's `init` registers the tests the floor reads with `internal/rmzero`, a package that uses only the standard library.
+The access looks each one up once, when it is initialised, and fails at start-up if one is missing.
+The tests stay unexported: an exported `IsZero` method would change how `encoding/json/v2` reads `omitzero` on the RM types, and exported functions would add API no consumer needs, the reasoning [ADR 0028](0028-generated-rm-attribute-access.md) gives for the access itself.
+
+The direct JSON writer and the XML encoder put each such member behind its zero test.
+The JSON wrapper cannot leave out a struct by its value, so a class with such a member gets a second wrapper, taken only when the member is empty ([ADR 0022](0022-canonical-json-encoding-json-v2.md#encode-writes-each-member-itself)).
+
 ## Consequences
 
 - Consumers construct COMPOSITION values from a single `rm` import; no six-package import fan-out.
@@ -99,4 +113,4 @@ A BMM version bump is one pull request. The new schema is added beside the old o
 
 ## Traceability
 
-- Applies: REQ-041 (its mapping rules), REQ-056
+- Applies: REQ-041 (its mapping rules), REQ-056, REQ-052 and REQ-171 (D12)

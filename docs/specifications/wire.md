@@ -177,6 +177,7 @@ Compared with the input, the output matches the input's *expected form*, the inp
   - a `null` member as absent;
   - an elided `_type` as present (§ Polymorphic substitution);
   - an empty bound beside its open flag as absent;
+  - an empty value at a mandatory member held as a struct as absent (§ *An absent mandatory member* below);
   - an empty list an optional attribute holds as absent, such as `mappings`, `LOCATABLE.links` or the base64 `DV_MULTIMEDIA.data` and `integrity_check` (the item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` stay, and so does an empty optional map, which the SDK holds through a pointer: the encoder writes a present one, as § *An absent mandatory member* below says);
   - a `null` mandatory primitive member as the zero the encoder writes for it (the empty string for a `String`, `0` for an `Integer`, `Integer64`, `Real` or `Double` and `false` for a `Boolean`, since a Go value of those types holds no null), except an interval boundary flag, which takes its default as above;
   - a number, quoted or not, as the literal the encoder writes for its value ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers)).
@@ -229,9 +230,12 @@ A present empty **mandatory** list or map **MUST** be written as it is, `[]` or 
 The optional item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` are the exception and are written as a mandatory list is: a present empty one is written as `[]`, a nil one is left out, and a decoded `[]` re-encodes as `[]`.
 An archetype can make these lists mandatory by existence, a CDR refuses a structure that leaves its list out, and no RM invariant keeps them non-empty, so `[]` is RM-valid.
 An absent mandatory member leaves the instance RM-invalid; how the floor reports that, and a present empty list, is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, and on decode such a member is a missing member, which [§ REQ-175](#req-175--missing-members-on-decode) reports on request.
-A mandatory member held by value has no absent form and is written: `OBSERVATION.data`, or the `data` of an event over a concrete structure, such as `POINT_EVENT<ITEM_TREE>`.
+A mandatory member held by value as a struct, directly or through a type parameter bound to one, **MUST** be left out when it is its type's zero value as [REQ-171 *Structural access*](clinical-modeling.md#structural-access) reads one, every field empty: `OBSERVATION.data`, `ROLE.performer`, or the `data` of an event over a concrete structure, such as `POINT_EVENT<ITEM_TREE>`.
+Such a member with any field set is written in full, and so are EHR_STATUS `subject` and ARCHETYPED `archetype_id`, which the floor reads as present whatever they hold.
+A struct an interface holds is written, empty or not, and so is every other mandatory member held by value, a number, a boolean, a character or a string, which has no absent form.
 A mandatory `any` field holds a value, not an RM object, so a typed-nil pointer, a nil list or a nil map it holds is written as `null`.
-Canonical XML writes no element for an absent mandatory list, map, pointer or interface either ([§ REQ-056](#req-056)), and none for an empty `Hash`, whose entries it writes one element each ([clinical-modeling.md § REQ-176](clinical-modeling.md#round-trip)); a `Hash` whose values are `Hash`es is outside what that codec models ([§ REQ-170](#req-170--unmatched-content-on-decode)), and its encode fails on one, nil or not.
+Canonical XML writes no element for an absent mandatory list, map, pointer or interface, or for a member held as a struct that is left out above ([§ REQ-056](#req-056)), and none for an empty `Hash`, whose entries it writes one element each ([clinical-modeling.md § REQ-176](clinical-modeling.md#round-trip)).
+A `Hash` whose values are `Hash`es is outside what that codec models ([§ REQ-170](#req-170--unmatched-content-on-decode)), and its encode fails on one, nil or not.
 As with the typed-nil bullet above, this is a `canjson` contract: a v1 `encoding/json` caller spells a typed-nil `null`.
 
 #### An open interval side carries no bound
