@@ -8,19 +8,20 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
 
-// roleXML is a ROLE in canonical XML whose performer, a PARTY_REF the SDK
-// holds by value, is spelled performer: "" leaves the element out.
-func roleXML(performer string) string {
-	return `<role xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` +
-		` archetype_node_id="openEHR-DEMOGRAPHIC-ROLE.role.v1"><name xsi:type="DV_TEXT"><value>r</value></name>` +
-		performer + `</role>`
+// relationshipXML is a PARTY_RELATIONSHIP in canonical XML whose source, a
+// PARTY_REF the SDK holds by value, is spelled source: "" leaves the element
+// out. Its target is set.
+func relationshipXML(source string) string {
+	return `<party_relationship xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` +
+		` archetype_node_id="openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.r.v1"><name xsi:type="DV_TEXT"><value>r</value></name>` +
+		source + `<target><namespace>local</namespace><type>PERSON</type></target></party_relationship>`
 }
 
-// TestREQ056_EmptyMandatoryStructMemberWritesNoElement decodes ROLE documents
-// whose mandatory performer, held by value, is missing, empty, or partly
-// filled, re-encodes them, and holds the output to the rule canonical JSON
-// follows: a member left out of the input stays out, an empty one is left
-// out, and one with a part set is written in full.
+// TestREQ056_EmptyMandatoryStructMemberWritesNoElement decodes
+// PARTY_RELATIONSHIP documents whose mandatory source, held by value, is
+// missing, empty, or partly filled, re-encodes them, and holds the output to
+// the rule canonical JSON follows: a member left out of the input stays out,
+// an empty one is left out, and one with a part set is written in full.
 //
 // REQ-056: canonical XML writes no element for a mandatory member held by
 // value as a struct whose every field is empty (REQ-052 § An absent mandatory
@@ -31,21 +32,21 @@ func TestREQ056_EmptyMandatoryStructMemberWritesNoElement(t *testing.T) {
 		in   string
 		want string
 	}{
-		{name: "missing", in: roleXML(""), want: roleXML("")},
-		{name: "empty, its children empty", in: roleXML(`<performer><namespace></namespace><type></type></performer>`), want: roleXML("")},
-		{name: "empty, self-closing", in: roleXML(`<performer/>`), want: roleXML("")},
+		{name: "missing", in: relationshipXML(""), want: relationshipXML("")},
+		{name: "empty, its children empty", in: relationshipXML(`<source><namespace></namespace><type></type></source>`), want: relationshipXML("")},
+		{name: "empty, self-closing", in: relationshipXML(`<source/>`), want: relationshipXML("")},
 		{
 			name: "namespace only",
-			in:   roleXML(`<performer><namespace>local</namespace><type></type></performer>`),
-			want: roleXML(`<performer><namespace>local</namespace><type></type></performer>`),
+			in:   relationshipXML(`<source><namespace>local</namespace><type></type></source>`),
+			want: relationshipXML(`<source><namespace>local</namespace><type></type></source>`),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var role rm.Role
-			if err := canxml.Unmarshal([]byte(tc.in), &role); err != nil {
+			var rel rm.PartyRelationship
+			if err := canxml.Unmarshal([]byte(tc.in), &rel); err != nil {
 				t.Fatalf("canxml.Unmarshal(%s): %v", tc.in, err)
 			}
-			got, err := canxml.Marshal(&role)
+			got, err := canxml.Marshal(&rel)
 			if err != nil {
 				t.Fatalf("canxml.Marshal: %v", err)
 			}

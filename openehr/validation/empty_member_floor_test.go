@@ -49,12 +49,6 @@ func TestREQ052_FloorReadsAnEncodedEmptyMemberAsBefore(t *testing.T) {
 		want []string // the paths of `required` the floor reports
 	}{
 		{
-			name: "ROLE with an empty performer",
-			v:    &rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", Name: name},
-			root: func() any { return new(rm.Role) },
-			want: []string{"/identities", "/performer"},
-		},
-		{
 			name: "COMPOSITION with empty category, language and territory",
 			v:    &rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1", Name: name},
 			root: func() any { return new(rm.Composition) },

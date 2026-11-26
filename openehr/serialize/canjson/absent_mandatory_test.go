@@ -14,11 +14,6 @@ import (
 // codePhraseNL is a complete CODE_PHRASE for the inputs that need one.
 const codePhraseNL = `{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"},"code_string":"nl"}`
 
-// roleWithoutPerformer is a ROLE that leaves out its mandatory performer, as
-// testkit/corpus/its_rest/demographic/role.json does.
-const roleWithoutPerformer = `{"_type":"ROLE","archetype_node_id":"openEHR-DEMOGRAPHIC-ROLE.role.v1",` +
-	`"name":{"_type":"DV_TEXT","value":"Attending Physician"}}`
-
 // TestREQ052_AbsentMandatoryMemberIsOmitted decodes inputs that leave out a
 // mandatory member, re-encodes them, and requires the member to stay absent
 // rather than come back as null. Each row is one class from issue 257, plus a
@@ -78,10 +73,10 @@ func TestREQ052_AbsentMandatoryMemberIsOmitted(t *testing.T) {
 			absent: []string{"name"},
 		},
 		{
-			name:   "ROLE performer, a PARTY_REF held by value",
-			in:     roleWithoutPerformer,
-			target: func() any { return new(rm.Role) },
-			absent: []string{"performer", "identities"},
+			name:   "PARTY_RELATIONSHIP source and target, PARTY_REFs held by value",
+			in:     `{"_type":"PARTY_RELATIONSHIP","archetype_node_id":"openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.r.v1","name":{"_type":"DV_TEXT","value":"r"}}`,
+			target: func() any { return new(rm.PartyRelationship) },
+			absent: []string{"source", "target"},
 		},
 		{
 			name:   "COMPOSITION category, language and territory, held by value",
@@ -207,9 +202,9 @@ func TestREQ052_GoBuiltAbsentMandatoryMember(t *testing.T) {
 			member: "uid",
 		},
 		{
-			name:   "a zero PARTY_REF held by value in ROLE.performer",
-			value:  &rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", Name: rm.DVText{Value: "r"}},
-			member: "performer",
+			name:   "a zero PARTY_REF held by value in PARTY_RELATIONSHIP.source",
+			value:  &rm.PartyRelationship{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.r.v1", Name: rm.DVText{Value: "r"}},
+			member: "source",
 		},
 		{
 			name:   "a zero CODE_PHRASE held by value in COMPOSITION.language",
@@ -274,9 +269,9 @@ func TestREQ052_MandatoryMemberWithAValueIsWritten(t *testing.T) {
 			wantType: "DV_TEXT",
 		},
 		{
-			name:     "a PARTY_REF with only its type set, held by value in ROLE.performer",
-			value:    &rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", Name: rm.DVText{Value: "r"}, Performer: rm.PartyRef{Type: "PERSON"}},
-			member:   "performer",
+			name:     "a PARTY_REF with only its type set, held by value in PARTY_RELATIONSHIP.source",
+			value:    &rm.PartyRelationship{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.r.v1", Name: rm.DVText{Value: "r"}, Source: rm.PartyRef{Type: "PERSON"}},
+			member:   "source",
 			wantType: "PARTY_REF",
 		},
 		{

@@ -20,11 +20,12 @@ type emptyMemberCase struct {
 	written []string // members the re-encode writes
 }
 
-// emptyRole is a ROLE whose performer, a PARTY_REF the SDK holds by value,
-// is performer.
-func emptyRole(performer string) string {
-	return `{"_type":"ROLE","archetype_node_id":"openEHR-DEMOGRAPHIC-ROLE.role.v1",` +
-		`"name":{"_type":"DV_TEXT","value":"r"},"performer":` + performer + `}`
+// relationship is a PARTY_RELATIONSHIP whose source, a PARTY_REF the SDK
+// holds by value, is source; its target is set.
+func relationship(source string) string {
+	return `{"_type":"PARTY_RELATIONSHIP","archetype_node_id":"openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.r.v1",` +
+		`"name":{"_type":"DV_TEXT","value":"r"},"source":` + source + `,` +
+		`"target":{"_type":"PARTY_REF","namespace":"local","type":"PERSON"}}`
 }
 
 // emptyEvent is an OBSERVATION whose one POINT_EVENT has time, a DV_DATE_TIME
@@ -43,16 +44,16 @@ func emptyEvent(time string) string {
 // a value with one part set, which is no empty value.
 var emptyMemberCases = []emptyMemberCase{
 	{
-		name:   "an empty PARTY_REF in ROLE.performer",
-		in:     emptyRole(`{"_type":"PARTY_REF","namespace":"","type":""}`),
-		target: func() any { return new(rm.Role) },
-		absent: []string{"performer"},
+		name:   "an empty PARTY_REF in PARTY_RELATIONSHIP.source",
+		in:     relationship(`{"_type":"PARTY_REF","namespace":"","type":""}`),
+		target: func() any { return new(rm.PartyRelationship) },
+		absent: []string{"source"},
 	},
 	{
-		name:   "a PARTY_REF with no member in ROLE.performer",
-		in:     emptyRole(`{"_type":"PARTY_REF"}`),
-		target: func() any { return new(rm.Role) },
-		absent: []string{"performer"},
+		name:   "a PARTY_REF with no member in PARTY_RELATIONSHIP.source",
+		in:     relationship(`{"_type":"PARTY_REF"}`),
+		target: func() any { return new(rm.PartyRelationship) },
+		absent: []string{"source"},
 	},
 	{
 		name:   "an empty CODE_PHRASE, its TERMINOLOGY_ID empty too, in COMPOSITION.language",
@@ -61,10 +62,10 @@ var emptyMemberCases = []emptyMemberCase{
 		absent: []string{"language"},
 	},
 	{
-		name:    "a PARTY_REF with only its namespace set in ROLE.performer",
-		in:      emptyRole(`{"_type":"PARTY_REF","namespace":"local","type":""}`),
-		target:  func() any { return new(rm.Role) },
-		written: []string{"performer"},
+		name:    "a PARTY_REF with only its namespace set in PARTY_RELATIONSHIP.source",
+		in:      relationship(`{"_type":"PARTY_REF","namespace":"local","type":""}`),
+		target:  func() any { return new(rm.PartyRelationship) },
+		written: []string{"source"},
 	},
 	{
 		// A present list, empty or not, is a field the zero test reads as set.

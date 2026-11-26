@@ -40,8 +40,8 @@ func TestEmptyMembers_REQ052(t *testing.T) {
 	for _, tc := range []struct {
 		class, member, test string
 	}{
-		{"ROLE", "performer", "isZeroPartyRef"},
 		{"PARTY_RELATIONSHIP", "source", "isZeroPartyRef"},
+		{"PARTY_RELATIONSHIP", "target", "isZeroPartyRef"},
 		{"COMPOSITION", "category", "isZeroDVCodedText"},
 		{"COMPOSITION", "language", "isZeroCodePhrase"},
 		{"COMPOSITION", "territory", "isZeroCodePhrase"},
@@ -70,6 +70,7 @@ func TestEmptyMembers_REQ052(t *testing.T) {
 		{"DV_QUANTITY", "magnitude", "a number"},
 		{"COMPOSITION", "composer", "held through an interface"},
 		{"PARTY_IDENTITY", "details", "held through an interface"},
+		{"ROLE", "performer", "optional, held through a pointer"},
 	} {
 		if got, ok := members(tc.class)[tc.member]; ok {
 			t.Errorf("%s.%s = %+v; want it written whatever it holds (%s)", tc.class, tc.member, got, tc.why)

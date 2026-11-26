@@ -651,8 +651,8 @@ func TestREQ052DirectEncodeLeavesOutEmptyMembersAsTheWrapperDoes(t *testing.T) {
 		v      any
 		absent string // the member both leave out, or "" when both write it
 	}{
-		{name: "ROLE with an empty performer", v: &rm.Role{ArchetypeNodeID: "at0000", Name: name}, absent: "performer"},
-		{name: "ROLE with a performer that has a type", v: &rm.Role{ArchetypeNodeID: "at0000", Name: name, Performer: rm.PartyRef{Type: "PERSON"}}},
+		{name: "PARTY_RELATIONSHIP with an empty source", v: &rm.PartyRelationship{ArchetypeNodeID: "at0000", Name: name, Target: rm.PartyRef{Type: "PERSON"}}, absent: "source"},
+		{name: "PARTY_RELATIONSHIP with a source that has a type", v: &rm.PartyRelationship{ArchetypeNodeID: "at0000", Name: name, Source: rm.PartyRef{Type: "PERSON"}, Target: rm.PartyRef{Type: "PERSON"}}},
 		{name: "COMPOSITION with empty category, language and territory", v: &rm.Composition{ArchetypeNodeID: "at0000", Name: name}, absent: "category"},
 		{name: "DV_CODED_TEXT with an empty defining code", v: &rm.DVCodedText{Value: "v"}, absent: "defining_code"},
 		{name: "DV_CODED_TEXT with a code and no terminology", v: &rm.DVCodedText{Value: "v", DefiningCode: rm.CodePhrase{CodeString: "c"}}},
