@@ -86,7 +86,7 @@ The generated `UnmarshalJSONFrom` reads `{`, each member name and `}` as tokens,
 It decodes the wrapper instead, through `typereg.DecodeInto`, where json/v2's struct decode would read a member otherwise (`typereg.DirectDecode`):
 
 - when the decoder carries a caller's unmarshalers, or no SDK hooks, as the outermost value of a bare v2 call does;
-- when it carries `MatchCaseInsensitiveNames`, `RejectUnknownMembers`, `StringifyNumbers` or v1's legacy error reporting;
+- when it carries `MatchCaseInsensitiveNames`, `RejectUnknownMembers`, `StringifyNumbers`, or v1's legacy error reporting or merge semantics;
 - when the value is a null or not an object, or opens past the nesting bound.
 
 ### Omit options
