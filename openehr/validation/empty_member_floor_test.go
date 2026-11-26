@@ -87,7 +87,9 @@ func TestREQ052_FloorReadsAnEncodedEmptyMemberAsBefore(t *testing.T) {
 }
 
 // minFloorCorpusDocuments is a floor on the corpus documents the test below
-// reads: a skip rule that stopped matching would otherwise empty it.
+// reads, and on those of them it re-encodes in canonical XML: a skip rule
+// that stopped matching, or a canonical-XML refusal that grew, would
+// otherwise empty it.
 const minFloorCorpusDocuments = 90
 
 // extra returns the members of got that want lacks.
@@ -153,7 +155,7 @@ func emptyValues(doc []byte) []string {
 func TestREQ052_CorpusReencodeAddsNoMissingMember(t *testing.T) {
 	t.Parallel()
 	root := fixtures.CorpusRoot()
-	read := 0
+	read, readXML := 0, 0
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -207,6 +209,7 @@ func TestREQ052_CorpusReencodeAddsNoMissingMember(t *testing.T) {
 		if added := extra(extra(xmlMissing, jsonMissing), emptyValues(j)); len(added) > 0 {
 			t.Errorf("%s: the canonical-XML re-encode leaves out %q, which the canonical-JSON re-encode writes", rel, added)
 		}
+		readXML++
 		return nil
 	})
 	if err != nil {
@@ -214,5 +217,8 @@ func TestREQ052_CorpusReencodeAddsNoMissingMember(t *testing.T) {
 	}
 	if read < minFloorCorpusDocuments {
 		t.Errorf("read %d corpus documents, want at least %d", read, minFloorCorpusDocuments)
+	}
+	if readXML < minFloorCorpusDocuments {
+		t.Errorf("re-encoded %d corpus documents in canonical XML, want at least %d", readXML, minFloorCorpusDocuments)
 	}
 }

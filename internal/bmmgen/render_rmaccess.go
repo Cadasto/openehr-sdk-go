@@ -161,10 +161,11 @@ var goPredeclaredKinds = map[string]accessKind{
 // attributes and a reader of the containers the class declares, the type
 // switches single, appendMultiple, hash and covers that dispatch on a
 // value's Go type (pointer and value form alike), a reader of the entries of
-// every Hash attribute, and a field-by-field zero test for every class an
-// attribute holds by value. Which attributes a class has, whether each is a container
-// and which are Hash attributes is read from the same fold rminfo is
-// generated from ([effectiveProperties]).
+// every Hash attribute, and, for every class an attribute holds by value, a
+// lookup of the zero test openehr/rm generates for it in zero_gen.go and
+// registers with internal/rmzero. Which attributes a class has, whether each
+// is a container and which are Hash attributes is read from the same fold
+// rminfo is generated from ([effectiveProperties]).
 //
 // Returns nil for every target but RM. Output is deterministic and gofmt'd.
 func RenderRMAccessFile(plan *Plan) ([]byte, error) {
