@@ -351,7 +351,7 @@ Encode writes the shortest decimal that reads back as the same `float64`, so a d
 Neither format makes the spelling part of the value: `1.10` and `1.1` are one JSON number, and one value of the `xs:float` the ITS-XML schema gives `DV_QUANTITY.magnitude`.
 The number of decimal places a quantity was recorded to is the RM's `precision` attribute.
 
-The clause is met on both its arms: an out-of-range magnitude (e.g. `1e400`) fails with a typed codec error, reachable by `errors.As` through the generated `UnmarshalJSONFrom` wrapper; and a lossy literal fails decode wrapping `canjson.ErrInvalidShape`, in both the bare-number and quoted-decimal-string forms `Real` accepts.
+The clause is met on both its arms: an out-of-range magnitude (e.g. `1e400`) fails with a typed codec error, reachable by `errors.As` through the generated `UnmarshalJSONFrom`; and a lossy literal fails decode wrapping `canjson.ErrInvalidShape`, in both the bare-number and quoted-decimal-string forms `Real` accepts.
 **Parse and range failures take precedence over the lossy test:** a malformed literal (fails JSON number or decimal-string syntax) or an out-of-range one (overflows `float64`) reports its own parse or range error first; the test applies only to a literal that parsed as a syntactically valid, in-range decimal.
 `rm.Real` is the sole primitive this clause governs; `DV_QUANTITY.magnitude`, `DV_PROPORTION.numerator`/`denominator` and every other `Real`-typed field inherit the check through the ordinary struct-field decode path, with no change to the generated code, in canonical XML as in canonical JSON ([§ REQ-056](#req-056)).
 

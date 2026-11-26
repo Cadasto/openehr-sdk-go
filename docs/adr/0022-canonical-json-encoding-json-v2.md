@@ -9,7 +9,7 @@ date: 2026-09-14
 # ADR 0022 — Canonical JSON: `encoding/json/v2` through generated streaming marshalers; member order not promised; numbers strict on encode, tolerant on decode
 
 - **Status:** Accepted, 2026-09-14.
-- **Amended:** 2026-11-25: takes in the member-order and number-tolerance decisions and the design of the generated encoders, each class now writing its members itself.
+- **Amended:** 2026-11-26: takes in the member-order and number-tolerance decisions and the design of the generated encoders and decoders, each class now writing and reading its members itself.
 - **Strand:** resolves the `encoding/json/v2` and default-codec sub-questions of [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance), and retires the byte-stability premise of its codec gate.
 - **Amends:** [REQ-052](../specifications/wire.md#req-052) (member order is unspecified; a quoted number decodes).
 - **Related:** [REQ-040](../specifications/reference-model.md#type-registry-req-040) (the registry the dispatch hooks read), [REQ-041](../specifications/reference-model.md#req-041--pinned-bmm-sources) (the primitive mapping the number types keep), [REQ-056](../specifications/wire.md#req-056) (canonical XML keeps its element order), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the floor a round trip is checked against); [ADR 0002](0002-bmm-codegen-decisions.md) (the generator that emits the codec).
@@ -29,8 +29,8 @@ A promised order constrains every encoder the SDK might adopt, and a probe that 
 Some producers write a `Real` or `Integer` quoted: `testkit/corpus/compositions/vital_signs.json` carries `"magnitude": "1256"`.
 A strict-number decoder refuses that output; a consumer of the SDK's own output needs numbers.
 
-**Encode cost.**
-Marshalling a wrapper struct per value allocates for every value written, and json/v2 copies a value held by value in an interface slot before calling its method.
+**Codec cost.**
+Marshalling a wrapper struct per value allocates for every value written, and decoding into one for every value read; json/v2 also copies a value held by value in an interface slot before calling its method.
 
 ## Decision
 
@@ -41,13 +41,13 @@ Marshalling a wrapper struct per value allocates for every value written, and js
 - The generator emits `MarshalJSONTo(*jsontext.Encoder) error` and `UnmarshalJSONFrom(*jsontext.Decoder) error` for each concrete RM and AOM 1.4 class, and no `MarshalJSON` / `UnmarshalJSON` pair.
 - `MarshalJSONTo` has a value receiver, so it is in the method set of a value and of a pointer: a value held in an interface slot or a map writes its `_type`.
   The receiver matters under a v1 entry point, whose `CallMethodsWithLegacySemantics` skips a pointer-receiver method on an unaddressable value.
-- `UnmarshalJSONFrom` refuses a nil receiver and calls one shared helper, `typereg.DecodeInto`.
-  It decodes into a method-free alias of the class, or into a flat wire struct for a class that embeds a concrete ancestor with methods of its own, whose alias would promote them.
-  It then checks `_type` and classifies a shape failure ([wire.md § Decode-side shape sentinel](../specifications/wire.md#decode-side-shape-sentinel)).
+- `UnmarshalJSONFrom` refuses a nil receiver and reads its class's members into the receiver itself ([§ Decode reads each member itself](#decode-reads-each-member-itself)).
+  Where it does not, it calls one shared helper, `typereg.DecodeInto`, which decodes into a method-free alias of the class, or into a flat wire struct for a class that embeds a concrete ancestor with methods of its own, whose alias would promote them.
+  Either way it then checks `_type` and classifies a shape failure ([wire.md § Decode-side shape sentinel](../specifications/wire.md#decode-side-shape-sentinel)).
 - A substitutable slot is served by one `json.UnmarshalFromFunc` per polymorphic interface, built from `typereg.Default` at init and supplied through `json.WithUnmarshalers`.
   Every hook passes `dec.Options()` to its nested decode; without it a deeper slot loses its hook.
-- The generated decoders hold no logic per class beyond that delegation, except the interval classes.
-  Encode leaves out an open side's bound ([wire.md § An open interval side carries no bound](../specifications/wire.md#an-open-interval-side-carries-no-bound)), and decode gives an absent boundary flag its default ([wire.md § REQ-169](../specifications/wire.md#req-169--interval-boundary-flag-defaults)); the delegation sees neither.
+- Beyond reading their members, the generated decoders hold no logic per class except the interval classes.
+  Encode leaves out an open side's bound ([wire.md § An open interval side carries no bound](../specifications/wire.md#an-open-interval-side-carries-no-bound)), and decode gives an absent boundary flag its default ([wire.md § REQ-169](../specifications/wire.md#req-169--interval-boundary-flag-defaults)); a member-by-member read sees neither.
   The generator emits that logic for every class carrying the four flags, BASE `Interval` and the AOM 1.4 constraint intervals included, and refuses a flag-carrying class whose shape it does not handle.
 - The decoders are specified for a zero-value receiver: reuse of a populated receiver is unspecified, and the alias and the flat struct differ on it ([wire.md § Decode state after a failure](../specifications/wire.md#decode-state-after-a-failure)).
 - Determinism is an option, not an emergent property: `typereg.MarshalOptions` passes `json.Deterministic(true)` to every generated marshaler, so `Hash` keys are written sorted.
@@ -73,6 +73,21 @@ It marshals the wrapper instead, the alias or the flat struct with `_type` leadi
 - before writing anything, when a member that may be left out, typed by an interface or a type parameter, holds a value of a type the registry does not list.
 
 The encoder's own options, indentation and escaping, apply to the tokens either way, and a failure names the class whose method failed, as json/v2 does at a method boundary.
+
+### Decode reads each member itself
+
+The generated `UnmarshalJSONFrom` reads `{`, each member name and `}` as tokens, decodes each member its class declares into the receiver's field through `json.UnmarshalDecode`, and skips any other member:
+
+- a member decodes through json/v2 under the decoder's options, so a slot's hook, a number's tolerance and json/v2's error text are those of the wrapper;
+- a `_type` naming another class is refused after the whole value, so a member's failure is still the one reported;
+- a class decoded through a flat wire struct restores the receiver on a failure, as the wrapper leaves it untouched;
+- a duplicate of the class's own member name, which the tokenizer refuses before the name is read, is placed at that name, where json/v2's struct decode places it.
+
+It decodes the wrapper instead, through `typereg.DecodeInto`, where json/v2's struct decode would read a member otherwise (`typereg.DirectDecode`):
+
+- when the decoder carries a caller's unmarshalers, or no SDK hooks, as the outermost value of a bare v2 call does;
+- when it carries `MatchCaseInsensitiveNames`, `RejectUnknownMembers`, `StringifyNumbers` or v1's legacy error reporting;
+- when the value is a null or not an object, or opens past the nesting bound.
 
 ### Omit options
 
@@ -115,6 +130,9 @@ A caller that must refuse quoted numbers checks the input before `canjson.Unmars
 - Writing members directly cut the Demonstration composition's encode from 147 to 58 µs and from 1,012 to 6 allocations (darwin/arm64); 177 of those allocations were the numbers' `MarshalJSON` calls.
   The cost is code: the generated JSON encoders grew from 4,883 to 19,572 lines, and a program that encodes canonical JSON from 8.44 to 9.63 MB.
   Tests encode every corpus document and every registered class both ways and compare the bytes, under each option the gate checks.
+- Reading members directly cut the decode of the width-400 synthetic composition from 5,626 to 2,015 allocations and its time by 15 percent, and an operational template's from 3,750 to 1,920 allocations and its time by 18 percent (darwin/arm64); the allocations left are the values the registry builds for interface slots.
+  The generated JSON decoders grew from 3,631 to 13,089 lines, and `cmd/examples/canxml_roundtrip` by 4.8 percent.
+  Tests decode every corpus document and every registered class both ways, and a set of malformed documents, and compare the value and the whole error chain.
 - The codec carries a performance budget: a benchmark regresses materially when its time/op is more than 20 percent worse than the retired generated marshalers' at p < 0.05, measured with `benchstat` ([PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171)).
 - Withdrawing the order promise is one-way: restoring it after consumers have absorbed its removal would break them again.
 
@@ -128,6 +146,7 @@ A caller that must refuse quoted numbers checks the input before `canjson.Unmars
 - **Keep the member-order profile as a requirement.** Rejected: no specification asks for it, and `go doc encoding/json/v2.Deterministic` holds determinism only across identical binaries, so the promise would be weaker than it reads.
 - **Ship a canonicalisation helper for consumers who hash.** Rejected: the withdrawn promise under another name, for a format whose specification defines no canonical form.
 - **A strict-number decode option.** Rejected, as *Numbers* says.
+- **Read string members as tokens on decode.** Rejected: 10 to 17 percent faster than decoding them through json/v2, but about 3,200 more allocations on the width-400 composition, since a token read bypasses json/v2's string cache.
 
 ## Traceability
 
