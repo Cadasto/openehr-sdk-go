@@ -11,8 +11,12 @@ import (
 // EncodeString writes s as the text of one element named name, the bytes
 // e.EncodeElement(s, …) writes, without the copy of s that passing it as an
 // any makes. Generator-emitted MarshalXML methods call it for each member of
-// a string type; consumers rarely need it.
+// a string type; consumers rarely need it. A nil e is refused with an error
+// wrapping [typereg.ErrNilArgument] that names the element.
 func EncodeString(e *xml.Encoder, name, s string) error {
+	if e == nil {
+		return nilArgument("EncodeString", "e", name)
+	}
 	start := xml.StartElement{Name: xml.Name{Local: name}}
 	// Character data written as a token keeps a newline as it is, where
 	// EncodeElement writes `&#xA;`; a long text is not worth the copy.
@@ -51,8 +55,12 @@ var textBufs = sync.Pool{New: func() any {
 // bytes e.EncodeElement(v, …) writes, without the copy of v that passing it
 // as an any makes. Generator-emitted MarshalXML methods call it for each
 // member of a primitive type that marshals itself to text, such as a Real;
-// consumers rarely need it.
+// consumers rarely need it. A nil e is refused with an error wrapping
+// [typereg.ErrNilArgument] that names the element.
 func EncodeText[T encoding.TextMarshaler](e *xml.Encoder, name string, v T) error {
+	if e == nil {
+		return nilArgument("EncodeText", "e", name)
+	}
 	start := xml.StartElement{Name: xml.Name{Local: name}}
 	text, err := v.MarshalText()
 	// EncodeElement writes the start tag before it reports the failure, and

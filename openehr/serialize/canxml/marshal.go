@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // Canonical XML namespaces.
@@ -174,7 +176,13 @@ func ElementName(bmmName string) string {
 // v's MarshalXML must not keep the start element's attributes after it
 // returns, since they are reused; one that writes the start element through
 // e keeps none.
+//
+// A nil e is refused, whatever v is, with an error wrapping
+// [typereg.ErrNilArgument] that names the element.
 func EncodePoly(e *xml.Encoder, name string, v any) error {
+	if e == nil {
+		return nilArgument("EncodePoly", "e", name)
+	}
 	if isNilValue(v) {
 		return nil
 	}
@@ -192,6 +200,14 @@ func EncodePoly(e *xml.Encoder, name string, v any) error {
 	*attrs = [2]xml.Attr{}
 	polyAttrs.Put(attrs)
 	return err
+}
+
+// nilArgument is the refusal of a nil arg, an encoder or a decoder, handed to
+// the helper fn for the element named name. It wraps [typereg.ErrNilArgument],
+// so a caller matches it with errors.Is instead of recovering a panic. Its
+// text takes forms a [DecodeError] writes out, which leaves out any other.
+func nilArgument(fn, arg, name string) error {
+	return fmt.Errorf("canxml: <%s>: %w: %s for canxml.%s", name, typereg.ErrNilArgument, arg, fn)
 }
 
 // polyAttrs holds the attribute slots [EncodePoly] hands a polymorphic
