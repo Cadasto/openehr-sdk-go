@@ -707,8 +707,13 @@ func XSITypeOf(start xml.StartElement) (string, error) {
 //   - The body bytes are consumed up to and including the matching
 //     end element so the parent decoder is positioned correctly for
 //     the next child.
+//   - A nil dec is refused before anything is read, with
+//     [typereg.ErrNilArgument] wrapped in [DecodeError].
 func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	var zero T
+	if dec == nil {
+		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: nilArgument("DecodeAs", "dec", start.Name.Local)}
+	}
 	d, err := xmlschema.Discriminator(dec, start)
 	if err != nil {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
@@ -755,9 +760,13 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 // supplied defaultCtor instantiates the declared parent type, and the
 // element body decodes into it as the decode's options say (see
 // [WithUnmatched]). This preserves openEHR canonical XML where the static
-// field type fixes the concrete subtype.
+// field type fixes the concrete subtype. A nil dec is refused as DecodeAs
+// refuses it.
 func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultCtor func() any) (T, error) {
 	var zero T
+	if dec == nil {
+		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: nilArgument("DecodeAsOrDefault", "dec", start.Name.Local)}
+	}
 	d, err := xmlschema.Discriminator(dec, start)
 	if err != nil {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}

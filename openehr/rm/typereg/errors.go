@@ -50,13 +50,14 @@ var (
 	// and the hand-written primitive codecs (rm.Real, rm.Integer,
 	// rm.Integer64, rm.Character) wrap it.
 	ErrNilReceiver = errors.New("typereg: nil receiver")
-	// ErrNilArgument classifies a nil argument that an exported decode helper
+	// ErrNilArgument classifies a nil argument that an exported codec helper
 	// would otherwise dereference: a nil *jsontext.Decoder, a nil out, or a
 	// nil gotType handed to [DecodeInto], and a nil *jsontext.Decoder or nil
 	// out handed to [DecodePolymorphic]. It is caller misuse (no generated
 	// body passes one), refused before any decode with a [DecodeError] whose
 	// Inner wraps this sentinel and names the argument, so a caller can match
-	// it with errors.Is instead of recovering a panic.
+	// it with errors.Is instead of recovering a panic. The canonical-XML
+	// helpers wrap it too, for a nil encoder or decoder.
 	ErrNilArgument = errors.New("typereg: nil argument")
 	// ErrInvalidShape classifies a JSON-level shape failure (valid JSON
 	// that is the wrong shape for the target type) or a hand-written
