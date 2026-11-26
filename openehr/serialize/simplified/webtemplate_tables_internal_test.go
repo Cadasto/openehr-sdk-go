@@ -53,18 +53,22 @@ func TestREQ053WebTemplateTablesBuiltOncePerWebTemplate(t *testing.T) {
 func TestREQ053WebTemplateTablesDroppedWithTheirWebTemplate(t *testing.T) {
 	// The Web Template is reachable only inside this function, so once it
 	// returns the cache's weak key is the only way left to it. The decode
-	// reads every table, the decode-only ones included.
+	// reads every table, the decode-only ones included. The entry is looked
+	// for while the Web Template is still kept alive, as a collection after
+	// the function returns may already drop it.
 	key := func() weak.Pointer[webtemplate.WebTemplate] {
 		wt, _ := conformanceWT(t)
 		body := rmattrBody(mergedIsmStateOnly("524"))
 		if _, err := UnmarshalFlat(mustJSON(t, body), wt); err != nil {
 			t.Fatalf("UnmarshalFlat: %v", err)
 		}
-		return weak.Make(wt)
+		key := weak.Make(wt)
+		if _, ok := webTemplateTablesCache.Load(key); !ok {
+			t.Fatal("webTemplateTablesCache holds no entry for a Web Template a decode just used")
+		}
+		runtime.KeepAlive(wt)
+		return key
 	}()
-	if _, ok := webTemplateTablesCache.Load(key); !ok {
-		t.Fatal("webTemplateTablesCache holds no entry for a Web Template a decode just used")
-	}
 	// A cleanup runs on its own goroutine after the collection that frees
 	// the Web Template, so the entry goes some time after one.
 	for range 100 {

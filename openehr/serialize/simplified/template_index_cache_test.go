@@ -37,15 +37,19 @@ func TestTemplateIndexBuiltOncePerTemplate(t *testing.T) {
 // out the cleanup and its entry stays.
 func TestTemplateIndexDroppedWithItsTemplate(t *testing.T) {
 	// The template is reachable only inside this function, so once it returns
-	// the cache's weak key is the only way left to it.
+	// the cache's weak key is the only way left to it. The entry is looked for
+	// while the template is still kept alive, as a collection after the
+	// function returns may already drop it.
 	key := func() weak.Pointer[templatecompile.Compiled] {
 		compiled := compileValues(t, func(opt string) string { return opt })
 		templateIndexFor(compiled)
-		return weak.Make(compiled)
+		key := weak.Make(compiled)
+		if _, ok := templateIndexes.Load(key); !ok {
+			t.Fatal("templateIndexes holds no entry for a template templateIndexFor just indexed")
+		}
+		runtime.KeepAlive(compiled)
+		return key
 	}()
-	if _, ok := templateIndexes.Load(key); !ok {
-		t.Fatal("templateIndexes holds no entry for a template templateIndexFor just indexed")
-	}
 	// A cleanup runs on its own goroutine after the collection that frees
 	// the template, so the entry goes some time after one.
 	for range 100 {
