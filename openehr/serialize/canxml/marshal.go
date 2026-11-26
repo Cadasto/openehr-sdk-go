@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 // Canonical XML namespaces.
@@ -169,6 +170,10 @@ func ElementName(bmmName string) string {
 // are emitted as absent (no element written). A nil-interface that
 // boxes a typed-nil pointer (`var p *T = nil; var i I = p`) is also
 // treated as absent.
+//
+// v's MarshalXML must not keep the start element's attributes after it
+// returns, since they are reused; one that writes the start element through
+// e keeps none.
 func EncodePoly(e *xml.Encoder, name string, v any) error {
 	if isNilValue(v) {
 		return nil
@@ -177,16 +182,24 @@ func EncodePoly(e *xml.Encoder, name string, v any) error {
 	if !ok {
 		return fmt.Errorf("canxml: EncodePoly %s: %T does not implement BMMNamer/xml.Marshaler", name, v)
 	}
-	// A LOCATABLE's MarshalXML appends its archetype_node_id: leave it room.
-	n := 1
-	if _, ok := m.(locatable); ok {
-		n = 2
-	}
-	attrs := make([]xml.Attr, 1, n)
+	// The attributes go to MarshalXML through an interface, so a slice made
+	// here would escape on every call; a pooled one is reused. A LOCATABLE's
+	// MarshalXML appends its archetype_node_id into the second slot.
+	attrs := polyAttrs.Get().(*[2]xml.Attr)
 	attrs[0] = xml.Attr{Name: XSITypeAttrName(), Value: bn.BMMName()}
-	start := xml.StartElement{Name: xml.Name{Local: name}, Attr: attrs}
-	return m.MarshalXML(e, start)
+	start := xml.StartElement{Name: xml.Name{Local: name}, Attr: attrs[:1]}
+	err := m.MarshalXML(e, start)
+	*attrs = [2]xml.Attr{}
+	polyAttrs.Put(attrs)
+	return err
 }
+
+// polyAttrs holds the attribute slots [EncodePoly] hands a polymorphic
+// element's MarshalXML: its `xsi:type` and the one attribute a generated
+// class appends. The encoder writes a start element's attributes as it
+// encodes the token and keeps none of them, so a slot is free again once
+// MarshalXML returns.
+var polyAttrs = sync.Pool{New: func() any { return new([2]xml.Attr) }}
 
 // locatable is implemented by every generated LOCATABLE class, whose
 // MarshalXML adds the archetype_node_id attribute to its start element.

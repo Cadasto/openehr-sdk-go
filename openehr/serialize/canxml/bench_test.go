@@ -3,6 +3,7 @@ package canxml_test
 import (
 	"bufio"
 	"bytes"
+	"encoding/xml"
 	"io"
 	"os"
 	"strings"
@@ -44,6 +45,27 @@ func BenchmarkMarshalComposition(b *testing.B) {
 		if _, err := canxml.Marshal(c); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// TestEncodePolyCopiesNoAttributes pins EncodePoly, which the generated
+// encoders call at each polymorphic member, to allocating nothing for the
+// attributes it hands a MarshalXML, once the encoder has grown its stacks: a
+// polymorphic ELEMENT, with its archetype_node_id, and its DV_TEXT name, each
+// with its `xsi:type`.
+func TestEncodePolyCopiesNoAttributes(t *testing.T) {
+	if raceEnabled {
+		t.Skip("the race detector drops pooled values at random")
+	}
+	e := xml.NewEncoder(io.Discard)
+	element := &rm.Element{ArchetypeNodeID: "at0004", Name: &rm.DVText{}}
+	n := testing.AllocsPerRun(100, func() {
+		if err := canxml.EncodePoly(e, "items", element); err != nil {
+			t.Fatalf("EncodePoly: %v", err)
+		}
+	})
+	if n != 0 {
+		t.Errorf("EncodePoly of an ELEMENT allocates %v times; want 0", n)
 	}
 }
 
