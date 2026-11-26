@@ -241,7 +241,8 @@ As with the typed-nil bullet above, this is a `canjson` contract: a v1 `encoding
 #### An open interval side carries no bound
 
 BASE `Interval` marks a side open with `lower_unbounded` / `upper_unbounded`, and an open side has no bound value.
-The canonical JSON and canonical XML ([§ REQ-056](#req-056)) encoders **MUST** omit the `lower` / `upper` member of a side marked unbounded when its bound is empty: nil, a typed-nil pointer, or the zero value of a concrete bound type (a `DVInterval[DVQuantity]` holds its bounds by value, so an unset one is a zero `DV_QUANTITY`).
+The canonical JSON and canonical XML ([§ REQ-056](#req-056)) encoders **MUST** omit the `lower` / `upper` member of a side marked unbounded when its bound is empty: nil, a typed-nil pointer, or the zero value of a concrete bound type.
+That zero value is read as [REQ-171 *Structural access*](clinical-modeling.md#structural-access) reads one, a typed-nil pointer in one of its fields counting as nil; a `DVInterval[DVQuantity]` holds its bounds by value, so an unset one is a zero `DV_QUANTITY`.
 The rule binds the RM class `DV_INTERVAL` and the BASE classes `PROPER_INTERVAL` and `POINT_INTERVAL`, whose bound type is a `DV_ORDERED` data value, a BMM primitive or a Go built-in scalar, and the abstract BASE `Interval<T>`.
 AOM 1.4's constraint intervals (`occurrences`, `existence`, `cardinality.interval`, …), which the SDK holds as `Interval<T>` of a BMM primitive (`Integer`, `Real`) or a string, therefore omit an open side's zero bound the same way.
 A bound of any other Go type is emitted as it stands.

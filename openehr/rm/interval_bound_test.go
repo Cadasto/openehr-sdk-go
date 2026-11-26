@@ -7,11 +7,14 @@ import "testing"
 // REQ-112 gives the floor: a bound typed by an interface is empty only when
 // it is nil or a typed-nil pointer, so an all-zero value behind the interface
 // is a bound; a bound of a concrete type is empty when it is that type's zero
-// value, down to a field of a nested struct.
+// value, down to a field of a nested struct, a typed-nil pointer behind an
+// interface field reading as nil, as the encoders leave such a field out.
 func TestIsEmptyIntervalBound(t *testing.T) {
 	var nilQuantity *DVQuantity
 	coded := DVOrdinal{}
 	coded.Symbol.DefiningCode.TerminologyID.Value = "local"
+	nilLink := DVOrdinal{}
+	nilLink.Symbol.Hyperlink = (*DVURI)(nil)
 
 	cases := []struct {
 		name string
@@ -33,6 +36,7 @@ func TestIsEmptyIntervalBound(t *testing.T) {
 		{"DV_DATE: value only", IsEmptyIntervalBound(DVDate{Value: "2026-10-01"}), false},
 		{"DV_ORDINAL: zero", IsEmptyIntervalBound(DVOrdinal{}), true},
 		{"DV_ORDINAL: nested terminology id only", IsEmptyIntervalBound(coded), false},
+		{"DV_ORDINAL: nested typed-nil hyperlink only", IsEmptyIntervalBound(nilLink), true},
 		{"pointer-typed: nil", IsEmptyIntervalBound(nilQuantity), true},
 		{"pointer-typed: pointer to an all-zero value", IsEmptyIntervalBound(&DVQuantity{}), false},
 		{"Integer: zero", IsEmptyIntervalBound(Integer(0)), true},

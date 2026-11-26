@@ -167,9 +167,11 @@ func omitIntervalBound[T any](unbounded bool, bound T) bool {
 // is empty when it is nil or holds a typed-nil pointer to an RM class; an
 // all-zero value behind the interface is still a value. A bound of a concrete
 // type is empty when it is that type's zero value: field by field for the RM
-// data value types an interval can bound, and by comparison for a Go built-in
-// scalar type or an RM primitive such as Integer and Real. A bound of any
-// other Go type is never empty, so it is emitted as it stands.
+// data value types an interval can bound, a field that holds a typed-nil
+// pointer behind an interface reading as nil, as the encoders leave it out,
+// and by comparison for a Go built-in scalar type or an RM primitive such as
+// Integer and Real. A bound of any other Go type is never empty, so it is
+// emitted as it stands.
 func IsEmptyIntervalBound[T any](bound T) bool {
 	v := any(bound)
 	if v == nil || IsTypedNil(v) {
