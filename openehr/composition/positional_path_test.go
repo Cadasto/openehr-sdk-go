@@ -95,7 +95,7 @@ func positionalWrites(comp *rm.Composition) []string {
 // REQ-101, that Set returns ErrInvalidPath, Build carries it and nothing is
 // written, for a path through a positional segment ([@N], the key the
 // compile step gives a list child with no archetype id, node id or slot
-// predicate) under a multi-valued attribute for which the template lists
+// predicate) under a multi-valued attribute for which the template allows
 // more than one child of any kind. The skeleton's list order does not follow
 // the template's, and a PARTICIPATION or TERM_MAPPING carries no node id to
 // match, so the builder cannot tell which item the position names. Every
@@ -154,7 +154,7 @@ func TestREQ101_SetRefusesAPositionalSegmentOfSeveralChildren(t *testing.T) {
 			if setErr != nil {
 				msg := setErr.Error()
 				if !strings.Contains(msg, tc.path) || !strings.Contains(msg, "more than one child") {
-					t.Errorf("Set(%s) error %q, want it to name the path and say the template lists more than one child", tc.path, msg)
+					t.Errorf("Set(%s) error %q, want it to name the path and say the template allows more than one child", tc.path, msg)
 				}
 				if strings.Contains(msg, positionalMark) {
 					t.Errorf("Set(%s) error %q carries the value %q", tc.path, msg, positionalMark)

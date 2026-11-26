@@ -176,9 +176,11 @@ func (b *Builder) TemplateID() string {
 //     value, is one Set writes;
 //   - a path through a positional segment, the [@N] the compiled template
 //     gives a list member with no archetype id, node id or slot predicate,
-//     such as a PARTICIPATION, where the template lists more than one child
-//     for that list: no list item says which child it was built from. Where
-//     the template lists that child alone, the path is one Set writes.
+//     such as a PARTICIPATION, where the template allows more than one child
+//     for that list, or prohibits the child the segment names: no list item
+//     says which child it was built from. Where the template allows that
+//     child alone, the path is one Set writes, whatever children with
+//     occurrences 0..0 stand beside it.
 //
 // Errors are accumulated and surfaced from Build. Set never
 // short-circuits the builder so the caller can stack assignments and
@@ -330,13 +332,18 @@ func (b *Builder) Build() (*rm.Composition, error) {
 //     builder does not replace;
 //   - a member of a multi-valued attribute, which a value would replace or
 //     add to; a node below such a member is writable;
-//   - a node below a positional member of a multi-valued attribute for
-//     which the template lists more than one child. A positional member
-//     ([positional]) carries nothing to match a list item by, and the
-//     skeleton's list order need not follow the template's, so the builder
-//     cannot tell which item the position names. Where the template lists
-//     that child alone, every item the skeleton holds there was built from
-//     it, and the first serves.
+//   - a node below a positional member of a multi-valued attribute that
+//     the template prohibits, with occurrences 0..0, or for which it allows
+//     more than one child. A positional member ([positional]) carries
+//     nothing to match a list item by, and the skeleton's list order need
+//     not follow the template's, so the builder cannot tell which item the
+//     position names. Where the template allows that child alone, every
+//     item the skeleton holds there was built from it, and the first
+//     serves; a prohibited sibling builds no item. Where it prohibits the
+//     child, the skeleton holds no item built from it, and the first item
+//     is another child's. The type tiers do not refuse such a path, since
+//     they bind the node the path ends at, which a prohibited ancestor
+//     leaves allowed.
 func checkWritable(path string, node *tcimpl.CompiledNode) error {
 	parent := node.Parent()
 	if parent == nil {
@@ -352,8 +359,13 @@ func checkWritable(path string, node *tcimpl.CompiledNode) error {
 		if attr == nil || attr.Cardinality() != template.Multiple || !positional(cur) {
 			continue
 		}
-		if len(tcimpl.ChildNodes(attr)) > 1 {
-			return fmt.Errorf("%w: %s: the positional segment %s sits under the multi-valued attribute %q, for which the template lists more than one child: the builder cannot tell which list item it names",
+		allowed := tcimpl.AllowedChildNodes(attr)
+		if !slices.Contains(allowed, cur) {
+			return fmt.Errorf("%w: %s: the positional segment %s names a child of the multi-valued attribute %q that the template prohibits: the skeleton holds no list item built from it",
+				ErrInvalidPath, path, cur.AQLPath(), attr.Name())
+		}
+		if len(allowed) > 1 {
+			return fmt.Errorf("%w: %s: the positional segment %s sits under the multi-valued attribute %q, for which the template allows more than one child: the builder cannot tell which list item it names",
 				ErrInvalidPath, path, cur.AQLPath(), attr.Name())
 		}
 	}
@@ -534,8 +546,9 @@ func descendOne(cur any, s pathSegment) (any, error) {
 		}
 		if s.matchID == "" {
 			// A positional segment: Set refuses one whose list the template
-			// gives more than one child (checkWritable), so every item here
-			// was built from the one child it gives, and the first serves.
+			// allows more than one child, or that names a child it prohibits
+			// (checkWritable), so every item here was built from the one
+			// child it allows, and the first serves.
 			return items[0], nil
 		}
 		for _, it := range items {
