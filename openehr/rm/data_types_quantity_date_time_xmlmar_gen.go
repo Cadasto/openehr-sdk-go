@@ -47,7 +47,7 @@ func (d *DVDate) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if d.MagnitudeStatus != nil {
-		if err := _e.EncodeElement(*d.MagnitudeStatus, xml.StartElement{Name: xml.Name{Local: "magnitude_status"}}); err != nil {
+		if err := canxml.EncodeString(_e, "magnitude_status", *d.MagnitudeStatus); err != nil {
 			return err
 		}
 	}
@@ -56,7 +56,7 @@ func (d *DVDate) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", d.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -101,7 +101,7 @@ func (d *DVDateTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 		}
 	}
 	if d.MagnitudeStatus != nil {
-		if err := _e.EncodeElement(*d.MagnitudeStatus, xml.StartElement{Name: xml.Name{Local: "magnitude_status"}}); err != nil {
+		if err := canxml.EncodeString(_e, "magnitude_status", *d.MagnitudeStatus); err != nil {
 			return err
 		}
 	}
@@ -110,7 +110,7 @@ func (d *DVDateTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", d.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -155,12 +155,12 @@ func (d *DVDuration) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 		}
 	}
 	if d.MagnitudeStatus != nil {
-		if err := _e.EncodeElement(*d.MagnitudeStatus, xml.StartElement{Name: xml.Name{Local: "magnitude_status"}}); err != nil {
+		if err := canxml.EncodeString(_e, "magnitude_status", *d.MagnitudeStatus); err != nil {
 			return err
 		}
 	}
 	if d.Accuracy != nil {
-		if err := _e.EncodeElement(*d.Accuracy, xml.StartElement{Name: xml.Name{Local: "accuracy"}}); err != nil {
+		if err := canxml.EncodeText(_e, "accuracy", *d.Accuracy); err != nil {
 			return err
 		}
 	}
@@ -169,7 +169,7 @@ func (d *DVDuration) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", d.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -214,7 +214,7 @@ func (d *DVTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if d.MagnitudeStatus != nil {
-		if err := _e.EncodeElement(*d.MagnitudeStatus, xml.StartElement{Name: xml.Name{Local: "magnitude_status"}}); err != nil {
+		if err := canxml.EncodeString(_e, "magnitude_status", *d.MagnitudeStatus); err != nil {
 			return err
 		}
 	}
@@ -223,7 +223,7 @@ func (d *DVTime) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", d.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {

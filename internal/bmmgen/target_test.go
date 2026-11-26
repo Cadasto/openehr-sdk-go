@@ -53,7 +53,7 @@ func TestTargetRM_REQ041_CarriesTheNamesItsRootDeclares(t *testing.T) {
 	src := out.String()
 	for _, want := range []string{
 		"Accreditation *string `json:\"accreditation,omitzero\"`",
-		`EncodeElement(*t.Accreditation, xml.StartElement{Name: xml.Name{Local: "accreditation"}})`,
+		`canxml.EncodeString(_e, "accreditation", *t.Accreditation)`,
 		`case "accreditation":`,
 	} {
 		if !strings.Contains(src, want) {

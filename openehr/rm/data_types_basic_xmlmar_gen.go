@@ -61,20 +61,20 @@ func (d *DVIdentifier) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 		return err
 	}
 	if d.Issuer != nil {
-		if err := _e.EncodeElement(*d.Issuer, xml.StartElement{Name: xml.Name{Local: "issuer"}}); err != nil {
+		if err := canxml.EncodeString(_e, "issuer", *d.Issuer); err != nil {
 			return err
 		}
 	}
 	if d.Assigner != nil {
-		if err := _e.EncodeElement(*d.Assigner, xml.StartElement{Name: xml.Name{Local: "assigner"}}); err != nil {
+		if err := canxml.EncodeString(_e, "assigner", *d.Assigner); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(d.ID, xml.StartElement{Name: xml.Name{Local: "id"}}); err != nil {
+	if err := canxml.EncodeString(_e, "id", d.ID); err != nil {
 		return err
 	}
 	if d.Type != nil {
-		if err := _e.EncodeElement(*d.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
+		if err := canxml.EncodeString(_e, "type", *d.Type); err != nil {
 			return err
 		}
 	}

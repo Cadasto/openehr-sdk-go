@@ -85,7 +85,7 @@ func (i *ImportedVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 		}
 	}
 	if i.Signature != nil {
-		if err := _e.EncodeElement(*i.Signature, xml.StartElement{Name: xml.Name{Local: "signature"}}); err != nil {
+		if err := canxml.EncodeString(_e, "signature", *i.Signature); err != nil {
 			return err
 		}
 	}
@@ -129,7 +129,7 @@ func (o *OriginalVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 		}
 	}
 	if o.Signature != nil {
-		if err := _e.EncodeElement(*o.Signature, xml.StartElement{Name: xml.Name{Local: "signature"}}); err != nil {
+		if err := canxml.EncodeString(_e, "signature", *o.Signature); err != nil {
 			return err
 		}
 	}

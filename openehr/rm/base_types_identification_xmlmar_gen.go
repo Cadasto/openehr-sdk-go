@@ -36,10 +36,10 @@ func (a *AccessGroupRef) MarshalXML(_e *xml.Encoder, _start xml.StartElement) er
 			return err
 		}
 	}
-	if err := _e.EncodeElement(a.Namespace, xml.StartElement{Name: xml.Name{Local: "namespace"}}); err != nil {
+	if err := canxml.EncodeString(_e, "namespace", a.Namespace); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(a.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
+	if err := canxml.EncodeString(_e, "type", a.Type); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -68,7 +68,7 @@ func (a *ArchetypeID) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(a.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", a.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -97,10 +97,10 @@ func (g *GenericID) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(g.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", g.Value); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(g.Scheme, xml.StartElement{Name: xml.Name{Local: "scheme"}}); err != nil {
+	if err := canxml.EncodeString(_e, "scheme", g.Scheme); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -129,7 +129,7 @@ func (h *HierObjectID) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(h.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", h.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -158,7 +158,7 @@ func (i *ISOOID) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(i.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", i.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -187,7 +187,7 @@ func (i *InternetID) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(i.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", i.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -221,14 +221,14 @@ func (l *LocatableRef) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
-	if err := _e.EncodeElement(l.Namespace, xml.StartElement{Name: xml.Name{Local: "namespace"}}); err != nil {
+	if err := canxml.EncodeString(_e, "namespace", l.Namespace); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(l.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
+	if err := canxml.EncodeString(_e, "type", l.Type); err != nil {
 		return err
 	}
 	if l.Path != nil {
-		if err := _e.EncodeElement(*l.Path, xml.StartElement{Name: xml.Name{Local: "path"}}); err != nil {
+		if err := canxml.EncodeString(_e, "path", *l.Path); err != nil {
 			return err
 		}
 	}
@@ -263,10 +263,10 @@ func (o *ObjectRef) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(o.Namespace, xml.StartElement{Name: xml.Name{Local: "namespace"}}); err != nil {
+	if err := canxml.EncodeString(_e, "namespace", o.Namespace); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(o.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
+	if err := canxml.EncodeString(_e, "type", o.Type); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -295,7 +295,7 @@ func (o *ObjectVersionID) MarshalXML(_e *xml.Encoder, _start xml.StartElement) e
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(o.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", o.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -329,10 +329,10 @@ func (p *PartyRef) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(p.Namespace, xml.StartElement{Name: xml.Name{Local: "namespace"}}); err != nil {
+	if err := canxml.EncodeString(_e, "namespace", p.Namespace); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(p.Type, xml.StartElement{Name: xml.Name{Local: "type"}}); err != nil {
+	if err := canxml.EncodeString(_e, "type", p.Type); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -361,7 +361,7 @@ func (t *TemplateID) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(t.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", t.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -390,7 +390,7 @@ func (t *TerminologyID) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(t.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", t.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -419,7 +419,7 @@ func (u *Uuid) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(u.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", u.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -448,7 +448,7 @@ func (v *VersionTreeID) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(v.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", v.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {

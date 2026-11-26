@@ -69,6 +69,37 @@ func TestEncodePolyCopiesNoAttributes(t *testing.T) {
 	}
 }
 
+// TestEncodeStringAndTextCopyNoValue pins the helpers the generated encoders
+// call for primitive members, once the encoder has grown its stacks:
+// EncodeString writes a string allocating nothing, and EncodeText a Real
+// allocating less than EncodeElement, which copies the Real into an
+// interface.
+func TestEncodeStringAndTextCopyNoValue(t *testing.T) {
+	if raceEnabled {
+		t.Skip("the race detector drops pooled values at random")
+	}
+	e := xml.NewEncoder(io.Discard)
+	allocs := func(write func() error) float64 {
+		return testing.AllocsPerRun(100, func() {
+			if err := write(); err != nil {
+				t.Fatalf("write: %v", err)
+			}
+		})
+	}
+	// Members, as the generated encoders read them: a constant converts to
+	// an interface without a copy.
+	q := &rm.DVQuantity{Magnitude: 80.5, Units: "kg"}
+	if n := allocs(func() error { return canxml.EncodeString(e, "units", q.Units) }); n != 0 {
+		t.Errorf("EncodeString allocates %v times; want 0", n)
+	}
+	start := xml.StartElement{Name: xml.Name{Local: "magnitude"}}
+	text := allocs(func() error { return canxml.EncodeText(e, "magnitude", q.Magnitude) })
+	boxed := allocs(func() error { return e.EncodeElement(q.Magnitude, start) })
+	if text >= boxed {
+		t.Errorf("EncodeText of a Real allocates %v times, EncodeElement %v; want fewer", text, boxed)
+	}
+}
+
 // BenchmarkUnmarshalComposition pins decode throughput. The input
 // is pre-encoded once via canxml.Marshal so the loop measures only
 // the decode side.

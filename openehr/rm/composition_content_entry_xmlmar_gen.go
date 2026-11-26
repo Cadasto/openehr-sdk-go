@@ -171,7 +171,7 @@ func (a *Activity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(a.ActionArchetypeID, xml.StartElement{Name: xml.Name{Local: "action_archetype_id"}}); err != nil {
+	if err := canxml.EncodeString(_e, "action_archetype_id", a.ActionArchetypeID); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -487,7 +487,7 @@ func (i *InstructionDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeElement(&i.InstructionID, xml.StartElement{Name: xml.Name{Local: "instruction_id"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(i.ActivityID, xml.StartElement{Name: xml.Name{Local: "activity_id"}}); err != nil {
+	if err := canxml.EncodeString(_e, "activity_id", i.ActivityID); err != nil {
 		return err
 	}
 	if i.WfDetails != nil {

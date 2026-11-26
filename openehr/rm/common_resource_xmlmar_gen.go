@@ -42,15 +42,15 @@ func (r *ResourceDescription) MarshalXML(_e *xml.Encoder, _start xml.StartElemen
 		}
 	}
 	for _, _item := range r.OtherContributors {
-		if err := _e.EncodeElement(_item, xml.StartElement{Name: xml.Name{Local: "other_contributors"}}); err != nil {
+		if err := canxml.EncodeString(_e, "other_contributors", _item); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(r.LifecycleState, xml.StartElement{Name: xml.Name{Local: "lifecycle_state"}}); err != nil {
+	if err := canxml.EncodeString(_e, "lifecycle_state", r.LifecycleState); err != nil {
 		return err
 	}
 	if r.ResourcePackageURI != nil {
-		if err := _e.EncodeElement(*r.ResourcePackageURI, xml.StartElement{Name: xml.Name{Local: "resource_package_uri"}}); err != nil {
+		if err := canxml.EncodeString(_e, "resource_package_uri", *r.ResourcePackageURI); err != nil {
 			return err
 		}
 	}
@@ -106,26 +106,26 @@ func (r *ResourceDescriptionItem) MarshalXML(_e *xml.Encoder, _start xml.StartEl
 	if err := _e.EncodeElement(&r.Language, xml.StartElement{Name: xml.Name{Local: "language"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(r.Purpose, xml.StartElement{Name: xml.Name{Local: "purpose"}}); err != nil {
+	if err := canxml.EncodeString(_e, "purpose", r.Purpose); err != nil {
 		return err
 	}
 	for _, _item := range r.Keywords {
-		if err := _e.EncodeElement(_item, xml.StartElement{Name: xml.Name{Local: "keywords"}}); err != nil {
+		if err := canxml.EncodeString(_e, "keywords", _item); err != nil {
 			return err
 		}
 	}
 	if r.Use != nil {
-		if err := _e.EncodeElement(*r.Use, xml.StartElement{Name: xml.Name{Local: "use"}}); err != nil {
+		if err := canxml.EncodeString(_e, "use", *r.Use); err != nil {
 			return err
 		}
 	}
 	if r.Misuse != nil {
-		if err := _e.EncodeElement(*r.Misuse, xml.StartElement{Name: xml.Name{Local: "misuse"}}); err != nil {
+		if err := canxml.EncodeString(_e, "misuse", *r.Misuse); err != nil {
 			return err
 		}
 	}
 	if r.Copyright != nil {
-		if err := _e.EncodeElement(*r.Copyright, xml.StartElement{Name: xml.Name{Local: "copyright"}}); err != nil {
+		if err := canxml.EncodeString(_e, "copyright", *r.Copyright); err != nil {
 			return err
 		}
 	}
@@ -182,7 +182,7 @@ func (t *TranslationDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 		}
 	}
 	if t.Accreditation != nil {
-		if err := _e.EncodeElement(*t.Accreditation, xml.StartElement{Name: xml.Name{Local: "accreditation"}}); err != nil {
+		if err := canxml.EncodeString(_e, "accreditation", *t.Accreditation); err != nil {
 			return err
 		}
 	}

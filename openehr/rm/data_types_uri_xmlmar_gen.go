@@ -31,7 +31,7 @@ func (d *DVEHRURI) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", d.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
@@ -60,7 +60,7 @@ func (d *DVURI) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+	if err := canxml.EncodeString(_e, "value", d.Value); err != nil {
 		return err
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
