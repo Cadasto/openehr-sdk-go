@@ -11,8 +11,11 @@ import (
 // EncodeString writes s as the text of one element named name, the bytes
 // e.EncodeElement(s, …) writes, without the copy of s that passing it as an
 // any makes. Generator-emitted MarshalXML methods call it for each member of
-// a string type; consumers rarely need it. A nil e is refused with an error
-// wrapping [typereg.ErrNilArgument] that names the element.
+// a string type; consumers rarely need it. Like e.EncodeToken, it may leave
+// the bytes buffered in e, so a caller outside a MarshalXML method flushes e,
+// as e.Encode and e.EncodeElement do once the enclosing value is written. A
+// nil e is refused with an error wrapping [typereg.ErrNilArgument] that names
+// the element.
 func EncodeString(e *xml.Encoder, name, s string) error {
 	if e == nil {
 		return nilArgument("EncodeString", "e", name)
@@ -56,7 +59,8 @@ var textBufs = sync.Pool{New: func() any {
 // marshals itself to text, without the copy of v that passing it as an any
 // makes. Generator-emitted MarshalXML methods call it for each member of a
 // primitive type that marshals itself to text, a Real or a Character;
-// consumers rarely need it.
+// consumers rarely need it. It leaves the bytes buffered in e as
+// [EncodeString] does.
 //
 // T's underlying type is float64 or string, so v is never a nil pointer,
 // which EncodeElement writes nothing for. A MarshalXML method of T's own is
