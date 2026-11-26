@@ -77,6 +77,15 @@ func genericParamPerson() *rm.Person {
 	}
 }
 
+// genericParamQuantityInterval returns a DV_INTERVAL instantiated with
+// DV_QUANTITY, not with DV_ORDERED as the type registry constructs it.
+func genericParamQuantityInterval() rm.DVInterval[rm.DVQuantity] {
+	return rm.DVInterval[rm.DVQuantity]{Interval: rm.Interval[rm.DVQuantity]{
+		Lower: rm.DVQuantity{Magnitude: 1.5, Units: "mm"}, LowerIncluded: true,
+		Upper: rm.DVQuantity{Magnitude: 3, Units: "mm"}, UpperIncluded: true,
+	}}
+}
+
 // genericParamComposition returns a COMPOSITION with the members the codec
 // needs.
 func genericParamComposition() *rm.Composition {
@@ -96,9 +105,10 @@ func genericParamComposition() *rm.Composition {
 // interface (ORIGINAL_VERSION<PARTY>, ORIGINAL_VERSION<any>, Proper_interval
 // of DV_ORDERED) or the class itself (ORIGINAL_VERSION<COMPOSITION>,
 // Point_interval of DV_QUANTITY), and whether an interface holds the value
-// through a pointer or by value, and the value decodes back, strictly, to the
-// same canonical JSON. A primitive value is written as its text, with no
-// `xsi:type`.
+// through a pointer or by value, a generic class instantiated otherwise than
+// the type registry constructs it included (DV_INTERVAL<DV_QUANTITY>), and
+// the value decodes back, strictly, to the same canonical JSON. A primitive
+// value is written as its text, with no `xsi:type`.
 //
 // Can-fail control: before the encoder wrote `xsi:type` there, the
 // interface instantiations failed to decode with typereg.ErrMissingType and
@@ -140,6 +150,20 @@ func TestREQ056_XMLGenericParamClassValueRoundTrips(t *testing.T) {
 			fresh: func() any { return new(rm.OriginalVersion[any]) },
 			elem:  "data",
 			want:  "PERSON",
+		},
+		{
+			name:  "ORIGINAL_VERSION<any> holding a DV_INTERVAL<DV_QUANTITY>",
+			value: originalVersionOf[any](new(genericParamQuantityInterval())),
+			fresh: func() any { return new(rm.OriginalVersion[any]) },
+			elem:  "data",
+			want:  "DV_INTERVAL",
+		},
+		{
+			name:  "ORIGINAL_VERSION<any> holding a DV_INTERVAL<DV_QUANTITY> by value",
+			value: originalVersionOf[any](genericParamQuantityInterval()),
+			fresh: func() any { return new(rm.OriginalVersion[any]) },
+			elem:  "data",
+			want:  "DV_INTERVAL",
 		},
 		{
 			name:  "ORIGINAL_VERSION<COMPOSITION>",
