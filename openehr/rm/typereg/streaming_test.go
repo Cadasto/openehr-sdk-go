@@ -186,3 +186,21 @@ func TestDecodePolymorphicNilArguments(t *testing.T) {
 		}
 	})
 }
+
+// TestREQ052DecodeTypeMemberNilDecoder is the DecodeTypeMember twin (REQ-052,
+// idiom.md § No panics): a nil dec is refused with a *DecodeError wrapping
+// ErrNilArgument, naming no class. Can-fail: removing the dec check panics on
+// PeekKind.
+func TestREQ052DecodeTypeMemberNilDecoder(t *testing.T) {
+	call := "DecodeTypeMember(nil dec)"
+	var got string
+	err := callNoPanic(t, call, func() error {
+		var err error
+		got, err = DecodeTypeMember(nil, "DV_TEXT")
+		return err
+	})
+	assertNilArgument(t, call, "dec", err)
+	if got != "" {
+		t.Errorf("%s = %q; want no class beside the refusal", call, got)
+	}
+}

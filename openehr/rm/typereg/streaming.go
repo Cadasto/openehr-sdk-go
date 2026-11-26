@@ -576,8 +576,13 @@ func DirectDecode(dec *jsontext.Decoder) bool {
 // wrapper's string field reads it: a JSON null reads as empty, and a value
 // of any other kind but a string fails as it fails there. It returns the
 // class the member names when that is neither rmType nor empty, for
-// [DecodeDone] to refuse once the whole value is read.
+// [DecodeDone] to refuse once the whole value is read. A nil dec is caller
+// misuse, refused with a [DecodeError] wrapping [ErrNilArgument] rather than
+// dereferenced.
 func DecodeTypeMember(dec *jsontext.Decoder, rmType string) (string, error) {
+	if dec == nil {
+		return "", nilArgument("DecodeTypeMember", "dec", rmType)
+	}
 	if dec.PeekKind() != '"' {
 		var s string
 		if err := json.UnmarshalDecode(dec, &s); err != nil {
