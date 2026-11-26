@@ -576,7 +576,9 @@ func TestREQ052DirectDecodeRoots(t *testing.T) {
 // check it dropped would let the direct read, which knows nothing of the
 // option, read the value its own way, and the case fails. A caller's hooks
 // reach the outermost value only through the wrapper, which passes them on to
-// every value inside it.
+// every value inside it. v1's merge semantics keep the wrapper's `_type` as it
+// was when a repeated `_type` reads null, where the direct read takes the
+// last; the case allows duplicate names on both sides of its check.
 func TestREQ052DirectDecodeGatedOptions(t *testing.T) {
 	t.Parallel()
 	upper := json.WithUnmarshalers(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, s *string) error {
@@ -589,23 +591,26 @@ func TestREQ052DirectDecodeGatedOptions(t *testing.T) {
 	}))
 	failing := strings.Replace(directDecodeDoc, `"archetype_node_id":"openEHR-EHR-COMPOSITION.encounter.v1"`, `"archetype_node_id":5`, 1)
 	newComposition := func() any { return new(rm.Composition) }
+	nullType := `{"_type":"DV_CODED_TEXT","value":"x","defining_code":{"_type":"DV_TEXT","_type":null,"code_string":"c","terminology_id":{"value":"local"}}}`
 	for _, tc := range []struct {
 		name string
 		doc  string
 		newV func() any
 		opt  json.Options
+		base []json.Options // options both sides of the with-and-without check share
 	}{
-		{"MatchCaseInsensitiveNames", `{"_type":"CODE_PHRASE","Code_String":"en"}`, func() any { return new(rm.CodePhrase) }, json.MatchCaseInsensitiveNames(true)},
-		{"RejectUnknownMembers", `{"_type":"CODE_PHRASE","code_string":"en","zz":1}`, func() any { return new(rm.CodePhrase) }, json.RejectUnknownMembers(true)},
-		{"ReportErrorsWithLegacySemantics", failing, newComposition, jsonv1.ReportErrorsWithLegacySemantics(true)},
-		{"encoding/json defaults", failing, newComposition, jsonv1.DefaultOptionsV1()},
-		{"a caller's hooks", `{"_type":"code_phrase","code_string":"en"}`, func() any { return new(rm.CodePhrase) }, upper},
+		{name: "MatchCaseInsensitiveNames", doc: `{"_type":"CODE_PHRASE","Code_String":"en"}`, newV: func() any { return new(rm.CodePhrase) }, opt: json.MatchCaseInsensitiveNames(true)},
+		{name: "RejectUnknownMembers", doc: `{"_type":"CODE_PHRASE","code_string":"en","zz":1}`, newV: func() any { return new(rm.CodePhrase) }, opt: json.RejectUnknownMembers(true)},
+		{name: "ReportErrorsWithLegacySemantics", doc: failing, newV: newComposition, opt: jsonv1.ReportErrorsWithLegacySemantics(true)},
+		{name: "MergeWithLegacySemantics", doc: nullType, newV: func() any { return new(rm.DVCodedText) }, opt: jsonv1.MergeWithLegacySemantics(true), base: []json.Options{jsontext.AllowDuplicateNames(true)}},
+		{name: "encoding/json defaults", doc: failing, newV: newComposition, opt: jsonv1.DefaultOptionsV1()},
+		{name: "a caller's hooks", doc: `{"_type":"code_phrase","code_string":"en"}`, newV: func() any { return new(rm.CodePhrase) }, opt: upper},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var tally decodeTally
-			sameDecode(t, tc.name, []byte(tc.doc), tc.newV, &tally, tc.opt)
-			with := decodeOnce([]byte(tc.doc), tc.newV, false, tc.opt, forceDecodeWrapper)
-			without := decodeOnce([]byte(tc.doc), tc.newV, false, forceDecodeWrapper)
+			sameDecode(t, tc.name, []byte(tc.doc), tc.newV, &tally, append(slices.Clone(tc.base), tc.opt)...)
+			with := decodeOnce([]byte(tc.doc), tc.newV, false, append(slices.Clone(tc.base), tc.opt, forceDecodeWrapper)...)
+			without := decodeOnce([]byte(tc.doc), tc.newV, false, append(slices.Clone(tc.base), forceDecodeWrapper)...)
 			if fmt.Sprint(with.err) == fmt.Sprint(without.err) && reflect.DeepEqual(with.v, without.v) {
 				t.Errorf("%s changes nothing the wrapper reads from this input, so the case checks nothing", tc.name)
 			}

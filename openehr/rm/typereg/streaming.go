@@ -8,8 +8,8 @@ package typereg
 // place rather than in 110 generated bodies (ADR 0022, REQ-052).
 //
 // This file imports the encoding/json family: v2 and jsontext for the codec,
-// plus encoding/json (v1) for its ReportErrorsWithLegacySemantics and
-// OmitEmptyWithLegacySemantics options. It
+// plus encoding/json (v1) for its ReportErrorsWithLegacySemantics,
+// MergeWithLegacySemantics and OmitEmptyWithLegacySemantics options. It
 // must not import openehr/rm: the generated trees import typereg, so a reverse
 // edge would form a cycle. Everything here works through Default and the
 // sentinels declared in this package.
@@ -527,11 +527,21 @@ func typeMismatch(rmType, got string) error {
 //     refuses that option on the wrapper struct.
 //   - The error reporting of encoding/json (v1): json/v2 then keeps decoding
 //     past a member's failure and reports the first.
+//   - The merge semantics of encoding/json (v1): json/v2 then keeps the
+//     wrapper's `_type` string as it was when it reads null, so with duplicate
+//     names allowed a `_type` repeated as null keeps the class it named first,
+//     where [DecodeTypeMember] takes the last.
 //
-// Any other option reads a member the same either way: the decoder's own,
-// such as duplicate names or invalid UTF-8 allowed, apply to the tokens, and
-// each member decodes through json/v2 under the decoder's options, as it does
-// inside the wrapper.
+// Under any other option a member reads the same either way. The jsontext
+// options that apply to decoding, such as duplicate names or invalid UTF-8
+// allowed, work on the tokens both read. Each member decodes through json/v2
+// under the decoder's options, as it does inside the wrapper, so the v1
+// options for bytes, times, durations and arrays read it the same. v1's
+// case-sensitive delimiter applies only to the case-insensitive matching
+// refused above, its legacy `string` option only to a field tagged `string`,
+// which no generated struct has, and its method-call semantics, when
+// decoding, only to map keys, which no class is. The rest apply to encoding
+// only.
 func DirectDecode(dec *jsontext.Decoder) bool {
 	if dec == nil || dec.PeekKind() != '{' {
 		return false
@@ -553,6 +563,9 @@ func DirectDecode(dec *jsontext.Decoder) bool {
 		return false
 	}
 	if v, _ := json.GetOption(opts, jsonv1.ReportErrorsWithLegacySemantics); v {
+		return false
+	}
+	if v, _ := json.GetOption(opts, jsonv1.MergeWithLegacySemantics); v {
 		return false
 	}
 	return true

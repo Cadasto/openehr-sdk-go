@@ -45,7 +45,7 @@ func TestREQ052DirectDecodeGate(t *testing.T) {
 		{name: "an object after a name", doc: `{"k":` + object + `}`, depth: 2, opts: []json.Options{sdk}, want: true},
 		{name: "an object after a comma", doc: `[1,` + object + `]`, depth: 2, opts: []json.Options{sdk}, want: true},
 		{name: "duplicate names and invalid UTF-8 allowed", doc: object, opts: []json.Options{sdk, jsontext.AllowDuplicateNames(true), jsontext.AllowInvalidUTF8(true)}, want: true},
-		{name: "the options turned off", doc: object, opts: []json.Options{sdk, json.MatchCaseInsensitiveNames(false), json.RejectUnknownMembers(false), json.StringifyNumbers(false), jsonv1.ReportErrorsWithLegacySemantics(false)}, want: true},
+		{name: "the options turned off", doc: object, opts: []json.Options{sdk, json.MatchCaseInsensitiveNames(false), json.RejectUnknownMembers(false), json.StringifyNumbers(false), jsonv1.ReportErrorsWithLegacySemantics(false), jsonv1.MergeWithLegacySemantics(false)}, want: true},
 		{name: "an object at the depth bound", doc: nested(maxDecodeDepth - 1), depth: maxDecodeDepth - 1, opts: []json.Options{sdk}, want: true},
 
 		{name: "an object past the depth bound", doc: nested(maxDecodeDepth), depth: maxDecodeDepth, opts: []json.Options{sdk}},
@@ -62,6 +62,7 @@ func TestREQ052DirectDecodeGate(t *testing.T) {
 		{name: "RejectUnknownMembers", doc: object, opts: []json.Options{sdk, json.RejectUnknownMembers(true)}},
 		{name: "StringifyNumbers", doc: object, opts: []json.Options{sdk, json.StringifyNumbers(true)}},
 		{name: "v1 error reporting", doc: object, opts: []json.Options{sdk, jsonv1.ReportErrorsWithLegacySemantics(true)}},
+		{name: "v1 merge semantics", doc: object, opts: []json.Options{sdk, jsonv1.MergeWithLegacySemantics(true)}},
 		{name: "encoding/json defaults", doc: object, opts: []json.Options{jsonv1.DefaultOptionsV1(), sdk}},
 	} {
 		dec := jsontext.NewDecoder(strings.NewReader(tc.doc), tc.opts...)
