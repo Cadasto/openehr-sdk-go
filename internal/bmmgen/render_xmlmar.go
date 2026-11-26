@@ -173,6 +173,15 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 			elemFields = append(elemFields, ef)
 		}
 	}
+	empties, err := emptyMembersOf(plan, pc)
+	if err != nil {
+		return "", err
+	}
+	for name := range empties {
+		if slices.Contains(attrs.members, name) {
+			return "", fmt.Errorf("%s.%s is an XML attribute and a member left out when empty", pc.BMMName, name)
+		}
+	}
 
 	var b strings.Builder
 
@@ -213,6 +222,11 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 		b.WriteString("// An open side (`lower_unbounded` or `upper_unbounded` set) whose bound\n")
 		b.WriteString("// is empty emits no `lower` or `upper` element.\n")
 	}
+	if len(empties) > 0 {
+		b.WriteString("//\n")
+		b.WriteString("// A mandatory member that holds a class by value whose every field is\n")
+		b.WriteString("// empty emits no element.\n")
+	}
 	fmt.Fprintf(&b, "func (%s *%s%s) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString("\tif _start.Name.Local == \"\" {\n")
 	fmt.Fprintf(&b, "\t\t_start.Name = xml.Name{Local: canxml.ElementName(%q)}\n", pc.BMMName)
@@ -236,6 +250,9 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 		}
 		if shaped {
 			line = guardOpenIntervalBoundXML(recv, ef.Prop.PropertyName(), line)
+		}
+		if e, ok := empties[ef.Prop.PropertyName()]; ok {
+			line = guardLines(e.cond(recv+"."+FieldName(ef.Prop.PropertyName())), line)
 		}
 		b.WriteString(line)
 	}

@@ -187,13 +187,43 @@ type jsonWireVersionedFolder struct {
 // marshalJSONWrapped is the wrapper encode of VersionedFolder: it copies each field
 // into the flat wire struct, `_type` (value "VERSIONED_FOLDER") leading, and marshals
 // it, so json/v2 writes every member under the encoder's options.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (v *VersionedFolder) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroHierObjectID(v.UID) ||
+		isZeroDVDateTime(v.TimeCreated) {
+		return v.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &jsonWireVersionedFolder{
 		Class:       "VERSIONED_FOLDER",
 		UID:         v.UID,
 		OwnerID:     v.OwnerID,
 		TimeCreated: v.TimeCreated,
 	}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of VersionedFolder when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (v *VersionedFolder) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class       string        `json:"_type"`
+		UID         any           `json:"uid,omitzero"`
+		OwnerID     ObjectRefLike `json:"owner_id,omitempty"`
+		TimeCreated any           `json:"time_created,omitzero"`
+	}{
+		Class:   "VERSIONED_FOLDER",
+		OwnerID: v.OwnerID,
+	}
+	if !isZeroHierObjectID(v.UID) {
+		w.UID = v.UID
+	}
+	if !isZeroDVDateTime(v.TimeCreated) {
+		w.TimeCreated = v.TimeCreated
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for VersionedFolder: an object whose
@@ -204,6 +234,8 @@ func (v *VersionedFolder) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -238,11 +270,13 @@ func (v *VersionedFolder) writeJSONMembers(enc *jsontext.Encoder, ownerIdSlot ui
 	if err := writeJSONString(enc, "_type", "VERSIONED_FOLDER"); err != nil {
 		return err
 	}
-	if err := writeJSONName(enc, "uid"); err != nil {
-		return err
-	}
-	if err := v.UID.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroHierObjectID(v.UID) {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := v.UID.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if ownerIdSlot != jsonSlotAbsent {
 		if err := writeJSONName(enc, "owner_id"); err != nil {
@@ -252,11 +286,13 @@ func (v *VersionedFolder) writeJSONMembers(enc *jsontext.Encoder, ownerIdSlot ui
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "time_created"); err != nil {
-		return err
-	}
-	if err := v.TimeCreated.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVDateTime(v.TimeCreated) {
+		if err := writeJSONName(enc, "time_created"); err != nil {
+			return err
+		}
+		if err := v.TimeCreated.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }

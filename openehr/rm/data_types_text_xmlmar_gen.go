@@ -24,6 +24,9 @@ func (c *CodePhrase) BMMName() string { return "CODE_PHRASE" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value whose every field is
+// empty emits no element.
 func (c *CodePhrase) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("CODE_PHRASE")}
@@ -31,8 +34,10 @@ func (c *CodePhrase) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&c.TerminologyID, xml.StartElement{Name: xml.Name{Local: "terminology_id"}}); err != nil {
-		return err
+	if !isZeroTerminologyID(c.TerminologyID) {
+		if err := _e.EncodeElement(&c.TerminologyID, xml.StartElement{Name: xml.Name{Local: "terminology_id"}}); err != nil {
+			return err
+		}
 	}
 	if err := canxml.EncodeString(_e, "code_string", c.CodeString); err != nil {
 		return err
@@ -61,6 +66,9 @@ func (d *DVCodedText) BMMName() string { return "DV_CODED_TEXT" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value whose every field is
+// empty emits no element.
 func (d *DVCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("DV_CODED_TEXT")}
@@ -96,8 +104,10 @@ func (d *DVCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&d.DefiningCode, xml.StartElement{Name: xml.Name{Local: "defining_code"}}); err != nil {
-		return err
+	if !isZeroCodePhrase(d.DefiningCode) {
+		if err := _e.EncodeElement(&d.DefiningCode, xml.StartElement{Name: xml.Name{Local: "defining_code"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -206,6 +216,9 @@ func (t *TermMapping) BMMName() string { return "TERM_MAPPING" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value whose every field is
+// empty emits no element.
 func (t *TermMapping) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("TERM_MAPPING")}
@@ -221,8 +234,10 @@ func (t *TermMapping) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&t.Target, xml.StartElement{Name: xml.Name{Local: "target"}}); err != nil {
-		return err
+	if !isZeroCodePhrase(t.Target) {
+		if err := _e.EncodeElement(&t.Target, xml.StartElement{Name: xml.Name{Local: "target"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

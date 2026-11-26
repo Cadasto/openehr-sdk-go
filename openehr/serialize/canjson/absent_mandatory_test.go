@@ -14,6 +14,11 @@ import (
 // codePhraseNL is a complete CODE_PHRASE for the inputs that need one.
 const codePhraseNL = `{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"},"code_string":"nl"}`
 
+// roleWithoutPerformer is a ROLE that leaves out its mandatory performer, as
+// testkit/corpus/its_rest/demographic/role.json does.
+const roleWithoutPerformer = `{"_type":"ROLE","archetype_node_id":"openEHR-DEMOGRAPHIC-ROLE.role.v1",` +
+	`"name":{"_type":"DV_TEXT","value":"Attending Physician"}}`
+
 // TestREQ052_AbsentMandatoryMemberIsOmitted decodes inputs that leave out a
 // mandatory member, re-encodes them, and requires the member to stay absent
 // rather than come back as null. Each row is one class from issue 257, plus a
@@ -71,6 +76,18 @@ func TestREQ052_AbsentMandatoryMemberIsOmitted(t *testing.T) {
 			in:     `{"_type":"ELEMENT","archetype_node_id":"at0001"}`,
 			target: func() any { return new(rm.Element) },
 			absent: []string{"name"},
+		},
+		{
+			name:   "ROLE performer, a PARTY_REF held by value",
+			in:     roleWithoutPerformer,
+			target: func() any { return new(rm.Role) },
+			absent: []string{"performer", "identities"},
+		},
+		{
+			name:   "COMPOSITION category, language and territory, held by value",
+			in:     `{"_type":"COMPOSITION","archetype_node_id":"openEHR-EHR-COMPOSITION.report.v1","name":{"_type":"DV_TEXT","value":"r"}}`,
+			target: func() any { return new(rm.Composition) },
+			absent: []string{"category", "language", "territory"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -150,12 +167,14 @@ func TestREQ052_PresentEmptyMandatoryContainerIsWritten(t *testing.T) {
 
 // TestREQ052_GoBuiltAbsentMandatoryMember encodes Go values whose mandatory
 // field holds no value: a nil interface, a typed-nil pointer in an interface,
-// a nil type-parameter field instantiated with an interface, a nil pointer
-// and a nil `any`. Each member must be left out.
+// a nil type-parameter field instantiated with an interface, a nil pointer, a
+// nil `any`, and a struct held by value whose every field is empty, held
+// directly or by a type-parameter field instantiated with a struct. Each
+// member must be left out.
 //
 // REQ-052 § An absent mandatory member: a nil list, map, pointer or
-// interface, or a polymorphic RM slot holding a typed-nil pointer, is left
-// out on encode.
+// interface, a polymorphic RM slot holding a typed-nil pointer, or a struct
+// held by value whose zero test holds, is left out on encode.
 func TestREQ052_GoBuiltAbsentMandatoryMember(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -183,6 +202,26 @@ func TestREQ052_GoBuiltAbsentMandatoryMember(t *testing.T) {
 			member: "data",
 		},
 		{
+			name:   "a zero HIER_OBJECT_ID held by value in CONTRIBUTION.uid",
+			value:  &rm.Contribution{Versions: []rm.ObjectRefLike{}},
+			member: "uid",
+		},
+		{
+			name:   "a zero PARTY_REF held by value in ROLE.performer",
+			value:  &rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", Name: rm.DVText{Value: "r"}},
+			member: "performer",
+		},
+		{
+			name:   "a zero CODE_PHRASE held by value in COMPOSITION.language",
+			value:  &rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.c.v1", Name: rm.DVText{Value: "c"}},
+			member: "language",
+		},
+		{
+			name:   "a zero data in POINT_EVENT[ItemTree]",
+			value:  &rm.PointEvent[rm.ItemTree]{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "e"}},
+			member: "data",
+		},
+		{
 			name:   "a nil ontology in an AOM 1.4 ARCHETYPE",
 			value:  &aom14.Archetype{Concept: "at0000"},
 			member: "ontology",
@@ -207,13 +246,17 @@ func TestREQ052_GoBuiltAbsentMandatoryMember(t *testing.T) {
 
 // TestREQ052_MandatoryMemberWithAValueIsWritten is the control for the test
 // above: a mandatory field that holds a value is written, even when the value
-// is empty. A concrete RM value encodes with its `_type`, so a zero one is
-// still written; a struct or primitive held by value, and a type-parameter
-// field instantiated by value, have no absent form; and an `any` holding an
-// empty string or a zero class value holds a value.
+// is empty. A concrete RM value an interface holds encodes with its `_type`,
+// so a zero one is still written, and so is one a type-parameter field
+// instantiated with an interface holds; a struct held by value with any
+// field set is written in full; the two struct members a fixed reading
+// decides, EHR_STATUS subject and ARCHETYPED archetype_id, are written
+// whatever they hold; a primitive held by value has no absent form; and an
+// `any` holding an empty string or a zero class value holds a value.
 //
-// REQ-052 § An absent mandatory member: a mandatory member held by value
-// has no absent form and is written.
+// REQ-052 § An absent mandatory member: a struct held by value is left out
+// only when its zero test holds; any other mandatory member held by value is
+// written.
 func TestREQ052_MandatoryMemberWithAValueIsWritten(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -231,10 +274,36 @@ func TestREQ052_MandatoryMemberWithAValueIsWritten(t *testing.T) {
 			wantType: "DV_TEXT",
 		},
 		{
-			name:     "a zero HIER_OBJECT_ID held by value in CONTRIBUTION.uid",
-			value:    &rm.Contribution{Versions: []rm.ObjectRefLike{}},
-			member:   "uid",
-			wantType: "HIER_OBJECT_ID",
+			name:     "a PARTY_REF with only its type set, held by value in ROLE.performer",
+			value:    &rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", Name: rm.DVText{Value: "r"}, Performer: rm.PartyRef{Type: "PERSON"}},
+			member:   "performer",
+			wantType: "PARTY_REF",
+		},
+		{
+			// The floor's content rule reads this CODE_PHRASE as absent, as its
+			// code and terminology are empty; the encoder reads every field.
+			name:     "a CODE_PHRASE with only its preferred_term set, held by value in COMPOSITION.language",
+			value:    &rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.c.v1", Name: rm.DVText{Value: "c"}, Language: rm.CodePhrase{PreferredTerm: new("Dutch")}},
+			member:   "language",
+			wantType: "CODE_PHRASE",
+		},
+		{
+			name:     "an ITEM_TREE with only its archetype_node_id set in POINT_EVENT[ItemTree].data",
+			value:    &rm.PointEvent[rm.ItemTree]{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "e"}, Data: rm.ItemTree{ArchetypeNodeID: "at0003"}},
+			member:   "data",
+			wantType: "ITEM_TREE",
+		},
+		{
+			name:     "a zero PARTY_SELF held by value in EHR_STATUS.subject",
+			value:    &rm.EHRStatus{ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1", Name: rm.DVText{Value: "s"}},
+			member:   "subject",
+			wantType: "PARTY_SELF",
+		},
+		{
+			name:     "a zero ARCHETYPE_ID held by value in ARCHETYPED.archetype_id",
+			value:    &rm.Archetyped{RMVersion: "1.0.4"},
+			member:   "archetype_id",
+			wantType: "ARCHETYPE_ID",
 		},
 		{
 			name:   "an empty string held by value in ELEMENT.archetype_node_id",
@@ -243,8 +312,8 @@ func TestREQ052_MandatoryMemberWithAValueIsWritten(t *testing.T) {
 			want:   `""`,
 		},
 		{
-			name:     "a zero data in POINT_EVENT[ItemTree]",
-			value:    &rm.PointEvent[rm.ItemTree]{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "e"}},
+			name:     "a zero ITEM_TREE an interface holds in POINT_EVENT[ItemStructure].data",
+			value:    &rm.PointEvent[rm.ItemStructure]{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "e"}, Data: rm.ItemTree{}},
 			member:   "data",
 			wantType: "ITEM_TREE",
 		},

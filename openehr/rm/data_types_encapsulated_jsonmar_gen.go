@@ -25,11 +25,54 @@ type rawDVMultimedia DVMultimedia
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (d *DVMultimedia) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroCodePhrase(d.MediaType) {
+		return d.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawDVMultimedia
 	}{"DV_MULTIMEDIA", rawDVMultimedia(*d)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of DVMultimedia when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (d *DVMultimedia) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class                   string        `json:"_type"`
+		AlternateText           *string       `json:"alternate_text,omitzero"`
+		Charset                 *CodePhrase   `json:"charset,omitzero"`
+		CompressionAlgorithm    *CodePhrase   `json:"compression_algorithm,omitzero"`
+		Data                    []byte        `json:"data,omitempty"`
+		IntegrityCheck          []byte        `json:"integrity_check,omitempty"`
+		IntegrityCheckAlgorithm *CodePhrase   `json:"integrity_check_algorithm,omitzero"`
+		Language                *CodePhrase   `json:"language,omitzero"`
+		MediaType               any           `json:"media_type,omitzero"`
+		Size                    Integer       `json:"size"`
+		Thumbnail               *DVMultimedia `json:"thumbnail,omitzero"`
+		URI                     DVURILike     `json:"uri,omitempty"`
+	}{
+		Class:                   "DV_MULTIMEDIA",
+		AlternateText:           d.AlternateText,
+		Charset:                 d.Charset,
+		CompressionAlgorithm:    d.CompressionAlgorithm,
+		Data:                    d.Data,
+		IntegrityCheck:          d.IntegrityCheck,
+		IntegrityCheckAlgorithm: d.IntegrityCheckAlgorithm,
+		Language:                d.Language,
+		Size:                    d.Size,
+		Thumbnail:               d.Thumbnail,
+		URI:                     d.URI,
+	}
+	if !isZeroCodePhrase(d.MediaType) {
+		w.MediaType = d.MediaType
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for DVMultimedia: an object whose
@@ -40,6 +83,8 @@ func (d *DVMultimedia) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -132,11 +177,13 @@ func (d *DVMultimedia) writeJSONMembers(enc *jsontext.Encoder, uriSlot uint8) er
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "media_type"); err != nil {
-		return err
-	}
-	if err := d.MediaType.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroCodePhrase(d.MediaType) {
+		if err := writeJSONName(enc, "media_type"); err != nil {
+			return err
+		}
+		if err := d.MediaType.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if err := writeJSONName(enc, "size"); err != nil {
 		return err

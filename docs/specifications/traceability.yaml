@@ -355,6 +355,7 @@ requirements:
       - internal/bmmgen/render_keeps_empty_tag_test.go
       - internal/bmmgen/render_mandatory_tag_test.go
       - internal/bmmgen/render_streaming_test.go
+      - internal/bmmgen/render_zero_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/rmaccess/interval_test.go
       - internal/rmjsonwalk/walk_once_budget_internal_test.go
@@ -396,6 +397,7 @@ requirements:
       - openehr/serialize/canjson/decode_test.go
       - openehr/serialize/canjson/direct_encode_test.go
       - openehr/serialize/canjson/edgecases_test.go
+      - openehr/serialize/canjson/empty_member_test.go
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/entryerror_internal_test.go
       - openehr/serialize/canjson/inplace_slots_test.go
@@ -417,6 +419,7 @@ requirements:
       - openehr/serialize/canjson/typednil_slot_test.go
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canjson/valuefree_test.go
+      - openehr/serialize/canxml/empty_member_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/primitive_error_test.go
       - openehr/serialize/canxml/real_precision_test.go
@@ -429,6 +432,7 @@ requirements:
       - openehr/serialize/simplified/error_text_test.go
       - openehr/serialize/simplified/fit_test.go
       - openehr/templatecompile/external_test.go
+      - openehr/validation/empty_member_floor_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/rmfloor_bytes_test.go
@@ -669,6 +673,7 @@ requirements:
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
       - openehr/serialize/canxml/edgecases_test.go
+      - openehr/serialize/canxml/empty_member_test.go
       - openehr/serialize/canxml/encode_text_test.go
       - openehr/serialize/canxml/generic_param_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
@@ -692,6 +697,7 @@ requirements:
       - openehr/serialize/canxml/string_text_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/canxml/xsd_prefix_test.go
+      - openehr/validation/empty_member_floor_test.go
       - testkit/conformance/crossformat/census_test.go
       - testkit/conformance/crossformat/recorded_test.go
       - testkit/fixtures/crossformat_test.go
@@ -1830,6 +1836,7 @@ requirements:
       - openehr/validation/constraint_ref_walk_test.go
       - openehr/validation/coverage_test.go
       - openehr/validation/coverage_unevaluated_test.go
+      - openehr/validation/empty_member_floor_test.go
       - openehr/validation/engine_template_test.go
       - openehr/validation/engine_walk_test.go
       - openehr/validation/finding_identity_rules_test.go
@@ -2395,6 +2402,7 @@ requirements:
     tests:
       - internal/bmmgen/render_inventory_test.go
       - internal/bmmgen/render_rmaccess_test.go
+      - internal/bmmgen/render_zero_test.go
       - internal/bmmgen/sim_bump_test.go
       - internal/importguard/importguard_test.go
       - internal/rmaccess/coverage_test.go
@@ -2525,6 +2533,7 @@ requirements:
       - openehr/serialize/canxml/presence_test.go
       - openehr/serialize/canxml/report_cost_test.go
       - openehr/serialize/canxml/string_text_test.go
+      - openehr/validation/empty_member_floor_test.go
       - openehr/validation/missing_members_test.go
 
   - id: REQ-176

@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -71,6 +72,8 @@ type directMember struct {
 	number     string     // for directNumber: Real, Integer or Integer64
 	encodeKind encodeKind // for directEncode: the Go kind of the field
 	bound      string     // for an interval bound: the variable that leaves it out on an open side
+	decl       string     // the field's declaration, as the class's Go struct carries it
+	empty      *emptyMember
 }
 
 // precomputed reports whether MarshalJSONTo classifies the value of m before
@@ -389,17 +392,25 @@ func directMembers(plan *Plan, idx map[string]directKind, pc *PlannedClass, shap
 		return nil, err
 	}
 	interval := shape == shapeIntervalAlias || shape == shapeIntervalBase || shape == shapeIntervalDerived
+	empties, err := emptyMembersOf(plan, pc)
+	if err != nil {
+		return nil, err
+	}
 	members := make([]directMember, 0, len(fields))
 	for _, f := range fields {
 		src, err := renderField(plan, f.ef.Owner, f.ef.OwnerName, f.ef.Prop)
 		if err != nil {
 			return nil, fmt.Errorf("render field %s.%s: %w", pc.BMMName, f.ef.Prop.PropertyName(), err)
 		}
-		decl, err := parseDeclaredField(withoutCommentLines(src))
+		line := withoutCommentLines(src)
+		decl, err := parseDeclaredField(line)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", pc.BMMName, err)
 		}
-		m := directMember{name: decl.jsonName, field: decl.goName, omit: decl.omit}
+		m := directMember{name: decl.jsonName, field: decl.goName, omit: decl.omit, decl: line}
+		if e, ok := empties[f.ef.Prop.PropertyName()]; ok {
+			m.empty = &e
+		}
 		classifyDirectMember(plan, idx, f.ef.Owner, decl.typ, &m)
 		if interval {
 			switch m.name {
@@ -448,6 +459,9 @@ func renderDirectEncode(plan *Plan, pc *PlannedClass, shape jsonWireShape, base 
 			}
 			fmt.Fprintf(&setup, "\t%s := any(%s)\n", m.valueVar(), value)
 			fmt.Fprintf(&setup, "\t%s := jsonParam(%s)\n", m.slotVar(), m.valueVar())
+			if m.empty != nil {
+				fmt.Fprintf(&setup, "\tif %s(%s) {\n\t\t%s = jsonSlotAbsent\n\t}\n", emptyHeldFunc, value, m.slotVar())
+			}
 			params = append(params, m.slotVar()+" uint8", m.valueVar()+" any")
 			args = append(args, m.slotVar(), m.valueVar())
 		} else {
@@ -463,7 +477,7 @@ func renderDirectEncode(plan *Plan, pc *PlannedClass, shape jsonWireShape, base 
 	}
 
 	var b strings.Builder
-	renderDirectDoc(&b, pc, shape, checks != "")
+	renderDirectDoc(&b, pc, shape, checks != "", slices.ContainsFunc(members, func(m directMember) bool { return m.empty != nil }))
 	fmt.Fprintf(&b, "func (%s %s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, class)
 	b.WriteString("\tif !typereg.DirectEncode(enc) {\n")
 	fmt.Fprintf(&b, "\t\treturn %s.marshalJSONWrapped(enc)\n", recv)
@@ -510,7 +524,7 @@ func renderDirectEncode(plan *Plan, pc *PlannedClass, shape jsonWireShape, base 
 }
 
 // renderDirectDoc writes the doc comment of a class's MarshalJSONTo.
-func renderDirectDoc(b *strings.Builder, pc *PlannedClass, shape jsonWireShape, checks bool) {
+func renderDirectDoc(b *strings.Builder, pc *PlannedClass, shape jsonWireShape, checks, empties bool) {
 	if shape == shapeIntervalBase {
 		fmt.Fprintf(b, "// MarshalJSONTo writes canonical openEHR JSON for %s, which is abstract\n", pc.GoName)
 		b.WriteString("// and so carries no `_type`: an object holding each member that is not\n")
@@ -525,6 +539,10 @@ func renderDirectDoc(b *strings.Builder, pc *PlannedClass, shape jsonWireShape, 
 	b.WriteString("// member is left out as its field's omit option leaves it out under\n")
 	b.WriteString("// encoding/json/v2, such as a nil list or map, a nil pointer, or an\n")
 	b.WriteString("// interface holding nil or a nil pointer to a class.\n")
+	if empties {
+		b.WriteString("// A mandatory member that holds a class by value is left out too when\n")
+		b.WriteString("// every field of that value is empty.\n")
+	}
 	if shape == shapeIntervalBase || shape == shapeIntervalAlias || shape == shapeIntervalDerived {
 		fmt.Fprintf(b, "// An open side (`%s` or `%s` set) whose bound is empty\n", propLowerUnbounded, propUpperUnbounded)
 		fmt.Fprintf(b, "// writes no `%s` or `%s` member.\n", propLower, propUpper)
@@ -667,6 +685,15 @@ func renderDirectMember(b *strings.Builder, recv string, m directMember) error {
 			cond = "!" + m.bound
 		} else {
 			cond = "!" + m.bound + " && " + cond
+		}
+	}
+	if m.empty != nil && !m.empty.param {
+		// A member typed by the class's parameter is left out through its
+		// classification, which MarshalJSONTo settles before it writes.
+		if cond == "" {
+			cond = m.empty.cond(v)
+		} else {
+			cond = m.empty.cond(v) + " && " + cond
 		}
 	}
 

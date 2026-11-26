@@ -25,11 +25,34 @@ type rawDVGeneralTimeSpecification DVGeneralTimeSpecification
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (d *DVGeneralTimeSpecification) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroDVParsable(d.Value) {
+		return d.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawDVGeneralTimeSpecification
 	}{"DV_GENERAL_TIME_SPECIFICATION", rawDVGeneralTimeSpecification(*d)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of DVGeneralTimeSpecification when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (d *DVGeneralTimeSpecification) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class string `json:"_type"`
+		Value any    `json:"value,omitzero"`
+	}{
+		Class: "DV_GENERAL_TIME_SPECIFICATION",
+	}
+	if !isZeroDVParsable(d.Value) {
+		w.Value = d.Value
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for DVGeneralTimeSpecification: an object whose
@@ -40,6 +63,8 @@ func (d *DVGeneralTimeSpecification) marshalJSONWrapped(enc *jsontext.Encoder) e
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -69,11 +94,13 @@ func (d *DVGeneralTimeSpecification) writeJSONMembers(enc *jsontext.Encoder) err
 	if err := writeJSONString(enc, "_type", "DV_GENERAL_TIME_SPECIFICATION"); err != nil {
 		return err
 	}
-	if err := writeJSONName(enc, "value"); err != nil {
-		return err
-	}
-	if err := d.Value.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVParsable(d.Value) {
+		if err := writeJSONName(enc, "value"); err != nil {
+			return err
+		}
+		if err := d.Value.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }
@@ -91,11 +118,34 @@ type rawDVPeriodicTimeSpecification DVPeriodicTimeSpecification
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (d *DVPeriodicTimeSpecification) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroDVParsable(d.Value) {
+		return d.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawDVPeriodicTimeSpecification
 	}{"DV_PERIODIC_TIME_SPECIFICATION", rawDVPeriodicTimeSpecification(*d)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of DVPeriodicTimeSpecification when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (d *DVPeriodicTimeSpecification) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class string `json:"_type"`
+		Value any    `json:"value,omitzero"`
+	}{
+		Class: "DV_PERIODIC_TIME_SPECIFICATION",
+	}
+	if !isZeroDVParsable(d.Value) {
+		w.Value = d.Value
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for DVPeriodicTimeSpecification: an object whose
@@ -106,6 +156,8 @@ func (d *DVPeriodicTimeSpecification) marshalJSONWrapped(enc *jsontext.Encoder) 
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -135,11 +187,13 @@ func (d *DVPeriodicTimeSpecification) writeJSONMembers(enc *jsontext.Encoder) er
 	if err := writeJSONString(enc, "_type", "DV_PERIODIC_TIME_SPECIFICATION"); err != nil {
 		return err
 	}
-	if err := writeJSONName(enc, "value"); err != nil {
-		return err
-	}
-	if err := d.Value.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVParsable(d.Value) {
+		if err := writeJSONName(enc, "value"); err != nil {
+			return err
+		}
+		if err := d.Value.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }

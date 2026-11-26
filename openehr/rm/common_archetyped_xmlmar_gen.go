@@ -61,6 +61,9 @@ func (f *FeederAudit) BMMName() string { return "FEEDER_AUDIT" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value whose every field is
+// empty emits no element.
 func (f *FeederAudit) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("FEEDER_AUDIT")}
@@ -83,8 +86,10 @@ func (f *FeederAudit) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&f.OriginatingSystemAudit, xml.StartElement{Name: xml.Name{Local: "originating_system_audit"}}); err != nil {
-		return err
+	if !isZeroFeederAuditDetails(f.OriginatingSystemAudit) {
+		if err := _e.EncodeElement(&f.OriginatingSystemAudit, xml.StartElement{Name: xml.Name{Local: "originating_system_audit"}}); err != nil {
+			return err
+		}
 	}
 	if f.FeederSystemAudit != nil {
 		if err := _e.EncodeElement(f.FeederSystemAudit, xml.StartElement{Name: xml.Name{Local: "feeder_system_audit"}}); err != nil {
@@ -169,6 +174,9 @@ func (l *Link) BMMName() string { return "LINK" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value whose every field is
+// empty emits no element.
 func (l *Link) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("LINK")}
@@ -186,8 +194,10 @@ func (l *Link) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&l.Target, xml.StartElement{Name: xml.Name{Local: "target"}}); err != nil {
-		return err
+	if !isZeroDVEHRURI(l.Target) {
+		if err := _e.EncodeElement(&l.Target, xml.StartElement{Name: xml.Name{Local: "target"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

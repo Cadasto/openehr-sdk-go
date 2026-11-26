@@ -25,11 +25,62 @@ type rawComposition Composition
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (c *Composition) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroDVCodedText(c.Category) ||
+		isZeroCodePhrase(c.Language) ||
+		isZeroCodePhrase(c.Territory) {
+		return c.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawComposition
 	}{"COMPOSITION", rawComposition(*c)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of Composition when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (c *Composition) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class            string        `json:"_type"`
+		ArchetypeDetails *Archetyped   `json:"archetype_details,omitzero"`
+		ArchetypeNodeID  string        `json:"archetype_node_id"`
+		Category         any           `json:"category,omitzero"`
+		Composer         PartyProxy    `json:"composer,omitempty"`
+		Content          []ContentItem `json:"content,omitempty"`
+		Context          *EventContext `json:"context,omitzero"`
+		FeederAudit      *FeederAudit  `json:"feeder_audit,omitzero"`
+		Language         any           `json:"language,omitzero"`
+		Links            []Link        `json:"links,omitempty"`
+		Name             DVTextLike    `json:"name,omitempty"`
+		Territory        any           `json:"territory,omitzero"`
+		UID              UIDBasedID    `json:"uid,omitempty"`
+	}{
+		Class:            "COMPOSITION",
+		ArchetypeDetails: c.ArchetypeDetails,
+		ArchetypeNodeID:  c.ArchetypeNodeID,
+		Composer:         c.Composer,
+		Content:          c.Content,
+		Context:          c.Context,
+		FeederAudit:      c.FeederAudit,
+		Links:            c.Links,
+		Name:             c.Name,
+		UID:              c.UID,
+	}
+	if !isZeroDVCodedText(c.Category) {
+		w.Category = c.Category
+	}
+	if !isZeroCodePhrase(c.Language) {
+		w.Language = c.Language
+	}
+	if !isZeroCodePhrase(c.Territory) {
+		w.Territory = c.Territory
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for Composition: an object whose
@@ -40,6 +91,8 @@ func (c *Composition) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -87,11 +140,13 @@ func (c *Composition) writeJSONMembers(enc *jsontext.Encoder, composerSlot uint8
 	if err := writeJSONString(enc, "archetype_node_id", c.ArchetypeNodeID); err != nil {
 		return err
 	}
-	if err := writeJSONName(enc, "category"); err != nil {
-		return err
-	}
-	if err := c.Category.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVCodedText(c.Category) {
+		if err := writeJSONName(enc, "category"); err != nil {
+			return err
+		}
+		if err := c.Category.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if composerSlot != jsonSlotAbsent {
 		if err := writeJSONName(enc, "composer"); err != nil {
@@ -133,11 +188,13 @@ func (c *Composition) writeJSONMembers(enc *jsontext.Encoder, composerSlot uint8
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "language"); err != nil {
-		return err
-	}
-	if err := c.Language.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroCodePhrase(c.Language) {
+		if err := writeJSONName(enc, "language"); err != nil {
+			return err
+		}
+		if err := c.Language.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if len(c.Links) > 0 {
 		if err := writeJSONName(enc, "links"); err != nil {
@@ -163,11 +220,13 @@ func (c *Composition) writeJSONMembers(enc *jsontext.Encoder, composerSlot uint8
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "territory"); err != nil {
-		return err
-	}
-	if err := c.Territory.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroCodePhrase(c.Territory) {
+		if err := writeJSONName(enc, "territory"); err != nil {
+			return err
+		}
+		if err := c.Territory.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if uidSlot != jsonSlotAbsent {
 		if err := writeJSONName(enc, "uid"); err != nil {
@@ -193,11 +252,49 @@ type rawEventContext EventContext
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (e *EventContext) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroDVCodedText(e.Setting) ||
+		isZeroDVDateTime(e.StartTime) {
+		return e.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawEventContext
 	}{"EVENT_CONTEXT", rawEventContext(*e)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of EventContext when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (e *EventContext) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class              string              `json:"_type"`
+		EndTime            *DVDateTime         `json:"end_time,omitzero"`
+		HealthCareFacility PartyIdentifiedLike `json:"health_care_facility,omitempty"`
+		Location           *string             `json:"location,omitzero"`
+		OtherContext       ItemStructure       `json:"other_context,omitempty"`
+		Participations     []Participation     `json:"participations,omitempty"`
+		Setting            any                 `json:"setting,omitzero"`
+		StartTime          any                 `json:"start_time,omitzero"`
+	}{
+		Class:              "EVENT_CONTEXT",
+		EndTime:            e.EndTime,
+		HealthCareFacility: e.HealthCareFacility,
+		Location:           e.Location,
+		OtherContext:       e.OtherContext,
+		Participations:     e.Participations,
+	}
+	if !isZeroDVCodedText(e.Setting) {
+		w.Setting = e.Setting
+	}
+	if !isZeroDVDateTime(e.StartTime) {
+		w.StartTime = e.StartTime
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for EventContext: an object whose
@@ -208,6 +305,8 @@ func (e *EventContext) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -291,17 +390,21 @@ func (e *EventContext) writeJSONMembers(enc *jsontext.Encoder, healthCareFacilit
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "setting"); err != nil {
-		return err
+	if !isZeroDVCodedText(e.Setting) {
+		if err := writeJSONName(enc, "setting"); err != nil {
+			return err
+		}
+		if err := e.Setting.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
-	if err := e.Setting.MarshalJSONTo(enc); err != nil {
-		return err
-	}
-	if err := writeJSONName(enc, "start_time"); err != nil {
-		return err
-	}
-	if err := e.StartTime.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVDateTime(e.StartTime) {
+		if err := writeJSONName(enc, "start_time"); err != nil {
+			return err
+		}
+		if err := e.StartTime.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }

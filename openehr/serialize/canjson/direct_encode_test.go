@@ -633,3 +633,48 @@ func TestREQ052DirectEncodeAllocatesLess(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ052DirectEncodeLeavesOutEmptyMembersAsTheWrapperDoes holds the two
+// encodes to one rule for a mandatory member held by value: each value holds
+// such a member empty, which both leave out, or with a part set, which both
+// write. It covers a class of the alias shape, one of the flat shape
+// (DV_CODED_TEXT) and a member typed by the class's own type parameter, bound
+// to a struct and to an interface. Without the wrapper's marshalJSONOmitting
+// the wrapper writes the empty member and the bytes differ.
+//
+// REQ-052 § An absent mandatory member.
+func TestREQ052DirectEncodeLeavesOutEmptyMembersAsTheWrapperDoes(t *testing.T) {
+	t.Parallel()
+	name := rm.DVText{Value: "n"}
+	for _, tc := range []struct {
+		name   string
+		v      any
+		absent string // the member both leave out, or "" when both write it
+	}{
+		{name: "ROLE with an empty performer", v: &rm.Role{ArchetypeNodeID: "at0000", Name: name}, absent: "performer"},
+		{name: "ROLE with a performer that has a type", v: &rm.Role{ArchetypeNodeID: "at0000", Name: name, Performer: rm.PartyRef{Type: "PERSON"}}},
+		{name: "COMPOSITION with empty category, language and territory", v: &rm.Composition{ArchetypeNodeID: "at0000", Name: name}, absent: "category"},
+		{name: "DV_CODED_TEXT with an empty defining code", v: &rm.DVCodedText{Value: "v"}, absent: "defining_code"},
+		{name: "DV_CODED_TEXT with a code and no terminology", v: &rm.DVCodedText{Value: "v", DefiningCode: rm.CodePhrase{CodeString: "c"}}},
+		{name: "OBSERVATION with an empty data", v: &rm.Observation{ArchetypeNodeID: "at0000", Name: name}, absent: "data"},
+		{name: "POINT_EVENT[ItemTree] with an empty data", v: &rm.PointEvent[rm.ItemTree]{ArchetypeNodeID: "at0001", Name: name}, absent: "data"},
+		{name: "POINT_EVENT[ItemStructure] holding an empty ITEM_TREE", v: &rm.PointEvent[rm.ItemStructure]{ArchetypeNodeID: "at0001", Name: name, Data: rm.ItemTree{}}},
+	} {
+		if diff := sameAsWrapper(tc.v); diff != "" {
+			t.Errorf("%s: %s", tc.name, diff)
+		}
+		wrapped := encode(tc.v, forceWrapper)
+		if wrapped.err != "" {
+			t.Fatalf("%s: wrapper encode: %s", tc.name, wrapped.err)
+		}
+		var members map[string]jsonv1.RawMessage
+		if err := jsonv1.Unmarshal(wrapped.out, &members); err != nil {
+			t.Fatalf("%s: read %s: %v", tc.name, wrapped.out, err)
+		}
+		if tc.absent != "" {
+			if raw, ok := members[tc.absent]; ok {
+				t.Errorf("%s: the wrapper writes %q as %s, want it left out", tc.name, tc.absent, raw)
+			}
+		}
+	}
+}

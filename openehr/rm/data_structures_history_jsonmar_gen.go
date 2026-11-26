@@ -25,11 +25,54 @@ type rawHistory[T ItemStructure] History[T]
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (h *History[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroDVDateTime(h.Origin) {
+		return h.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawHistory[T]
 	}{"HISTORY", rawHistory[T](*h)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of History when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (h *History[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class            string        `json:"_type"`
+		ArchetypeDetails *Archetyped   `json:"archetype_details,omitzero"`
+		ArchetypeNodeID  string        `json:"archetype_node_id"`
+		Duration         *DVDuration   `json:"duration,omitzero"`
+		Events           []Event       `json:"events,omitempty"`
+		FeederAudit      *FeederAudit  `json:"feeder_audit,omitzero"`
+		Links            []Link        `json:"links,omitempty"`
+		Name             DVTextLike    `json:"name,omitempty"`
+		Origin           any           `json:"origin,omitzero"`
+		Period           *DVDuration   `json:"period,omitzero"`
+		Summary          ItemStructure `json:"summary,omitempty"`
+		UID              UIDBasedID    `json:"uid,omitempty"`
+	}{
+		Class:            "HISTORY",
+		ArchetypeDetails: h.ArchetypeDetails,
+		ArchetypeNodeID:  h.ArchetypeNodeID,
+		Duration:         h.Duration,
+		Events:           h.Events,
+		FeederAudit:      h.FeederAudit,
+		Links:            h.Links,
+		Name:             h.Name,
+		Period:           h.Period,
+		Summary:          h.Summary,
+		UID:              h.UID,
+	}
+	if !isZeroDVDateTime(h.Origin) {
+		w.Origin = h.Origin
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for History: an object whose
@@ -40,6 +83,8 @@ func (h *History[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -143,11 +188,13 @@ func (h *History[T]) writeJSONMembers(enc *jsontext.Encoder, nameSlot uint8, sum
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "origin"); err != nil {
-		return err
-	}
-	if err := h.Origin.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVDateTime(h.Origin) {
+		if err := writeJSONName(enc, "origin"); err != nil {
+			return err
+		}
+		if err := h.Origin.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if h.Period != nil {
 		if err := writeJSONName(enc, "period"); err != nil {
@@ -189,11 +236,65 @@ type rawIntervalEvent[T ItemStructure] IntervalEvent[T]
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (i *IntervalEvent[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isEmptyHeld(i.Data) ||
+		isZeroDVCodedText(i.MathFunction) ||
+		isZeroDVDateTime(i.Time) ||
+		isZeroDVDuration(i.Width) {
+		return i.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawIntervalEvent[T]
 	}{"INTERVAL_EVENT", rawIntervalEvent[T](*i)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of IntervalEvent when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (i *IntervalEvent[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class            string        `json:"_type"`
+		ArchetypeDetails *Archetyped   `json:"archetype_details,omitzero"`
+		ArchetypeNodeID  string        `json:"archetype_node_id"`
+		Data             any           `json:"data,omitzero"`
+		FeederAudit      *FeederAudit  `json:"feeder_audit,omitzero"`
+		Links            []Link        `json:"links,omitempty"`
+		MathFunction     any           `json:"math_function,omitzero"`
+		Name             DVTextLike    `json:"name,omitempty"`
+		SampleCount      *Integer      `json:"sample_count,omitzero"`
+		State            ItemStructure `json:"state,omitempty"`
+		Time             any           `json:"time,omitzero"`
+		UID              UIDBasedID    `json:"uid,omitempty"`
+		Width            any           `json:"width,omitzero"`
+	}{
+		Class:            "INTERVAL_EVENT",
+		ArchetypeDetails: i.ArchetypeDetails,
+		ArchetypeNodeID:  i.ArchetypeNodeID,
+		FeederAudit:      i.FeederAudit,
+		Links:            i.Links,
+		Name:             i.Name,
+		SampleCount:      i.SampleCount,
+		State:            i.State,
+		UID:              i.UID,
+	}
+	if !isEmptyHeld(i.Data) && jsonParam(any(i.Data)) != jsonSlotAbsent {
+		w.Data = i.Data
+	}
+	if !isZeroDVCodedText(i.MathFunction) {
+		w.MathFunction = i.MathFunction
+	}
+	if !isZeroDVDateTime(i.Time) {
+		w.Time = i.Time
+	}
+	if !isZeroDVDuration(i.Width) {
+		w.Width = i.Width
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for IntervalEvent: an object whose
@@ -204,6 +305,8 @@ func (i *IntervalEvent[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -219,6 +322,9 @@ func (i IntervalEvent[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}
 	dataValue := any(i.Data)
 	dataSlot := jsonParam(dataValue)
+	if isEmptyHeld(i.Data) {
+		dataSlot = jsonSlotAbsent
+	}
 	nameSlot := jsonSlot(i.Name)
 	stateSlot := jsonSlot(i.State)
 	uidSlot := jsonSlot(i.UID)
@@ -285,11 +391,13 @@ func (i *IntervalEvent[T]) writeJSONMembers(enc *jsontext.Encoder, dataSlot uint
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "math_function"); err != nil {
-		return err
-	}
-	if err := i.MathFunction.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVCodedText(i.MathFunction) {
+		if err := writeJSONName(enc, "math_function"); err != nil {
+			return err
+		}
+		if err := i.MathFunction.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if nameSlot != jsonSlotAbsent {
 		if err := writeJSONName(enc, "name"); err != nil {
@@ -315,11 +423,13 @@ func (i *IntervalEvent[T]) writeJSONMembers(enc *jsontext.Encoder, dataSlot uint
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "time"); err != nil {
-		return err
-	}
-	if err := i.Time.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVDateTime(i.Time) {
+		if err := writeJSONName(enc, "time"); err != nil {
+			return err
+		}
+		if err := i.Time.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if uidSlot != jsonSlotAbsent {
 		if err := writeJSONName(enc, "uid"); err != nil {
@@ -329,11 +439,13 @@ func (i *IntervalEvent[T]) writeJSONMembers(enc *jsontext.Encoder, dataSlot uint
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "width"); err != nil {
-		return err
-	}
-	if err := i.Width.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVDuration(i.Width) {
+		if err := writeJSONName(enc, "width"); err != nil {
+			return err
+		}
+		if err := i.Width.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }
@@ -351,11 +463,53 @@ type rawPointEvent[T ItemStructure] PointEvent[T]
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (p *PointEvent[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isEmptyHeld(p.Data) ||
+		isZeroDVDateTime(p.Time) {
+		return p.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawPointEvent[T]
 	}{"POINT_EVENT", rawPointEvent[T](*p)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of PointEvent when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (p *PointEvent[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class            string        `json:"_type"`
+		ArchetypeDetails *Archetyped   `json:"archetype_details,omitzero"`
+		ArchetypeNodeID  string        `json:"archetype_node_id"`
+		Data             any           `json:"data,omitzero"`
+		FeederAudit      *FeederAudit  `json:"feeder_audit,omitzero"`
+		Links            []Link        `json:"links,omitempty"`
+		Name             DVTextLike    `json:"name,omitempty"`
+		State            ItemStructure `json:"state,omitempty"`
+		Time             any           `json:"time,omitzero"`
+		UID              UIDBasedID    `json:"uid,omitempty"`
+	}{
+		Class:            "POINT_EVENT",
+		ArchetypeDetails: p.ArchetypeDetails,
+		ArchetypeNodeID:  p.ArchetypeNodeID,
+		FeederAudit:      p.FeederAudit,
+		Links:            p.Links,
+		Name:             p.Name,
+		State:            p.State,
+		UID:              p.UID,
+	}
+	if !isEmptyHeld(p.Data) && jsonParam(any(p.Data)) != jsonSlotAbsent {
+		w.Data = p.Data
+	}
+	if !isZeroDVDateTime(p.Time) {
+		w.Time = p.Time
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for PointEvent: an object whose
@@ -366,6 +520,8 @@ func (p *PointEvent[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -381,6 +537,9 @@ func (p PointEvent[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}
 	dataValue := any(p.Data)
 	dataSlot := jsonParam(dataValue)
+	if isEmptyHeld(p.Data) {
+		dataSlot = jsonSlotAbsent
+	}
 	nameSlot := jsonSlot(p.Name)
 	stateSlot := jsonSlot(p.State)
 	uidSlot := jsonSlot(p.UID)
@@ -463,11 +622,13 @@ func (p *PointEvent[T]) writeJSONMembers(enc *jsontext.Encoder, dataSlot uint8, 
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "time"); err != nil {
-		return err
-	}
-	if err := p.Time.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVDateTime(p.Time) {
+		if err := writeJSONName(enc, "time"); err != nil {
+			return err
+		}
+		if err := p.Time.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if uidSlot != jsonSlotAbsent {
 		if err := writeJSONName(enc, "uid"); err != nil {

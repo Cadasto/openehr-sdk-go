@@ -7,15 +7,17 @@ import (
 )
 
 // TestRMAccessImports guards the package's place below the validators
-// (ADR 0028): its own non-test files import only the standard library and
-// openehr/rm, so it never reaches the validation, template, serialization or
-// client packages it is read by, and nothing it pulls in reaches transport,
-// auth or openehr/client (REQ-013). The RM metadata stays in
-// openehr/rm/rminfo, which callers read beside the access.
+// (ADR 0028): its own non-test files import only the standard library,
+// openehr/rm and internal/rmzero, through which openehr/rm hands over the
+// zero tests it generates, so it never reaches the validation, template,
+// serialization or client packages it is read by, and nothing it pulls in
+// reaches transport, auth or openehr/client (REQ-013). The RM metadata stays
+// in openehr/rm/rminfo, which callers read beside the access.
 func TestRMAccessImports(t *testing.T) {
 	t.Parallel()
 	allowed := map[string]bool{
-		"github.com/cadasto/openehr-sdk-go/openehr/rm": true,
+		"github.com/cadasto/openehr-sdk-go/openehr/rm":      true,
+		"github.com/cadasto/openehr-sdk-go/internal/rmzero": true,
 	}
 	imports, err := importguard.Imports(".")
 	if err != nil {
@@ -26,7 +28,7 @@ func TestRMAccessImports(t *testing.T) {
 	}
 	for _, imp := range imports {
 		if !importguard.Standard(imp) && !allowed[imp] {
-			t.Errorf("internal/rmaccess MUST NOT import %q in its own files: it imports only the standard library and openehr/rm (ADR 0028)", imp)
+			t.Errorf("internal/rmaccess MUST NOT import %q in its own files: it imports only the standard library, openehr/rm and internal/rmzero (ADR 0028)", imp)
 		}
 		if p, ok := importguard.Matches(imp, importguard.RuleLoaders()); ok {
 			t.Errorf("internal/rmaccess MUST NOT import %q in its own files (forbidden entry %q; REQ-171: the access the validators read through loads nothing at run time)", imp, p)

@@ -124,8 +124,8 @@ func TestZeroPredicateRefusals(t *testing.T) {
 			if tc.plan == aomPlan && !pc.External {
 				t.Fatalf("%s is owned by the AOM 1.4 target, want a class of another target", tc.class)
 			}
-			if src, _, err := renderZeroPredicate(tc.plan, pc); err == nil {
-				t.Errorf("renderZeroPredicate(%s) succeeded, want a refusal:\n%s", tc.class, src)
+			if err := checkPredicateClass(pc); err == nil {
+				t.Errorf("checkPredicateClass(%s) succeeded, want a refusal", tc.class)
 			}
 		})
 	}
@@ -157,8 +157,8 @@ func TestIntervalBoundFileWithoutBoundClasses(t *testing.T) {
 			t.Errorf("interval bound file without DV_INTERVAL lacks %q:\n%s", want, body)
 		}
 	}
-	if strings.Contains(string(body), "func isZeroDVQuantity(") {
-		t.Errorf("interval bound file without DV_INTERVAL still carries the DV_ORDERED predicates:\n%s", body)
+	if strings.Contains(string(body), "case DVQuantity:") {
+		t.Errorf("interval bound file without DV_INTERVAL still switches on the DV_ORDERED classes:\n%s", body)
 	}
 }
 
@@ -185,10 +185,15 @@ func TestIntervalBoundFromFieldType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderIntervalBoundFile: %v", err)
 	}
-	for _, want := range []string{"case DVBoolean:", "func isZeroDVBoolean("} {
-		if !strings.Contains(string(body), want) {
-			t.Errorf("interval bound file with DV_BOOLEAN bounds lacks %q:\n%s", want, body)
-		}
+	if !strings.Contains(string(body), "case DVBoolean:") {
+		t.Errorf("interval bound file with DV_BOOLEAN bounds lacks %q:\n%s", "case DVBoolean:", body)
+	}
+	zero, err := RenderZeroFile(plan)
+	if err != nil {
+		t.Fatalf("RenderZeroFile: %v", err)
+	}
+	if !strings.Contains(string(zero), "func isZeroDVBoolean(") {
+		t.Errorf("zero file with DV_BOOLEAN interval bounds lacks %q:\n%s", "func isZeroDVBoolean(", zero)
 	}
 }
 

@@ -43,10 +43,13 @@
 // only when its side is marked unbounded and the bound is empty; EHR_STATUS
 // subject is always present; ARCHETYPED archetype_id and rm_version are always
 // present. The content rules and the fixed readings are in presence.go; the
-// reading by Go kind and the zero tests are generated.
+// reading by Go kind is generated here. The zero tests are generated into
+// openehr/rm, whose canonical encoders leave out an empty mandatory member
+// held by value through the same tests, and reach this package through
+// internal/rmzero, once, when it is initialised.
 //
 // # Dependencies
 //
-// The package imports the standard library and openehr/rm only. It is
-// module-internal: it adds no API to the RM types.
+// The package imports the standard library, openehr/rm and internal/rmzero
+// only. It is module-internal: it adds no API to the RM types.
 package rmaccess

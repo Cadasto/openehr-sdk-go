@@ -56,35 +56,7 @@
       },
       "data": {
         "_type": "COMPOSITION",
-        "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1",
-        "category": {
-          "_type": "DV_CODED_TEXT",
-          "value": "",
-          "defining_code": {
-            "_type": "CODE_PHRASE",
-            "code_string": "",
-            "terminology_id": {
-              "_type": "TERMINOLOGY_ID",
-              "value": ""
-            }
-          }
-        },
-        "language": {
-          "_type": "CODE_PHRASE",
-          "code_string": "",
-          "terminology_id": {
-            "_type": "TERMINOLOGY_ID",
-            "value": ""
-          }
-        },
-        "territory": {
-          "_type": "CODE_PHRASE",
-          "code_string": "",
-          "terminology_id": {
-            "_type": "TERMINOLOGY_ID",
-            "value": ""
-          }
-        }
+        "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1"
       }
     },
     {
@@ -127,35 +99,7 @@
       },
       "data": {
         "_type": "COMPOSITION",
-        "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1",
-        "category": {
-          "_type": "DV_CODED_TEXT",
-          "value": "",
-          "defining_code": {
-            "_type": "CODE_PHRASE",
-            "code_string": "",
-            "terminology_id": {
-              "_type": "TERMINOLOGY_ID",
-              "value": ""
-            }
-          }
-        },
-        "language": {
-          "_type": "CODE_PHRASE",
-          "code_string": "",
-          "terminology_id": {
-            "_type": "TERMINOLOGY_ID",
-            "value": ""
-          }
-        },
-        "territory": {
-          "_type": "CODE_PHRASE",
-          "code_string": "",
-          "terminology_id": {
-            "_type": "TERMINOLOGY_ID",
-            "value": ""
-          }
-        }
+        "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1"
       }
     },
     {

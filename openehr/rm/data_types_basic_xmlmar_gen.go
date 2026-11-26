@@ -97,6 +97,9 @@ func (d *DVState) BMMName() string { return "DV_STATE" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value whose every field is
+// empty emits no element.
 func (d *DVState) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("DV_STATE")}
@@ -104,8 +107,10 @@ func (d *DVState) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
-		return err
+	if !isZeroDVCodedText(d.Value) {
+		if err := _e.EncodeElement(&d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(d.IsTerminal, xml.StartElement{Name: xml.Name{Local: "is_terminal"}}); err != nil {
 		return err

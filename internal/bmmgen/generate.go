@@ -18,6 +18,9 @@
 //   - interval_bound_gen.go, the emptiness test the canonical encoders
 //     apply to an open interval side's bound, when the target owns an
 //     interval-shaped class;
+//   - zero_gen.go, the zero tests of the classes held by value that the
+//     interval-bound emptiness test, the canonical encoders and the RM
+//     validation floor read as empty, when any of them reads one;
 //   - integer_enumeration_gen.go, the canonical codecs of the target's
 //     integer enumerations, when it emits one.
 //
@@ -562,10 +565,34 @@ func runTarget(opts Options, t Target, resolver schemaResolver, schemas *itsXMLS
 	}
 
 	// The generated RM attribute access (REQ-171, ADR 0028), one file in the
-	// module-internal internal/rmaccess package; nil for non-RM targets.
-	accessBody, err := RenderRMAccessFile(plan)
+	// module-internal internal/rmaccess package, nil for non-RM targets; and
+	// the target's zero tests, which the access, the canonical encoders and
+	// the interval-bound emptiness test share, nil when none reads one.
+	accessBody, zeroBody, err := renderAccessAndZero(plan)
 	if err != nil {
 		return tr, err
+	}
+	zeroPath := filepath.Join(outDir, zeroFile)
+	if zeroBody == nil {
+		if opts.Verify {
+			if _, statErr := os.Stat(zeroPath); statErr == nil {
+				result.Drifts = append(result.Drifts, DriftRecord{Path: zeroPath, Existing: true})
+			}
+		}
+	} else {
+		tr.Files = append(tr.Files, zeroPath)
+		result.Files = append(result.Files, zeroPath)
+		if opts.Verify {
+			drift, err := compareFile(zeroPath, zeroBody)
+			if err != nil {
+				return tr, err
+			}
+			if drift != nil {
+				result.Drifts = append(result.Drifts, *drift)
+			}
+		} else if err := writeAtomic(zeroPath, zeroBody); err != nil {
+			return tr, err
+		}
 	}
 	if accessBody != nil {
 		accessPath := filepath.Join(opts.OutDir, "internal", "rmaccess", rmaccessFile)
@@ -606,7 +633,7 @@ func runTarget(opts Options, t Target, resolver schemaResolver, schemas *itsXMLS
 // the ones not derived from a BMM package: a package whose file stem produced
 // one of them would be silently overwritten by it.
 //
-// The reservation is uniform: all six names, in every target. A BMM package
+// The reservation is uniform: all seven names, in every target. A BMM package
 // named like a fixed file is refused even in a target that would not emit that
 // file (the AOM 1.4 target emits neither interval_bound_gen.go nor
 // release_gen.go), so the set of reserved names never depends on the target and
@@ -615,6 +642,7 @@ var fixedGeneratedFiles = []string{
 	"typereg_gen.go",
 	"jsonhooks_gen.go",
 	intervalBoundFile,
+	zeroFile,
 	releaseFileName,
 	integerEnumFile,
 	xmlNamesFile,

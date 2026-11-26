@@ -134,6 +134,9 @@ func (d *DVOrdinal) BMMName() string { return "DV_ORDINAL" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value whose every field is
+// empty emits no element.
 func (d *DVOrdinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("DV_ORDINAL")}
@@ -159,8 +162,10 @@ func (d *DVOrdinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeElement(d.Value, xml.StartElement{Name: xml.Name{Local: "value"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&d.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
-		return err
+	if !isZeroDVCodedText(d.Symbol) {
+		if err := _e.EncodeElement(&d.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -328,6 +333,9 @@ func (d *DVScale) BMMName() string { return "DV_SCALE" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value whose every field is
+// empty emits no element.
 func (d *DVScale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("DV_SCALE")}
@@ -353,8 +361,10 @@ func (d *DVScale) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := canxml.EncodeText(_e, "value", d.Value); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&d.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
-		return err
+	if !isZeroDVCodedText(d.Symbol) {
+		if err := _e.EncodeElement(&d.Symbol, xml.StartElement{Name: xml.Name{Local: "symbol"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -375,6 +385,9 @@ func (r *ReferenceRange[T]) BMMName() string { return "REFERENCE_RANGE" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value whose every field is
+// empty emits no element.
 func (r *ReferenceRange[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("REFERENCE_RANGE")}
@@ -387,8 +400,10 @@ func (r *ReferenceRange[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&r.Range, xml.StartElement{Name: xml.Name{Local: "range"}}); err != nil {
-		return err
+	if !isZeroDVIntervalDVOrdered(r.Range) {
+		if err := _e.EncodeElement(&r.Range, xml.StartElement{Name: xml.Name{Local: "range"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

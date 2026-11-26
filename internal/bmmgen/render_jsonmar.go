@@ -434,10 +434,18 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	if checks != "" && shape != shapeAlias {
 		return "", fmt.Errorf("%s has an Any member and takes JSON wire shape %d, whose encoder does not check one", pc.BMMName, shape)
 	}
+	members, err := directMembers(plan, directTypeIndex(plan), pc, shape, base)
+	if err != nil {
+		return "", fmt.Errorf("direct encode: %w", err)
+	}
+	guard, omitting, err := renderMarshalOmitting(pc, shape, recv, typeArgs, members)
+	if err != nil {
+		return "", err
+	}
 	var wrapped string
 	switch shape {
 	case shapeFlat:
-		wrapped, err = renderMarshalFlat(plan, pc, recv, typeParams, typeArgs)
+		wrapped, err = renderMarshalFlat(plan, pc, recv, typeParams, typeArgs, guard)
 	case shapeIntervalBase:
 		wrapped = renderMarshalIntervalBase(pc, recv, typeParams, typeArgs)
 	case shapeIntervalDerived:
@@ -445,13 +453,14 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	case shapeIntervalAlias:
 		wrapped = renderMarshalAliasInterval(pc, recv, typeParams, typeArgs)
 	case shapeAlias:
-		wrapped = renderMarshalAlias(pc, recv, typeParams, typeArgs, checks)
+		wrapped = renderMarshalAlias(pc, recv, typeParams, typeArgs, checks, guard)
 	default:
 		return "", fmt.Errorf("%s: unhandled JSON wire shape %d", pc.BMMName, shape)
 	}
 	if err != nil {
 		return "", err
 	}
+	wrapped += omitting
 	direct, err := renderDirectEncode(plan, pc, shape, base, recv, typeArgs)
 	if err != nil {
 		return "", fmt.Errorf("direct encode: %w", err)
@@ -538,7 +547,7 @@ func jsonAnyChecks(plan *Plan, pc *PlannedClass, recv string, refuse func(errExp
 // into it once. Converting a pointer to the receiver instead would move the
 // receiver to the heap, which costs a second allocation per encoded value.
 // checks, from [jsonAnyChecks], run first.
-func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs, checks string) string {
+func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs, checks, guard string) string {
 	alias := aliasTypeName(pc.GoName)
 	var b strings.Builder
 	b.WriteString(renderMarshalAliasDecl(pc, typeParams, typeArgs))
@@ -554,8 +563,12 @@ func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs, checks str
 		b.WriteString("// A member typed Any that holds a value its decoder would not read\n")
 		b.WriteString("// back is refused, as the canonical-XML encoder refuses it.\n")
 	}
+	if guard != "" {
+		b.WriteString(omittingDoc)
+	}
 	fmt.Fprintf(&b, "func (%s *%s%s) marshalJSONWrapped(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString(checks)
+	b.WriteString(guard)
 	b.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
 	b.WriteString("\t\tType string `json:\"_type\"`\n")
 	fmt.Fprintf(&b, "\t\t%s%s\n", alias, typeArgs)
@@ -582,7 +595,7 @@ func renderMarshalAliasDecl(pc *PlannedClass, typeParams, typeArgs string) strin
 // marshaler-bearing concrete ancestor: a wire struct that flattens every
 // JSON-visible field (so it embeds nothing) and a marshalJSONWrapped that copies
 // each field in.
-func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs string) (string, error) {
+func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs, guard string) (string, error) {
 	fields, err := effectiveFields(plan, pc)
 	if err != nil {
 		return "", err
@@ -607,7 +620,11 @@ func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs 
 	fmt.Fprintf(&b, "// marshalJSONWrapped is the wrapper encode of %s: it copies each field\n", pc.GoName)
 	fmt.Fprintf(&b, "// into the flat wire struct, `_type` (value %q) leading, and marshals\n", pc.BMMName)
 	b.WriteString("// it, so json/v2 writes every member under the encoder's options.\n")
+	if guard != "" {
+		b.WriteString(omittingDoc)
+	}
 	fmt.Fprintf(&b, "func (%s *%s%s) marshalJSONWrapped(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	b.WriteString(guard)
 	fmt.Fprintf(&b, "\treturn json.MarshalEncode(enc, &%s%s{\n", wire, typeArgs)
 	fmt.Fprintf(&b, "\t\tClass: %q,\n", pc.BMMName)
 	for _, ef := range fields {
@@ -617,6 +634,88 @@ func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs 
 	b.WriteString("\t}, typereg.MarshalOptions(enc))\n")
 	b.WriteString("}\n\n")
 	return b.String(), nil
+}
+
+// omittingDoc is the doc comment line a wrapper encode carries when the
+// class has a member [renderMarshalOmitting] may leave out.
+const omittingDoc = "// A mandatory member that holds a class by value whose every field is\n" +
+	"// empty is left out, through marshalJSONOmitting.\n"
+
+// renderMarshalOmitting renders, for a class with a mandatory member the
+// encoders leave out when empty ([emptyMember]), the guard its wrapper encode
+// opens with and the marshalJSONOmitting the guard calls. Neither the alias
+// nor the flat wire struct can leave such a member out: json/v2 writes a
+// struct held by value whatever it holds, and the alias carries the class's
+// own fields. marshalJSONOmitting marshals instead an anonymous struct that
+// declares every member the wrapper writes, in the order it writes them, each
+// as the class declares it except a member left out when empty, which is an
+// any left nil, and so out, when the member is empty. It is taken only when a
+// member is empty, so every other value takes the wrapper it always took.
+// It returns "", "" for a class with no such member.
+func renderMarshalOmitting(pc *PlannedClass, shape jsonWireShape, recv, typeArgs string, members []directMember) (guard, omitting string, err error) {
+	var empty []directMember
+	for _, m := range members {
+		if m.empty != nil {
+			empty = append(empty, m)
+		}
+	}
+	if len(empty) == 0 {
+		return "", "", nil
+	}
+	if shape != shapeAlias && shape != shapeFlat {
+		return "", "", fmt.Errorf("%s has a mandatory member it leaves out when empty and takes JSON wire shape %d, whose wrapper cannot leave one out", pc.BMMName, shape)
+	}
+	var conds []string
+	for _, m := range empty {
+		v := recv + "." + m.field
+		if m.empty.param {
+			conds = append(conds, fmt.Sprintf("%s(%s)", emptyHeldFunc, v))
+		} else {
+			conds = append(conds, fmt.Sprintf("%s(%s)", m.empty.test, v))
+		}
+	}
+	guard = fmt.Sprintf("\tif %s {\n\t\treturn %s.marshalJSONOmitting(enc)\n\t}\n", strings.Join(conds, " ||\n\t\t"), recv)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "// marshalJSONOmitting is the wrapper encode of %s when a mandatory member\n", pc.GoName)
+	b.WriteString("// that holds a class by value is empty: it marshals an anonymous struct\n")
+	b.WriteString("// that declares every member marshalJSONWrapped writes, in the same order,\n")
+	b.WriteString("// each such member as an any that holds its value unless the value is\n")
+	b.WriteString("// empty, so that an empty one is left out.\n")
+	fmt.Fprintf(&b, "func (%s *%s%s) marshalJSONOmitting(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
+	// The discriminator field is named Class, as in the flat wire struct; no
+	// member's field may take the name.
+	if slices.ContainsFunc(members, func(m directMember) bool { return m.field == "Class" }) {
+		return "", "", fmt.Errorf("%s has a member whose field is named Class, the discriminator's", pc.BMMName)
+	}
+	b.WriteString("\tw := &struct {\n")
+	b.WriteString("\t\tClass string `json:\"_type\"`\n")
+	for _, m := range members {
+		if m.empty != nil {
+			fmt.Fprintf(&b, "\t\t%s any `json:%q`\n", m.field, m.name+",omitzero")
+			continue
+		}
+		b.WriteString("\t" + m.decl)
+	}
+	fmt.Fprintf(&b, "\t}{\n\t\tClass: %q,\n", pc.BMMName)
+	for _, m := range members {
+		if m.empty == nil {
+			fmt.Fprintf(&b, "\t\t%s: %s.%s,\n", m.field, recv, m.field)
+		}
+	}
+	b.WriteString("\t}\n")
+	for _, m := range empty {
+		v := recv + "." + m.field
+		if m.empty.param {
+			fmt.Fprintf(&b, "\tif !%s(%s) && jsonParam(any(%s)) != jsonSlotAbsent {\n", emptyHeldFunc, v, v)
+		} else {
+			fmt.Fprintf(&b, "\tif !%s(%s) {\n", m.empty.test, v)
+		}
+		fmt.Fprintf(&b, "\t\tw.%s = %s\n\t}\n", m.field, v)
+	}
+	b.WriteString("\treturn json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))\n")
+	b.WriteString("}\n\n")
+	return guard, b.String(), nil
 }
 
 // aliasTypeName is the method-free alias type identifier for the alias

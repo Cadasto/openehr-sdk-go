@@ -1,6 +1,30 @@
 package rmaccess
 
-import "github.com/cadasto/openehr-sdk-go/openehr/rm"
+import (
+	"fmt"
+
+	"github.com/cadasto/openehr-sdk-go/internal/rmzero"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+)
+
+// registeredZeroTest returns the zero test of T that package rm generated and
+// registered with internal/rmzero when it was initialised, which is before
+// this package is. The canonical encoders of package rm leave out a mandatory
+// member held by value when the same test holds, so the access reads that
+// member as absent exactly when the encoders leave it out.
+//
+// It panics when package rm registered no test of T: the generator emits each
+// test the access names, so a missing one is a broken generator invariant no
+// caller can reach (idiom.md § No panics), and it fails when the package is
+// initialised rather than on the first value a walk reads.
+func registeredZeroTest[T any]() func(T) bool {
+	test := rmzero.Test[T]()
+	if test == nil {
+		var zero T
+		panic(fmt.Sprintf("rmaccess: package rm registered no zero test of %T", zero))
+	}
+	return test
+}
 
 // The presence readings the generated access calls by name. The reading by Go
 // kind (pointer, interface, string, number or boolean, list or hash) and the

@@ -25,11 +25,58 @@ type rawEHR EHR
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (e *EHR) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroHierObjectID(e.EHRID) ||
+		isZeroHierObjectID(e.SystemID) ||
+		isZeroDVDateTime(e.TimeCreated) {
+		return e.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawEHR
 	}{"EHR", rawEHR(*e)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of EHR when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (e *EHR) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class         string          `json:"_type"`
+		Compositions  []ObjectRefLike `json:"compositions,omitempty"`
+		Contributions []ObjectRefLike `json:"contributions,omitempty"`
+		Directory     ObjectRefLike   `json:"directory,omitempty"`
+		EHRAccess     ObjectRefLike   `json:"ehr_access,omitempty"`
+		EHRID         any             `json:"ehr_id,omitzero"`
+		EHRStatus     ObjectRefLike   `json:"ehr_status,omitempty"`
+		Folders       []ObjectRefLike `json:"folders,omitempty"`
+		SystemID      any             `json:"system_id,omitzero"`
+		Tags          []ObjectRefLike `json:"tags,omitempty"`
+		TimeCreated   any             `json:"time_created,omitzero"`
+	}{
+		Class:         "EHR",
+		Compositions:  e.Compositions,
+		Contributions: e.Contributions,
+		Directory:     e.Directory,
+		EHRAccess:     e.EHRAccess,
+		EHRStatus:     e.EHRStatus,
+		Folders:       e.Folders,
+		Tags:          e.Tags,
+	}
+	if !isZeroHierObjectID(e.EHRID) {
+		w.EHRID = e.EHRID
+	}
+	if !isZeroHierObjectID(e.SystemID) {
+		w.SystemID = e.SystemID
+	}
+	if !isZeroDVDateTime(e.TimeCreated) {
+		w.TimeCreated = e.TimeCreated
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for EHR: an object whose
@@ -40,6 +87,8 @@ func (e *EHR) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -124,11 +173,13 @@ func (e *EHR) writeJSONMembers(enc *jsontext.Encoder, directorySlot uint8, ehrAc
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "ehr_id"); err != nil {
-		return err
-	}
-	if err := e.EHRID.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroHierObjectID(e.EHRID) {
+		if err := writeJSONName(enc, "ehr_id"); err != nil {
+			return err
+		}
+		if err := e.EHRID.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if ehrStatusSlot != jsonSlotAbsent {
 		if err := writeJSONName(enc, "ehr_status"); err != nil {
@@ -154,11 +205,13 @@ func (e *EHR) writeJSONMembers(enc *jsontext.Encoder, directorySlot uint8, ehrAc
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "system_id"); err != nil {
-		return err
-	}
-	if err := e.SystemID.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroHierObjectID(e.SystemID) {
+		if err := writeJSONName(enc, "system_id"); err != nil {
+			return err
+		}
+		if err := e.SystemID.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if len(e.Tags) > 0 {
 		if err := writeJSONName(enc, "tags"); err != nil {
@@ -176,11 +229,13 @@ func (e *EHR) writeJSONMembers(enc *jsontext.Encoder, directorySlot uint8, ehrAc
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "time_created"); err != nil {
-		return err
-	}
-	if err := e.TimeCreated.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVDateTime(e.TimeCreated) {
+		if err := writeJSONName(enc, "time_created"); err != nil {
+			return err
+		}
+		if err := e.TimeCreated.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }
@@ -466,13 +521,43 @@ type jsonWireVersionedComposition struct {
 // marshalJSONWrapped is the wrapper encode of VersionedComposition: it copies each field
 // into the flat wire struct, `_type` (value "VERSIONED_COMPOSITION") leading, and marshals
 // it, so json/v2 writes every member under the encoder's options.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (v *VersionedComposition) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroHierObjectID(v.UID) ||
+		isZeroDVDateTime(v.TimeCreated) {
+		return v.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &jsonWireVersionedComposition{
 		Class:       "VERSIONED_COMPOSITION",
 		UID:         v.UID,
 		OwnerID:     v.OwnerID,
 		TimeCreated: v.TimeCreated,
 	}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of VersionedComposition when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (v *VersionedComposition) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class       string        `json:"_type"`
+		UID         any           `json:"uid,omitzero"`
+		OwnerID     ObjectRefLike `json:"owner_id,omitempty"`
+		TimeCreated any           `json:"time_created,omitzero"`
+	}{
+		Class:   "VERSIONED_COMPOSITION",
+		OwnerID: v.OwnerID,
+	}
+	if !isZeroHierObjectID(v.UID) {
+		w.UID = v.UID
+	}
+	if !isZeroDVDateTime(v.TimeCreated) {
+		w.TimeCreated = v.TimeCreated
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for VersionedComposition: an object whose
@@ -483,6 +568,8 @@ func (v *VersionedComposition) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -517,11 +604,13 @@ func (v *VersionedComposition) writeJSONMembers(enc *jsontext.Encoder, ownerIdSl
 	if err := writeJSONString(enc, "_type", "VERSIONED_COMPOSITION"); err != nil {
 		return err
 	}
-	if err := writeJSONName(enc, "uid"); err != nil {
-		return err
-	}
-	if err := v.UID.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroHierObjectID(v.UID) {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := v.UID.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if ownerIdSlot != jsonSlotAbsent {
 		if err := writeJSONName(enc, "owner_id"); err != nil {
@@ -531,11 +620,13 @@ func (v *VersionedComposition) writeJSONMembers(enc *jsontext.Encoder, ownerIdSl
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "time_created"); err != nil {
-		return err
-	}
-	if err := v.TimeCreated.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVDateTime(v.TimeCreated) {
+		if err := writeJSONName(enc, "time_created"); err != nil {
+			return err
+		}
+		if err := v.TimeCreated.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }
@@ -557,13 +648,43 @@ type jsonWireVersionedEHRAccess struct {
 // marshalJSONWrapped is the wrapper encode of VersionedEHRAccess: it copies each field
 // into the flat wire struct, `_type` (value "VERSIONED_EHR_ACCESS") leading, and marshals
 // it, so json/v2 writes every member under the encoder's options.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (v *VersionedEHRAccess) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroHierObjectID(v.UID) ||
+		isZeroDVDateTime(v.TimeCreated) {
+		return v.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &jsonWireVersionedEHRAccess{
 		Class:       "VERSIONED_EHR_ACCESS",
 		UID:         v.UID,
 		OwnerID:     v.OwnerID,
 		TimeCreated: v.TimeCreated,
 	}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of VersionedEHRAccess when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (v *VersionedEHRAccess) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class       string        `json:"_type"`
+		UID         any           `json:"uid,omitzero"`
+		OwnerID     ObjectRefLike `json:"owner_id,omitempty"`
+		TimeCreated any           `json:"time_created,omitzero"`
+	}{
+		Class:   "VERSIONED_EHR_ACCESS",
+		OwnerID: v.OwnerID,
+	}
+	if !isZeroHierObjectID(v.UID) {
+		w.UID = v.UID
+	}
+	if !isZeroDVDateTime(v.TimeCreated) {
+		w.TimeCreated = v.TimeCreated
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for VersionedEHRAccess: an object whose
@@ -574,6 +695,8 @@ func (v *VersionedEHRAccess) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -608,11 +731,13 @@ func (v *VersionedEHRAccess) writeJSONMembers(enc *jsontext.Encoder, ownerIdSlot
 	if err := writeJSONString(enc, "_type", "VERSIONED_EHR_ACCESS"); err != nil {
 		return err
 	}
-	if err := writeJSONName(enc, "uid"); err != nil {
-		return err
-	}
-	if err := v.UID.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroHierObjectID(v.UID) {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := v.UID.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if ownerIdSlot != jsonSlotAbsent {
 		if err := writeJSONName(enc, "owner_id"); err != nil {
@@ -622,11 +747,13 @@ func (v *VersionedEHRAccess) writeJSONMembers(enc *jsontext.Encoder, ownerIdSlot
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "time_created"); err != nil {
-		return err
-	}
-	if err := v.TimeCreated.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVDateTime(v.TimeCreated) {
+		if err := writeJSONName(enc, "time_created"); err != nil {
+			return err
+		}
+		if err := v.TimeCreated.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }
@@ -648,13 +775,43 @@ type jsonWireVersionedEHRStatus struct {
 // marshalJSONWrapped is the wrapper encode of VersionedEHRStatus: it copies each field
 // into the flat wire struct, `_type` (value "VERSIONED_EHR_STATUS") leading, and marshals
 // it, so json/v2 writes every member under the encoder's options.
+// A mandatory member that holds a class by value whose every field is
+// empty is left out, through marshalJSONOmitting.
 func (v *VersionedEHRStatus) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroHierObjectID(v.UID) ||
+		isZeroDVDateTime(v.TimeCreated) {
+		return v.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &jsonWireVersionedEHRStatus{
 		Class:       "VERSIONED_EHR_STATUS",
 		UID:         v.UID,
 		OwnerID:     v.OwnerID,
 		TimeCreated: v.TimeCreated,
 	}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of VersionedEHRStatus when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out.
+func (v *VersionedEHRStatus) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class       string        `json:"_type"`
+		UID         any           `json:"uid,omitzero"`
+		OwnerID     ObjectRefLike `json:"owner_id,omitempty"`
+		TimeCreated any           `json:"time_created,omitzero"`
+	}{
+		Class:   "VERSIONED_EHR_STATUS",
+		OwnerID: v.OwnerID,
+	}
+	if !isZeroHierObjectID(v.UID) {
+		w.UID = v.UID
+	}
+	if !isZeroDVDateTime(v.TimeCreated) {
+		w.TimeCreated = v.TimeCreated
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for VersionedEHRStatus: an object whose
@@ -665,6 +822,8 @@ func (v *VersionedEHRStatus) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// every field of that value is empty.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -699,11 +858,13 @@ func (v *VersionedEHRStatus) writeJSONMembers(enc *jsontext.Encoder, ownerIdSlot
 	if err := writeJSONString(enc, "_type", "VERSIONED_EHR_STATUS"); err != nil {
 		return err
 	}
-	if err := writeJSONName(enc, "uid"); err != nil {
-		return err
-	}
-	if err := v.UID.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroHierObjectID(v.UID) {
+		if err := writeJSONName(enc, "uid"); err != nil {
+			return err
+		}
+		if err := v.UID.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if ownerIdSlot != jsonSlotAbsent {
 		if err := writeJSONName(enc, "owner_id"); err != nil {
@@ -713,11 +874,13 @@ func (v *VersionedEHRStatus) writeJSONMembers(enc *jsontext.Encoder, ownerIdSlot
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "time_created"); err != nil {
-		return err
-	}
-	if err := v.TimeCreated.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVDateTime(v.TimeCreated) {
+		if err := writeJSONName(enc, "time_created"); err != nil {
+			return err
+		}
+		if err := v.TimeCreated.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }
