@@ -4669,222 +4669,27 @@ func singleVersionTreeID(x *rm.VersionTreeID, attr string, peek bool) (any, bool
 	return nil, false, false
 }
 
-// isZeroCodePhrase reports whether v is the zero rm.CodePhrase, field by field.
-func isZeroCodePhrase(v rm.CodePhrase) bool {
-	return v.CodeString == "" &&
-		v.PreferredTerm == nil &&
-		isZeroTerminologyID(v.TerminologyID)
-}
-
-// isZeroDVCodedText reports whether v is the zero rm.DVCodedText, field by field.
-func isZeroDVCodedText(v rm.DVCodedText) bool {
-	return isZeroDVText(v.DVText) &&
-		isZeroCodePhrase(v.DefiningCode)
-}
-
-// isZeroDVDateTime reports whether v is the zero rm.DVDateTime, field by field.
-func isZeroDVDateTime(v rm.DVDateTime) bool {
-	return v.Accuracy == nil &&
-		v.MagnitudeStatus == nil &&
-		v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.OtherReferenceRanges == nil &&
-		v.Value == ""
-}
-
-// isZeroDVDuration reports whether v is the zero rm.DVDuration, field by field.
-func isZeroDVDuration(v rm.DVDuration) bool {
-	return v.Accuracy == nil &&
-		v.AccuracyIsPercent == nil &&
-		v.MagnitudeStatus == nil &&
-		v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.OtherReferenceRanges == nil &&
-		v.Value == ""
-}
-
-// isZeroDVEHRURI reports whether v is the zero rm.DVEHRURI, field by field.
-func isZeroDVEHRURI(v rm.DVEHRURI) bool {
-	return isZeroDVURI(v.DVURI)
-}
-
-// isZeroDVIntervalDVOrdered reports whether v is the zero rm.DVInterval[rm.DVOrdered], field by field.
-func isZeroDVIntervalDVOrdered(v rm.DVInterval[rm.DVOrdered]) bool {
-	return isZeroIntervalDVOrdered(v.Interval)
-}
-
-// isZeroDVParsable reports whether v is the zero rm.DVParsable, field by field.
-func isZeroDVParsable(v rm.DVParsable) bool {
-	return v.Charset == nil &&
-		v.Formalism == "" &&
-		v.Language == nil &&
-		v.Value == ""
-}
-
-// isZeroDVText reports whether v is the zero rm.DVText, field by field.
-func isZeroDVText(v rm.DVText) bool {
-	return v.Encoding == nil &&
-		v.Formatting == nil &&
-		(v.Hyperlink == nil || rm.IsTypedNil(v.Hyperlink)) &&
-		v.Language == nil &&
-		v.Mappings == nil &&
-		v.Value == ""
-}
-
-// isZeroDVURI reports whether v is the zero rm.DVURI, field by field.
-func isZeroDVURI(v rm.DVURI) bool {
-	return v.Value == ""
-}
-
-// isZeroElement reports whether v is the zero rm.Element, field by field.
-func isZeroElement(v rm.Element) bool {
-	return v.ArchetypeDetails == nil &&
-		v.ArchetypeNodeID == "" &&
-		v.FeederAudit == nil &&
-		v.Links == nil &&
-		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
-		v.NullFlavour == nil &&
-		(v.NullReason == nil || rm.IsTypedNil(v.NullReason)) &&
-		(v.UID == nil || rm.IsTypedNil(v.UID)) &&
-		(v.Value == nil || rm.IsTypedNil(v.Value))
-}
-
-// isZeroFeederAuditDetails reports whether v is the zero rm.FeederAuditDetails, field by field.
-func isZeroFeederAuditDetails(v rm.FeederAuditDetails) bool {
-	return (v.Location == nil || rm.IsTypedNil(v.Location)) &&
-		(v.OtherDetails == nil || rm.IsTypedNil(v.OtherDetails)) &&
-		(v.Provider == nil || rm.IsTypedNil(v.Provider)) &&
-		(v.Subject == nil || rm.IsTypedNil(v.Subject)) &&
-		v.SystemID == "" &&
-		v.Time == nil &&
-		v.VersionID == nil
-}
-
-// isZeroHierObjectID reports whether v is the zero rm.HierObjectID, field by field.
-func isZeroHierObjectID(v rm.HierObjectID) bool {
-	return v.Value == ""
-}
-
-// isZeroHistoryItemStructure reports whether v is the zero rm.History[rm.ItemStructure], field by field.
-func isZeroHistoryItemStructure(v rm.History[rm.ItemStructure]) bool {
-	return v.ArchetypeDetails == nil &&
-		v.ArchetypeNodeID == "" &&
-		v.Duration == nil &&
-		v.Events == nil &&
-		v.FeederAudit == nil &&
-		v.Links == nil &&
-		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
-		isZeroDVDateTime(v.Origin) &&
-		v.Period == nil &&
-		(v.Summary == nil || rm.IsTypedNil(v.Summary)) &&
-		(v.UID == nil || rm.IsTypedNil(v.UID))
-}
-
-// isZeroIntervalDVOrdered reports whether v is the zero rm.Interval[rm.DVOrdered], field by field.
-func isZeroIntervalDVOrdered(v rm.Interval[rm.DVOrdered]) bool {
-	return (v.Lower == nil || rm.IsTypedNil(v.Lower)) &&
-		!v.LowerIncluded &&
-		!v.LowerUnbounded &&
-		(v.Upper == nil || rm.IsTypedNil(v.Upper)) &&
-		!v.UpperIncluded &&
-		!v.UpperUnbounded
-}
-
-// isZeroIsmTransition reports whether v is the zero rm.IsmTransition, field by field.
-func isZeroIsmTransition(v rm.IsmTransition) bool {
-	return v.CareflowStep == nil &&
-		isZeroDVCodedText(v.CurrentState) &&
-		v.Reason == nil &&
-		v.Transition == nil
-}
-
-// isZeroItemList reports whether v is the zero rm.ItemList, field by field.
-func isZeroItemList(v rm.ItemList) bool {
-	return v.ArchetypeDetails == nil &&
-		v.ArchetypeNodeID == "" &&
-		v.FeederAudit == nil &&
-		v.Items == nil &&
-		v.Links == nil &&
-		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
-		(v.UID == nil || rm.IsTypedNil(v.UID))
-}
-
-// isZeroItemSingle reports whether v is the zero rm.ItemSingle, field by field.
-func isZeroItemSingle(v rm.ItemSingle) bool {
-	return v.ArchetypeDetails == nil &&
-		v.ArchetypeNodeID == "" &&
-		v.FeederAudit == nil &&
-		isZeroElement(v.Item) &&
-		v.Links == nil &&
-		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
-		(v.UID == nil || rm.IsTypedNil(v.UID))
-}
-
-// isZeroItemTable reports whether v is the zero rm.ItemTable, field by field.
-func isZeroItemTable(v rm.ItemTable) bool {
-	return v.ArchetypeDetails == nil &&
-		v.ArchetypeNodeID == "" &&
-		v.FeederAudit == nil &&
-		v.Links == nil &&
-		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
-		v.Rows == nil &&
-		(v.UID == nil || rm.IsTypedNil(v.UID))
-}
-
-// isZeroItemTree reports whether v is the zero rm.ItemTree, field by field.
-func isZeroItemTree(v rm.ItemTree) bool {
-	return v.ArchetypeDetails == nil &&
-		v.ArchetypeNodeID == "" &&
-		v.FeederAudit == nil &&
-		v.Items == nil &&
-		v.Links == nil &&
-		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
-		(v.UID == nil || rm.IsTypedNil(v.UID))
-}
-
-// isZeroLocatableRef reports whether v is the zero rm.LocatableRef, field by field.
-func isZeroLocatableRef(v rm.LocatableRef) bool {
-	return isZeroObjectRef(v.ObjectRef) &&
-		(v.ID == nil || rm.IsTypedNil(v.ID)) &&
-		v.Path == nil
-}
-
-// isZeroObjectRef reports whether v is the zero rm.ObjectRef, field by field.
-func isZeroObjectRef(v rm.ObjectRef) bool {
-	return (v.ID == nil || rm.IsTypedNil(v.ID)) &&
-		v.Namespace == "" &&
-		v.Type == ""
-}
-
-// isZeroObjectVersionID reports whether v is the zero rm.ObjectVersionID, field by field.
-func isZeroObjectVersionID(v rm.ObjectVersionID) bool {
-	return v.Value == ""
-}
-
-// isZeroOriginalVersionAny reports whether v is the zero rm.OriginalVersion[any], field by field.
-func isZeroOriginalVersionAny(v rm.OriginalVersion[any]) bool {
-	return isZeroVersionAny(v.Version) &&
-		v.Attestations == nil &&
-		v.Data == nil &&
-		isZeroDVCodedText(v.LifecycleState) &&
-		v.OtherInputVersionUids == nil &&
-		v.PrecedingVersionUID == nil &&
-		isZeroObjectVersionID(v.UID)
-}
-
-// isZeroPartyRef reports whether v is the zero rm.PartyRef, field by field.
-func isZeroPartyRef(v rm.PartyRef) bool {
-	return isZeroObjectRef(v.ObjectRef)
-}
-
-// isZeroTerminologyID reports whether v is the zero rm.TerminologyID, field by field.
-func isZeroTerminologyID(v rm.TerminologyID) bool {
-	return v.Value == ""
-}
-
-// isZeroVersionAny reports whether v is the zero rm.Version[any], field by field.
-func isZeroVersionAny(v rm.Version[any]) bool {
-	return (v.CommitAudit == nil || rm.IsTypedNil(v.CommitAudit)) &&
-		(v.Contribution == nil || rm.IsTypedNil(v.Contribution)) &&
-		v.Signature == nil
-}
+// The zero tests the presence readings above call: package rm generates
+// them and registers them, so the canonical encoders and these readings
+// share one test per class.
+var (
+	isZeroDVDateTime           = registeredZeroTest[rm.DVDateTime]()
+	isZeroDVDuration           = registeredZeroTest[rm.DVDuration]()
+	isZeroDVEHRURI             = registeredZeroTest[rm.DVEHRURI]()
+	isZeroDVIntervalDVOrdered  = registeredZeroTest[rm.DVInterval[rm.DVOrdered]]()
+	isZeroDVParsable           = registeredZeroTest[rm.DVParsable]()
+	isZeroElement              = registeredZeroTest[rm.Element]()
+	isZeroFeederAuditDetails   = registeredZeroTest[rm.FeederAuditDetails]()
+	isZeroHierObjectID         = registeredZeroTest[rm.HierObjectID]()
+	isZeroHistoryItemStructure = registeredZeroTest[rm.History[rm.ItemStructure]]()
+	isZeroIsmTransition        = registeredZeroTest[rm.IsmTransition]()
+	isZeroItemList             = registeredZeroTest[rm.ItemList]()
+	isZeroItemSingle           = registeredZeroTest[rm.ItemSingle]()
+	isZeroItemTable            = registeredZeroTest[rm.ItemTable]()
+	isZeroItemTree             = registeredZeroTest[rm.ItemTree]()
+	isZeroLocatableRef         = registeredZeroTest[rm.LocatableRef]()
+	isZeroObjectVersionID      = registeredZeroTest[rm.ObjectVersionID]()
+	isZeroOriginalVersionAny   = registeredZeroTest[rm.OriginalVersion[any]]()
+	isZeroPartyRef             = registeredZeroTest[rm.PartyRef]()
+	isZeroTerminologyID        = registeredZeroTest[rm.TerminologyID]()
+)

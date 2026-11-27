@@ -25,7 +25,8 @@ import (
 //
 // Presence is decided as § REQ-171 *Structural access* states it: by the
 // field's Go kind (pointer, interface, string, number or boolean, list), and
-// for a value held by value by a generated zero test; at an attribute the RM
+// for a value held by value by a zero test, which [RenderZeroFile] emits into
+// package rm for the canonical encoders to share; at an attribute the RM
 // marks mandatory, by a content rule keyed by the attribute's declared RM
 // type ([contentPresence]); and, for the three readings § REQ-112 fixes, by
 // the hand-written functions [fixedPresence] and [intervalBoundPresence]
@@ -160,10 +161,11 @@ var goPredeclaredKinds = map[string]accessKind{
 // attributes and a reader of the containers the class declares, the type
 // switches single, appendMultiple, hash and covers that dispatch on a
 // value's Go type (pointer and value form alike), a reader of the entries of
-// every Hash attribute, and a field-by-field zero test for every class an
-// attribute holds by value. Which attributes a class has, whether each is a container
-// and which are Hash attributes is read from the same fold rminfo is
-// generated from ([effectiveProperties]).
+// every Hash attribute, and, for every class an attribute holds by value, a
+// lookup of the zero test openehr/rm generates for it in zero_gen.go and
+// registers with internal/rmzero. Which attributes a class has, whether each
+// is a container and which are Hash attributes is read from the same fold
+// rminfo is generated from ([effectiveProperties]).
 //
 // Returns nil for every target but RM. Output is deterministic and gofmt'd.
 func RenderRMAccessFile(plan *Plan) ([]byte, error) {
@@ -578,9 +580,7 @@ func (g *rmaccessGen) render() ([]byte, error) {
 		}
 	}
 
-	if err := g.writeZeroTests(&b); err != nil {
-		return nil, err
-	}
+	g.writeZeroTestLookups(&b)
 
 	formatted, err := format.Source(b.Bytes())
 	if err != nil {
@@ -821,12 +821,31 @@ func (g *rmaccessGen) zeroTest(t *goType) (string, error) {
 	return name, nil
 }
 
+// writeZeroTestLookups writes, for every zero test the presence readings
+// call, the variable that holds it: package rm generates the test into its
+// zero file and registers it with internal/rmzero, and registeredZeroTest
+// (presence.go) looks it up when the access is initialised.
+func (g *rmaccessGen) writeZeroTestLookups(b *bytes.Buffer) {
+	if len(g.zeroTests) == 0 {
+		return
+	}
+	b.WriteString("\n// The zero tests the presence readings above call: package rm generates\n")
+	b.WriteString("// them and registers them, so the canonical encoders and these readings\n")
+	b.WriteString("// share one test per class.\n")
+	b.WriteString("var (\n")
+	for _, name := range slices.Sorted(maps.Keys(g.zeroTests)) {
+		fmt.Fprintf(b, "\t%s = registeredZeroTest[%s]()\n", name, g.zeroTests[name].qualified())
+	}
+	b.WriteString(")\n")
+}
+
 // writeZeroTests writes every registered zero test, and those they call,
-// sorted by name. A zero test compares every field of the Go struct with its
-// zero value: an embedded struct through its own test, a pointer, slice or
-// map with nil, an interface with nil or a nil pointer, which § REQ-171
-// *Structural access* counts as zero, a string with "", a boolean with false,
-// a number with 0, and a struct held by value through its own test.
+// sorted by name, for package rm, which declares the types they read. A zero
+// test compares every field of the Go struct with its zero value: an embedded
+// struct through its own test, a pointer, slice or map with nil, an interface
+// with nil or a nil pointer, which § REQ-171 *Structural access* counts as
+// zero, a string with "", a boolean with false, a number with 0, and a struct
+// held by value through its own test.
 func (g *rmaccessGen) writeZeroTests(b *bytes.Buffer) error {
 	rendered := map[string]string{}
 	for {
@@ -894,7 +913,7 @@ func (g *rmaccessGen) renderZeroTest(name string, t *goType) (string, error) {
 		case accessPointer, accessList:
 			conds = append(conds, field+" == nil")
 		case accessInterface:
-			conds = append(conds, fmt.Sprintf("(%s == nil || rm.IsTypedNil(%s))", field, field))
+			conds = append(conds, fmt.Sprintf("(%s == nil || IsTypedNil(%s))", field, field))
 		case accessString:
 			conds = append(conds, field+` == ""`)
 		case accessBool:
@@ -910,8 +929,8 @@ func (g *rmaccessGen) renderZeroTest(name string, t *goType) (string, error) {
 		}
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "// %s reports whether v is the zero %s, field by field.\n", name, t.qualified())
-	fmt.Fprintf(&b, "func %s(v %s) bool {\n", name, t.qualified())
+	fmt.Fprintf(&b, "// %s reports whether v is the zero %s, field by field.\n", name, t.spell(""))
+	fmt.Fprintf(&b, "func %s(v %s) bool {\n", name, t.spell(""))
 	if len(conds) == 0 {
 		b.WriteString("\treturn true\n")
 	} else {
@@ -1057,25 +1076,31 @@ func (t *goType) bind(binds map[string]*goType) *goType {
 // qualified writes t as the access package spells it: every name that is not
 // a predeclared Go type qualified with rm.
 func (t *goType) qualified() string {
+	return t.spell("rm.")
+}
+
+// spell writes t with qual before every name that is not a predeclared Go
+// type: "rm." in internal/rmaccess, "" in package rm itself.
+func (t *goType) spell(qual string) string {
 	switch t.kind {
 	case goPointer:
-		return "*" + t.elem.qualified()
+		return "*" + t.elem.spell(qual)
 	case goSlice:
-		return "[]" + t.elem.qualified()
+		return "[]" + t.elem.spell(qual)
 	case goMap:
-		return "map[" + t.key.qualified() + "]" + t.elem.qualified()
+		return "map[" + t.key.spell(qual) + "]" + t.elem.spell(qual)
 	case goNamed:
 	}
 	name := t.name
 	if _, ok := goPredeclaredKinds[name]; !ok {
-		name = "rm." + name
+		name = qual + name
 	}
 	if len(t.args) == 0 {
 		return name
 	}
 	args := make([]string, len(t.args))
 	for i, a := range t.args {
-		args[i] = a.qualified()
+		args[i] = a.spell(qual)
 	}
 	return name + "[" + strings.Join(args, ", ") + "]"
 }

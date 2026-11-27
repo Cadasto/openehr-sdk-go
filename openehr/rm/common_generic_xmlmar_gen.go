@@ -24,6 +24,10 @@ func (a *Attestation) BMMName() string { return "ATTESTATION" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (a *Attestation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ATTESTATION")}
@@ -39,11 +43,15 @@ func (a *Attestation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&a.TimeCommitted, xml.StartElement{Name: xml.Name{Local: "time_committed"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(a.TimeCommitted) {
+		if err := _e.EncodeElement(&a.TimeCommitted, xml.StartElement{Name: xml.Name{Local: "time_committed"}}); err != nil {
+			return err
+		}
 	}
-	if err := _e.EncodeElement(&a.ChangeType, xml.StartElement{Name: xml.Name{Local: "change_type"}}); err != nil {
-		return err
+	if !isZeroDVCodedText(a.ChangeType) {
+		if err := _e.EncodeElement(&a.ChangeType, xml.StartElement{Name: xml.Name{Local: "change_type"}}); err != nil {
+			return err
+		}
 	}
 	if a.Description != nil {
 		if err := canxml.EncodePoly(_e, "description", a.Description); err != nil {
@@ -92,6 +100,10 @@ func (a *AuditDetails) BMMName() string { return "AUDIT_DETAILS" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (a *AuditDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("AUDIT_DETAILS")}
@@ -107,11 +119,15 @@ func (a *AuditDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&a.TimeCommitted, xml.StartElement{Name: xml.Name{Local: "time_committed"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(a.TimeCommitted) {
+		if err := _e.EncodeElement(&a.TimeCommitted, xml.StartElement{Name: xml.Name{Local: "time_committed"}}); err != nil {
+			return err
+		}
 	}
-	if err := _e.EncodeElement(&a.ChangeType, xml.StartElement{Name: xml.Name{Local: "change_type"}}); err != nil {
-		return err
+	if !isZeroDVCodedText(a.ChangeType) {
+		if err := _e.EncodeElement(&a.ChangeType, xml.StartElement{Name: xml.Name{Local: "change_type"}}); err != nil {
+			return err
+		}
 	}
 	if a.Description != nil {
 		if err := canxml.EncodePoly(_e, "description", a.Description); err != nil {
@@ -224,6 +240,10 @@ func (p *PartyRelated) BMMName() string { return "PARTY_RELATED" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (p *PartyRelated) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("PARTY_RELATED")}
@@ -246,8 +266,10 @@ func (p *PartyRelated) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&p.Relationship, xml.StartElement{Name: xml.Name{Local: "relationship"}}); err != nil {
-		return err
+	if !isZeroDVCodedText(p.Relationship) {
+		if err := _e.EncodeElement(&p.Relationship, xml.StartElement{Name: xml.Name{Local: "relationship"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -330,6 +352,10 @@ func (r *RevisionHistoryItem) BMMName() string { return "REVISION_HISTORY_ITEM" 
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (r *RevisionHistoryItem) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("REVISION_HISTORY_ITEM")}
@@ -337,8 +363,10 @@ func (r *RevisionHistoryItem) MarshalXML(_e *xml.Encoder, _start xml.StartElemen
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&r.VersionID, xml.StartElement{Name: xml.Name{Local: "version_id"}}); err != nil {
-		return err
+	if !isZeroObjectVersionID(r.VersionID) {
+		if err := _e.EncodeElement(&r.VersionID, xml.StartElement{Name: xml.Name{Local: "version_id"}}); err != nil {
+			return err
+		}
 	}
 	for _, _item := range r.Audits {
 		if _item == nil {

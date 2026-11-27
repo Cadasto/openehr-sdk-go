@@ -175,11 +175,37 @@ type rawDVState DVState
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (d *DVState) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroDVCodedText(d.Value) {
+		return d.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawDVState
 	}{"DV_STATE", rawDVState(*d)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of DVState when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
+func (d *DVState) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class      string `json:"_type"`
+		IsTerminal bool   `json:"is_terminal"`
+		Value      any    `json:"value,omitzero"`
+	}{
+		Class:      "DV_STATE",
+		IsTerminal: d.IsTerminal,
+	}
+	if !isZeroDVCodedText(d.Value) {
+		w.Value = d.Value
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for DVState: an object whose
@@ -190,6 +216,9 @@ func (d *DVState) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -222,11 +251,13 @@ func (d *DVState) writeJSONMembers(enc *jsontext.Encoder) error {
 	if err := writeJSONBool(enc, "is_terminal", d.IsTerminal); err != nil {
 		return err
 	}
-	if err := writeJSONName(enc, "value"); err != nil {
-		return err
-	}
-	if err := d.Value.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVCodedText(d.Value) {
+		if err := writeJSONName(enc, "value"); err != nil {
+			return err
+		}
+		if err := d.Value.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }

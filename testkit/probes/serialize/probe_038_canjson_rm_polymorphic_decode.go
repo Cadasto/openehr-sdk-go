@@ -28,15 +28,17 @@ import (
 //
 //  1. canjson.Unmarshal succeeds.
 //  2. canjson.Marshal of the recovered value succeeds.
-//  3. Every `_type` discriminator the input carried on a member the RM
-//     defines appears in the re-marshalled output at least as often,
-//     counted as a multiset. Substitution must be lossless across decode
-//     then re-marshal; a silent narrowing (e.g. DV_CODED_TEXT decoded
-//     into a parent DVText struct that loses defining_code and re-emits
-//     as DV_TEXT) is the regression this assertion guards against. A
-//     `_type` inside a member that names no attribute of its object's RM
-//     type is not counted: the decoder ignores that member, so its
-//     discriminators are not part of the value (testkit/expectedform).
+//  3. Every `_type` discriminator the input's expected form carries
+//     appears in the re-marshalled output at least as often, counted as a
+//     multiset. Substitution must be lossless across decode then
+//     re-marshal; a silent narrowing (e.g. DV_CODED_TEXT decoded into a
+//     parent DVText struct that loses defining_code and re-emits as
+//     DV_TEXT) is the regression this assertion guards against. A `_type`
+//     the expected form does not carry is not counted: one inside a member
+//     that names no attribute of its object's RM type, which the decoder
+//     ignores, and one inside a value the canonical round trip leaves out,
+//     such as an empty mandatory member held by value or an empty bound
+//     beside its open flag (testkit/expectedform).
 //  4. Re-marshalling is a wire-equivalence fixpoint: decoding the
 //     re-marshalled bytes (b1) and encoding again (b2) produces a
 //     document wire-equivalent to b1 (testkit/wireequiv): re-marshalling
@@ -142,17 +144,17 @@ func (want typeSet) Diff(got typeSet) []string {
 }
 
 // inputDiscriminators returns the multiset of `_type` discriminators the
-// input carries on members the RM defines: the input is pruned first
-// (expectedform.PruneFor), so a `_type` inside a member that names no
-// attribute of its object's RM type, which the decoder ignores, is not
+// input's expected form carries (expectedform.BuildFor): a `_type` inside a
+// member that names no attribute of its object's RM type, which the decoder
+// ignores, or inside a value the canonical round trip leaves out, is not
 // counted. target is the decode target, whose Go type gives the root's RM
 // type and, for a generic class, the class its type parameter is bound to.
 func inputDiscriminators(body []byte, target any) (typeSet, error) {
-	pruned, err := expectedform.PruneFor(body, target)
+	expected, err := expectedform.BuildFor(body, target)
 	if err != nil {
 		return nil, fmt.Errorf("read the input against the RM: %w", err)
 	}
-	return collectDiscriminators(pruned), nil
+	return collectDiscriminators(expected), nil
 }
 
 // collectDiscriminators returns a multiset of every `_type` string

@@ -96,6 +96,10 @@ func (r *ResourceDescriptionItem) BMMName() string { return "RESOURCE_DESCRIPTIO
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 // A Hash member writes one element per entry, in ascending key order.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (r *ResourceDescriptionItem) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("RESOURCE_DESCRIPTION_ITEM")}
@@ -103,8 +107,10 @@ func (r *ResourceDescriptionItem) MarshalXML(_e *xml.Encoder, _start xml.StartEl
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&r.Language, xml.StartElement{Name: xml.Name{Local: "language"}}); err != nil {
-		return err
+	if !isZeroCodePhrase(r.Language) {
+		if err := _e.EncodeElement(&r.Language, xml.StartElement{Name: xml.Name{Local: "language"}}); err != nil {
+			return err
+		}
 	}
 	if err := canxml.EncodeString(_e, "purpose", r.Purpose); err != nil {
 		return err
@@ -165,6 +171,10 @@ func (t *TranslationDetails) BMMName() string { return "TRANSLATION_DETAILS" }
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
 // A Hash member writes one element per entry, in ascending key order.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (t *TranslationDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("TRANSLATION_DETAILS")}
@@ -172,8 +182,10 @@ func (t *TranslationDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&t.Language, xml.StartElement{Name: xml.Name{Local: "language"}}); err != nil {
-		return err
+	if !isZeroCodePhrase(t.Language) {
+		if err := _e.EncodeElement(&t.Language, xml.StartElement{Name: xml.Name{Local: "language"}}); err != nil {
+			return err
+		}
 	}
 	for _, _k := range slices.Sorted(maps.Keys(t.Author)) {
 		_v := t.Author[_k]

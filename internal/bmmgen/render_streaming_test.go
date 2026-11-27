@@ -117,6 +117,10 @@ func directLeadsWithType(direct, bmmName string) bool {
 // renderMarshalIntervalDerived, after another field in renderMarshalFlat, or
 // changing how the alias is embedded turns the census red.
 //
+// The marshalJSONOmitting of a class with a mandatory member left out when
+// empty declares every member flat, so it is held to the flat rule: `_type`
+// is its first json tag.
+//
 // The direct writer, which every MarshalJSONTo takes unless an encoder option
 // sends it to the wrapper, is held by [directLeadsWithType] the same way: it
 // reads as not leading when `_type` follows another member, names another
@@ -253,8 +257,12 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 			if !ok {
 				t.Fatalf("%s: no MarshalJSONTo doc comment ends the wrapper in the chunk:\n%s", pc.BMMName, chunk)
 			}
+			wrapped, omitting, _ := strings.Cut(wrapped, "\n// marshalJSONOmitting ")
 			if !marshalLeadsWithType(wrapped, aliasEmbed) {
 				t.Errorf("%s wrapper does not lead with `_type`: the discriminator must be the first member (REQ-052)", pc.BMMName)
+			}
+			if omitting != "" && !marshalLeadsWithType(omitting, "") {
+				t.Errorf("%s marshalJSONOmitting does not lead with `_type`: the discriminator must be the first member (REQ-052)", pc.BMMName)
 			}
 			if !directLeadsWithType(direct, pc.BMMName) {
 				t.Errorf("%s direct writer does not lead with `_type`: the discriminator must be the first member (REQ-052)", pc.BMMName)

@@ -81,6 +81,10 @@ func (i *ItemSingle) BMMName() string { return "ITEM_SINGLE" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (i *ItemSingle) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ITEM_SINGLE")}
@@ -114,8 +118,10 @@ func (i *ItemSingle) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&i.Item, xml.StartElement{Name: xml.Name{Local: "item"}}); err != nil {
-		return err
+	if !isZeroElement(i.Item) {
+		if err := _e.EncodeElement(&i.Item, xml.StartElement{Name: xml.Name{Local: "item"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

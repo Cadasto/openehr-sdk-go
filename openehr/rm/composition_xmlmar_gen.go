@@ -24,6 +24,10 @@ func (c *Composition) BMMName() string { return "COMPOSITION" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (c *Composition) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("COMPOSITION")}
@@ -57,14 +61,20 @@ func (c *Composition) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&c.Language, xml.StartElement{Name: xml.Name{Local: "language"}}); err != nil {
-		return err
+	if !isZeroCodePhrase(c.Language) {
+		if err := _e.EncodeElement(&c.Language, xml.StartElement{Name: xml.Name{Local: "language"}}); err != nil {
+			return err
+		}
 	}
-	if err := _e.EncodeElement(&c.Territory, xml.StartElement{Name: xml.Name{Local: "territory"}}); err != nil {
-		return err
+	if !isZeroCodePhrase(c.Territory) {
+		if err := _e.EncodeElement(&c.Territory, xml.StartElement{Name: xml.Name{Local: "territory"}}); err != nil {
+			return err
+		}
 	}
-	if err := _e.EncodeElement(&c.Category, xml.StartElement{Name: xml.Name{Local: "category"}}); err != nil {
-		return err
+	if !isZeroDVCodedText(c.Category) {
+		if err := _e.EncodeElement(&c.Category, xml.StartElement{Name: xml.Name{Local: "category"}}); err != nil {
+			return err
+		}
 	}
 	if c.Composer != nil {
 		if err := canxml.EncodePoly(_e, "composer", c.Composer); err != nil {
@@ -103,6 +113,10 @@ func (e *EventContext) BMMName() string { return "EVENT_CONTEXT" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (e *EventContext) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("EVENT_CONTEXT")}
@@ -110,8 +124,10 @@ func (e *EventContext) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&e.StartTime, xml.StartElement{Name: xml.Name{Local: "start_time"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(e.StartTime) {
+		if err := _e.EncodeElement(&e.StartTime, xml.StartElement{Name: xml.Name{Local: "start_time"}}); err != nil {
+			return err
+		}
 	}
 	if e.EndTime != nil {
 		if err := _e.EncodeElement(e.EndTime, xml.StartElement{Name: xml.Name{Local: "end_time"}}); err != nil {
@@ -123,8 +139,10 @@ func (e *EventContext) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&e.Setting, xml.StartElement{Name: xml.Name{Local: "setting"}}); err != nil {
-		return err
+	if !isZeroDVCodedText(e.Setting) {
+		if err := _e.EncodeElement(&e.Setting, xml.StartElement{Name: xml.Name{Local: "setting"}}); err != nil {
+			return err
+		}
 	}
 	if e.OtherContext != nil {
 		if err := canxml.EncodePoly(_e, "other_context", e.OtherContext); err != nil {

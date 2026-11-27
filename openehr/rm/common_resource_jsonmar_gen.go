@@ -151,11 +151,49 @@ type rawResourceDescriptionItem ResourceDescriptionItem
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (r *ResourceDescriptionItem) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroCodePhrase(r.Language) {
+		return r.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawResourceDescriptionItem
 	}{"RESOURCE_DESCRIPTION_ITEM", rawResourceDescriptionItem(*r)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of ResourceDescriptionItem when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
+func (r *ResourceDescriptionItem) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class               string             `json:"_type"`
+		Copyright           *string            `json:"copyright,omitzero"`
+		Keywords            []string           `json:"keywords,omitempty"`
+		Language            any                `json:"language,omitzero"`
+		Misuse              *string            `json:"misuse,omitzero"`
+		OriginalResourceURI *map[string]string `json:"original_resource_uri,omitzero"`
+		OtherDetails        *map[string]string `json:"other_details,omitzero"`
+		Purpose             string             `json:"purpose"`
+		Use                 *string            `json:"use,omitzero"`
+	}{
+		Class:               "RESOURCE_DESCRIPTION_ITEM",
+		Copyright:           r.Copyright,
+		Keywords:            r.Keywords,
+		Misuse:              r.Misuse,
+		OriginalResourceURI: r.OriginalResourceURI,
+		OtherDetails:        r.OtherDetails,
+		Purpose:             r.Purpose,
+		Use:                 r.Use,
+	}
+	if !isZeroCodePhrase(r.Language) {
+		w.Language = r.Language
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for ResourceDescriptionItem: an object whose
@@ -166,6 +204,9 @@ func (r *ResourceDescriptionItem) marshalJSONWrapped(enc *jsontext.Encoder) erro
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -219,11 +260,13 @@ func (r *ResourceDescriptionItem) writeJSONMembers(enc *jsontext.Encoder) error 
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "language"); err != nil {
-		return err
-	}
-	if err := r.Language.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroCodePhrase(r.Language) {
+		if err := writeJSONName(enc, "language"); err != nil {
+			return err
+		}
+		if err := r.Language.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if r.Misuse != nil {
 		if err := writeJSONName(enc, "misuse"); err != nil {
@@ -276,11 +319,41 @@ type rawTranslationDetails TranslationDetails
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (t *TranslationDetails) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroCodePhrase(t.Language) {
+		return t.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawTranslationDetails
 	}{"TRANSLATION_DETAILS", rawTranslationDetails(*t)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of TranslationDetails when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
+func (t *TranslationDetails) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class         string             `json:"_type"`
+		Accreditation *string            `json:"accreditation,omitzero"`
+		Author        map[string]string  `json:"author,omitzero"`
+		Language      any                `json:"language,omitzero"`
+		OtherDetails  *map[string]string `json:"other_details,omitzero"`
+	}{
+		Class:         "TRANSLATION_DETAILS",
+		Accreditation: t.Accreditation,
+		Author:        t.Author,
+		OtherDetails:  t.OtherDetails,
+	}
+	if !isZeroCodePhrase(t.Language) {
+		w.Language = t.Language
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for TranslationDetails: an object whose
@@ -291,6 +364,9 @@ func (t *TranslationDetails) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -337,11 +413,13 @@ func (t *TranslationDetails) writeJSONMembers(enc *jsontext.Encoder) error {
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "language"); err != nil {
-		return err
-	}
-	if err := t.Language.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroCodePhrase(t.Language) {
+		if err := writeJSONName(enc, "language"); err != nil {
+			return err
+		}
+		if err := t.Language.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if t.OtherDetails != nil {
 		if err := writeJSONName(enc, "other_details"); err != nil {

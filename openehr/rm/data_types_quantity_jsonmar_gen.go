@@ -281,11 +281,43 @@ type rawDVOrdinal DVOrdinal
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (d *DVOrdinal) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroDVCodedText(d.Symbol) {
+		return d.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawDVOrdinal
 	}{"DV_ORDINAL", rawDVOrdinal(*d)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of DVOrdinal when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
+func (d *DVOrdinal) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class                string                      `json:"_type"`
+		NormalRange          *DVInterval[DVOrdered]      `json:"normal_range,omitzero"`
+		NormalStatus         *CodePhrase                 `json:"normal_status,omitzero"`
+		OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
+		Symbol               any                         `json:"symbol,omitzero"`
+		Value                Integer                     `json:"value"`
+	}{
+		Class:                "DV_ORDINAL",
+		NormalRange:          d.NormalRange,
+		NormalStatus:         d.NormalStatus,
+		OtherReferenceRanges: d.OtherReferenceRanges,
+		Value:                d.Value,
+	}
+	if !isZeroDVCodedText(d.Symbol) {
+		w.Symbol = d.Symbol
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for DVOrdinal: an object whose
@@ -296,6 +328,9 @@ func (d *DVOrdinal) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -357,11 +392,13 @@ func (d *DVOrdinal) writeJSONMembers(enc *jsontext.Encoder) error {
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "symbol"); err != nil {
-		return err
-	}
-	if err := d.Symbol.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVCodedText(d.Symbol) {
+		if err := writeJSONName(enc, "symbol"); err != nil {
+			return err
+		}
+		if err := d.Symbol.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if err := writeJSONName(enc, "value"); err != nil {
 		return err
@@ -676,11 +713,43 @@ type rawDVScale DVScale
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (d *DVScale) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroDVCodedText(d.Symbol) {
+		return d.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawDVScale
 	}{"DV_SCALE", rawDVScale(*d)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of DVScale when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
+func (d *DVScale) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class                string                      `json:"_type"`
+		NormalRange          *DVInterval[DVOrdered]      `json:"normal_range,omitzero"`
+		NormalStatus         *CodePhrase                 `json:"normal_status,omitzero"`
+		OtherReferenceRanges []ReferenceRange[DVOrdered] `json:"other_reference_ranges,omitempty"`
+		Symbol               any                         `json:"symbol,omitzero"`
+		Value                Real                        `json:"value"`
+	}{
+		Class:                "DV_SCALE",
+		NormalRange:          d.NormalRange,
+		NormalStatus:         d.NormalStatus,
+		OtherReferenceRanges: d.OtherReferenceRanges,
+		Value:                d.Value,
+	}
+	if !isZeroDVCodedText(d.Symbol) {
+		w.Symbol = d.Symbol
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for DVScale: an object whose
@@ -691,6 +760,9 @@ func (d *DVScale) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -752,11 +824,13 @@ func (d *DVScale) writeJSONMembers(enc *jsontext.Encoder) error {
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "symbol"); err != nil {
-		return err
-	}
-	if err := d.Symbol.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVCodedText(d.Symbol) {
+		if err := writeJSONName(enc, "symbol"); err != nil {
+			return err
+		}
+		if err := d.Symbol.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	if err := writeJSONName(enc, "value"); err != nil {
 		return err
@@ -780,11 +854,37 @@ type rawReferenceRange[T DVOrdered] ReferenceRange[T]
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (r *ReferenceRange[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroDVIntervalDVOrdered(r.Range) {
+		return r.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawReferenceRange[T]
 	}{"REFERENCE_RANGE", rawReferenceRange[T](*r)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of ReferenceRange when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
+func (r *ReferenceRange[T]) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class   string     `json:"_type"`
+		Meaning DVTextLike `json:"meaning,omitempty"`
+		Range   any        `json:"range,omitzero"`
+	}{
+		Class:   "REFERENCE_RANGE",
+		Meaning: r.Meaning,
+	}
+	if !isZeroDVIntervalDVOrdered(r.Range) {
+		w.Range = r.Range
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for ReferenceRange: an object whose
@@ -795,6 +895,9 @@ func (r *ReferenceRange[T]) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -837,11 +940,13 @@ func (r *ReferenceRange[T]) writeJSONMembers(enc *jsontext.Encoder, meaningSlot 
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "range"); err != nil {
-		return err
-	}
-	if err := r.Range.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroDVIntervalDVOrdered(r.Range) {
+		if err := writeJSONName(enc, "range"); err != nil {
+			return err
+		}
+		if err := r.Range.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }

@@ -25,6 +25,10 @@ func (d *DVMultimedia) BMMName() string { return "DV_MULTIMEDIA" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (d *DVMultimedia) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("DV_MULTIMEDIA")}
@@ -57,8 +61,10 @@ func (d *DVMultimedia) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&d.MediaType, xml.StartElement{Name: xml.Name{Local: "media_type"}}); err != nil {
-		return err
+	if !isZeroCodePhrase(d.MediaType) {
+		if err := _e.EncodeElement(&d.MediaType, xml.StartElement{Name: xml.Name{Local: "media_type"}}); err != nil {
+			return err
+		}
 	}
 	if d.CompressionAlgorithm != nil {
 		if err := _e.EncodeElement(d.CompressionAlgorithm, xml.StartElement{Name: xml.Name{Local: "compression_algorithm"}}); err != nil {

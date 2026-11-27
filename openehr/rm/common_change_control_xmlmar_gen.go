@@ -25,6 +25,10 @@ func (c *Contribution) BMMName() string { return "CONTRIBUTION" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (c *Contribution) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("CONTRIBUTION")}
@@ -32,8 +36,10 @@ func (c *Contribution) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&c.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
-		return err
+	if !isZeroHierObjectID(c.UID) {
+		if err := _e.EncodeElement(&c.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
+			return err
+		}
 	}
 	for _, _item := range c.Versions {
 		if _item == nil {
@@ -67,6 +73,10 @@ func (i *ImportedVersion[T]) BMMName() string { return "IMPORTED_VERSION" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (i *ImportedVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("IMPORTED_VERSION")}
@@ -89,8 +99,10 @@ func (i *ImportedVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&i.Item, xml.StartElement{Name: xml.Name{Local: "item"}}); err != nil {
-		return err
+	if !isZeroOriginalVersionAny(i.Item) {
+		if err := _e.EncodeElement(&i.Item, xml.StartElement{Name: xml.Name{Local: "item"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -111,6 +123,10 @@ func (o *OriginalVersion[T]) BMMName() string { return "ORIGINAL_VERSION" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (o *OriginalVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ORIGINAL_VERSION")}
@@ -133,8 +149,10 @@ func (o *OriginalVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&o.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
-		return err
+	if !isZeroObjectVersionID(o.UID) {
+		if err := _e.EncodeElement(&o.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
+			return err
+		}
 	}
 	if o.Data != nil {
 		if _c, _ok := any(o.Data).(canxml.BMMNamer); _ok {
@@ -170,8 +188,10 @@ func (o *OriginalVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&o.LifecycleState, xml.StartElement{Name: xml.Name{Local: "lifecycle_state"}}); err != nil {
-		return err
+	if !isZeroDVCodedText(o.LifecycleState) {
+		if err := _e.EncodeElement(&o.LifecycleState, xml.StartElement{Name: xml.Name{Local: "lifecycle_state"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -192,6 +212,10 @@ func (v *VersionedObject[T]) BMMName() string { return "VERSIONED_OBJECT" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (v *VersionedObject[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("VERSIONED_OBJECT")}
@@ -199,16 +223,20 @@ func (v *VersionedObject[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
-		return err
+	if !isZeroHierObjectID(v.UID) {
+		if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
+			return err
+		}
 	}
 	if v.OwnerID != nil {
 		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(v.TimeCreated) {
+		if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

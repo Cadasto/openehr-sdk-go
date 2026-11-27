@@ -167,9 +167,11 @@ func omitIntervalBound[T any](unbounded bool, bound T) bool {
 // is empty when it is nil or holds a typed-nil pointer to an RM class; an
 // all-zero value behind the interface is still a value. A bound of a concrete
 // type is empty when it is that type's zero value: field by field for the RM
-// data value types an interval can bound, and by comparison for a Go built-in
-// scalar type or an RM primitive such as Integer and Real. A bound of any
-// other Go type is never empty, so it is emitted as it stands.
+// data value types an interval can bound, a field that holds a typed-nil
+// pointer behind an interface reading as nil, as the encoders leave it out,
+// and by comparison for a Go built-in scalar type or an RM primitive such as
+// Integer and Real. A bound of any other Go type is never empty, so it is
+// emitted as it stands.
 func IsEmptyIntervalBound[T any](bound T) bool {
 	v := any(bound)
 	if v == nil || IsTypedNil(v) {
@@ -203,131 +205,4 @@ func IsEmptyIntervalBound[T any](bound T) bool {
 		return v == any(zero)
 	}
 	return false
-}
-
-// isZeroCodePhrase reports whether v is the zero CODE_PHRASE, field by field.
-func isZeroCodePhrase(v CodePhrase) bool {
-	return v.CodeString == "" &&
-		v.PreferredTerm == nil &&
-		isZeroTerminologyID(v.TerminologyID)
-}
-
-// isZeroDVCodedText reports whether v is the zero DV_CODED_TEXT, field by field.
-func isZeroDVCodedText(v DVCodedText) bool {
-	return isZeroDVText(v.DVText) &&
-		isZeroCodePhrase(v.DefiningCode)
-}
-
-// isZeroDVCount reports whether v is the zero DV_COUNT, field by field.
-func isZeroDVCount(v DVCount) bool {
-	return v.Accuracy == nil &&
-		v.AccuracyIsPercent == nil &&
-		v.Magnitude == 0 &&
-		v.MagnitudeStatus == nil &&
-		v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.OtherReferenceRanges == nil
-}
-
-// isZeroDVDate reports whether v is the zero DV_DATE, field by field.
-func isZeroDVDate(v DVDate) bool {
-	return v.Accuracy == nil &&
-		v.MagnitudeStatus == nil &&
-		v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.OtherReferenceRanges == nil &&
-		v.Value == ""
-}
-
-// isZeroDVDateTime reports whether v is the zero DV_DATE_TIME, field by field.
-func isZeroDVDateTime(v DVDateTime) bool {
-	return v.Accuracy == nil &&
-		v.MagnitudeStatus == nil &&
-		v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.OtherReferenceRanges == nil &&
-		v.Value == ""
-}
-
-// isZeroDVDuration reports whether v is the zero DV_DURATION, field by field.
-func isZeroDVDuration(v DVDuration) bool {
-	return v.Accuracy == nil &&
-		v.AccuracyIsPercent == nil &&
-		v.MagnitudeStatus == nil &&
-		v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.OtherReferenceRanges == nil &&
-		v.Value == ""
-}
-
-// isZeroDVOrdinal reports whether v is the zero DV_ORDINAL, field by field.
-func isZeroDVOrdinal(v DVOrdinal) bool {
-	return v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.OtherReferenceRanges == nil &&
-		isZeroDVCodedText(v.Symbol) &&
-		v.Value == 0
-}
-
-// isZeroDVProportion reports whether v is the zero DV_PROPORTION, field by field.
-func isZeroDVProportion(v DVProportion) bool {
-	return v.Accuracy == nil &&
-		v.AccuracyIsPercent == nil &&
-		v.Denominator == 0 &&
-		v.MagnitudeStatus == nil &&
-		v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.Numerator == 0 &&
-		v.OtherReferenceRanges == nil &&
-		v.Precision == nil &&
-		v.Type == 0
-}
-
-// isZeroDVQuantity reports whether v is the zero DV_QUANTITY, field by field.
-func isZeroDVQuantity(v DVQuantity) bool {
-	return v.Accuracy == nil &&
-		v.AccuracyIsPercent == nil &&
-		v.Magnitude == 0 &&
-		v.MagnitudeStatus == nil &&
-		v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.OtherReferenceRanges == nil &&
-		v.Precision == nil &&
-		v.Units == "" &&
-		v.UnitsDisplayName == nil &&
-		v.UnitsSystem == nil
-}
-
-// isZeroDVScale reports whether v is the zero DV_SCALE, field by field.
-func isZeroDVScale(v DVScale) bool {
-	return v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.OtherReferenceRanges == nil &&
-		isZeroDVCodedText(v.Symbol) &&
-		v.Value == 0
-}
-
-// isZeroDVText reports whether v is the zero DV_TEXT, field by field.
-func isZeroDVText(v DVText) bool {
-	return v.Encoding == nil &&
-		v.Formatting == nil &&
-		v.Hyperlink == nil &&
-		v.Language == nil &&
-		v.Mappings == nil &&
-		v.Value == ""
-}
-
-// isZeroDVTime reports whether v is the zero DV_TIME, field by field.
-func isZeroDVTime(v DVTime) bool {
-	return v.Accuracy == nil &&
-		v.MagnitudeStatus == nil &&
-		v.NormalRange == nil &&
-		v.NormalStatus == nil &&
-		v.OtherReferenceRanges == nil &&
-		v.Value == ""
-}
-
-// isZeroTerminologyID reports whether v is the zero TERMINOLOGY_ID, field by field.
-func isZeroTerminologyID(v TerminologyID) bool {
-	return v.Value == ""
 }

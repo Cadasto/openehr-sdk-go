@@ -177,6 +177,7 @@ Compared with the input, the output matches the input's *expected form*, the inp
   - a `null` member as absent;
   - an elided `_type` as present (§ Polymorphic substitution);
   - an empty bound beside its open flag as absent;
+  - an empty value at a mandatory member of an RM class held as a struct, which § *An absent mandatory member* below leaves out, as absent;
   - an empty list an optional attribute holds as absent, such as `mappings`, `LOCATABLE.links` or the base64 `DV_MULTIMEDIA.data` and `integrity_check` (the item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` stay, and so does an empty optional map, which the SDK holds through a pointer: the encoder writes a present one, as § *An absent mandatory member* below says);
   - a `null` mandatory primitive member as the zero the encoder writes for it (the empty string for a `String`, `0` for an `Integer`, `Integer64`, `Real` or `Double` and `false` for a `Boolean`, since a Go value of those types holds no null), except an interval boundary flag, which takes its default as above;
   - a number, quoted or not, as the literal the encoder writes for its value ([ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md#numbers)).
@@ -229,15 +230,19 @@ A present empty **mandatory** list or map **MUST** be written as it is, `[]` or 
 The optional item-structure lists `ITEM_LIST.items`, `ITEM_TREE.items` and `ITEM_TABLE.rows` are the exception and are written as a mandatory list is: a present empty one is written as `[]`, a nil one is left out, and a decoded `[]` re-encodes as `[]`.
 An archetype can make these lists mandatory by existence, a CDR refuses a structure that leaves its list out, and no RM invariant keeps them non-empty, so `[]` is RM-valid.
 An absent mandatory member leaves the instance RM-invalid; how the floor reports that, and a present empty list, is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, and on decode such a member is a missing member, which [§ REQ-175](#req-175--missing-members-on-decode) reports on request.
-A mandatory member held by value has no absent form and is written: `OBSERVATION.data`, or the `data` of an event over a concrete structure, such as `POINT_EVENT<ITEM_TREE>`.
+A mandatory member of an RM class held by value as a struct, directly or through a type parameter bound to one, **MUST** be left out when it is its type's zero value as [REQ-171 *Structural access*](clinical-modeling.md#structural-access) reads one: `OBSERVATION.data`, `PARTY_RELATIONSHIP.source`, or the `data` of an event over a concrete structure, such as `POINT_EVENT<ITEM_TREE>`.
+Such a member with any field set is written in full, a present list counting as set even when it is empty, and so are EHR_STATUS `subject` and ARCHETYPED `archetype_id`, which the floor reads as present whatever they hold.
+A struct an interface holds is written, empty or not; so is every other mandatory member held by value, a number, a boolean, a character or a string, which has no absent form; and so is a struct member of an AOM 1.4 class, which no floor reads.
 A mandatory `any` field holds a value, not an RM object, so a typed-nil pointer, a nil list or a nil map it holds is written as `null`.
-Canonical XML writes no element for an absent mandatory list, map, pointer or interface either ([§ REQ-056](#req-056)), and none for an empty `Hash`, whose entries it writes one element each ([clinical-modeling.md § REQ-176](clinical-modeling.md#round-trip)); a `Hash` whose values are `Hash`es is outside what that codec models ([§ REQ-170](#req-170--unmatched-content-on-decode)), and its encode fails on one, nil or not.
+Canonical XML writes no element for an absent mandatory list, map, pointer or interface, or for a member held as a struct that is left out above ([§ REQ-056](#req-056)), and none for an empty `Hash`, whose entries it writes one element each ([clinical-modeling.md § REQ-176](clinical-modeling.md#round-trip)).
+A `Hash` whose values are `Hash`es is outside what that codec models ([§ REQ-170](#req-170--unmatched-content-on-decode)), and its encode fails on one, nil or not.
 As with the typed-nil bullet above, this is a `canjson` contract: a v1 `encoding/json` caller spells a typed-nil `null`.
 
 #### An open interval side carries no bound
 
 BASE `Interval` marks a side open with `lower_unbounded` / `upper_unbounded`, and an open side has no bound value.
-The canonical JSON and canonical XML ([§ REQ-056](#req-056)) encoders **MUST** omit the `lower` / `upper` member of a side marked unbounded when its bound is empty: nil, a typed-nil pointer, or the zero value of a concrete bound type (a `DVInterval[DVQuantity]` holds its bounds by value, so an unset one is a zero `DV_QUANTITY`).
+The canonical JSON and canonical XML ([§ REQ-056](#req-056)) encoders **MUST** omit the `lower` / `upper` member of a side marked unbounded when its bound is empty: nil, a typed-nil pointer, or the zero value of a concrete bound type.
+That zero value is read as [REQ-171 *Structural access*](clinical-modeling.md#structural-access) reads one, a typed-nil pointer in one of its fields counting as nil; a `DVInterval[DVQuantity]` holds its bounds by value, so an unset one is a zero `DV_QUANTITY`.
 The rule binds the RM class `DV_INTERVAL` and the BASE classes `PROPER_INTERVAL` and `POINT_INTERVAL`, whose bound type is a `DV_ORDERED` data value, a BMM primitive or a Go built-in scalar, and the abstract BASE `Interval<T>`.
 AOM 1.4's constraint intervals (`occurrences`, `existence`, `cardinality.interval`, …), which the SDK holds as `Interval<T>` of a BMM primitive (`Integer`, `Real`) or a string, therefore omit an open side's zero bound the same way.
 A bound of any other Go type is emitted as it stands.
@@ -393,7 +398,7 @@ canonical JSON carries `_type` everywhere in principle, but real-world fixtures 
 The decoder falls back to the **declared parent's concrete type** when the wire omits `_type` on a narrow-interface slot; this preserves backward compatibility with permissive producers without compromising the strict-abstract-slot rule (`DATA_VALUE`, `DV_ORDERED`, `ITEM_STRUCTURE`, `PARTY_PROXY` still require `_type`).
 
 The full substitution semantics are pinned by [PROBE-038](conformance.md#probe-038--rm-polymorphic-decode-coverage) (decode + re-marshal preserves every input `_type` discriminator on a member the RM defines).
-An empty bound beside an open flag is dropped on re-encode by [§ REQ-052](#req-052), which is outside that probe.
+A value [§ REQ-052](#req-052) drops on re-encode, such as an empty bound beside an open flag or an empty mandatory member held by value, is not in the input's expected form, so that probe does not count its discriminators.
 What a BMM bump that adds a subtype owes the codec is step 10 of [`resources/bmm/README.md` § Updating](../../resources/bmm/README.md#updating).
 
 ## Canonical XML

@@ -24,6 +24,10 @@ func (h *History[T]) BMMName() string { return "HISTORY" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (h *History[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("HISTORY")}
@@ -57,8 +61,10 @@ func (h *History[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&h.Origin, xml.StartElement{Name: xml.Name{Local: "origin"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(h.Origin) {
+		if err := _e.EncodeElement(&h.Origin, xml.StartElement{Name: xml.Name{Local: "origin"}}); err != nil {
+			return err
+		}
 	}
 	if h.Period != nil {
 		if err := _e.EncodeElement(h.Period, xml.StartElement{Name: xml.Name{Local: "period"}}); err != nil {
@@ -102,6 +108,10 @@ func (i *IntervalEvent[T]) BMMName() string { return "INTERVAL_EVENT" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (i *IntervalEvent[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("INTERVAL_EVENT")}
@@ -135,27 +145,35 @@ func (i *IntervalEvent[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&i.Time, xml.StartElement{Name: xml.Name{Local: "time"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(i.Time) {
+		if err := _e.EncodeElement(&i.Time, xml.StartElement{Name: xml.Name{Local: "time"}}); err != nil {
+			return err
+		}
 	}
-	if err := canxml.EncodePoly(_e, "data", i.Data); err != nil {
-		return err
+	if !isEmptyHeld(i.Data) {
+		if err := canxml.EncodePoly(_e, "data", i.Data); err != nil {
+			return err
+		}
 	}
 	if i.State != nil {
 		if err := canxml.EncodePoly(_e, "state", i.State); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&i.Width, xml.StartElement{Name: xml.Name{Local: "width"}}); err != nil {
-		return err
+	if !isZeroDVDuration(i.Width) {
+		if err := _e.EncodeElement(&i.Width, xml.StartElement{Name: xml.Name{Local: "width"}}); err != nil {
+			return err
+		}
 	}
 	if i.SampleCount != nil {
 		if err := _e.EncodeElement(*i.SampleCount, xml.StartElement{Name: xml.Name{Local: "sample_count"}}); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&i.MathFunction, xml.StartElement{Name: xml.Name{Local: "math_function"}}); err != nil {
-		return err
+	if !isZeroDVCodedText(i.MathFunction) {
+		if err := _e.EncodeElement(&i.MathFunction, xml.StartElement{Name: xml.Name{Local: "math_function"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -176,6 +194,10 @@ func (p *PointEvent[T]) BMMName() string { return "POINT_EVENT" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (p *PointEvent[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("POINT_EVENT")}
@@ -209,11 +231,15 @@ func (p *PointEvent[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&p.Time, xml.StartElement{Name: xml.Name{Local: "time"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(p.Time) {
+		if err := _e.EncodeElement(&p.Time, xml.StartElement{Name: xml.Name{Local: "time"}}); err != nil {
+			return err
+		}
 	}
-	if err := canxml.EncodePoly(_e, "data", p.Data); err != nil {
-		return err
+	if !isEmptyHeld(p.Data) {
+		if err := canxml.EncodePoly(_e, "data", p.Data); err != nil {
+			return err
+		}
 	}
 	if p.State != nil {
 		if err := canxml.EncodePoly(_e, "state", p.State); err != nil {

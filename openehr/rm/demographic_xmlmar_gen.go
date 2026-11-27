@@ -517,6 +517,10 @@ func (p *PartyRelationship) BMMName() string { return "PARTY_RELATIONSHIP" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (p *PartyRelationship) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("PARTY_RELATIONSHIP")}
@@ -560,11 +564,15 @@ func (p *PartyRelationship) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&p.Source, xml.StartElement{Name: xml.Name{Local: "source"}}); err != nil {
-		return err
+	if !isZeroPartyRef(p.Source) {
+		if err := _e.EncodeElement(&p.Source, xml.StartElement{Name: xml.Name{Local: "source"}}); err != nil {
+			return err
+		}
 	}
-	if err := _e.EncodeElement(&p.Target, xml.StartElement{Name: xml.Name{Local: "target"}}); err != nil {
-		return err
+	if !isZeroPartyRef(p.Target) {
+		if err := _e.EncodeElement(&p.Target, xml.StartElement{Name: xml.Name{Local: "target"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -757,6 +765,10 @@ func (v *VersionedParty) BMMName() string { return "VERSIONED_PARTY" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (v *VersionedParty) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("VERSIONED_PARTY")}
@@ -764,16 +776,20 @@ func (v *VersionedParty) MarshalXML(_e *xml.Encoder, _start xml.StartElement) er
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
-		return err
+	if !isZeroHierObjectID(v.UID) {
+		if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
+			return err
+		}
 	}
 	if v.OwnerID != nil {
 		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(v.TimeCreated) {
+		if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

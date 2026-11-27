@@ -633,3 +633,139 @@ func TestREQ052DirectEncodeAllocatesLess(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ052DirectEncodeLeavesOutEmptyMembersAsTheWrapperDoes holds the two
+// encodes to one rule for a mandatory member held by value: each value holds
+// such a member empty, which both leave out, or with a part set, which both
+// write. It covers a class of the alias shape, one of the flat shape
+// (DV_CODED_TEXT) and a member typed by the class's own type parameter, bound
+// to a struct and to an interface. Without the wrapper's marshalJSONOmitting
+// the wrapper writes the empty member and the bytes differ.
+//
+// REQ-052 § An absent mandatory member.
+func TestREQ052DirectEncodeLeavesOutEmptyMembersAsTheWrapperDoes(t *testing.T) {
+	t.Parallel()
+	name := rm.DVText{Value: "n"}
+	for _, tc := range []struct {
+		name   string
+		v      any
+		absent string // the member both leave out, or "" when both write it
+	}{
+		{name: "PARTY_RELATIONSHIP with an empty source", v: &rm.PartyRelationship{ArchetypeNodeID: "at0000", Name: name, Target: rm.PartyRef{Type: "PERSON"}}, absent: "source"},
+		{name: "PARTY_RELATIONSHIP with a source that has a type", v: &rm.PartyRelationship{ArchetypeNodeID: "at0000", Name: name, Source: rm.PartyRef{Type: "PERSON"}, Target: rm.PartyRef{Type: "PERSON"}}},
+		{name: "COMPOSITION with empty category, language and territory", v: &rm.Composition{ArchetypeNodeID: "at0000", Name: name}, absent: "category"},
+		{name: "DV_CODED_TEXT with an empty defining code", v: &rm.DVCodedText{Value: "v"}, absent: "defining_code"},
+		{name: "DV_CODED_TEXT with a code and no terminology", v: &rm.DVCodedText{Value: "v", DefiningCode: rm.CodePhrase{CodeString: "c"}}},
+		{name: "OBSERVATION with an empty data", v: &rm.Observation{ArchetypeNodeID: "at0000", Name: name}, absent: "data"},
+		{name: "POINT_EVENT[ItemTree] with an empty data", v: &rm.PointEvent[rm.ItemTree]{ArchetypeNodeID: "at0001", Name: name}, absent: "data"},
+		{name: "POINT_EVENT[ItemStructure] holding an empty ITEM_TREE", v: &rm.PointEvent[rm.ItemStructure]{ArchetypeNodeID: "at0001", Name: name, Data: rm.ItemTree{}}},
+		{name: "POINT_EVENT[*ItemTree] with a nil data", v: &rm.PointEvent[*rm.ItemTree]{ArchetypeNodeID: "at0001", Name: name}, absent: "data"},
+	} {
+		if diff := sameAsWrapper(tc.v); diff != "" {
+			t.Errorf("%s: %s", tc.name, diff)
+		}
+		wrapped := encode(tc.v, forceWrapper)
+		if wrapped.err != "" {
+			t.Fatalf("%s: wrapper encode: %s", tc.name, wrapped.err)
+		}
+		var members map[string]jsonv1.RawMessage
+		if err := jsonv1.Unmarshal(wrapped.out, &members); err != nil {
+			t.Fatalf("%s: read %s: %v", tc.name, wrapped.out, err)
+		}
+		if tc.absent != "" {
+			if raw, ok := members[tc.absent]; ok {
+				t.Errorf("%s: the wrapper writes %q as %s, want it left out", tc.name, tc.absent, raw)
+			}
+		}
+	}
+}
+
+// TestREQ052WrapperLeavesTheOtherMembersAsTheirTagsDo holds the wrapper that
+// leaves out an empty member to the omit option of every other member: the
+// data of an event is written, or left out, the same whether or not a struct
+// member beside it (the time, or an interval event's width) is empty, which
+// alone decides which wrapper encodes it. The data's own tag is omitempty: it
+// writes a nil pointer behind an interface as null under encoding/json's
+// legacy rule, leaves out a nil pointer the type parameter is itself, and
+// leaves out a value a caller's marshaler writes as an empty object.
+//
+// REQ-052 § An absent mandatory member.
+func TestREQ052WrapperLeavesTheOtherMembersAsTheirTagsDo(t *testing.T) {
+	t.Parallel()
+	emptyObject := json.WithMarshalers(json.MarshalToFunc(func(enc *jsontext.Encoder, _ rm.ItemTree) error {
+		return enc.WriteValue(jsontext.Value(`{}`))
+	}))
+	name := rm.DVText{Value: "e"}
+	at := rm.DVDateTime{Value: "2026-11-27T10:00:00Z"}
+	for _, tc := range []struct {
+		name string
+		// event returns the event, with its sibling struct empty when
+		// empty is set.
+		event func(empty bool) any
+		opt   json.Options
+	}{
+		{
+			name: "a nil pointer behind the interface under encoding/json's defaults",
+			event: func(empty bool) any {
+				e := &rm.PointEvent[rm.ItemStructure]{ArchetypeNodeID: "at0002", Name: name, Data: (*rm.ItemTree)(nil), Time: at}
+				if empty {
+					e.Time = rm.DVDateTime{}
+				}
+				return e
+			},
+			opt: jsonv1.DefaultOptionsV1(),
+		},
+		{
+			name: "a caller's marshaler writing an empty object",
+			event: func(empty bool) any {
+				e := &rm.PointEvent[rm.ItemStructure]{ArchetypeNodeID: "at0002", Name: name, Data: rm.ItemTree{ArchetypeNodeID: "at0003"}, Time: at}
+				if empty {
+					e.Time = rm.DVDateTime{}
+				}
+				return e
+			},
+			opt: emptyObject,
+		},
+		{
+			name: "a nil pointer type argument under encoding/json's defaults",
+			event: func(empty bool) any {
+				e := &rm.PointEvent[*rm.ItemTree]{ArchetypeNodeID: "at0002", Name: name, Time: at}
+				if empty {
+					e.Time = rm.DVDateTime{}
+				}
+				return e
+			},
+			opt: jsonv1.DefaultOptionsV1(),
+		},
+		{
+			name: "a nil pointer type argument of an interval event, its width empty, under encoding/json's defaults",
+			event: func(empty bool) any {
+				e := &rm.IntervalEvent[*rm.ItemTree]{ArchetypeNodeID: "at0002", Name: name, Time: at, Width: rm.DVDuration{Value: "PT1H"}, MathFunction: rm.DVCodedText{DVText: rm.DVText{Value: "mean"}}}
+				if empty {
+					e.Width = rm.DVDuration{}
+				}
+				return e
+			},
+			opt: jsonv1.DefaultOptionsV1(),
+		},
+	} {
+		var data [2]string
+		for i, empty := range []bool{false, true} {
+			got := encode(tc.event(empty), tc.opt)
+			if got.err != "" {
+				t.Fatalf("%s, sibling empty %v: encode: %s", tc.name, empty, got.err)
+			}
+			var members map[string]jsonv1.RawMessage
+			if err := jsonv1.Unmarshal(got.out, &members); err != nil {
+				t.Fatalf("%s, sibling empty %v: read %s: %v", tc.name, empty, got.out, err)
+			}
+			data[i] = "left out"
+			if raw, ok := members["data"]; ok {
+				data[i] = string(raw)
+			}
+		}
+		if data[0] != data[1] {
+			t.Errorf("%s: data is %s beside a set sibling and %s beside an empty one, want the same", tc.name, data[0], data[1])
+		}
+	}
+}

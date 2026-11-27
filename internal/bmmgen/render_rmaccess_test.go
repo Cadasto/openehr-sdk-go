@@ -39,6 +39,24 @@ func rmAccessOutput(t *testing.T) (*Plan, []byte, *ast.File) {
 	return plan, out, file
 }
 
+// rmZeroOutput renders the RM target's zero file and parses it.
+func rmZeroOutput(t *testing.T) *ast.File {
+	t.Helper()
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, testResolver())
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+	out, err := RenderZeroFile(plan)
+	if err != nil {
+		t.Fatalf("RenderZeroFile(RM): %v", err)
+	}
+	file, err := parser.ParseFile(token.NewFileSet(), zeroFile, out, 0)
+	if err != nil {
+		t.Fatalf("parse rendered %s: %v", zeroFile, err)
+	}
+	return file
+}
+
 // funcDecl returns the top-level function name of file, or nil.
 func funcDecl(file *ast.File, name string) *ast.FuncDecl {
 	for _, d := range file.Decls {
@@ -423,14 +441,14 @@ func TestRenderRMAccessFile_REQ171_ReferencesReadByTheirZeroTest(t *testing.T) {
 	}
 }
 
-// TestRenderRMAccessFile_REQ171_ZeroTestsReadANilPointerAsZero pins REQ-171
+// TestRenderZeroFile_REQ171_ZeroTestsReadANilPointerAsZero pins REQ-171
 // Structural access on every zero test the generator writes: an interface
 // field holding a nil pointer counts as zero, so a value held by value whose
 // only content is a nil pointer reads absent. Each field the Go struct
 // declares as an interface is compared with nil and with a nil pointer; a
 // pointer, a slice or a map with nil alone.
-func TestRenderRMAccessFile_REQ171_ZeroTestsReadANilPointerAsZero(t *testing.T) {
-	_, _, file := rmAccessOutput(t)
+func TestRenderZeroFile_REQ171_ZeroTestsReadANilPointerAsZero(t *testing.T) {
+	file := rmZeroOutput(t)
 	interfaces := rmInterfaceFields(t)
 	checked := 0
 	for _, d := range file.Decls {
@@ -438,19 +456,19 @@ func TestRenderRMAccessFile_REQ171_ZeroTestsReadANilPointerAsZero(t *testing.T) 
 		if !ok || !strings.HasPrefix(fd.Name.Name, "isZero") {
 			continue
 		}
-		sel, ok := genericBase(fd.Type.Params.List[0].Type).(*ast.SelectorExpr)
+		id, ok := genericBase(fd.Type.Params.List[0].Type).(*ast.Ident)
 		if !ok {
-			t.Fatalf("%s tests a %s, want an rm type", fd.Name.Name, types.ExprString(fd.Type.Params.List[0].Type))
+			t.Fatalf("%s tests a %s, want a type of package rm", fd.Name.Name, types.ExprString(fd.Type.Params.List[0].Type))
 		}
 		var b bytes.Buffer
 		if err := printer.Fprint(&b, token.NewFileSet(), fd.Body); err != nil {
 			t.Fatalf("print %s: %v", fd.Name.Name, err)
 		}
 		body := b.String()
-		for _, field := range interfaces[sel.Sel.Name] {
+		for _, field := range interfaces[id.Name] {
 			checked++
-			if want := fmt.Sprintf("(v.%s == nil || rm.IsTypedNil(v.%s))", field, field); !strings.Contains(body, want) {
-				t.Errorf("%s reads the interface field %s of rm.%s as\n%s\nwant %s", fd.Name.Name, field, sel.Sel.Name, body, want)
+			if want := fmt.Sprintf("(v.%s == nil || IsTypedNil(v.%s))", field, field); !strings.Contains(body, want) {
+				t.Errorf("%s reads the interface field %s of rm.%s as\n%s\nwant %s", fd.Name.Name, field, id.Name, body, want)
 			}
 		}
 	}
@@ -656,12 +674,12 @@ func genericBase(e ast.Expr) ast.Expr {
 	return e
 }
 
-// TestRenderRMAccessFile_REQ171_ZeroTestsReadEveryField pins that a
+// TestRenderZeroFile_REQ171_ZeroTestsReadEveryField pins that a
 // generated zero test compares every field of the Go struct it tests, its
 // embedded structs included, so a value with any one field set is not read
 // as zero.
-func TestRenderRMAccessFile_REQ171_ZeroTestsReadEveryField(t *testing.T) {
-	_, _, file := rmAccessOutput(t)
+func TestRenderZeroFile_REQ171_ZeroTestsReadEveryField(t *testing.T) {
+	file := rmZeroOutput(t)
 	structs := rmStructFields(t)
 	tests := 0
 	for _, d := range file.Decls {
@@ -671,14 +689,14 @@ func TestRenderRMAccessFile_REQ171_ZeroTestsReadEveryField(t *testing.T) {
 		}
 		tests++
 		param := fd.Type.Params.List[0]
-		sel, ok := genericBase(param.Type).(*ast.SelectorExpr)
+		id, ok := genericBase(param.Type).(*ast.Ident)
 		if !ok {
-			t.Errorf("%s tests a %s, want an rm type", fd.Name.Name, types.ExprString(param.Type))
+			t.Errorf("%s tests a %s, want a type of package rm", fd.Name.Name, types.ExprString(param.Type))
 			continue
 		}
-		want, ok := structs[sel.Sel.Name]
+		want, ok := structs[id.Name]
 		if !ok {
-			t.Errorf("%s tests rm.%s, which openehr/rm does not declare as a struct", fd.Name.Name, sel.Sel.Name)
+			t.Errorf("%s tests rm.%s, which openehr/rm does not declare as a struct", fd.Name.Name, id.Name)
 			continue
 		}
 		read := map[string]bool{}
@@ -692,7 +710,7 @@ func TestRenderRMAccessFile_REQ171_ZeroTestsReadEveryField(t *testing.T) {
 		})
 		got := slices.Sorted(maps.Keys(read))
 		if !slices.Equal(got, slices.Sorted(slices.Values(want))) {
-			t.Errorf("%s reads the fields %q of rm.%s, want every field %q", fd.Name.Name, got, sel.Sel.Name, slices.Sorted(slices.Values(want)))
+			t.Errorf("%s reads the fields %q of rm.%s, want every field %q", fd.Name.Name, got, id.Name, slices.Sorted(slices.Values(want)))
 		}
 	}
 	if tests < 10 {

@@ -25,6 +25,12 @@
 //     side whose bound is left out or null, and "*_included" is true on a
 //     side that is not unbounded and false on a side that is;
 //   - an empty bound on a side marked unbounded is removed;
+//   - an object at a mandatory attribute the SDK holds as a struct by value
+//     is removed when it is empty: it holds no list, empty or not, and every
+//     member other than "_type" is a mandatory attribute holding a zero
+//     literal, once the changes here are made inside it. EHR_STATUS "subject"
+//     and ARCHETYPED "archetype_id" stay, as the encoder writes them whatever
+//     they hold;
 //   - an empty list an optional attribute holds is removed, such as DV_TEXT
 //     "mappings", LOCATABLE "links", or DV_MULTIMEDIA "data" or
 //     "integrity_check", whose bytes are written as one base64 string. An
@@ -181,6 +187,7 @@ func transform(input []byte, rootShape rmjsonwalk.Root, full bool) ([]byte, erro
 		return nil, errors.New("expectedform: the document is not a JSON object")
 	}
 	w.unmatched = map[string]bool{}
+	w.rootByValue = rootShape.BoundByValue
 	err = w.model.Unmatched(input, rootShape, func(pointer *reportpath.Node) error {
 		w.unmatched[pointer.String()] = true
 		return nil
@@ -228,6 +235,9 @@ type walker struct {
 	hier      rminfo.Hierarchy
 	full      bool
 	unmatched map[string]bool
+	// rootByValue reports that the decode target holds the values of its
+	// root class's type parameter as structs (rmjsonwalk.Root.BoundByValue).
+	rootByValue bool
 }
 
 // newWalker builds the shared RM model over l, which asserts the optional
@@ -296,6 +306,11 @@ func (w walker) object(obj map[string]any, declared, boundType, ptr string) (map
 		out["_type"] = rmType
 		if w.isInterval(rmType) {
 			w.settleInterval(out, boundType)
+		}
+		for _, name := range required {
+			if v, ok := out[name].(map[string]any); ok && w.heldByValue(rmType, name, boundType, ptr == "" && w.rootByValue) && w.isEmptyHeld(v) && !w.holdsList(obj[name], ptr+"/"+escapeToken(name)) {
+				delete(out, name)
+			}
 		}
 	}
 	return out, nil
@@ -517,6 +532,94 @@ func (w walker) isEmptyBound(v any, boundType string) bool {
 	default:
 		return isZeroLiteral(v)
 	}
+}
+
+// writtenWhenEmpty names the two mandatory attributes the SDK holds as a struct
+// by value that the encoder writes whatever they hold: an EHR_STATUS subject
+// with no external reference is a PARTY_SELF, and an empty ARCHETYPED
+// archetype_id is reported at its own value.
+var writtenWhenEmpty = map[string]string{
+	"EHR_STATUS": "subject",
+	"ARCHETYPED": "archetype_id",
+}
+
+// heldByValue reports whether the SDK holds the mandatory single-valued
+// attribute name of rmType as a struct by value, which the encoder leaves out
+// when it is empty: its declared type is a class the BMM does not mark
+// abstract and nothing concrete extends, so the generator holds it as a
+// struct, not behind an interface.
+//
+// A type parameter is held as its instantiation binds it, which a walk from
+// the wire sees only at the root of a decode target that names it: byValue
+// reports that the target holds the parameter's values as structs, such as
+// the data of an rm.PointEvent[rm.ItemTree], and boundType is the class they
+// are. An interval bound and a generic payload are not held this way: the
+// bound has its own rule (settleInterval), and the payload is plain JSON.
+func (w walker) heldByValue(rmType, name, boundType string, byValue bool) bool {
+	if writtenWhenEmpty[rmType] == name {
+		return false
+	}
+	if container, ok := w.lookup.IsContainer(rmType, name); !ok || container {
+		return false
+	}
+	t, ok := w.lookup.AttributeRMType(rmType, name)
+	if !ok {
+		return false
+	}
+	if attr, _ := w.model.Attribute(rmType, name, ""); attr.Kind == rmjsonwalk.KindParameter {
+		if !byValue || attr.Payload || w.isInterval(rmType) {
+			return false
+		}
+		t = boundType
+	}
+	if abstract, known := w.hier.IsAbstract(t); !known || abstract {
+		return false
+	}
+	concrete, _ := w.hier.ConcreteDescendants(t)
+	return len(concrete) == 1 && concrete[0] == t
+}
+
+// isEmptyHeld reports whether obj, a value the SDK holds as a struct by value,
+// already in its expected form, is empty in the encoder's sense: every field
+// of the struct its zero value. In JSON that is an object in which every
+// member other than "_type" is a mandatory attribute holding a zero literal. A
+// mandatory attribute held by value that was itself empty is gone by now, and
+// an optional member present, even one holding a zero literal, is a value the
+// struct holds behind a pointer, so it makes obj non-empty.
+func (w walker) isEmptyHeld(obj map[string]any) bool {
+	rmType, _ := obj["_type"].(string)
+	mandatory := w.lookup.RequiredAttributes(rmType)
+	for name, m := range obj {
+		if name == "_type" {
+			continue
+		}
+		if !slices.Contains(mandatory, name) || !isZeroLiteral(m) {
+			return false
+		}
+	}
+	return true
+}
+
+// holdsList reports whether v, the input value at ptr, holds a list at any
+// depth, outside the members the shared walker reported as naming no
+// attribute. The SDK decodes a present list, even an empty one, to a list
+// that is not nil, which makes the struct holding it, and each struct holding
+// that, not empty in the encoder's sense, though the expected form removes an
+// empty optional list; so a value the SDK holds by value is empty only when
+// it holds none.
+func (w walker) holdsList(v any, ptr string) bool {
+	switch x := v.(type) {
+	case []any:
+		return true
+	case map[string]any:
+		for k, m := range x {
+			child := ptr + "/" + escapeToken(k)
+			if !w.unmatched[child] && w.holdsList(m, child) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isZeroLiteral reports whether v is the JSON spelling of a primitive zero

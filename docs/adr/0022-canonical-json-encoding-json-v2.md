@@ -9,7 +9,7 @@ date: 2026-09-14
 # ADR 0022 — Canonical JSON: `encoding/json/v2` through generated streaming marshalers; member order not promised; numbers strict on encode, tolerant on decode
 
 - **Status:** Accepted, 2026-09-14.
-- **Amended:** 2026-11-25: takes in the member-order and number-tolerance decisions and the design of the generated encoders, each class now writing its members itself.
+- **Amended:** 2026-11-26: the generated encoders leave out an empty mandatory member held by value as a struct, the wrapper through a second struct ([ADR 0002](0002-bmm-codegen-decisions.md) D12); 2026-11-25: takes in the member-order and number-tolerance decisions and the design of the generated encoders, each class now writing its members itself.
 - **Strand:** resolves the `encoding/json/v2` and default-codec sub-questions of [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance), and retires the byte-stability premise of its codec gate.
 - **Amends:** [REQ-052](../specifications/wire.md#req-052) (member order is unspecified; a quoted number decodes).
 - **Related:** [REQ-040](../specifications/reference-model.md#type-registry-req-040) (the registry the dispatch hooks read), [REQ-041](../specifications/reference-model.md#req-041--pinned-bmm-sources) (the primitive mapping the number types keep), [REQ-056](../specifications/wire.md#req-056) (canonical XML keeps its element order), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the floor a round trip is checked against); [ADR 0002](0002-bmm-codegen-decisions.md) (the generator that emits the codec).
@@ -65,8 +65,10 @@ The generated `MarshalJSONTo` writes `{`, `_type` and each member in struct decl
 - a value in an interface slot, through the `json.MarshalerTo` it implements;
 - a `Hash` map, an `Any` member, `[]byte`, `rm.Character`, an AOM 1.4 number and an integer enumeration, through `json.MarshalEncode`, so `json.Deterministic` still sorts `Hash` keys and json/v2 names the type in a failure.
 
-It applies each member's omit option as json/v2 applies the tag, a typed-nil pointer in an interface slot included.
-It marshals the wrapper instead, the alias or the flat struct with `_type` leading, through `json.MarshalEncode`, so the output and the error are json/v2's:
+It applies each member's omit option as json/v2 applies the tag, a typed-nil pointer in an interface slot included, and leaves out a mandatory member held by value as a struct when it is its type's zero value, as [REQ-171 *Structural access*](../specifications/clinical-modeling.md#structural-access) reads one ([wire.md § An absent mandatory member](../specifications/wire.md#an-absent-mandatory-member)).
+It marshals the wrapper instead, the alias or the flat struct with `_type` leading, through `json.MarshalEncode`, so the output and the error are json/v2's.
+A tag cannot leave out a struct by its value, so when such a member is empty the wrapper is an anonymous struct that declares each member in the same order, the members that may be empty as an `any` left nil when they are.
+The wrapper is taken:
 
 - when the encoder carries an option that changes how a member is written or a failure reported: a caller's marshalers, `OmitZeroStructFields`, `StringifyNumbers`, v1's legacy `omitempty` or v1's legacy error reporting (`typereg.DirectEncode`);
 - when the value sits more than 900 levels deep, so a pointer cycle fails as json/v2's cycle;

@@ -25,11 +25,39 @@ type rawCodePhrase CodePhrase
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (c *CodePhrase) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroTerminologyID(c.TerminologyID) {
+		return c.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawCodePhrase
 	}{"CODE_PHRASE", rawCodePhrase(*c)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of CodePhrase when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
+func (c *CodePhrase) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class         string  `json:"_type"`
+		CodeString    string  `json:"code_string"`
+		PreferredTerm *string `json:"preferred_term,omitzero"`
+		TerminologyID any     `json:"terminology_id,omitzero"`
+	}{
+		Class:         "CODE_PHRASE",
+		CodeString:    c.CodeString,
+		PreferredTerm: c.PreferredTerm,
+	}
+	if !isZeroTerminologyID(c.TerminologyID) {
+		w.TerminologyID = c.TerminologyID
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for CodePhrase: an object whose
@@ -40,6 +68,9 @@ func (c *CodePhrase) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -80,11 +111,13 @@ func (c *CodePhrase) writeJSONMembers(enc *jsontext.Encoder) error {
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "terminology_id"); err != nil {
-		return err
-	}
-	if err := c.TerminologyID.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroTerminologyID(c.TerminologyID) {
+		if err := writeJSONName(enc, "terminology_id"); err != nil {
+			return err
+		}
+		if err := c.TerminologyID.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }
@@ -122,7 +155,12 @@ type jsonWireDVCodedText struct {
 // marshalJSONWrapped is the wrapper encode of DVCodedText: it copies each field
 // into the flat wire struct, `_type` (value "DV_CODED_TEXT") leading, and marshals
 // it, so json/v2 writes every member under the encoder's options.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (d *DVCodedText) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroCodePhrase(d.DefiningCode) {
+		return d.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &jsonWireDVCodedText{
 		Class:        "DV_CODED_TEXT",
 		Value:        d.Value,
@@ -135,6 +173,37 @@ func (d *DVCodedText) marshalJSONWrapped(enc *jsontext.Encoder) error {
 	}, typereg.MarshalOptions(enc))
 }
 
+// marshalJSONOmitting is the wrapper encode of DVCodedText when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
+func (d *DVCodedText) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class        string        `json:"_type"`
+		Value        string        `json:"value"`
+		Hyperlink    DVURILike     `json:"hyperlink,omitempty"`
+		Formatting   *string       `json:"formatting,omitzero"`
+		Mappings     []TermMapping `json:"mappings,omitempty"`
+		Language     *CodePhrase   `json:"language,omitzero"`
+		Encoding     *CodePhrase   `json:"encoding,omitzero"`
+		DefiningCode any           `json:"defining_code,omitzero"`
+	}{
+		Class:      "DV_CODED_TEXT",
+		Value:      d.Value,
+		Hyperlink:  d.Hyperlink,
+		Formatting: d.Formatting,
+		Mappings:   d.Mappings,
+		Language:   d.Language,
+		Encoding:   d.Encoding,
+	}
+	if !isZeroCodePhrase(d.DefiningCode) {
+		w.DefiningCode = d.DefiningCode
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
+}
+
 // MarshalJSONTo writes canonical openEHR JSON for DVCodedText: an object whose
 // leading member is `_type` (value "DV_CODED_TEXT"), then each member that is not
 // left out.
@@ -143,6 +212,9 @@ func (d *DVCodedText) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -228,11 +300,13 @@ func (d *DVCodedText) writeJSONMembers(enc *jsontext.Encoder, hyperlinkSlot uint
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "defining_code"); err != nil {
-		return err
-	}
-	if err := d.DefiningCode.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroCodePhrase(d.DefiningCode) {
+		if err := writeJSONName(enc, "defining_code"); err != nil {
+			return err
+		}
+		if err := d.DefiningCode.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }
@@ -442,11 +516,39 @@ type rawTermMapping TermMapping
 // declaration, and json.Deterministic sorts any Hash keys. A nil list or
 // map field is left out by its omit option. The FormatNil* options write
 // any other nil slice or map, such as one held in an any field, as `null`.
+// A mandatory member that holds a class by value that is its type's
+// zero value is left out, through marshalJSONOmitting.
 func (t *TermMapping) marshalJSONWrapped(enc *jsontext.Encoder) error {
+	if isZeroCodePhrase(t.Target) {
+		return t.marshalJSONOmitting(enc)
+	}
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
 		rawTermMapping
 	}{"TERM_MAPPING", rawTermMapping(*t)}, typereg.MarshalOptions(enc))
+}
+
+// marshalJSONOmitting is the wrapper encode of TermMapping when a mandatory member
+// that holds a class by value is empty: it marshals an anonymous struct
+// that declares every member marshalJSONWrapped writes, in the same order,
+// each such member as an any that holds its value unless the value is
+// empty, so that an empty one is left out. Each member keeps the omit
+// option of its field's tag, omitzero standing in where the tag has none.
+func (t *TermMapping) marshalJSONOmitting(enc *jsontext.Encoder) error {
+	w := &struct {
+		Class   string       `json:"_type"`
+		Match   Character    `json:"match"`
+		Purpose *DVCodedText `json:"purpose,omitzero"`
+		Target  any          `json:"target,omitzero"`
+	}{
+		Class:   "TERM_MAPPING",
+		Match:   t.Match,
+		Purpose: t.Purpose,
+	}
+	if !isZeroCodePhrase(t.Target) {
+		w.Target = t.Target
+	}
+	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
 }
 
 // MarshalJSONTo writes canonical openEHR JSON for TermMapping: an object whose
@@ -457,6 +559,9 @@ func (t *TermMapping) marshalJSONWrapped(enc *jsontext.Encoder) error {
 // member is left out as its field's omit option leaves it out under
 // encoding/json/v2, such as a nil list or map, a nil pointer, or an
 // interface holding nil or a nil pointer to a class.
+// A mandatory member that holds a class by value is left out too when
+// that value is its type's zero value, every field unset; a present
+// list, even an empty one, is a set field.
 //
 // Under an encoder option that changes how json/v2 writes a member, such
 // as a caller's marshalers, it marshals a wrapper struct through
@@ -501,11 +606,13 @@ func (t *TermMapping) writeJSONMembers(enc *jsontext.Encoder) error {
 			return err
 		}
 	}
-	if err := writeJSONName(enc, "target"); err != nil {
-		return err
-	}
-	if err := t.Target.MarshalJSONTo(enc); err != nil {
-		return err
+	if !isZeroCodePhrase(t.Target) {
+		if err := writeJSONName(enc, "target"); err != nil {
+			return err
+		}
+		if err := t.Target.MarshalJSONTo(enc); err != nil {
+			return err
+		}
 	}
 	return enc.WriteToken(jsontext.EndObject)
 }

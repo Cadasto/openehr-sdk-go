@@ -834,18 +834,18 @@ func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, type
 // RenderIntervalBoundFile renders <pkg>/interval_bound_gen.go for a target
 // that owns an interval-shaped class (a concrete one, or the abstract BASE
 // Interval struct, see [codecClassesIn]): the exported emptiness test the
-// canonical encoders apply to an open side's bound, with one field-by-field
-// zero predicate per concrete bound type, derived from the BMM class's
-// properties and using no reflection. It also carries the boundary-flag
-// helpers the canonical decoders share ([renderIntervalFlagHelpers]).
+// canonical encoders apply to an open side's bound, which calls the
+// field-by-field zero test of each concrete bound type, held with the
+// target's other zero tests in its zero file ([RenderZeroFile]). It also
+// carries the boundary-flag helpers the canonical decoders share
+// ([renderIntervalFlagHelpers]).
 //
 // The bound types are read from each interval class's `lower` and `upper`
 // fields (see [intervalBounds]): the concrete classes a generic bound admits
 // (DV_ORDERED's for DV_INTERVAL) or a class the field names directly. Every
 // Go built-in scalar type and RM primitive is covered by a comparison with
 // its zero value, which is what BASE Interval's primitive bound Ordered
-// admits. A predicate for a class reached by value from a bound type
-// (DV_ORDINAL's `symbol`) is emitted too.
+// admits.
 //
 // Returns (nil, nil) when the target owns no interval-shaped class.
 func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
@@ -859,11 +859,6 @@ func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
 		return nil, nil
 	}
 	scalars, err := scalarBoundGoTypes()
-	if err != nil {
-		return nil, err
-	}
-
-	predicates, err := renderZeroPredicates(plan, boundClasses)
 	if err != nil {
 		return nil, err
 	}
@@ -903,9 +898,11 @@ func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
 	b.WriteString("// is empty when it is nil or holds a typed-nil pointer to an RM class; an\n")
 	b.WriteString("// all-zero value behind the interface is still a value. A bound of a concrete\n")
 	b.WriteString("// type is empty when it is that type's zero value: field by field for the RM\n")
-	b.WriteString("// data value types an interval can bound, and by comparison for a Go built-in\n")
-	b.WriteString("// scalar type or an RM primitive such as Integer and Real. A bound of any\n")
-	b.WriteString("// other Go type is never empty, so it is emitted as it stands.\n")
+	b.WriteString("// data value types an interval can bound, a field that holds a typed-nil\n")
+	b.WriteString("// pointer behind an interface reading as nil, as the encoders leave it out,\n")
+	b.WriteString("// and by comparison for a Go built-in scalar type or an RM primitive such as\n")
+	b.WriteString("// Integer and Real. A bound of any other Go type is never empty, so it is\n")
+	b.WriteString("// emitted as it stands.\n")
 	b.WriteString("func IsEmptyIntervalBound[T any](bound T) bool {\n")
 	b.WriteString("\tv := any(bound)\n")
 	b.WriteString("\tif v == nil || IsTypedNil(v) {\n")
@@ -926,11 +923,6 @@ func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
 	b.WriteString("\t}\n")
 	b.WriteString("\treturn false\n")
 	b.WriteString("}\n")
-
-	for _, p := range predicates {
-		b.WriteString("\n")
-		b.WriteString(p)
-	}
 
 	formatted, err := format.Source(b.Bytes())
 	if err != nil {
@@ -1070,8 +1062,9 @@ func boundTypeClasses(plan *Plan, bound string) ([]*PlannedClass, error) {
 	return out, nil
 }
 
-// checkPredicateClass refuses a class the zero-predicate renderer cannot
-// handle: it must be an owned, non-generic class rendered as a Go struct.
+// checkPredicateClass refuses a bound class the emptiness test cannot switch
+// on: it must be an owned, non-generic class rendered as a Go struct, whose
+// zero test the zero file holds under [zeroPredicateName].
 func checkPredicateClass(pc *PlannedClass) error {
 	sc, ok := pc.Class.(*bmm.SimpleClass)
 	switch {
@@ -1141,129 +1134,8 @@ func isGoIdentifier(s string) bool {
 	return true
 }
 
-// zeroPredicateName is the generated predicate for pc's zero value.
+// zeroPredicateName is the generated predicate for pc's zero value, which
+// the target's zero file holds ([RenderZeroFile]).
 func zeroPredicateName(pc *PlannedClass) string {
 	return "isZero" + pc.GoName
-}
-
-// renderZeroPredicates renders one zero predicate per class in roots and per
-// class they reach through a by-value field or an embedded ancestor, sorted
-// by Go name.
-func renderZeroPredicates(plan *Plan, roots []*PlannedClass) ([]string, error) {
-	rendered := map[string]string{}
-	queue := slices.Clone(roots)
-	for len(queue) > 0 {
-		pc := queue[0]
-		queue = queue[1:]
-		if _, done := rendered[pc.GoName]; done {
-			continue
-		}
-		src, deps, err := renderZeroPredicate(plan, pc)
-		if err != nil {
-			return nil, err
-		}
-		rendered[pc.GoName] = src
-		queue = append(queue, deps...)
-	}
-	out := make([]string, 0, len(rendered))
-	for _, name := range slices.Sorted(maps.Keys(rendered)) {
-		out = append(out, rendered[name])
-	}
-	return out, nil
-}
-
-// renderZeroPredicate renders the zero predicate of one class: every field of
-// the Go struct, in declaration order, compared with its zero value. It
-// returns the classes whose predicates the body calls.
-func renderZeroPredicate(plan *Plan, pc *PlannedClass) (string, []*PlannedClass, error) {
-	if err := checkPredicateClass(pc); err != nil {
-		return "", nil, err
-	}
-	sc := pc.Class.(*bmm.SimpleClass)
-
-	var conds []string
-	var deps []*PlannedClass
-	embedded, ancestors := embeddedStructAncestors(plan, pc)
-	for _, ap := range ancestors {
-		if err := checkPredicateClass(ap); err != nil {
-			return "", nil, fmt.Errorf("bmmgen: %s embeds %s: %w", pc.BMMName, ap.BMMName, err)
-		}
-		conds = append(conds, fmt.Sprintf("%s(v.%s)", zeroPredicateName(ap), ap.GoName))
-		deps = append(deps, ap)
-	}
-	props := collectFlattenedProperties(plan, sc, embedded)
-	for _, name := range sortedStringKeys(props) {
-		cond, dep, err := zeroFieldCondition(plan, pc, props[name])
-		if err != nil {
-			return "", nil, fmt.Errorf("bmmgen: zero predicate %s.%s: %w", pc.BMMName, name, err)
-		}
-		conds = append(conds, cond)
-		if dep != nil {
-			deps = append(deps, dep)
-		}
-	}
-
-	var b strings.Builder
-	fmt.Fprintf(&b, "// %s reports whether v is the zero %s, field by field.\n", zeroPredicateName(pc), pc.BMMName)
-	fmt.Fprintf(&b, "func %s(v %s) bool {\n", zeroPredicateName(pc), pc.GoName)
-	if len(conds) == 0 {
-		b.WriteString("\treturn true\n")
-	} else {
-		fmt.Fprintf(&b, "\treturn %s\n", strings.Join(conds, " &&\n\t\t"))
-	}
-	b.WriteString("}\n")
-	return b.String(), deps, nil
-}
-
-// zeroFieldCondition returns the Go condition that holds when one field of v
-// is its zero value, and the class whose predicate the condition calls, if
-// any. It reads the same type decisions the struct renderer makes.
-func zeroFieldCondition(plan *Plan, pc *PlannedClass, prop bmm.Property) (string, *PlannedClass, error) {
-	sc := pc.Class.(*bmm.SimpleClass)
-	field := "v." + FieldName(prop.PropertyName())
-	nilCond := field + " == nil"
-
-	switch p := prop.(type) {
-	case *bmm.ContainerProperty:
-		return nilCond, nil, nil
-
-	case *bmm.GenericProperty:
-		typ, err := genericTypeRef(plan, sc, p.TypeDef)
-		if err != nil {
-			return "", nil, err
-		}
-		if !p.IsMandatory || strings.HasPrefix(typ, "[]") || strings.HasPrefix(typ, "map[") {
-			return nilCond, nil, nil
-		}
-		return "", nil, fmt.Errorf("by-value generic field of type %s is not supported", typ)
-
-	case *bmm.SingleProperty:
-		typ, err := singlePropTypeExpr(plan, sc, pc.BMMName, p)
-		if err != nil {
-			return "", nil, err
-		}
-		switch {
-		case strings.HasPrefix(typ, "*"), typ == "any", strings.HasPrefix(typ, "any "), isInterfaceTypeRef(plan, p.TypeName):
-			return nilCond, nil, nil
-		case isPrimitive(p.TypeName):
-			switch primitiveGoType[p.TypeName] {
-			case "bool":
-				return "!" + field, nil, nil
-			case "string", "Character":
-				return field + ` == ""`, nil, nil
-			case "Integer", "Integer64", "Real", "byte", "float64":
-				return field + " == 0", nil, nil
-			}
-			return "", nil, fmt.Errorf("primitive %s (Go %s) has no zero comparison", p.TypeName, primitiveGoType[p.TypeName])
-		}
-		dep, ok := plan.Classes[p.TypeName]
-		if !ok {
-			return "", nil, fmt.Errorf("field type %s is not a planned class", p.TypeName)
-		}
-		if err := checkPredicateClass(dep); err != nil {
-			return "", nil, err
-		}
-		return fmt.Sprintf("%s(%s)", zeroPredicateName(dep), field), dep, nil
-	}
-	return "", nil, fmt.Errorf("property kind %T is not supported", prop)
 }

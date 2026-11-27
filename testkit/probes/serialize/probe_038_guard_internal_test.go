@@ -112,3 +112,51 @@ func TestProbe038PassesAGenericTarget(t *testing.T) {
 		t.Errorf("status = %q (detail: %s), want pass: canjson decodes the input into the generic target", r.Status, r.Detail)
 	}
 }
+
+// TestProbe038LeavesOutWhatTheRoundTripDrops pins that a `_type` inside a value
+// the canonical round trip leaves out by rule is not counted (REQ-052,
+// PROBE-038): an empty mandatory member held by value, such as a
+// PARTY_RELATIONSHIP source or a DV_CODED_TEXT defining_code, is not written
+// on re-encode, so its discriminators are not lost to a narrowing. Counted on
+// the pruned input, as the probe did before, they are, and the probe fails:
+// revert inputDiscriminators to expectedform.PruneFor and this test reddens.
+func TestProbe038LeavesOutWhatTheRoundTripDrops(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		body    string
+		factory func() any
+		want    typeSet
+	}{
+		{
+			name: "an empty PARTY_REF in PARTY_RELATIONSHIP.source",
+			body: `{"_type":"PARTY_RELATIONSHIP","archetype_node_id":"at0","name":{"_type":"DV_TEXT","value":"r"},` +
+				`"source":{"_type":"PARTY_REF"},"target":{"_type":"PARTY_REF","namespace":"local","type":"PERSON"}}`,
+			factory: func() any { return new(rm.PartyRelationship) },
+			want:    typeSet{"PARTY_RELATIONSHIP": 1, "DV_TEXT": 1, "PARTY_REF": 1},
+		},
+		{
+			name: "an empty CODE_PHRASE in DV_CODED_TEXT.defining_code",
+			body: `{"_type":"DV_CODED_TEXT","value":"v",` +
+				`"defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":""},"code_string":""}}`,
+			factory: func() any { return new(rm.DVCodedText) },
+			want:    typeSet{"DV_CODED_TEXT": 1},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := inputDiscriminators([]byte(tc.body), tc.factory())
+			if err != nil {
+				t.Fatalf("inputDiscriminators: %v", err)
+			}
+			if !maps.Equal(got, tc.want) {
+				t.Errorf("inputDiscriminators = %v, want %v", got, tc.want)
+			}
+			r, err := Probe038CanjsonRMPolymorphicDecode([]byte(tc.body), tc.factory)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("status = %q (detail: %s), want pass", r.Status, r.Detail)
+			}
+		})
+	}
+}

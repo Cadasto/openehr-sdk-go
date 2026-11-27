@@ -646,13 +646,28 @@ func capturedFully(rmType string, m canonValue, captured map[string]bool) bool {
 		// This is load-bearing, not defensive: adding `formatting` to
 		// capturedKeys["DV_CODED_TEXT"] without this made emitText write |other
 		// and silently discard the formatting (caught in PR #86 review).
+		//
+		// A DV_CODED_TEXT whose defining_code is empty has none in its
+		// canonical form either, since canonical JSON leaves out an empty
+		// mandatory member held by value; its code is the empty one, not
+		// absent, and is captured as the empty code it was.
 		dc := m.member("defining_code")
 		if dc.isNil() {
+			if m.member("_type").textIs("DV_CODED_TEXT") {
+				return true
+			}
 			return m.member("formatting").isNil()
 		}
 		return codePhraseCaptured(dc)
 	case "DV_ORDINAL", "DV_SCALE":
+		// An empty symbol is left out of the canonical form, as an empty
+		// defining_code is above, and is captured as the empty symbol it is:
+		// its blank |code and |value are what an interval bound's refusal of
+		// a Go-zero value reads.
 		sym := m.member("symbol")
+		if sym.isNil() {
+			return true
+		}
 		if !sym.isObject() {
 			return false
 		}
@@ -661,8 +676,10 @@ func capturedFully(rmType string, m canonValue, captured map[string]bool) bool {
 				return false
 			}
 		}
+		// A symbol whose defining code is empty has none in its canonical
+		// form, as above, and its code is the empty one.
 		dc := sym.member("defining_code")
-		if !codePhraseCaptured(dc) {
+		if !dc.isNil() && !codePhraseCaptured(dc) {
 			return false
 		}
 		// Encode writes no |terminology, and decode of a symbol without one

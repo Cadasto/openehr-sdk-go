@@ -24,6 +24,10 @@ func (e *EHR) BMMName() string { return "EHR" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (e *EHR) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("EHR")}
@@ -31,14 +35,20 @@ func (e *EHR) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&e.SystemID, xml.StartElement{Name: xml.Name{Local: "system_id"}}); err != nil {
-		return err
+	if !isZeroHierObjectID(e.SystemID) {
+		if err := _e.EncodeElement(&e.SystemID, xml.StartElement{Name: xml.Name{Local: "system_id"}}); err != nil {
+			return err
+		}
 	}
-	if err := _e.EncodeElement(&e.EHRID, xml.StartElement{Name: xml.Name{Local: "ehr_id"}}); err != nil {
-		return err
+	if !isZeroHierObjectID(e.EHRID) {
+		if err := _e.EncodeElement(&e.EHRID, xml.StartElement{Name: xml.Name{Local: "ehr_id"}}); err != nil {
+			return err
+		}
 	}
-	if err := _e.EncodeElement(&e.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(e.TimeCreated) {
+		if err := _e.EncodeElement(&e.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
+			return err
+		}
 	}
 	for _, _item := range e.Contributions {
 		if _item == nil {
@@ -229,6 +239,10 @@ func (v *VersionedComposition) BMMName() string { return "VERSIONED_COMPOSITION"
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (v *VersionedComposition) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("VERSIONED_COMPOSITION")}
@@ -236,16 +250,20 @@ func (v *VersionedComposition) MarshalXML(_e *xml.Encoder, _start xml.StartEleme
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
-		return err
+	if !isZeroHierObjectID(v.UID) {
+		if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
+			return err
+		}
 	}
 	if v.OwnerID != nil {
 		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(v.TimeCreated) {
+		if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -266,6 +284,10 @@ func (v *VersionedEHRAccess) BMMName() string { return "VERSIONED_EHR_ACCESS" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (v *VersionedEHRAccess) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("VERSIONED_EHR_ACCESS")}
@@ -273,16 +295,20 @@ func (v *VersionedEHRAccess) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
-		return err
+	if !isZeroHierObjectID(v.UID) {
+		if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
+			return err
+		}
 	}
 	if v.OwnerID != nil {
 		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(v.TimeCreated) {
+		if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -303,6 +329,10 @@ func (v *VersionedEHRStatus) BMMName() string { return "VERSIONED_EHR_STATUS" }
 // Polymorphic descendants are emitted via canxml.EncodePoly.
 // Members the class's ITS-XML schema type declares as XML attributes
 // are appended to start.Attr before the start token is written.
+//
+// A mandatory member that holds a class by value that is its type's
+// zero value, every field unset, emits no element; a present list, even
+// an empty one, is a set field.
 func (v *VersionedEHRStatus) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("VERSIONED_EHR_STATUS")}
@@ -310,16 +340,20 @@ func (v *VersionedEHRStatus) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
-		return err
+	if !isZeroHierObjectID(v.UID) {
+		if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
+			return err
+		}
 	}
 	if v.OwnerID != nil {
 		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
-		return err
+	if !isZeroDVDateTime(v.TimeCreated) {
+		if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
