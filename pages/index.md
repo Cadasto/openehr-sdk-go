@@ -185,7 +185,7 @@ openEHR REST deployment.
 ## Quick start
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@v0.53.0
+go get github.com/cadasto/openehr-sdk-go@v0.54.0
 ```
 
 ```go

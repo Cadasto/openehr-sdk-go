@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-11-27
+
+Fifty-fourth `v0.x` minor: ROLE.performer is optional, canonical JSON and XML leave out an empty mandatory member held by value, canonical XML encodes with fewer allocations, and a Web Template is read-only once made. **Breaking:** `rm.Role.Performer` is a pointer.
+
+### Added
+
+- **`canxml.EncodeString` and `EncodeText`** write a string or text member as `EncodeElement` writes it, without copying the value into an interface, and the generated `MarshalXML` methods use them (REQ-056).
+
+### Changed
+
+- **Breaking: `rm.Role.Performer`** is a `*rm.PartyRef`, as ROLE.performer is optional for a generic role (SPECRM-134), so canonical JSON and XML leave an absent performer out and the RM floor reports none missing (REQ-041).
+- **`canjson` and `canxml`** leave out a mandatory member held by value as a struct when it is its type's zero value, so only a document the RM floor already refuses re-encodes to different bytes (REQ-052, REQ-056).
+- **`canxml.Marshal`** writes the same bytes with fewer allocations, 73 in place of 132 on a body-weight composition (REQ-056).
+- **The `canxml` codec helpers and the interval classes' JSON decoders** return `typereg.ErrNilArgument` for a nil encoder or decoder, where they panicked (REQ-025).
+- **`webtemplate.WebTemplate`** is read-only once made: `Build` allocates 38% fewer objects, and the FLAT and STRUCTURED codecs keep their tables per Web Template, so one changed in place reads through the old tables (REQ-053, REQ-106).
+
 ## [0.53.0] - 2026-11-26
 
 Fifty-third `v0.x` minor: the demographic client gains item tags and canonical XML, the types every REST client shares move to `openehr/client`, the composition builder refuses early the paths it cannot write, and canonical XML types a generic member's class value. **Breaking:** the demographic repository gains methods and checks the party class, the reads refuse a caller's embedded Ref, probe 073 takes a format, and `Set` and `canxml.Marshal` refuse inputs they accepted.
