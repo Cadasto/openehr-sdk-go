@@ -35,8 +35,9 @@ func init() {
 
 // isEmptyHeld reports whether v, the value of a mandatory member typed by its
 // class's own type parameter, is empty: T is a class held by value and v
-// is its zero value, every field empty. A T that is an interface holds
-// its value through the interface, which is never empty in this sense.
+// is its zero value, every field unset, or T is a pointer to one and v is
+// nil. A T that is an interface holds its value through the interface,
+// which is never empty in this sense.
 func isEmptyHeld[T any](v T) bool {
 	var zero T
 	if any(zero) == nil {
@@ -51,6 +52,14 @@ func isEmptyHeld[T any](v T) bool {
 		return isZeroItemTable(x)
 	case ItemTree:
 		return isZeroItemTree(x)
+	case *ItemList:
+		return x == nil
+	case *ItemSingle:
+		return x == nil
+	case *ItemTable:
+		return x == nil
+	case *ItemTree:
+		return x == nil
 	}
 	return false
 }

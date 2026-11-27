@@ -331,19 +331,25 @@ func (g *rmaccessGen) renderZeroFile(floor []string) ([]byte, error) {
 // writeEmptyHeld writes [emptyHeldFunc], which reads the value of a mandatory
 // member typed by its class's own generic parameter: empty when the parameter
 // is bound to one of the structs in held, by name, and the value is that
-// struct's zero value. A parameter bound to an interface holds its value
-// through the interface, so whatever the interface holds is written.
+// struct's zero value, or when it is bound to a pointer to one and the value
+// is nil, which the member's own omitempty leaves out under either JSON rule
+// and an any holding it would not. A parameter bound to an interface holds its
+// value through the interface, so whatever the interface holds is written.
 func writeEmptyHeld(b *bytes.Buffer, held map[string]*goType) {
 	fmt.Fprintf(b, "\n// %s reports whether v, the value of a mandatory member typed by its\n", emptyHeldFunc)
 	b.WriteString("// class's own type parameter, is empty: T is a class held by value and v\n")
-	b.WriteString("// is its zero value, every field empty. A T that is an interface holds\n")
-	b.WriteString("// its value through the interface, which is never empty in this sense.\n")
+	b.WriteString("// is its zero value, every field unset, or T is a pointer to one and v is\n")
+	b.WriteString("// nil. A T that is an interface holds its value through the interface,\n")
+	b.WriteString("// which is never empty in this sense.\n")
 	fmt.Fprintf(b, "func %s[T any](v T) bool {\n", emptyHeldFunc)
 	b.WriteString("\tvar zero T\n")
 	b.WriteString("\tif any(zero) == nil {\n\t\treturn false\n\t}\n")
 	b.WriteString("\tswitch x := any(v).(type) {\n")
 	for _, name := range slices.Sorted(maps.Keys(held)) {
 		fmt.Fprintf(b, "\tcase %s:\n\t\treturn %s(x)\n", held[name].spell(""), name)
+	}
+	for _, name := range slices.Sorted(maps.Keys(held)) {
+		fmt.Fprintf(b, "\tcase *%s:\n\t\treturn x == nil\n", held[name].spell(""))
 	}
 	b.WriteString("\t}\n\treturn false\n}\n")
 }
