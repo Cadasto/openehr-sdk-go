@@ -346,7 +346,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/rm, internal/rmlists, openehr/rm/typereg, openehr/internal/refused, openehr/internal/xmlunmatched, openehr/aom/aom14, openehr/client/ehr/contribution, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
+    packages: [openehr/serialize/canjson, openehr/rm, internal/rmlists, openehr/rm/typereg, openehr/internal/refused, openehr/internal/xmlunmatched, openehr/aom/aom14, openehr/client/ehr/contribution, internal/bmmgen, internal/rmzero, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
     probes: [PROBE-030, PROBE-031, PROBE-038, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
@@ -2397,7 +2397,7 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-171--validation-engine
     status: draft
     implementation: landed
-    packages: [openehr/validation, internal/rmaccess, internal/bmmgen, internal/templatecompile]
+    packages: [openehr/validation, internal/rmaccess, internal/rmzero, internal/bmmgen, internal/templatecompile]
     probes: [PROBE-077]
     tests:
       - internal/bmmgen/render_inventory_test.go
